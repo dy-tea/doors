@@ -339,6 +339,7 @@ bmsg rule -a vesktop desktop=III
 **Consequence Options:**
 
 - `desktop=<name>` - Send window to specified desktop (e.g., `desktop=I`, `desktop=^1` for first desktop on monitor 1)
+- `monitor=<name>` - Send window to a specified monitor (e.g. `monitor=HDMI-A-1`, `monitor=eDP-1`)
 - `state=<state>` - Set window state: `tiled`, `floating`, `fullscreen`, `pseudo_tiled`
 - `follow=on|off` - Whether focus follows the window to its desktop (default: on)
 - `focus=on|off` - Whether the window receives focus (default: on)
