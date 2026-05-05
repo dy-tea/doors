@@ -91,6 +91,7 @@ typedef struct client_t {
 
   // Visual effects
   bool blur;
+  bool blur_from_rule;
   bool mica;
   bool acrylic;
   float border_radius;

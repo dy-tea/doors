@@ -336,6 +336,7 @@ void toplevel_map(struct wl_listener *listener, void *data) {
   // Apply blur/mica rule properties
   if (rule && rule->has_blur) {
     n->client->blur = rule->blur;
+    n->client->blur_from_rule = true;
     toplevel_set_blur(toplevel, rule->blur);
   }
   if (rule && rule->has_mica) {
@@ -661,8 +662,11 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
       wlr_ext_background_effect_v1_get_surface_state(xdg_surface->surface);
   bool wants_blur = fx && !pixman_region32_empty(&fx->blur_region);
   bool has_blur = toplevel->blur_node != NULL;
-  if (wants_blur != has_blur)
-    toplevel_set_blur(toplevel, wants_blur);
+  // only update blur from protocol if it wasn't set by a rule
+  if (toplevel->node && toplevel->node->client && !toplevel->node->client->blur_from_rule) {
+    if (wants_blur != has_blur)
+      toplevel_set_blur(toplevel, wants_blur);
+  }
 }
 
 void toplevel_set_blur(struct bwm_toplevel *tl, bool enabled) {
