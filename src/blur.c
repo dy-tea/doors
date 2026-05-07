@@ -1371,7 +1371,14 @@ static struct wlr_box get_client_rect(struct bwm_toplevel *tl) {
   else if (c->state == STATE_FLOATING)
     return c->floating_rectangle;
   else
-    return c->committed_tiled_rectangle;
+    return c->tiled_rectangle;
+}
+
+static bool scene_buffer_no_input(struct wlr_scene_buffer *buffer, double *sx, double *sy) {
+  (void)buffer;
+  (void)sx;
+  (void)sy;
+  return false;
 }
 
 static bool blur_render_border(struct bwm_toplevel *tl, int content_w, int content_h) {
@@ -1388,6 +1395,7 @@ static bool blur_render_border(struct bwm_toplevel *tl, int content_w, int conte
     tl->border_shader_node = wlr_scene_buffer_create(tl->border_tree, NULL);
     if (!tl->border_shader_node) return false;
     wlr_scene_node_set_position(&tl->border_shader_node->node, 0, 0);
+    tl->border_shader_node->point_accepts_input = scene_buffer_no_input;
   }
 
   GLuint dest_fbo = ensure_sized_buf(&tl->border_shader_buf, &tl->border_shader_buf_fbo,

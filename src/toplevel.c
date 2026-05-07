@@ -731,6 +731,13 @@ void toplevel_set_acrylic(struct bwm_toplevel *tl, bool enabled) {
   }
 }
 
+static bool corner_mask_no_input(struct wlr_scene_buffer *buffer, double *sx, double *sy) {
+  (void)buffer;
+  (void)sx;
+  (void)sy;
+  return false;
+}
+
 void toplevel_set_border_radius(struct bwm_toplevel *tl, float radius) {
   if (!tl || !tl->scene_tree || !tl->content_tree)
     return;
@@ -747,6 +754,7 @@ void toplevel_set_border_radius(struct bwm_toplevel *tl, float radius) {
         if (tl->border_tree)
           wlr_scene_node_place_below(&tl->corner_mask_node->node,
               &tl->border_tree->node);
+        tl->corner_mask_node->point_accepts_input = corner_mask_no_input;
       }
     }
     tl->border_dirty = true;
