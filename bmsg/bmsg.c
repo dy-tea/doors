@@ -7,7 +7,6 @@
 #include <poll.h>
 
 #define BWM_SOCKET_ENV "BWM_SOCKET"
-#define BWM_SOCKET_PATH_TEMPLATE "/tmp/bwm-%d.sock"
 #define BWM_BUFSIZ 4096
 
 static void err(const char *msg) {
@@ -26,11 +25,13 @@ int main(int argc, char *argv[]) {
   sock_address.sun_family = AF_UNIX;
 
   char *sp = getenv(BWM_SOCKET_ENV);
-  if (sp != NULL)
-    snprintf(sock_address.sun_path, sizeof(sock_address.sun_path), "%s", sp);
-  else
-    snprintf(sock_address.sun_path, sizeof(sock_address.sun_path), BWM_SOCKET_PATH_TEMPLATE, getuid());
+  if (sp == NULL) {
+    fprintf(stderr, "Error: BWM_SOCKET environment variable not set.\n");
+    fprintf(stderr, "This variable should be set by bwm when it starts.\n");
+    err("Make sure you are running bwm and executing bmsg from the same session.\n");
+  }
 
+  snprintf(sock_address.sun_path, sizeof(sock_address.sun_path), "%s", sp);
 
   if (strcmp(argv[1], "--print-socket-path") == 0) {
     printf("%s\n", sock_address.sun_path);
@@ -43,7 +44,8 @@ int main(int argc, char *argv[]) {
 
   if (connect(sock_fd, (struct sockaddr *)&sock_address, sizeof(sock_address)) == -1) {
     close(sock_fd);
-    err("Failed to connect to the socket.\n");
+    fprintf(stderr, "Error: Failed to connect to socket at %s\n", sock_address.sun_path);
+    err("Is bwm running?\n");
   }
 
   argc--;

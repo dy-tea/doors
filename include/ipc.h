@@ -7,7 +7,7 @@
 #include "types.h"
 
 #define BWM_SOCKET_ENV "BWM_SOCKET"
-#define BWM_SOCKET_PATH_TEMPLATE "/tmp/bwm-%d.sock"
+#define BWM_SOCKET_PATH_TEMPLATE "/run/user/%d/bwm-%d.sock"
 #define BWM_BUFSIZ 4096
 
 #define BWM_FIFO_TEMPLATE "bwm_fifo.XXXXXX"

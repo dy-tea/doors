@@ -59,7 +59,15 @@ void ipc_init(void) {
   fcntl(ipc_socket_fd, F_SETFD, FD_CLOEXEC);
 
   addr.sun_family = AF_UNIX;
-  snprintf(socket_path, sizeof(socket_path), BWM_SOCKET_PATH_TEMPLATE, getuid());
+  snprintf(socket_path, sizeof(socket_path), BWM_SOCKET_PATH_TEMPLATE, getuid(), getpid());
+
+  char *last_slash = strrchr(socket_path, '/');
+  if (last_slash != NULL) {
+    *last_slash = '\0';
+    mkdir(socket_path, 0700);
+    *last_slash = '/';
+  }
+
   unlink(socket_path);
 
   size_t path_len = strlen(socket_path);
