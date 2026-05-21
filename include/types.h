@@ -178,6 +178,7 @@ extern bool pointer_follows_focus;
 extern bool record_history;
 extern bool click_to_focus;
 extern bool disable_decorations;
+extern bool enable_animations;
 extern int mapping_events_count;
 extern int directional_focus_tightness;
 extern int ignore_ewmh_fullscreen;

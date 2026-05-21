@@ -8,6 +8,7 @@
 #include "tabs.h"
 #include "tree.h"
 #include "transaction.h"
+#include "animation.h"
 #include "types.h"
 #include "rule.h"
 #include "scroller.h"
@@ -537,6 +538,8 @@ void toplevel_unmap(struct wl_listener *listener, void *data) {
   if (toplevel->node == NULL)
     return;
 
+  animation_cancel_node(toplevel->node);
+
   if (toplevel->node->client && toplevel->node->client->shown)
     toplevel_save_buffer(toplevel);
 
@@ -800,6 +803,7 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
   }
 
   if (toplevel->node && toplevel->node->client) {
+    animation_cancel_node(toplevel->node);
     toplevel->node->client->toplevel = NULL;
     toplevel->node = NULL;
   }
@@ -1081,7 +1085,7 @@ void toplevel_apply_geometry(struct bwm_toplevel *toplevel) {
   else rect = &c->tiled_rectangle;
 
   wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, rect->width, rect->height);
-  wlr_scene_node_set_position(&toplevel->scene_tree->node, rect->x, rect->y);
+  animation_apply_geometry(toplevel->node, toplevel->scene_tree, *rect, true);
 
   toplevel_center_and_clip_surface(toplevel);
 

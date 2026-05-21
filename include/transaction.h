@@ -26,6 +26,7 @@ struct bwm_transaction_inst {
   struct wlr_box tiled_rectangle;
   struct wlr_box floating_rectangle;
   struct wlr_box content_rect;
+  struct wlr_box previous_tiled_rectangle;
   uint32_t serial;
   bool waiting;
   bool server_request;

@@ -2611,6 +2611,13 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
     } else {
       send_success(client_fd, disable_decorations ? "true\n" : "false\n");
     }
+  } else if (streq("enable_animations", *args)) {
+    if (num >= 2) {
+      enable_animations = (strcmp(args[1], "true") == 0);
+      send_success(client_fd, "enable_animations set\n");
+    } else {
+      send_success(client_fd, enable_animations ? "true\n" : "false\n");
+    }
   } else if (streq("edge_scroller_pointer_focus", *args)) {
     if (num >= 2) {
       edge_scroller_pointer_focus = (strcmp(args[1], "true") == 0);

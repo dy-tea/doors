@@ -5,6 +5,7 @@
 #include "idle.h"
 #include "output_config.h"
 #include "toplevel.h"
+#include "animation.h"
 #include "tree.h"
 #include "blur.h"
 #include "types.h"
@@ -89,11 +90,15 @@ void output_frame(struct wl_listener *listener, void *data) {
 	(void)data;
 	struct bwm_output *output = wl_container_of(listener, output, frame);
 	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(server.scene, output->wlr_output);
+  struct timespec now;
+  bool animating = false;
 
 	if (!scene_output)
 		return;
 
 	output_configure_scene(output);
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  animating = animation_update_output(output, now);
 
 	if (blur_ctx.available)
 		blur_output_frame(output, scene_output);
@@ -121,10 +126,10 @@ void output_frame(struct wl_listener *listener, void *data) {
 	if (!wlr_output_commit_state(output->wlr_output, &pending))
 		wlr_log(WLR_ERROR, "Failed to commit output state");
 	wlr_output_state_finish(&pending);
-
-	struct timespec now;
-	clock_gettime(CLOCK_MONOTONIC, &now);
 	wlr_scene_output_send_frame_done(scene_output, &now);
+
+  if (animating)
+    wlr_output_schedule_frame(output->wlr_output);
 }
 
 static void handle_output_present(struct wl_listener *listener, void *data) {

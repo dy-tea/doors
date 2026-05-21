@@ -10,6 +10,7 @@
 #include "keyboard.h"
 #include "output.h"
 #include "tabs.h"
+#include "animation.h"
 #include <float.h>
 #include <stdlib.h>
 #include <string.h>
@@ -697,6 +698,8 @@ static void handle_unmap(struct wl_listener *listener, void *data) {
 	struct bwm_xwayland_view *xwayland_view = wl_container_of(listener, xwayland_view, unmap);
 
 	xwayland_view->mapped = false;
+	if (xwayland_view->node)
+		animation_cancel_node(xwayland_view->node);
 
 	wl_list_remove(&xwayland_view->commit.link);
 
@@ -769,6 +772,8 @@ static void handle_destroy(struct wl_listener *listener, void *data) {
 		server.last_focused_xwayland_view = NULL;
 	}
 
+	if (xwayland_view->node && xwayland_view->node->client)
+		animation_cancel_node(xwayland_view->node);
 	if (xwayland_view->node && xwayland_view->node->client)
 		xwayland_view->node->client->xwayland_view = NULL;
 	xwayland_view->xwayland_surface = NULL;
@@ -1139,6 +1144,8 @@ static struct bwm_xwayland_view *create_xwayland_view(struct wlr_xwayland_surfac
 static void xwayland_view_destroy(struct bwm_xwayland_view *xwayland_view) {
 	if (xwayland_view->mapped)
 		handle_unmap(&xwayland_view->unmap, NULL);
+	if (xwayland_view->node)
+		animation_cancel_node(xwayland_view->node);
 
 	wl_list_remove(&xwayland_view->destroy.link);
 	wl_list_remove(&xwayland_view->request_configure.link);

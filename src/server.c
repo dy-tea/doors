@@ -16,6 +16,7 @@
 #include "keyboard.h"
 #include "xwayland.h"
 #include "blur.h"
+#include "animation.h"
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -447,6 +448,7 @@ void server_init(void) {
   server.input_method_relay = input_method_relay_create();
 
   transaction_init();
+  animation_init();
   workspace_init();
   ipc_init();
   rule_init();
@@ -611,6 +613,7 @@ void server_fini(void) {
     server.xwayland.wlr_xwayland = NULL;
   }
 
+  animation_fini();
   transaction_fini();
   workspace_fini();
   ipc_cleanup();

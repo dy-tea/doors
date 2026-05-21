@@ -20,3 +20,6 @@ bmsg config borderless_monocle true
 
 # Set gapless monocle
 bmsg config gapless_monocle true
+
+# Enable animations
+bmsg config enable_animations true

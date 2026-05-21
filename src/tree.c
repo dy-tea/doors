@@ -2,6 +2,7 @@
 #include "server.h"
 #include "tabs.h"
 #include "toplevel.h"
+#include "animation.h"
 #include "types.h"
 #include "transaction.h"
 #include "output.h"
@@ -29,6 +30,7 @@ bool pointer_follows_focus = false;
 bool record_history = true;
 bool click_to_focus = false;
 bool disable_decorations = false;
+bool enable_animations = false;
 int mapping_events_count = 0;
 int directional_focus_tightness = 20;
 int ignore_ewmh_fullscreen = 0;
@@ -117,6 +119,8 @@ client_t *make_client(void) {
 void free_node(node_t *n) {
   if (n == NULL)
     return;
+
+  animation_cancel_node(n);
 
   // deadbeef my beloved
   static uintptr_t sentinel = 0xDEADBEEF;
@@ -414,8 +418,7 @@ void apply_layout(struct bwm_output *m, desktop_t *d, node_t *n, struct wlr_box 
       if (st)
         wlr_scene_node_set_enabled(&st->node, show);
       if (show && leaf->client->toplevel) {
-        wlr_scene_node_set_position(&st->node, leaf->client->tiled_rectangle.x,
-          leaf->client->tiled_rectangle.y);
+        animation_apply_geometry(leaf, st, leaf->client->tiled_rectangle, true);
         toplevel_center_and_clip_surface(leaf->client->toplevel);
         toplevel_send_frame_done(leaf->client->toplevel);
       }

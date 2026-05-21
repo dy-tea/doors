@@ -1,0 +1,563 @@
+#include "animation.h"
+#include "output.h"
+#include "toplevel.h"
+#include "tree.h"
+#include "types.h"
+#include <stdlib.h>
+#include <wlr/types/wlr_output.h>
+#include <wlr/types/wlr_scene.h>
+#include <wlr/util/log.h>
+
+struct bwm_snapshot_buffer {
+  struct wl_list link;
+  struct wlr_scene_buffer *buffer;
+  int x;
+  int y;
+  int width;
+  int height;
+};
+
+struct bwm_animation_entry {
+  struct wl_list link;
+  bool snapshot_resize;
+  bool snapshot_buffers_initialized;
+  bool updated_buffers_initialized;
+  bool use_content_tree;
+  struct node_t *node;
+  struct bwm_toplevel *toplevel;
+  struct wlr_scene_tree *scene_tree;
+  struct wlr_box from;
+  struct wlr_box to;
+  struct timespec start;
+  uint32_t duration_ms;
+  struct wl_list snapshot_buffers;
+  struct wl_list updated_buffers;
+};
+
+static struct wl_list animations;
+static const uint32_t ANIMATION_DURATION_MS = 180;
+
+static void snapshot_buffer_iterator(struct wlr_scene_buffer *buffer, int sx, int sy, void *data);
+static void updated_buffer_iterator(struct wlr_scene_buffer *buffer, int sx, int sy, void *data);
+
+static struct bwm_animation_entry *create_animation_entry(void) {
+  struct bwm_animation_entry *entry = calloc(1, sizeof(*entry));
+  if (!entry)
+    return NULL;
+
+  wl_list_init(&entry->snapshot_buffers);
+  entry->snapshot_buffers_initialized = true;
+  wl_list_init(&entry->updated_buffers);
+  entry->updated_buffers_initialized = true;
+  entry->use_content_tree = false;
+  wl_list_insert(&animations, &entry->link);
+  wlr_log(WLR_DEBUG, "animation: created entry %p", (void *)entry);
+  return entry;
+}
+
+static struct bwm_animation_entry *find_animation(struct node_t *node) {
+  struct bwm_animation_entry *entry;
+  wl_list_for_each(entry, &animations, link)
+    if (entry->node == node)
+      return entry;
+
+  return NULL;
+}
+
+static double elapsed_ms(struct timespec start, struct timespec now) {
+  return (now.tv_sec - start.tv_sec) * 1000.0 +
+    (now.tv_nsec - start.tv_nsec) / 1000000.0;
+}
+
+static double ease_out_cubic(double t) {
+  double inv = 1.0 - t;
+  return 1.0 - inv * inv * inv;
+}
+
+static void sample_position(const struct bwm_animation_entry *entry, struct timespec now, int *x, int *y) {
+  double progress = elapsed_ms(entry->start, now) / (double)entry->duration_ms;
+  if (progress < 0.0)
+    progress = 0.0;
+  if (progress > 1.0)
+    progress = 1.0;
+
+  double eased = ease_out_cubic(progress);
+  if (x)
+    *x = (int)(entry->from.x + (entry->to.x - entry->from.x) * eased);
+  if (y)
+    *y = (int)(entry->from.y + (entry->to.y - entry->from.y) * eased);
+}
+
+static void schedule_output(struct bwm_output *output) {
+  if (!output || !output->wlr_output || !output->enabled)
+    return;
+
+  wlr_output_schedule_frame(output->wlr_output);
+}
+
+static void snapshot_buffer_iterator(struct wlr_scene_buffer *buffer, int sx, int sy, void *data) {
+  struct bwm_animation_entry *entry = data;
+
+  if (!buffer || !buffer->buffer)
+    return;
+
+  struct bwm_snapshot_buffer *copy = calloc(1, sizeof(*copy));
+  if (!copy)
+    return;
+
+  copy->buffer = buffer;
+  copy->x = sx;
+  copy->y = sy;
+  copy->width = buffer->dst_width > 0 ? buffer->dst_width : buffer->WLR_PRIVATE.buffer_width;
+  copy->height = buffer->dst_height > 0 ? buffer->dst_height : buffer->WLR_PRIVATE.buffer_height;
+  wl_list_insert(&entry->snapshot_buffers, &copy->link);
+}
+
+static void updated_buffer_iterator(struct wlr_scene_buffer *buffer, int sx, int sy, void *data) {
+  struct bwm_animation_entry *entry = data;
+
+  if (!buffer || !buffer->buffer)
+    return;
+  if (!entry || !entry->scene_tree)
+    return;
+
+  struct wlr_scene_buffer *sbuf = wlr_scene_buffer_create(entry->scene_tree, NULL);
+  if (!sbuf)
+    return;
+
+  wlr_scene_buffer_set_dest_size(sbuf, buffer->dst_width, buffer->dst_height);
+  wlr_scene_buffer_set_opaque_region(sbuf, &buffer->opaque_region);
+  wlr_scene_buffer_set_source_box(sbuf, &buffer->src_box);
+  wlr_scene_node_set_position(&sbuf->node, sx, sy);
+  wlr_scene_buffer_set_transform(sbuf, buffer->transform);
+  wlr_scene_buffer_set_buffer(sbuf, buffer->buffer);
+
+  struct bwm_snapshot_buffer *copy = calloc(1, sizeof(*copy));
+  if (!copy) {
+    wlr_scene_node_destroy(&sbuf->node);
+    return;
+  }
+
+  copy->buffer = sbuf;
+  copy->x = sx;
+  copy->y = sy;
+  copy->width = buffer->dst_width > 0 ? buffer->dst_width : buffer->WLR_PRIVATE.buffer_width;
+  copy->height = buffer->dst_height > 0 ? buffer->dst_height : buffer->WLR_PRIVATE.buffer_height;
+  wl_list_insert(&entry->updated_buffers, &copy->link);
+}
+
+struct clip_iter_data {
+  struct bwm_animation_entry *entry;
+  int anim_w;
+  int anim_h;
+};
+
+static void content_buffer_clip_iterator(struct wlr_scene_buffer *buffer, int sx, int sy, void *data) {
+  struct clip_iter_data *d = data;
+  (void)d;
+  if (!buffer || !buffer->buffer)
+    return;
+
+  int vis_x1 = sx < 0 ? 0 : sx;
+  int vis_y1 = sy < 0 ? 0 : sy;
+  int vis_x2 = sx + (buffer->dst_width > 0 ? buffer->dst_width : buffer->WLR_PRIVATE.buffer_width);
+  if (vis_x2 > d->anim_w) vis_x2 = d->anim_w;
+  int vis_y2 = sy + (buffer->dst_height > 0 ? buffer->dst_height : buffer->WLR_PRIVATE.buffer_height);
+  if (vis_y2 > d->anim_h) vis_y2 = d->anim_h;
+
+  if (vis_x2 <= vis_x1 || vis_y2 <= vis_y1) {
+    wlr_scene_node_set_position(&buffer->node, vis_x1, vis_y1);
+    wlr_scene_buffer_set_dest_size(buffer, 1, 1);
+    return;
+  }
+
+  struct wlr_fbox src_fbox = {
+    .x = (float)(vis_x1 - sx),
+    .y = (float)(vis_y1 - sy),
+    .width = (float)(vis_x2 - vis_x1),
+    .height = (float)(vis_y2 - vis_y1),
+  };
+
+  wlr_scene_buffer_set_source_box(buffer, &src_fbox);
+  wlr_scene_node_set_position(&buffer->node, vis_x1, vis_y1);
+  wlr_scene_buffer_set_dest_size(buffer, (int)src_fbox.width, (int)src_fbox.height);
+}
+
+static void detect_buffer_iterator(struct wlr_scene_buffer *buffer, int sx, int sy, void *data) {
+  (void)sx; (void)sy;
+  bool *found = data;
+  if (!found)
+    return;
+  if (buffer && buffer->buffer)
+    *found = true;
+}
+static void destroy_snapshot_buffers(struct bwm_animation_entry *entry) {
+  if (!entry || !entry->snapshot_buffers_initialized)
+    return;
+
+  struct bwm_snapshot_buffer *copy, *tmp;
+  wl_list_for_each_safe(copy, tmp, &entry->snapshot_buffers, link) {
+    wl_list_remove(&copy->link);
+    free(copy);
+  }
+
+  entry->snapshot_buffers_initialized = false;
+  if (entry->updated_buffers_initialized) {
+    wl_list_for_each_safe(copy, tmp, &entry->updated_buffers, link) {
+      wl_list_remove(&copy->link);
+      free(copy);
+    }
+    entry->updated_buffers_initialized = false;
+  }
+}
+
+void animation_init(void) {
+  wl_list_init(&animations);
+}
+
+void animation_fini(void) {
+  struct bwm_animation_entry *entry, *tmp;
+  wl_list_for_each_safe(entry, tmp, &animations, link) {
+    destroy_snapshot_buffers(entry);
+    wl_list_remove(&entry->link);
+    free(entry);
+  }
+}
+
+void animation_cancel_node(struct node_t *node) {
+  struct bwm_animation_entry *entry = find_animation(node);
+  if (!entry)
+    return;
+  wlr_log(WLR_DEBUG, "animation: cancel node %u entry=%p", node ? node->id : 0, (void*)entry);
+  destroy_snapshot_buffers(entry);
+  wl_list_remove(&entry->link);
+  free(entry);
+}
+
+bool animation_start_snapshot_resize(struct bwm_toplevel *toplevel, struct wlr_box from, struct wlr_box to) {
+  if (!toplevel || !toplevel->saved_surface_tree || !toplevel->node || !enable_animations)
+    return false;
+
+  animation_cancel_node(toplevel->node);
+
+  struct bwm_animation_entry *entry = find_animation(toplevel->node);
+  if (!entry) {
+    entry = create_animation_entry();
+    if (!entry)
+      return false;
+  }
+
+  entry->snapshot_resize = true;
+  entry->node = toplevel->node;
+  entry->toplevel = toplevel;
+  entry->scene_tree = toplevel->saved_surface_tree;
+  entry->from = from;
+  entry->to = to;
+  clock_gettime(CLOCK_MONOTONIC, &entry->start);
+  entry->duration_ms = ANIMATION_DURATION_MS;
+  entry->use_content_tree = false;
+
+  destroy_snapshot_buffers(entry);
+  wl_list_init(&entry->snapshot_buffers);
+  wlr_scene_node_for_each_buffer(&toplevel->saved_surface_tree->node, snapshot_buffer_iterator, entry);
+
+  wl_list_init(&entry->updated_buffers);
+  if (toplevel->content_tree)
+    wlr_scene_node_for_each_buffer(&toplevel->content_tree->node, updated_buffer_iterator, entry);
+
+  if (toplevel->content_tree) {
+    entry->use_content_tree = true;
+    wlr_log(WLR_DEBUG, "animation: using content_tree for snapshot resize entry=%p node=%u", (void*)entry, entry->node ? entry->node->id : 0);
+    wlr_scene_node_set_enabled(&toplevel->content_tree->node, true);
+    if (toplevel->saved_surface_tree)
+      wlr_scene_node_set_enabled(&toplevel->saved_surface_tree->node, false);
+    entry->scene_tree = toplevel->content_tree;
+  }
+
+  if (wl_list_empty(&entry->snapshot_buffers)) {
+    destroy_snapshot_buffers(entry);
+    wl_list_remove(&entry->link);
+    free(entry);
+    return false;
+  }
+
+  wlr_scene_node_set_position(&toplevel->scene_tree->node, from.x, from.y);
+  wlr_scene_node_set_position(&toplevel->saved_surface_tree->node, 0, 0);
+  wlr_log(WLR_DEBUG, "animation: start snapshot resize entry=%p node=%u from=(%d,%d %dx%d) to=(%d,%d %dx%d)",
+    (void*)entry, entry->node ? entry->node->id : 0,
+    from.x, from.y, from.width, from.height,
+    to.x, to.y, to.width, to.height);
+  schedule_output(toplevel->node->output);
+  return true;
+}
+
+bool animation_apply_geometry(struct node_t *node, struct wlr_scene_tree *scene_tree, struct wlr_box target, bool animate) {
+  struct wlr_box from;
+  from.x = scene_tree->node.x;
+  from.y = scene_tree->node.y;
+  from.width = target.width;
+  from.height = target.height;
+  return animation_apply_geometry_from(node, scene_tree, from, target, animate);
+}
+
+bool animation_apply_geometry_from(struct node_t *node, struct wlr_scene_tree *scene_tree,
+    struct wlr_box from, struct wlr_box target, bool animate) {
+  if (!node || !scene_tree)
+    return false;
+
+  struct bwm_output *output = node->output;
+  if (!animate || !enable_animations || !output || !output->enabled || !node->client || !node->client->shown) {
+    animation_cancel_node(node);
+    wlr_scene_node_set_position(&scene_tree->node, target.x, target.y);
+    return false;
+  }
+
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+
+  struct bwm_animation_entry *entry = find_animation(node);
+  if (!entry) {
+    entry = create_animation_entry();
+    if (!entry) {
+      wlr_scene_node_set_position(&scene_tree->node, target.x, target.y);
+      return false;
+    }
+  }
+
+  entry->node = node;
+  entry->scene_tree = scene_tree;
+  entry->from = from;
+  entry->to = target;
+  entry->start = now;
+  entry->duration_ms = ANIMATION_DURATION_MS;
+
+  if (entry->from.x == entry->to.x && entry->from.y == entry->to.y) {
+    animation_cancel_node(node);
+    wlr_scene_node_set_position(&scene_tree->node, target.x, target.y);
+    return false;
+  }
+
+  wlr_log(WLR_DEBUG, "animation: apply_geometry entry=%p node=%u from=(%d,%d) to=(%d,%d)",
+   	(void*)entry, node ? node->id : 0, entry->from.x, entry->from.y, entry->to.x, entry->to.y);
+
+  wlr_scene_node_set_position(&scene_tree->node, entry->from.x, entry->from.y);
+  schedule_output(output);
+  return true;
+}
+
+static void update_snapshot_entry(struct bwm_animation_entry *entry,
+                                  struct timespec now) {
+  if (!entry->toplevel || !entry->toplevel->saved_surface_tree)
+    return;
+
+  double progress = elapsed_ms(entry->start, now) / (double)entry->duration_ms;
+  if (progress < 0.0)
+    progress = 0.0;
+  if (progress > 1.0)
+    progress = 1.0;
+
+  double eased = ease_out_cubic(progress);
+  int x = (int)(entry->from.x + (entry->to.x - entry->from.x) * eased);
+  int y = (int)(entry->from.y + (entry->to.y - entry->from.y) * eased);
+  int width = (int)(entry->from.width + (entry->to.width - entry->from.width) * eased);
+  int height = (int)(entry->from.height + (entry->to.height - entry->from.height) * eased);
+
+  if (entry->from.width <= 0 || entry->from.height <= 0)
+    return;
+
+  double scale_x = (double)width / (double)entry->from.width;
+  double scale_y = (double)height / (double)entry->from.height;
+
+  wlr_scene_node_set_position(&entry->toplevel->scene_tree->node, x, y);
+
+  if (entry->use_content_tree && entry->toplevel->content_tree) {
+    struct wlr_box clip = {
+      .x = entry->toplevel->geometry.x,
+      .y = entry->toplevel->geometry.y,
+      .width = width,
+      .height = height,
+    };
+    wlr_scene_subsurface_tree_set_clip(&entry->toplevel->content_tree->node, &clip);
+
+    bool has_children = !wl_list_empty(&entry->toplevel->content_tree->children);
+    bool any_buf = false;
+    if (has_children)
+      wlr_scene_node_for_each_buffer(&entry->toplevel->content_tree->node, detect_buffer_iterator, &any_buf);
+    wlr_log(WLR_DEBUG, "animation: content_tree children=%d any_buf=%d entry=%p node=%u",
+      has_children, any_buf, (void*)entry, entry->node ? entry->node->id : 0);
+    goto borders_update;
+  }
+
+  if (!entry->use_content_tree && entry->toplevel && entry->toplevel->content_tree &&
+      entry->to.width > entry->from.width) {
+    bool has_buf = false;
+    wlr_scene_node_for_each_buffer(&entry->toplevel->content_tree->node,
+                                   detect_buffer_iterator, &has_buf);
+    if (has_buf) {
+      entry->use_content_tree = true;
+      wlr_log(WLR_DEBUG, "animation: switching to content_tree mid-animation entry=%p node=%u", (void*)entry, entry->node ? entry->node->id : 0);
+      wlr_scene_node_set_enabled(&entry->toplevel->content_tree->node, true);
+      if (entry->toplevel->saved_surface_tree)
+        wlr_scene_node_set_enabled(&entry->toplevel->saved_surface_tree->node, false);
+      entry->scene_tree = entry->toplevel->content_tree;
+    }
+  }
+
+  struct bwm_snapshot_buffer *copy;
+  bool used_updated = false;
+
+  if (entry->to.width > entry->from.width && entry->updated_buffers_initialized && !wl_list_empty(&entry->updated_buffers)) {
+    used_updated = true;
+    if (entry->use_content_tree && entry->toplevel && entry->toplevel->content_tree) {
+      struct clip_iter_data d = { .entry = entry, .anim_w = width, .anim_h = height };
+      wlr_scene_node_for_each_buffer(&entry->toplevel->content_tree->node, content_buffer_clip_iterator, &d);
+    } else {
+      wl_list_for_each(copy, &entry->updated_buffers, link) {
+      int vis_x1 = copy->x < 0 ? 0 : copy->x;
+      int vis_y1 = copy->y < 0 ? 0 : copy->y;
+      int vis_x2 = copy->x + copy->width;
+      if (vis_x2 > width) vis_x2 = width;
+      int vis_y2 = copy->y + copy->height;
+      if (vis_y2 > height) vis_y2 = height;
+
+      if (vis_x2 <= vis_x1 || vis_y2 <= vis_y1) {
+        wlr_scene_node_set_position(&copy->buffer->node, vis_x1, vis_y1);
+        wlr_scene_buffer_set_dest_size(copy->buffer, 1, 1);
+        continue;
+      }
+
+      struct wlr_fbox src_fbox = {
+        .x = (float)(vis_x1 - copy->x),
+        .y = (float)(vis_y1 - copy->y),
+        .width = (float)(vis_x2 - vis_x1),
+        .height = (float)(vis_y2 - vis_y1),
+      };
+
+      wlr_scene_buffer_set_source_box(copy->buffer, &src_fbox);
+      wlr_scene_node_set_position(&copy->buffer->node, vis_x1, vis_y1);
+      wlr_scene_buffer_set_dest_size(copy->buffer, (int)src_fbox.width, (int)src_fbox.height);
+      }
+    }
+  }
+
+  if (!used_updated) {
+    if (entry->to.width > entry->from.width && !entry->use_content_tree && wl_list_empty(&entry->updated_buffers)) {
+      wl_list_for_each(copy, &entry->snapshot_buffers, link) {
+        struct wlr_fbox full_src = {
+          .x = 0.0f,
+          .y = 0.0f,
+          .width = (float)copy->width,
+          .height = (float)copy->height,
+        };
+        int dx = (int)(copy->x * scale_x);
+        int dy = (int)(copy->y * scale_y);
+        int dw = (int)(copy->width * scale_x);
+        int dh = (int)(copy->height * scale_y);
+        if (dw <= 0) dw = 1;
+        if (dh <= 0) dh = 1;
+        wlr_scene_buffer_set_source_box(copy->buffer, &full_src);
+        wlr_scene_node_set_position(&copy->buffer->node, dx, dy);
+        wlr_scene_buffer_set_dest_size(copy->buffer, dw, dh);
+      }
+      goto borders_update;
+    }
+
+    wl_list_for_each(copy, &entry->snapshot_buffers, link) {
+      int vis_x1 = copy->x < 0 ? 0 : copy->x;
+      int vis_y1 = copy->y < 0 ? 0 : copy->y;
+      int vis_x2 = copy->x + copy->width;
+      if (vis_x2 > width) vis_x2 = width;
+      int vis_y2 = copy->y + copy->height;
+      if (vis_y2 > height) vis_y2 = height;
+
+      if (vis_x2 <= vis_x1 || vis_y2 <= vis_y1) {
+        wlr_scene_node_set_position(&copy->buffer->node, vis_x1, vis_y1);
+        wlr_scene_buffer_set_dest_size(copy->buffer, 1, 1);
+        continue;
+      }
+
+      struct wlr_fbox src_fbox = {
+        .x = (float)(vis_x1 - copy->x),
+        .y = (float)(vis_y1 - copy->y),
+        .width = (float)(vis_x2 - vis_x1),
+        .height = (float)(vis_y2 - vis_y1),
+      };
+
+      wlr_scene_buffer_set_source_box(copy->buffer, &src_fbox);
+      wlr_scene_node_set_position(&copy->buffer->node, vis_x1, vis_y1);
+      wlr_scene_buffer_set_dest_size(copy->buffer, (int)src_fbox.width, (int)src_fbox.height);
+    }
+  }
+
+borders_update:
+  if (entry->toplevel && entry->toplevel->border_tree) {
+    struct wlr_box geo = {0, 0, width, height};
+    unsigned int bw = 0;
+    if (entry->node && entry->node->client)
+      bw = entry->node->client->border_width;
+    update_borders(entry->toplevel->border_tree, entry->toplevel->border_rects, geo, bw);
+
+    if (entry->toplevel->border_shader_node && bw > 0) {
+      int new_fw = width + 2 * (int)bw;
+      int new_fh = height + 2 * (int)bw;
+      if (new_fw > 0 && new_fh > 0)
+        wlr_scene_buffer_set_dest_size(entry->toplevel->border_shader_node, new_fw, new_fh);
+    }
+  }
+}
+
+bool animation_update_output(struct bwm_output *output, struct timespec now) {
+  bool active = false;
+  struct bwm_animation_entry *entry, *tmp;
+
+  wl_list_for_each_safe(entry, tmp, &animations, link) {
+    if (!entry->node || !entry->scene_tree || !entry->node->client) {
+      wl_list_remove(&entry->link);
+      free(entry);
+      continue;
+    }
+
+    if (entry->node->output != output)
+      continue;
+
+    if (entry->snapshot_resize) {
+      update_snapshot_entry(entry, now);
+      double progress = elapsed_ms(entry->start, now) / (double)entry->duration_ms;
+      if (progress >= 1.0) {
+        if (entry->toplevel) {
+          toplevel_remove_saved_buffer(entry->toplevel);
+          if (entry->toplevel->scene_tree)
+            wlr_scene_node_set_enabled(&entry->toplevel->scene_tree->node, true);
+        }
+        wlr_log(WLR_DEBUG, "animation: finishing snapshot entry=%p node=%u", (void*)entry, entry->node ? entry->node->id : 0);
+        destroy_snapshot_buffers(entry);
+        wl_list_remove(&entry->link);
+        free(entry);
+      } else {
+        active = true;
+      }
+      continue;
+    }
+
+    if (!entry->node->client->shown || !entry->scene_tree->node.enabled) {
+      wl_list_remove(&entry->link);
+      free(entry);
+      continue;
+    }
+
+    int x, y;
+    sample_position(entry, now, &x, &y);
+    wlr_scene_node_set_position(&entry->scene_tree->node, x, y);
+    wlr_log(WLR_DEBUG, "animation: update entry=%p node=%u pos=(%d,%d)", (void*)entry, entry->node ? entry->node->id : 0, x, y);
+
+    double progress = elapsed_ms(entry->start, now) / (double)entry->duration_ms;
+    if (progress >= 1.0) {
+      wl_list_remove(&entry->link);
+      free(entry);
+    } else {
+      active = true;
+    }
+  }
+
+  return active;
+}

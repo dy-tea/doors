@@ -2,6 +2,7 @@
 #include "server.h"
 #include "toplevel.h"
 #include "tree.h"
+#include "animation.h"
 #include "types.h"
 #include "output.h"
 #include <stdlib.h>
@@ -84,6 +85,7 @@ static void copy_node_state(node_t *node,
   instruction->hidden = node->pending.hidden;
 
   if (node->client) {
+    instruction->previous_tiled_rectangle = node->client->committed_tiled_rectangle;
     instruction->state = node->client->state;
     instruction->tiled_rectangle = node->client->tiled_rectangle;
     instruction->floating_rectangle = node->client->floating_rectangle;
@@ -211,7 +213,23 @@ static void apply_node_state(node_t *node,
       return;
     }
 
-    if (node->client->toplevel && node->client->toplevel->saved_surface_tree) {
+    bool snapshot_resize = false;
+    if (node->client->toplevel && node->client->toplevel->saved_surface_tree &&
+        instruction->previous_tiled_rectangle.width > 0 &&
+        instruction->previous_tiled_rectangle.height > 0 &&
+        (instruction->previous_tiled_rectangle.width != rect->width ||
+         instruction->previous_tiled_rectangle.height != rect->height)) {
+      snapshot_resize = animation_start_snapshot_resize(node->client->toplevel,
+        instruction->previous_tiled_rectangle, *rect);
+      wlr_log(WLR_DEBUG, "Started snapshot resize animation for node %u: from=(%dx%d) to=(%dx%d) active=%d",
+        node->id,
+        instruction->previous_tiled_rectangle.width,
+        instruction->previous_tiled_rectangle.height,
+        rect->width, rect->height,
+        snapshot_resize);
+    }
+
+    if (node->client->toplevel && node->client->toplevel->saved_surface_tree && !snapshot_resize) {
       toplevel_remove_saved_buffer(node->client->toplevel);
       wlr_log(WLR_DEBUG, "Removed saved buffer for node %u", node->id);
     }
@@ -235,7 +253,14 @@ static void apply_node_state(node_t *node,
       return;
     }
 
-    wlr_scene_node_set_position(&scene_tree->node, rect->x, rect->y);
+    if (!snapshot_resize) {
+      if (instruction->previous_tiled_rectangle.width > 0 && instruction->previous_tiled_rectangle.height > 0)
+        animation_apply_geometry_from(node, scene_tree, instruction->previous_tiled_rectangle, *rect, true);
+      else
+        animation_apply_geometry(node, scene_tree, *rect, true);
+    }
+    else
+      wlr_scene_node_set_position(&scene_tree->node, rect->x, rect->y);
 
     // update borders
     if (node->client->border_width != 0) {
