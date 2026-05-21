@@ -111,6 +111,7 @@ static void rotate_log_file(void) {
 }
 
 static void signal_handler(int sig) {
+#if defined(__linux__) && (defined(__GLIBC__) || defined(__GNU_LIBRARY__))
   const char *sig_name = "UNKNOWN";
   switch (sig) {
     case SIGSEGV: sig_name = "SIGSEGV (Segmentation Fault)"; break;
@@ -141,6 +142,9 @@ static void signal_handler(int sig) {
     fprintf(log_file, "##################################\n\n");
     fflush(log_file);
   }
+#else
+	write(STDOUT_FILENO, "Backtrace not available on musl.", 32);
+#endif
 
   // exit with error code
   _exit(128 + sig);
