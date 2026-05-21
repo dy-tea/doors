@@ -6,10 +6,13 @@
 #include <stdarg.h>
 #include <time.h>
 #include <signal.h>
-#include <execinfo.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <errno.h>
+
+#if defined(__linux__) && (defined(__GLIBC__) || defined(__GNU_LIBRARY__))
+	#include <execinfo.h>
+#endif
 
 #define MAX_LOG_LINES 10000
 #define MAX_LOG_FILES 5
@@ -119,7 +122,7 @@ static void signal_handler(int sig) {
 
   // get backtrace
   void *addrlist[32];
-  int addrlen = backtrace(addrlist, 32);
+  int addrlen = (int)backtrace(addrlist, 32);
 
   // log to stdout
   write(STDOUT_FILENO, "\n########## CRASH REPORT ##########\n", 36);
