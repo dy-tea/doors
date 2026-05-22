@@ -11,7 +11,6 @@
 #include "output.h"
 #include "tabs.h"
 #include "animation.h"
-#include <float.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wayland-server-core.h>
@@ -346,26 +345,6 @@ static struct bwm_xwayland_unmanaged *create_unmanaged(struct wlr_xwayland_surfa
 	surface->override_redirect.notify = unmanaged_handle_override_redirect;
 
 	return surface;
-}
-
-// TODO: maybe use this?
-static void xwayland_view_get_constraints(struct bwm_xwayland_view *xwayland_view,
-		double *min_width, double *max_width, double *min_height, double *max_height) {
-	struct wlr_xwayland_surface *surface = xwayland_view->xwayland_surface;
-	xcb_size_hints_t *size_hints = surface->size_hints;
-
-	if (size_hints == NULL) {
-		*min_width = 0;
-		*max_width = DBL_MAX;
-		*min_height = 0;
-		*max_height = DBL_MAX;
-		return;
-	}
-
-	*min_width = size_hints->min_width > 0 ? size_hints->min_width : 0;
-	*max_width = size_hints->max_width > 0 ? size_hints->max_width : DBL_MAX;
-	*min_height = size_hints->min_height > 0 ? size_hints->min_height : 0;
-	*max_height = size_hints->max_height > 0 ? size_hints->max_height : DBL_MAX;
 }
 
 static bool xwayland_view_wants_floating(struct bwm_xwayland_view *xwayland_view) {

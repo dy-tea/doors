@@ -19,8 +19,8 @@
 #define LOG_FILENAME_BASE "bwm"
 
 static FILE *log_file = NULL;
-static char log_path[256] = {0};
-static char log_dir[256] = {0};
+static char log_path[2048] = {0};
+static char log_dir[1024] = {0};
 static unsigned int current_line_count = 0;
 static unsigned int rotation_count = 0;
 
@@ -78,7 +78,7 @@ static void rotate_log_file(void) {
   fclose(log_file);
   log_file = NULL;
 
-  char rotated_path[256];
+  char rotated_path[sizeof(log_path)];
   snprintf(rotated_path, sizeof(rotated_path), "%s/%s.%u.log",
   	log_dir, LOG_FILENAME_BASE, rotation_count++ % MAX_LOG_FILES);
 
@@ -172,8 +172,9 @@ int log_init(const char *log_file_path) {
     // try to create directories
     struct stat st = {0};
     if (stat(log_dir, &st) == -1) {
-      char mkdir_cmd[512];
+      char mkdir_cmd[sizeof(log_dir) + 16];
       snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p %s", log_dir);
+
       if (system(mkdir_cmd) != 0) {
         fprintf(stderr, "ERROR: Failed to create log directory: %s\n", log_dir);
         return -1;
