@@ -1566,13 +1566,11 @@ void create_borders(struct wlr_scene_tree *parent, struct wlr_scene_tree **borde
   if (!*border_tree)
     return;
 
-  float color[4];
-  parse_color(focused_border_color, color);
-
-  rects[0] = wlr_scene_rect_create(*border_tree, 0, border_width, color);
-  rects[1] = wlr_scene_rect_create(*border_tree, 0, border_width, color);
-  rects[2] = wlr_scene_rect_create(*border_tree, border_width, 0, color);
-  rects[3] = wlr_scene_rect_create(*border_tree, border_width, 0, color);
+  static const float transparent[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+  rects[0] = wlr_scene_rect_create(*border_tree, 0, border_width, transparent);
+  rects[1] = wlr_scene_rect_create(*border_tree, 0, border_width, transparent);
+  rects[2] = wlr_scene_rect_create(*border_tree, border_width, 0, transparent);
+  rects[3] = wlr_scene_rect_create(*border_tree, border_width, 0, transparent);
 }
 
 void destroy_borders(struct wlr_scene_tree **border_tree, struct wlr_scene_rect *rects[4]) {
