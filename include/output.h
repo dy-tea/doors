@@ -32,6 +32,7 @@ struct bwm_output {
 
   struct wlr_session_lock_surface_v1 *lock_surface;
   struct wl_listener destroy_lock_surface;
+  struct wl_listener map_lock_surface;
 
   bool enabled;
   bool allow_tearing;

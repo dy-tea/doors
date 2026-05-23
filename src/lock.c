@@ -7,6 +7,7 @@
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_seat.h>
 #include <wlr/types/wlr_output.h>
+#include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_session_lock_v1.h>
 
 void destroy_unlock(struct bwm_session_lock *session_lock, const bool unlock) {
@@ -35,24 +36,46 @@ void destroy_lock_surface(struct wl_listener *listener, void *data) {
 	(void)data;
 	struct bwm_output *output = wl_container_of(listener, output, destroy_lock_surface);
 	struct wlr_session_lock_surface_v1 *surface = output->lock_surface;
+	bool was_focused = surface->surface == server.seat->keyboard_state.focused_surface;
 
 	output->lock_surface = NULL;
 	wl_list_remove(&output->destroy_lock_surface.link);
+	wl_list_remove(&output->map_lock_surface.link);
 
-	if (surface->surface != server.seat->keyboard_state.focused_surface)
+	if (!server.locked || !server.current_session_lock)
 		return;
 
-	if (server.locked && server.current_session_lock && !wl_list_empty(&server.current_session_lock->surfaces)) {
-		surface = wl_container_of(server.current_session_lock->surfaces.next, surface, link);
+	if (!was_focused)
+		return;
 
+	struct wlr_session_lock_surface_v1 *next;
+	wl_list_for_each(next, &server.current_session_lock->surfaces, link) {
+		if (next == surface || !next->surface->mapped)
+			continue;
 		struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server.seat);
+		wlr_seat_keyboard_notify_enter(server.seat, next->surface,
+			keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
+		return;
+	}
+
+	wlr_seat_keyboard_notify_clear_focus(server.seat);
+}
+
+void map_lock_surface(struct wl_listener *listener, void *data) {
+	(void)data;
+	struct bwm_output *output = wl_container_of(listener, output, map_lock_surface);
+	struct wlr_session_lock_surface_v1 *surface = output->lock_surface;
+
+	if (!surface || !server.current_session_lock || !server.locked)
+		return;
+
+	if (server.seat->keyboard_state.focused_surface)
+		return;
+
+	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server.seat);
+	if (keyboard)
 		wlr_seat_keyboard_notify_enter(server.seat, surface->surface,
 			keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
-	} else if (!server.locked) {
-		focus_node(server.focused_output, server.focused_output->desk, server.focused_output->desk->focus);
-	} else {
-		wlr_seat_keyboard_notify_clear_focus(server.seat);
-	}
 }
 
 void lock_new_surface(struct wl_listener *listener, void *data) {
@@ -66,17 +89,20 @@ void lock_new_surface(struct wl_listener *listener, void *data) {
 
 	struct wlr_box box = output->rectangle;
 	wlr_scene_node_set_position(&scene_tree->node, box.x, box.y);
-  wlr_session_lock_surface_v1_configure(surface, box.width, box.height);
+	wlr_session_lock_surface_v1_configure(surface, box.width, box.height);
 
-  output->destroy_lock_surface.notify = destroy_lock_surface;
-  wl_signal_add(&surface->events.destroy, &output->destroy_lock_surface);
+	output->destroy_lock_surface.notify = destroy_lock_surface;
+	wl_signal_add(&surface->events.destroy, &output->destroy_lock_surface);
 
-  if (mon == output) {
-  	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server.seat);
-  	if (keyboard)
-   		wlr_seat_keyboard_notify_enter(server.seat, surface->surface,
-       	keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
-  }
+	output->map_lock_surface.notify = map_lock_surface;
+	wl_signal_add(&surface->surface->events.map, &output->map_lock_surface);
+
+	if (server.focused_output == output) {
+		struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server.seat);
+		if (keyboard)
+			wlr_seat_keyboard_notify_enter(server.seat, surface->surface,
+				keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
+	}
 }
 
 void lock_unlock(struct wl_listener *listener, void *data) {
@@ -93,34 +119,45 @@ void lock_destroy(struct wl_listener *listener, void *data) {
 
 void handle_new_session_lock(struct wl_listener *listener, void *data) {
 	(void)listener;
-  struct wlr_session_lock_v1 *lock = data;
+	struct wlr_session_lock_v1 *lock = data;
 
-  wlr_scene_node_set_enabled(&server.lock_background->node, true);
+	if (server.current_session_lock != NULL) {
+		wlr_session_lock_v1_destroy(lock);
+		return;
+	}
 
-  if (server.current_session_lock != NULL) {
-    wlr_session_lock_v1_destroy(lock);
-    return;
-  }
+	struct wlr_box full_geo = {0};
+	wlr_output_layout_get_box(server.output_layout, NULL, &full_geo);
+	wlr_scene_rect_set_size(server.lock_background, full_geo.width, full_geo.height);
+	wlr_scene_node_set_enabled(&server.lock_background->node, true);
 
-  struct bwm_session_lock *session_lock = calloc(1, sizeof(struct bwm_session_lock));
-  if (!session_lock) {
-    wlr_session_lock_v1_destroy(lock);
-    return;
-  }
+	struct wlr_surface *focused = server.seat->keyboard_state.focused_surface;
+	if (focused) {
+		struct wl_client *lock_client = wl_resource_get_client(lock->resource);
+		struct wl_client *focused_client = wl_resource_get_client(focused->resource);
+		if (focused_client != lock_client)
+			wlr_seat_keyboard_notify_clear_focus(server.seat);
+	}
 
-  session_lock->scene_tree = wlr_scene_tree_create(server.lock_tree);
-  session_lock->session_lock = lock;
-  server.current_session_lock = session_lock->session_lock;
+	struct bwm_session_lock *session_lock = calloc(1, sizeof(struct bwm_session_lock));
+	if (!session_lock) {
+		wlr_session_lock_v1_destroy(lock);
+		return;
+	}
 
-  session_lock->new_surface.notify = lock_new_surface;
-  wl_signal_add(&lock->events.new_surface, &session_lock->new_surface);
+	session_lock->scene_tree = wlr_scene_tree_create(server.lock_tree);
+	session_lock->session_lock = lock;
+	server.current_session_lock = session_lock->session_lock;
 
-  session_lock->unlock.notify = lock_unlock;
-  wl_signal_add(&lock->events.unlock, &session_lock->unlock);
+	session_lock->new_surface.notify = lock_new_surface;
+	wl_signal_add(&lock->events.new_surface, &session_lock->new_surface);
 
-  session_lock->destroy.notify = lock_destroy;
-  wl_signal_add(&lock->events.destroy, &session_lock->destroy);
+	session_lock->unlock.notify = lock_unlock;
+	wl_signal_add(&lock->events.unlock, &session_lock->unlock);
 
-  wlr_session_lock_v1_send_locked(lock);
-  server.locked = true;
+	session_lock->destroy.notify = lock_destroy;
+	wl_signal_add(&lock->events.destroy, &session_lock->destroy);
+
+	wlr_session_lock_v1_send_locked(lock);
+	server.locked = true;
 }
