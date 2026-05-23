@@ -180,6 +180,12 @@ extern bool click_to_focus;
 extern bool disable_decorations;
 extern bool enable_animations;
 extern int mapping_events_count;
+
+// Transaction system settings
+extern int txn_timeout_ms;
+extern bool debug_txn_timings;
+extern bool debug_noatomic;
+extern bool debug_txn_wait;
 extern int directional_focus_tightness;
 extern int ignore_ewmh_fullscreen;
 extern padding_t monocle_padding;

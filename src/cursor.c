@@ -61,7 +61,7 @@ static void reset_cursor_mode(void) {
   server.tiled_resize_parent_horizontal = NULL;
 }
 
-static void *desktop_type_at(
+void *desktop_type_at(
       double lx, double ly, struct wlr_surface **surface,
       double *sx, double *sy) {
   struct wlr_scene_node *node = wlr_scene_node_at(
@@ -1178,6 +1178,17 @@ void handle_pointer_swipe_end(struct wl_listener *listener, void *data) {
   if (binding)
     execute_gesturebind(binding);
   gesture_tracker_end(&server.gesture_tracker);
+}
+
+void cursor_rebase(void) {
+  double sx, sy;
+  struct wlr_surface *surface = NULL;
+  desktop_type_at(server.cursor->x, server.cursor->y, &surface, &sx, &sy);
+
+  if (surface)
+    wlr_seat_pointer_notify_enter(server.seat, surface, sx, sy);
+  else
+    wlr_seat_pointer_clear_focus(server.seat);
 }
 
 void cursor_init_gestures(void) {

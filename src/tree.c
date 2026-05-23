@@ -40,6 +40,12 @@ int border_width = 2;
 int window_gap = 10;
 double split_ratio = 0.5;
 
+// transaction settings
+int txn_timeout_ms = 200;
+bool debug_txn_timings = false;
+bool debug_noatomic = false;
+bool debug_txn_wait = false;
+
 // border colors
 char normal_border_color[16] = "444444ff";
 char active_border_color[16] = "555555ff";
