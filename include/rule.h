@@ -43,6 +43,8 @@ typedef struct {
   bool has_acrylic;
   float border_radius;
   bool has_border_radius;
+  bool block_out_from_screenshare;
+  bool has_block_out_from_screenshare;
 } rule_consequence_t;
 
 typedef struct rule_t {

@@ -364,6 +364,11 @@ void toplevel_map(struct wl_listener *listener, void *data) {
       rule->has_scroller_proportion_single ? rule->scroller_proportion_single : 0.0f);
   }
 
+  // Apply screenshare block-out rule
+  if (rule && rule->has_block_out_from_screenshare) {
+    n->client->block_out_from_screenshare = rule->block_out_from_screenshare;
+  }
+
   // Apply blur/mica rule properties
   if (rule && rule->has_blur) {
     n->client->blur = rule->blur;
@@ -486,8 +491,10 @@ void toplevel_map(struct wl_listener *listener, void *data) {
   // tabbed ancestors force SSD, otherwise allow CSD
   toplevel_apply_decoration_mode(toplevel);
 
-  toplevel->image_capture_surface = wlr_scene_surface_create(
-  	&toplevel->image_capture->tree, toplevel->xdg_toplevel->base->surface);
+  if (!n->client->block_out_from_screenshare) {
+    toplevel->image_capture_surface = wlr_scene_surface_create(
+      &toplevel->image_capture->tree, toplevel->xdg_toplevel->base->surface);
+  }
 
   update_foreign_toplevel_state(toplevel);
 

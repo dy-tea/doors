@@ -16,6 +16,8 @@
 #include "keyboard.h"
 #include "xwayland.h"
 #include "blur.h"
+#include "screencopy.h"
+#include "copy_capture.h"
 #include "animation.h"
 #include <stdbool.h>
 #include <stdlib.h>
@@ -57,7 +59,6 @@
 #include <wlr/types/wlr_ext_foreign_toplevel_list_v1.h>
 #include <wlr/types/wlr_single_pixel_buffer_v1.h>
 #include <wlr/types/wlr_fixes.h>
-#include <wlr/types/wlr_screencopy_v1.h>
 #include <wlr/types/wlr_viewporter.h>
 #include <wlr/types/wlr_presentation_time.h>
 #include <wlr/types/wlr_export_dmabuf_v1.h>
@@ -65,7 +66,6 @@
 #include <wlr/types/wlr_ext_data_control_v1.h>
 #include <wlr/types/wlr_gamma_control_v1.h>
 #include <wlr/types/wlr_ext_image_capture_source_v1.h>
-#include <wlr/types/wlr_ext_image_copy_capture_v1.h>
 #include <wlr/types/wlr_alpha_modifier_v1.h>
 #include <wlr/types/wlr_idle_inhibit_v1.h>
 #include <wlr/types/wlr_idle_notify_v1.h>
@@ -403,7 +403,7 @@ void server_init(void) {
   wlr_single_pixel_buffer_manager_v1_create(server.wl_display);
 
   // screencopy
-  wlr_screencopy_manager_v1_create(server.wl_display);
+  screencopy_init();
 
   // viewporter
   wlr_viewporter_create(server.wl_display);
@@ -427,8 +427,7 @@ void server_init(void) {
   wlr_scene_set_gamma_control_manager_v1(server.scene, wlr_gamma_control_manager_v1_create(server.wl_display));
 
   // image copy capture
-  wlr_ext_image_copy_capture_manager_v1_create(server.wl_display, 1);
-  wlr_ext_output_image_capture_source_manager_v1_create(server.wl_display, 1);
+  image_copy_capture_init();
 
   // alpha modifier
   wlr_alpha_modifier_v1_create(server.wl_display);
@@ -613,6 +612,8 @@ void server_fini(void) {
     server.xwayland.wlr_xwayland = NULL;
   }
 
+  screencopy_fini();
+  image_copy_capture_fini();
   animation_fini();
   transaction_fini();
   workspace_fini();

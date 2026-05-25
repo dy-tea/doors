@@ -140,6 +140,9 @@ void list_rules(char *buf, size_t buf_size) {
       offset += snprintf(buf + offset, buf_size - offset, "acrylic=%s ", r->consequence.acrylic ? "on" : "off");
     if (r->consequence.has_border_radius)
       offset += snprintf(buf + offset, buf_size - offset, "border_radius=%.1f ", r->consequence.border_radius);
+    if (r->consequence.has_block_out_from_screenshare)
+      offset += snprintf(buf + offset, buf_size - offset, "block_out_from_screenshare=%s ",
+        r->consequence.block_out_from_screenshare ? "on" : "off");
 
     offset += snprintf(buf + offset, buf_size - offset, "\n");
 

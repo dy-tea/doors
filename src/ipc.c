@@ -3569,6 +3569,9 @@ static void ipc_cmd_toggle(char **args, int num, int client_fd) {
   } else if (streq("monocle", *args)) {
     toggle_monocle();
     send_success(client_fd, "toggled\n");
+  } else if (streq("block_out_from_screenshare", *args)) {
+    toggle_block_out_from_screenshare();
+    send_success(client_fd, "toggled\n");
   } else {
     send_failure(client_fd, "toggle: unknown property\n");
   }
@@ -3796,6 +3799,12 @@ static void ipc_cmd_rule(char **args, int num, int client_fd) {
       } else if (strncmp("border_radius=", arg, 14) == 0) {
         r->consequence.border_radius = atof(arg + 14);
         r->consequence.has_border_radius = true;
+      } else if (streq("block_out_from_screenshare=on", arg)) {
+        r->consequence.block_out_from_screenshare = true;
+        r->consequence.has_block_out_from_screenshare = true;
+      } else if (streq("block_out_from_screenshare=off", arg)) {
+        r->consequence.block_out_from_screenshare = false;
+        r->consequence.has_block_out_from_screenshare = true;
       }
 
       args++;

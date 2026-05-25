@@ -501,7 +501,7 @@ bmsg rule -a vesktop desktop=III
 - `border_radius=10.0` - Set the border radius to a given float value
 - `scroller_proportion=<0.1-1.0>` - Set the scroller proportion for matched windows
 - `scroller_proportion_single=<0.1-1.0>` - Set the single-window scroller proportion for matched windows
-
+- `block_out_from_screenshare=on|off` - Blocks out the window from screenshare and screenshot tools.
 
 **Matching by Title:**
 

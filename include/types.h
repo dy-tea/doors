@@ -97,6 +97,9 @@ typedef struct client_t {
   bool mica;
   bool acrylic;
   float border_radius;
+
+  // Screenshare privacy
+  bool block_out_from_screenshare;
 } client_t;
 
 typedef struct node_t {

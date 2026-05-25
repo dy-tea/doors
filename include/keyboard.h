@@ -54,6 +54,7 @@ void close_focused(void);
 void toggle_floating(void);
 void toggle_fullscreen(void);
 void toggle_pseudo_tiled(void);
+void toggle_block_out_from_screenshare(void);
 
 // window swapping
 void swap_west(void);

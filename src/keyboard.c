@@ -405,6 +405,48 @@ void close_focused(void) {
   wlr_log(WLR_INFO, "Closing focused window");
 }
 
+void toggle_block_out_from_screenshare(void) {
+  if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL) {
+    wlr_log(WLR_DEBUG, "toggle_block_out: mon=%p desk=%p focus=%p",
+      (void*)mon, mon ? (void*)mon->desk : NULL,
+      (mon && mon->desk) ? (void*)mon->desk->focus : NULL);
+    return;
+  }
+
+  node_t *n = mon->desk->focus;
+  if (n->client == NULL) {
+    wlr_log(WLR_DEBUG, "toggle_block_out: no client on focus");
+    return;
+  }
+
+  n->client->block_out_from_screenshare = !n->client->block_out_from_screenshare;
+  wlr_log(WLR_DEBUG, "toggle_block_out: %s -> %d", n->client->app_id,
+    n->client->block_out_from_screenshare);
+
+  if (n->client->toplevel) {
+    struct bwm_toplevel *tl = n->client->toplevel;
+    if (n->client->block_out_from_screenshare && tl->image_capture_surface) {
+      wlr_scene_node_destroy(&tl->image_capture_surface->buffer->node);
+      tl->image_capture_surface = NULL;
+    } else if (!n->client->block_out_from_screenshare && !tl->image_capture_surface) {
+      tl->image_capture_surface = wlr_scene_surface_create(
+        &tl->image_capture->tree, tl->xdg_toplevel->base->surface);
+    }
+  } else if (n->client->xwayland_view) {
+    struct bwm_xwayland_view *xw = n->client->xwayland_view;
+    if (n->client->block_out_from_screenshare && xw->image_capture_surface) {
+      wlr_scene_node_destroy(&xw->image_capture_surface->buffer->node);
+      xw->image_capture_surface = NULL;
+    } else if (!n->client->block_out_from_screenshare && !xw->image_capture_surface) {
+      xw->image_capture_surface = wlr_scene_surface_create(
+        &xw->image_capture->tree, xw->xwayland_surface->surface);
+    }
+  }
+
+  wlr_log(WLR_INFO, "toggle block_out_from_screenshare: %s",
+    n->client->block_out_from_screenshare ? "on" : "off");
+}
+
 void toggle_floating(void) {
   if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL)
     return;

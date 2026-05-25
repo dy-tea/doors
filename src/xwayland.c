@@ -578,6 +578,9 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	if (rule && rule->has_locked)
 		node->locked = rule->locked;
 
+	if (rule && rule->has_block_out_from_screenshare)
+		client->block_out_from_screenshare = rule->block_out_from_screenshare;
+
 	if (rule && (rule->has_scroller_proportion || rule->has_scroller_proportion_single)) {
 		scroller_apply_client_rules(client,
 			rule->has_scroller_proportion ? rule->scroller_proportion : 0.0f,
@@ -665,8 +668,10 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	xwayland_view_set_activated(xwayland_view, true);
 	server.last_focused_xwayland_view = xwayland_view;
 
-	xwayland_view->image_capture_surface = wlr_scene_surface_create(
-		&xwayland_view->image_capture->tree, xsurface->surface);
+	if (!client->block_out_from_screenshare) {
+		xwayland_view->image_capture_surface = wlr_scene_surface_create(
+			&xwayland_view->image_capture->tree, xsurface->surface);
+	}
 
 	wlr_log(WLR_DEBUG, "XWayland window map complete: scene_tree enabled=%d shown=%d",
 		xwayland_view->scene_tree->node.enabled, client->shown);

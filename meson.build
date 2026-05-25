@@ -45,6 +45,9 @@ protocols = [
 	wl_protocol_dir / 'unstable' / 'text-input' / 'text-input-unstable-v3.xml',
 	'protocols' / 'wlr-layer-shell-unstable-v1.xml',
 	'protocols' / 'wlr-output-power-management-unstable-v1.xml',
+	'protocols' / 'wlr-screencopy-unstable-v1.xml',
+	'protocols' / 'ext-image-capture-source-v1.xml',
+	'protocols' / 'ext-image-copy-capture-v1.xml',
 ]
 
 wl_protos_src = []
@@ -103,6 +106,8 @@ executable(
 		'src' / 'xwayland.c',
 		'src' / 'input_method.c',
 		'src' / 'blur.c',
+		'src' / 'screencopy.c',
+		'src' / 'copy_capture.c',
 		'src' / 'text.c',
 		'src' / 'tabs.c',
 		'src' / 'tearing.c',
