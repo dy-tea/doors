@@ -65,7 +65,7 @@ static void output_source_request_frame(
 }
 
 static void block_windows(struct bwm_image_copy_source *src,
-		struct wlr_render_pass *pass) {
+		struct wlr_render_pass *pass, float scale) {
 	struct bwm_output *bwm_output = output_from_wlr_output(src->output);
 	if (!bwm_output)
 		return;
@@ -101,10 +101,10 @@ static void block_windows(struct bwm_image_copy_source *src,
 
 		int bw = (int)border_width;
 		struct wlr_box block_box = {
-			.x = abs_x - bwm_output->rectangle.x - bw,
-			.y = abs_y - bwm_output->rectangle.y - bw,
-			.width = win_rect.width + 2 * bw,
-			.height = win_rect.height + 2 * bw,
+			.x = (int)((abs_x - bwm_output->rectangle.x - bw) * scale),
+			.y = (int)((abs_y - bwm_output->rectangle.y - bw) * scale),
+			.width = (int)((win_rect.width + 2 * bw) * scale),
+			.height = (int)((win_rect.height + 2 * bw) * scale),
 		};
 
 		wlr_render_pass_add_rect(pass, &(struct wlr_render_rect_options){
@@ -145,10 +145,10 @@ static void block_windows(struct bwm_image_copy_source *src,
 
 		int bw = (int)border_width;
 		struct wlr_box block_box = {
-			.x = abs_x - bwm_output->rectangle.x - bw,
-			.y = abs_y - bwm_output->rectangle.y - bw,
-			.width = win_rect.width + 2 * bw,
-			.height = win_rect.height + 2 * bw,
+			.x = (int)((abs_x - bwm_output->rectangle.x - bw) * scale),
+			.y = (int)((abs_y - bwm_output->rectangle.y - bw) * scale),
+			.width = (int)((win_rect.width + 2 * bw) * scale),
+			.height = (int)((win_rect.height + 2 * bw) * scale),
 		};
 
 		wlr_render_pass_add_rect(pass, &(struct wlr_render_rect_options){
@@ -509,14 +509,14 @@ static void block_windows_cpu(void *data, uint32_t width, uint32_t height,
 		wlr_scene_node_coords(&xw->scene_tree->node, &abs_x, &abs_y);
 
 		int bw = (int)border_width;
-		int bx = abs_x - bwm_output->rectangle.x - bw;
-		int by = abs_y - bwm_output->rectangle.y - bw;
-		int bw_w = win_rect.width + 2 * bw;
-		int bw_h = win_rect.height + 2 * bw;
+		int bx = (int)((abs_x - bwm_output->rectangle.x - bw) * scale);
+		int by = (int)((abs_y - bwm_output->rectangle.y - bw) * scale);
+		int bw_w = (int)((win_rect.width + 2 * bw) * scale);
+		int bw_h = (int)((win_rect.height + 2 * bw) * scale);
 
 		wlr_log(WLR_DEBUG, "ext-copy-capture: CPU block-out xw abs=(%d,%d) "
-			"box=(%d,%d,%d,%d)",
-			abs_x, abs_y, bx, by, bw_w, bw_h);
+			"box=(%d,%d,%d,%d) scale=%.1f",
+			abs_x, abs_y, bx, by, bw_w, bw_h, scale);
 
 		if (bx < 0) { bw_w += bx; bx = 0; }
 		if (by < 0) { bw_h += by; by = 0; }
@@ -598,7 +598,7 @@ static bool perform_output_capture(struct bwm_copy_frame *frame,
 			},
 		});
 
-		block_windows(src, pass);
+		block_windows(src, pass, output->scale);
 
 		wlr_render_pass_submit(pass);
 		wlr_texture_destroy(texture);
