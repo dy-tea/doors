@@ -240,7 +240,7 @@ static struct bwm_image_copy_source *create_output_source(
 	wlr_ext_image_capture_source_v1_init(&src->base, &source_impl);
 
 	int ow, oh;
-	wlr_output_effective_resolution(wlr_output, &ow, &oh);
+	wlr_output_transformed_resolution(wlr_output, &ow, &oh);
 	src->base.width = (uint32_t)ow;
 	src->base.height = (uint32_t)oh;
 
@@ -413,7 +413,7 @@ static void frame_handle_damage_buffer(struct wl_client *wl_client,
 }
 
 static void block_windows_cpu(void *data, uint32_t width, uint32_t height,
-		size_t stride, struct bwm_image_copy_source *src) {
+		size_t stride, struct bwm_image_copy_source *src, float scale) {
 	struct bwm_output *bwm_output = output_from_wlr_output(src->output);
 	if (!bwm_output)
 		return;
@@ -450,18 +450,18 @@ static void block_windows_cpu(void *data, uint32_t width, uint32_t height,
 		wlr_scene_node_coords(&tl->scene_tree->node, &abs_x, &abs_y);
 
 		int bw = (int)border_width;
-		int bx = abs_x - bwm_output->rectangle.x - bw;
-		int by = abs_y - bwm_output->rectangle.y - bw;
-		int bw_w = win_rect.width + 2 * bw;
-		int bw_h = win_rect.height + 2 * bw;
+		int bx = (int)((abs_x - bwm_output->rectangle.x - bw) * scale);
+		int by = (int)((abs_y - bwm_output->rectangle.y - bw) * scale);
+		int bw_w = (int)((win_rect.width + 2 * bw) * scale);
+		int bw_h = (int)((win_rect.height + 2 * bw) * scale);
 
 		wlr_log(WLR_DEBUG, "ext-copy-capture: CPU block-out tl abs=(%d,%d) "
 			"win_rect=(%d,%d,%d,%d) out_rect=(%d,%d) bw=%d "
-			"box=(%d,%d,%d,%d) capture=(%dx%d)",
+			"box=(%d,%d,%d,%d) capture=(%dx%d) scale=%.1f",
 			abs_x, abs_y, win_rect.x, win_rect.y,
 			win_rect.width, win_rect.height,
 			bwm_output->rectangle.x, bwm_output->rectangle.y,
-			bw, bx, by, bw_w, bw_h, width, height);
+			bw, bx, by, bw_w, bw_h, width, height, scale);
 
 		if (bx < 0) { bw_w += bx; bx = 0; }
 		if (by < 0) { bw_h += by; by = 0; }
@@ -549,6 +549,7 @@ static bool perform_output_capture(struct bwm_copy_frame *frame,
 			wlr_log(WLR_DEBUG, "ext-copy-capture: no scene output");
 			return false;
 		}
+		wlr_damage_ring_add_whole(&scene_output->damage_ring);
 		struct wlr_output_state tmp_state;
 		wlr_output_state_init(&tmp_state);
 		wlr_output_state_set_enabled(&tmp_state, true);
@@ -561,8 +562,9 @@ static bool perform_output_capture(struct bwm_copy_frame *frame,
 		wlr_buffer_lock(src->last_buffer);
 		wlr_output_state_finish(&tmp_state);
 		wlr_damage_ring_add_whole(&scene_output->damage_ring);
-		wlr_log(WLR_DEBUG, "ext-copy-capture: fresh render OK, buffer=%p",
-			(void*)src->last_buffer);
+		wlr_log(WLR_DEBUG, "ext-copy-capture: fresh render OK, buffer=%p (%dx%d)",
+			(void*)src->last_buffer,
+			src->last_buffer->width, src->last_buffer->height);
 	}
 
 	int phys_w = src->last_buffer->width;
@@ -607,8 +609,7 @@ static bool perform_output_capture(struct bwm_copy_frame *frame,
 	wlr_log(WLR_DEBUG, "ext-copy-capture: direct render failed, "
 		"falling back to SHM read-pixels + CPU block-out");
 
-	// Client buffer is likely SHM; read full physical texture to CPU,
-	// downscale to logical resolution, then apply block-out
+	// Client buffer is SHM; read texture directly into client buffer
 	uint32_t dst_format;
 	size_t dst_stride;
 	void *dst_data;
@@ -622,29 +623,15 @@ static bool perform_output_capture(struct bwm_copy_frame *frame,
 	}
 
 	wlr_log(WLR_DEBUG, "ext-copy-capture: client fmt=0x%x stride=%zu "
-		"logical=%dx%d physical=%dx%d",
-		dst_format, dst_stride, src->base.width, src->base.height,
-		phys_w, phys_h);
-
-	// Allocate CPU buffer at physical resolution
-	uint32_t log_w = src->base.width;
-	uint32_t log_h = src->base.height;
-	size_t phys_stride = (size_t)phys_w * 4;
-	uint8_t *phys_data = malloc(phys_stride * phys_h);
-	if (!phys_data) {
-		wlr_buffer_end_data_ptr_access(frame->buffer);
-		wlr_texture_destroy(texture);
-		wlr_log(WLR_DEBUG, "ext-copy-capture: malloc phys buffer failed");
-		return false;
-	}
+		"size=%dx%d",
+		dst_format, dst_stride, phys_w, phys_h);
 
 	if (!wlr_texture_read_pixels(texture, &(struct wlr_texture_read_pixels_options){
-			.data = phys_data,
+			.data = dst_data,
 			.format = dst_format,
-			.stride = (uint32_t)phys_stride,
+			.stride = (uint32_t)dst_stride,
 			.src_box = { .width = phys_w, .height = phys_h },
 		})) {
-		free(phys_data);
 		wlr_buffer_end_data_ptr_access(frame->buffer);
 		wlr_texture_destroy(texture);
 		wlr_log(WLR_DEBUG, "ext-copy-capture: read_pixels failed");
@@ -652,23 +639,11 @@ static bool perform_output_capture(struct bwm_copy_frame *frame,
 	}
 
 	wlr_texture_destroy(texture);
+	wlr_log(WLR_DEBUG, "ext-copy-capture: read_pixels OK, applying CPU block-out");
 
-	// Nearest-neighbor downscale from physical to logical
-	for (uint32_t y = 0; y < log_h; y++) {
-		int src_y = y * phys_h / (int)log_h;
-		for (uint32_t x = 0; x < log_w; x++) {
-			int src_x = x * phys_w / (int)log_w;
-			uint32_t pixel = *(uint32_t *)(phys_data + src_y * phys_stride + src_x * 4);
-			*(uint32_t *)((uint8_t *)dst_data + y * dst_stride + x * 4) = pixel;
-		}
-	}
-	free(phys_data);
-
-	wlr_log(WLR_DEBUG, "ext-copy-capture: read_pixels + downscale OK, "
-		"applying CPU block-out");
-
-	// Apply block-out rectangles on the logical-resolution client buffer
-	block_windows_cpu(dst_data, log_w, log_h, dst_stride, src);
+	// apply block-out rectangles on the client buffer
+	block_windows_cpu(dst_data, phys_w, phys_h, dst_stride, src,
+		output->scale);
 
 	wlr_log(WLR_DEBUG, "ext-copy-capture: SHM path completed OK");
 	wlr_buffer_end_data_ptr_access(frame->buffer);
