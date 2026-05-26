@@ -204,17 +204,13 @@ void toplevel_center_and_clip_surface(struct bwm_toplevel *toplevel) {
 
   wlr_scene_node_set_position(&toplevel->content_tree->node, x, y);
 
-  // when tiled surface is smaller than its container, update borders
+  // when tiled or floating surface is smaller than its container, update borders
   // to wrap the actual surface instead of the full allocated space
-  if (tiled && toplevel->border_tree && c->border_width > 0) {
+  if ((tiled || floating) && toplevel->border_tree && c->border_width > 0) {
     unsigned int bw = c->border_width;
-    if (x > 0 || y > 0) {
+    if (tiled && (x > 0 || y > 0)) {
       int border_w = (int)toplevel->geometry.width < container_rect->width ? (int)toplevel->geometry.width : container_rect->width;
       int border_h = (int)toplevel->geometry.height < container_rect->height ? (int)toplevel->geometry.height : container_rect->height;
-      wlr_log(WLR_DEBUG, "center_clip: undersized tiled surface geo=(%dx%d) offset=(%d,%d) container=(%dx%d) border_clamped=(%dx%d)",
-        toplevel->geometry.width, toplevel->geometry.height, x, y,
-        container_rect ? container_rect->width : 0, container_rect ? container_rect->height : 0,
-        border_w, border_h);
       struct wlr_box content_geo = {0, 0, border_w, border_h};
       update_borders(toplevel->border_tree, toplevel->border_rects, content_geo, bw);
       wlr_scene_node_set_position(&toplevel->border_tree->node, (int)x - (int)bw, (int)y - (int)bw);
@@ -227,9 +223,6 @@ void toplevel_center_and_clip_surface(struct bwm_toplevel *toplevel) {
           wlr_scene_buffer_set_dest_size(toplevel->border_shader_node, new_fw, new_fh);
       }
     } else if (container_rect) {
-      wlr_log(WLR_DEBUG, "center_clip: full-size tiled surface geo=(%dx%d) container=(%dx%d)",
-        toplevel->geometry.width, toplevel->geometry.height,
-        container_rect->width, container_rect->height);
       struct wlr_box full_geo = {0, 0, container_rect->width, container_rect->height};
       update_borders(toplevel->border_tree, toplevel->border_rects, full_geo, bw);
       update_border_colors(toplevel->border_tree, toplevel->border_rects, c);
@@ -705,6 +698,8 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
 
         if (c->state == STATE_FLOATING) {
           if (c->floating_rectangle.width > 0) {
+            c->floating_rectangle.width = toplevel->geometry.width;
+            c->floating_rectangle.height = toplevel->geometry.height;
             wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, toplevel->geometry.width,
               toplevel->geometry.height);
             transaction_commit_dirty_client();

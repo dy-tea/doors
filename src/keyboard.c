@@ -491,7 +491,18 @@ void toggle_floating(void) {
       wlr_log(WLR_ERROR, "toggle_floating: tiled node %u has no parent and is not root, already detached",
         n->id);
 
-    n->client->floating_rectangle = n->client->tiled_rectangle;
+    if (n->client->toplevel) {
+      struct bwm_toplevel *tl = n->client->toplevel;
+      int off_x = (n->client->tiled_rectangle.width - tl->geometry.width) / 2;
+      int off_y = (n->client->tiled_rectangle.height - tl->geometry.height) / 2;
+      n->client->floating_rectangle = (struct wlr_box){
+        .x = n->client->tiled_rectangle.x + (off_x > 0 ? off_x : 0),
+        .y = n->client->tiled_rectangle.y + (off_y > 0 ? off_y : 0),
+        .width = tl->geometry.width,
+        .height = tl->geometry.height
+      };
+    } else
+      n->client->floating_rectangle = n->client->tiled_rectangle;
 
     remove_node(mon->desk, n);
     n->hidden = true;
@@ -499,7 +510,6 @@ void toggle_floating(void) {
     if (n->client->toplevel) {
       wlr_scene_node_set_position(&n->client->toplevel->scene_tree->node,
         n->client->floating_rectangle.x, n->client->floating_rectangle.y);
-      toplevel_center_and_clip_surface(n->client->toplevel);
     } else if (n->client->xwayland_view)
       wlr_scene_node_set_position(&n->client->xwayland_view->scene_tree->node,
         n->client->floating_rectangle.x, n->client->floating_rectangle.y);
@@ -514,6 +524,11 @@ void toggle_floating(void) {
       xwayland_view_set_activated(n->client->xwayland_view, true);
 
     set_state(mon, mon->desk, n, STATE_FLOATING);
+
+    if (n->client->toplevel)
+      toplevel_center_and_clip_surface(n->client->toplevel);
+    node_set_dirty(n);
+    transaction_commit_dirty();
     wlr_log(WLR_INFO, "toggle_floating: now floating, node=%u root=%u focus=%u",
       n->id,
       mon->desk->root ? mon->desk->root->id : 0,
