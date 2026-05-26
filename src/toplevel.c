@@ -204,6 +204,45 @@ void toplevel_center_and_clip_surface(struct bwm_toplevel *toplevel) {
 
   wlr_scene_node_set_position(&toplevel->content_tree->node, x, y);
 
+  // when tiled surface is smaller than its container, update borders
+  // to wrap the actual surface instead of the full allocated space
+  if (tiled && toplevel->border_tree && c->border_width > 0) {
+    unsigned int bw = c->border_width;
+    if (x > 0 || y > 0) {
+      int border_w = (int)toplevel->geometry.width < container_rect->width ? (int)toplevel->geometry.width : container_rect->width;
+      int border_h = (int)toplevel->geometry.height < container_rect->height ? (int)toplevel->geometry.height : container_rect->height;
+      wlr_log(WLR_DEBUG, "center_clip: undersized tiled surface geo=(%dx%d) offset=(%d,%d) container=(%dx%d) border_clamped=(%dx%d)",
+        toplevel->geometry.width, toplevel->geometry.height, x, y,
+        container_rect ? container_rect->width : 0, container_rect ? container_rect->height : 0,
+        border_w, border_h);
+      struct wlr_box content_geo = {0, 0, border_w, border_h};
+      update_borders(toplevel->border_tree, toplevel->border_rects, content_geo, bw);
+      wlr_scene_node_set_position(&toplevel->border_tree->node, (int)x - (int)bw, (int)y - (int)bw);
+      update_border_colors(toplevel->border_tree, toplevel->border_rects, c);
+      if (c->border_radius > 0.0f && toplevel->border_shader_node) {
+        toplevel->border_dirty = true;
+        int new_fw = border_w + 2 * (int)bw;
+        int new_fh = border_h + 2 * (int)bw;
+        if (new_fw > 0 && new_fh > 0)
+          wlr_scene_buffer_set_dest_size(toplevel->border_shader_node, new_fw, new_fh);
+      }
+    } else if (container_rect) {
+      wlr_log(WLR_DEBUG, "center_clip: full-size tiled surface geo=(%dx%d) container=(%dx%d)",
+        toplevel->geometry.width, toplevel->geometry.height,
+        container_rect->width, container_rect->height);
+      struct wlr_box full_geo = {0, 0, container_rect->width, container_rect->height};
+      update_borders(toplevel->border_tree, toplevel->border_rects, full_geo, bw);
+      update_border_colors(toplevel->border_tree, toplevel->border_rects, c);
+      if (c->border_radius > 0.0f && toplevel->border_shader_node) {
+        toplevel->border_dirty = true;
+        int new_fw = container_rect->width + 2 * (int)bw;
+        int new_fh = container_rect->height + 2 * (int)bw;
+        if (new_fw > 0 && new_fh > 0)
+          wlr_scene_buffer_set_dest_size(toplevel->border_shader_node, new_fw, new_fh);
+      }
+    }
+  }
+
   if (!wl_list_empty(&toplevel->content_tree->children)) {
     if (clip_to_geometry) {
       struct wlr_box clip = {
@@ -1120,6 +1159,9 @@ void handle_new_xdg_toplevel(struct wl_listener *listener, void *data) {
     free(toplevel);
     return;
   }
+
+  // keep scene invisible until arrange_node_geometry positions and enables it
+  wlr_scene_node_set_enabled(&toplevel->scene_tree->node, false);
 
   // create content tree as child and add surface
   toplevel->content_tree = wlr_scene_tree_create(toplevel->scene_tree);

@@ -1847,6 +1847,12 @@ void blur_output_frame(struct bwm_output *output, struct wlr_scene_output *scene
       if (c->border_radius <= 0.0f) { tl->border_dirty = false; continue; }
 
       struct wlr_box content_r = get_client_rect(tl);
+      if (c->state == STATE_TILED && tl->geometry.width > 0 && tl->geometry.height > 0) {
+        if ((int)tl->geometry.width < content_r.width)
+          content_r.width = tl->geometry.width;
+        if ((int)tl->geometry.height < content_r.height)
+          content_r.height = tl->geometry.height;
+      }
       egl_make_current();
       blur_render_border(tl, content_r.width, content_r.height);
       egl_unset_current();

@@ -8,6 +8,8 @@
 #include <wlr/types/wlr_scene.h>
 #include <wlr/util/log.h>
 
+#define MIN(a, b) a < b ? a : b
+
 struct bwm_snapshot_buffer {
   struct wl_list link;
   struct wlr_scene_buffer *buffer;
@@ -491,15 +493,30 @@ static void update_snapshot_entry(struct bwm_animation_entry *entry,
 
 borders_update:
   if (entry->toplevel && entry->toplevel->border_tree) {
-    struct wlr_box geo = {0, 0, width, height};
     unsigned int bw = 0;
     if (entry->node && entry->node->client)
       bw = entry->node->client->border_width;
+
+    int bwidth = width, bheight = height;
+    if (entry->use_content_tree && entry->toplevel->geometry.width > 0) {
+      bwidth = MIN(width, entry->toplevel->geometry.width);
+      bheight = MIN(height, entry->toplevel->geometry.height);
+    }
+
+    struct wlr_box geo = {0, 0, bwidth, bheight};
     update_borders(entry->toplevel->border_tree, entry->toplevel->border_rects, geo, bw);
 
+    if (entry->use_content_tree) {
+      int cx = entry->toplevel->content_tree->node.x;
+      int cy = entry->toplevel->content_tree->node.y;
+      if (cx > 0 || cy > 0)
+        wlr_scene_node_set_position(&entry->toplevel->border_tree->node,
+          cx - (int)bw, cy - (int)bw);
+    }
+
     if (entry->toplevel->border_shader_node && bw > 0) {
-      int new_fw = width + 2 * (int)bw;
-      int new_fh = height + 2 * (int)bw;
+      int new_fw = bwidth + 2 * (int)bw;
+      int new_fh = bheight + 2 * (int)bw;
       if (new_fw > 0 && new_fh > 0)
         wlr_scene_buffer_set_dest_size(entry->toplevel->border_shader_node, new_fw, new_fh);
     }
