@@ -16,8 +16,11 @@
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_scene.h>
+#include <wlr/render/allocator.h>
 #include <wlr/util/log.h>
 #include "ext-image-capture-source-v1-protocol.h"
+
+const struct wlr_drm_format_set *wlr_renderer_get_render_formats(struct wlr_renderer *renderer);
 #include "ext-image-copy-capture-v1-protocol.h"
 
 struct bwm_image_copy_source {
@@ -664,6 +667,67 @@ send_ready:
 	return true;
 }
 
+struct capture_render_ctx {
+	struct wlr_render_pass *pass;
+	struct wlr_texture **textures;
+	size_t textures_len;
+	size_t textures_cap;
+};
+
+static void capture_render_buffer_iter(struct wlr_scene_buffer *scene_buffer,
+		int sx, int sy, void *user_data) {
+	struct capture_render_ctx *ctx = user_data;
+
+	if (!scene_buffer->buffer)
+		return;
+
+	struct wlr_texture *tex = wlr_texture_from_buffer(server.renderer,
+		scene_buffer->buffer);
+	if (!tex)
+		return;
+
+	if (ctx->textures_len >= ctx->textures_cap) {
+		size_t new_cap = ctx->textures_cap ? ctx->textures_cap * 2 : 8;
+		struct wlr_texture **new_t = realloc(ctx->textures,
+			new_cap * sizeof(*new_t));
+		if (!new_t) {
+			wlr_texture_destroy(tex);
+			return;
+		}
+		ctx->textures = new_t;
+		ctx->textures_cap = new_cap;
+	}
+	ctx->textures[ctx->textures_len++] = tex;
+
+	int dst_w = scene_buffer->dst_width;
+	int dst_h = scene_buffer->dst_height;
+	if (dst_w == 0)
+		dst_w = (int)scene_buffer->buffer->width;
+	if (dst_h == 0)
+		dst_h = (int)scene_buffer->buffer->height;
+
+	wlr_render_pass_add_texture(ctx->pass, &(struct wlr_render_texture_options){
+		.texture = tex,
+		.src_box = scene_buffer->src_box,
+		.dst_box = {
+			.x = sx,
+			.y = sy,
+			.width = dst_w,
+			.height = dst_h,
+		},
+		.alpha = &scene_buffer->opacity,
+		.transform = scene_buffer->transform,
+		.filter_mode = scene_buffer->filter_mode,
+		.blend_mode = WLR_RENDER_BLEND_MODE_PREMULTIPLIED,
+	});
+}
+
+static void capture_render_ctx_finish(struct capture_render_ctx *ctx) {
+	for (size_t i = 0; i < ctx->textures_len; i++)
+		wlr_texture_destroy(ctx->textures[i]);
+	free(ctx->textures);
+}
+
 static bool perform_scene_node_capture(struct bwm_copy_frame *frame,
 		struct wlr_ext_image_capture_source_v1 *source,
 		struct wlr_scene *capture_scene, bool block_out) {
@@ -672,60 +736,22 @@ static bool perform_scene_node_capture(struct bwm_copy_frame *frame,
 		return false;
 	}
 
-	if (wl_list_empty(&capture_scene->outputs)) {
-		wlr_log(WLR_DEBUG, "ext-copy-capture: capture scene has no outputs");
-		return false;
-	}
-
-	struct wlr_scene_output *scene_output =
-		wl_container_of(capture_scene->outputs.next, scene_output, link);
-
-	if (!scene_output->output) {
-		wlr_log(WLR_DEBUG, "ext-copy-capture: scene output has no wlr_output");
-		return false;
-	}
-
-	if (scene_output->output->width == 0 || scene_output->output->height == 0) {
-		wlr_log(WLR_DEBUG, "ext-copy-capture: virtual output %dx%d",
-			scene_output->output->width, scene_output->output->height);
-		return false;
-	}
-
-	wlr_log(WLR_DEBUG, "ext-copy-capture: rendering scene output %dx%d",
-		scene_output->output->width, scene_output->output->height);
-
-	wlr_damage_ring_add_whole(&scene_output->damage_ring);
-	struct wlr_output_state state;
-	wlr_output_state_init(&state);
-	wlr_output_state_set_enabled(&state, true);
-
-	if (!wlr_scene_output_build_state(scene_output, &state, NULL)) {
-		wlr_output_state_finish(&state);
-		return false;
-	}
-
-	struct wlr_buffer *rendered = state.buffer;
-	if (!rendered) {
-		wlr_output_state_finish(&state);
-		return false;
-	}
-
-	wlr_buffer_lock(rendered);
-	wlr_output_state_finish(&state);
-
-	struct wlr_texture *texture = wlr_texture_from_buffer(server.renderer, rendered);
-	wlr_buffer_unlock(rendered);
-	if (!texture)
-		return false;
+	wlr_log(WLR_DEBUG, "ext-copy-capture: rendering scene node %dx%d",
+		source->width, source->height);
 
 	struct wlr_render_pass *pass = wlr_renderer_begin_buffer_pass(
 		server.renderer, frame->buffer, NULL);
 	if (pass) {
-		wlr_render_pass_add_texture(pass, &(struct wlr_render_texture_options){
-			.texture = texture,
+		struct capture_render_ctx ctx = { .pass = pass };
+
+		wlr_render_pass_add_rect(pass, &(struct wlr_render_rect_options){
+			.box = { .width = source->width, .height = source->height },
+			.color = { 0, 0, 0, 0 },
 			.blend_mode = WLR_RENDER_BLEND_MODE_NONE,
-			.dst_box = { .width = source->width, .height = source->height },
 		});
+
+		wlr_scene_node_for_each_buffer(&capture_scene->tree.node,
+			capture_render_buffer_iter, &ctx);
 
 		if (block_out) {
 			wlr_render_pass_add_rect(pass, &(struct wlr_render_rect_options){
@@ -736,8 +762,67 @@ static bool perform_scene_node_capture(struct bwm_copy_frame *frame,
 		}
 
 		wlr_render_pass_submit(pass);
-		wlr_texture_destroy(texture);
+		capture_render_ctx_finish(&ctx);
 		goto send_ready;
+	}
+
+	wlr_log(WLR_DEBUG, "ext-copy-capture: GPU direct render failed, "
+		"falling back to SHM staging path");
+
+	const struct wlr_drm_format_set *fmts = wlr_renderer_get_render_formats(server.renderer);
+	const struct wlr_drm_format *fmt = NULL;
+	if (fmts) {
+		fmt = wlr_drm_format_set_get(fmts, DRM_FORMAT_ARGB8888);
+		if (!fmt)
+			fmt = wlr_drm_format_set_get(fmts, DRM_FORMAT_XRGB8888);
+	}
+	if (!fmt) {
+		wlr_log(WLR_DEBUG, "ext-copy-capture: no suitable render format");
+		return false;
+	}
+
+	struct wlr_buffer *staging = wlr_allocator_create_buffer(server.allocator,
+		(int)source->width, (int)source->height, fmt);
+	if (!staging) {
+		wlr_log(WLR_DEBUG, "ext-copy-capture: failed to create staging buffer");
+		return false;
+	}
+
+	struct wlr_render_pass *staging_pass = wlr_renderer_begin_buffer_pass(
+		server.renderer, staging, NULL);
+	if (!staging_pass) {
+		wlr_buffer_drop(staging);
+		wlr_log(WLR_DEBUG, "ext-copy-capture: failed to start staging render pass");
+		return false;
+	}
+
+	struct capture_render_ctx ctx = { .pass = staging_pass };
+
+	wlr_render_pass_add_rect(staging_pass, &(struct wlr_render_rect_options){
+		.box = { .width = source->width, .height = source->height },
+		.color = { 0, 0, 0, 0 },
+		.blend_mode = WLR_RENDER_BLEND_MODE_NONE,
+	});
+
+	wlr_scene_node_for_each_buffer(&capture_scene->tree.node,
+		capture_render_buffer_iter, &ctx);
+
+	if (block_out) {
+		wlr_render_pass_add_rect(staging_pass, &(struct wlr_render_rect_options){
+			.box = { .width = source->width, .height = source->height },
+			.color = { 0, 0, 0, 1 },
+			.blend_mode = WLR_RENDER_BLEND_MODE_NONE,
+		});
+	}
+
+	wlr_render_pass_submit(staging_pass);
+
+	struct wlr_texture *staging_tex = wlr_texture_from_buffer(server.renderer, staging);
+	wlr_buffer_drop(staging);
+	if (!staging_tex) {
+		capture_render_ctx_finish(&ctx);
+		wlr_log(WLR_DEBUG, "ext-copy-capture: failed to create staging texture");
+		return false;
 	}
 
 	uint32_t dst_format;
@@ -746,32 +831,26 @@ static bool perform_scene_node_capture(struct bwm_copy_frame *frame,
 	if (!wlr_buffer_begin_data_ptr_access(frame->buffer,
 			WLR_BUFFER_DATA_PTR_ACCESS_WRITE,
 			&dst_data, &dst_format, &dst_stride)) {
-		wlr_texture_destroy(texture);
+		wlr_texture_destroy(staging_tex);
+		capture_render_ctx_finish(&ctx);
 		return false;
 	}
 
-	if (!wlr_texture_read_pixels(texture, &(struct wlr_texture_read_pixels_options){
+	if (!wlr_texture_read_pixels(staging_tex, &(struct wlr_texture_read_pixels_options){
 			.data = dst_data,
 			.format = dst_format,
 			.stride = (uint32_t)dst_stride,
 			.src_box = { .width = (int)source->width, .height = (int)source->height },
 		})) {
 		wlr_buffer_end_data_ptr_access(frame->buffer);
-		wlr_texture_destroy(texture);
+		wlr_texture_destroy(staging_tex);
+		capture_render_ctx_finish(&ctx);
 		return false;
 	}
 
-	wlr_texture_destroy(texture);
-
-	if (block_out) {
-		for (uint32_t row = 0; row < source->height; row++) {
-			uint32_t *pixels = (uint32_t *)((uint8_t *)dst_data + row * dst_stride);
-			for (uint32_t col = 0; col < source->width; col++)
-				pixels[col] = 0xFF000000;
-		}
-	}
-
 	wlr_buffer_end_data_ptr_access(frame->buffer);
+	wlr_texture_destroy(staging_tex);
+	capture_render_ctx_finish(&ctx);
 
 send_ready:
 	ext_image_copy_capture_frame_v1_send_transform(frame->resource,
