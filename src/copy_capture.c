@@ -664,6 +664,131 @@ send_ready:
 	return true;
 }
 
+static bool perform_scene_node_capture(struct bwm_copy_frame *frame,
+		struct wlr_ext_image_capture_source_v1 *source,
+		struct wlr_scene *capture_scene, bool block_out) {
+	if (!capture_scene) {
+		wlr_log(WLR_DEBUG, "ext-copy-capture: no capture scene");
+		return false;
+	}
+
+	if (wl_list_empty(&capture_scene->outputs)) {
+		wlr_log(WLR_DEBUG, "ext-copy-capture: capture scene has no outputs");
+		return false;
+	}
+
+	struct wlr_scene_output *scene_output =
+		wl_container_of(capture_scene->outputs.next, scene_output, link);
+
+	if (!scene_output->output) {
+		wlr_log(WLR_DEBUG, "ext-copy-capture: scene output has no wlr_output");
+		return false;
+	}
+
+	if (scene_output->output->width == 0 || scene_output->output->height == 0) {
+		wlr_log(WLR_DEBUG, "ext-copy-capture: virtual output %dx%d",
+			scene_output->output->width, scene_output->output->height);
+		return false;
+	}
+
+	wlr_log(WLR_DEBUG, "ext-copy-capture: rendering scene output %dx%d",
+		scene_output->output->width, scene_output->output->height);
+
+	wlr_damage_ring_add_whole(&scene_output->damage_ring);
+	struct wlr_output_state state;
+	wlr_output_state_init(&state);
+	wlr_output_state_set_enabled(&state, true);
+
+	if (!wlr_scene_output_build_state(scene_output, &state, NULL)) {
+		wlr_output_state_finish(&state);
+		return false;
+	}
+
+	struct wlr_buffer *rendered = state.buffer;
+	if (!rendered) {
+		wlr_output_state_finish(&state);
+		return false;
+	}
+
+	wlr_buffer_lock(rendered);
+	wlr_output_state_finish(&state);
+
+	struct wlr_texture *texture = wlr_texture_from_buffer(server.renderer, rendered);
+	wlr_buffer_unlock(rendered);
+	if (!texture)
+		return false;
+
+	struct wlr_render_pass *pass = wlr_renderer_begin_buffer_pass(
+		server.renderer, frame->buffer, NULL);
+	if (pass) {
+		wlr_render_pass_add_texture(pass, &(struct wlr_render_texture_options){
+			.texture = texture,
+			.blend_mode = WLR_RENDER_BLEND_MODE_NONE,
+			.dst_box = { .width = source->width, .height = source->height },
+		});
+
+		if (block_out) {
+			wlr_render_pass_add_rect(pass, &(struct wlr_render_rect_options){
+				.box = { .width = source->width, .height = source->height },
+				.color = { 0, 0, 0, 1 },
+				.blend_mode = WLR_RENDER_BLEND_MODE_NONE,
+			});
+		}
+
+		wlr_render_pass_submit(pass);
+		wlr_texture_destroy(texture);
+		goto send_ready;
+	}
+
+	uint32_t dst_format;
+	size_t dst_stride;
+	void *dst_data;
+	if (!wlr_buffer_begin_data_ptr_access(frame->buffer,
+			WLR_BUFFER_DATA_PTR_ACCESS_WRITE,
+			&dst_data, &dst_format, &dst_stride)) {
+		wlr_texture_destroy(texture);
+		return false;
+	}
+
+	if (!wlr_texture_read_pixels(texture, &(struct wlr_texture_read_pixels_options){
+			.data = dst_data,
+			.format = dst_format,
+			.stride = (uint32_t)dst_stride,
+			.src_box = { .width = (int)source->width, .height = (int)source->height },
+		})) {
+		wlr_buffer_end_data_ptr_access(frame->buffer);
+		wlr_texture_destroy(texture);
+		return false;
+	}
+
+	wlr_texture_destroy(texture);
+
+	if (block_out) {
+		for (uint32_t row = 0; row < source->height; row++) {
+			uint32_t *pixels = (uint32_t *)((uint8_t *)dst_data + row * dst_stride);
+			for (uint32_t col = 0; col < source->width; col++)
+				pixels[col] = 0xFF000000;
+		}
+	}
+
+	wlr_buffer_end_data_ptr_access(frame->buffer);
+
+send_ready:
+	ext_image_copy_capture_frame_v1_send_transform(frame->resource,
+		WL_OUTPUT_TRANSFORM_NORMAL);
+
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	time_t tv_sec = now.tv_sec;
+	uint32_t tv_sec_hi = (sizeof(tv_sec) > 4) ? tv_sec >> 32 : 0;
+	uint32_t tv_sec_lo = tv_sec & 0xFFFFFFFF;
+	ext_image_copy_capture_frame_v1_send_presentation_time(
+		frame->resource, tv_sec_hi, tv_sec_lo, now.tv_nsec);
+
+	ext_image_copy_capture_frame_v1_send_ready(frame->resource);
+	return true;
+}
+
 static void frame_handle_capture(struct wl_client *wl_client,
 		struct wl_resource *frame_resource) {
 	(void)wl_client;
@@ -689,7 +814,11 @@ static void frame_handle_capture(struct wl_client *wl_client,
 	struct bwm_copy_session *session = frame->session;
 	struct wlr_ext_image_capture_source_v1 *source = session->source;
 
+	wlr_log(WLR_DEBUG, "ext-copy-capture: frame_handle_capture source=%p impl=%p",
+		(void*)source, source ? (void*)source->impl : NULL);
+
 	if (!source) {
+		wlr_log(WLR_DEBUG, "ext-copy-capture: source is NULL, sending stopped");
 		ext_image_copy_capture_frame_v1_send_failed(frame->resource,
 			EXT_IMAGE_COPY_CAPTURE_FRAME_V1_FAILURE_REASON_STOPPED);
 		session->frame = NULL;
@@ -697,16 +826,61 @@ static void frame_handle_capture(struct wl_client *wl_client,
 		return;
 	}
 
+	wlr_log(WLR_DEBUG, "ext-copy-capture: checking output source path");
 	if (wlr_output_try_from_ext_image_capture_source_v1(source) ||
 			source->impl == &source_impl) {
+		wlr_log(WLR_DEBUG, "ext-copy-capture: source is output-backed, "
+			"calling perform_output_capture");
 		struct bwm_image_copy_source *img_src = source_from_base(source);
 		if (perform_output_capture(frame, img_src)) {
 			session->frame = NULL;
 			frame_destroy(frame);
 			return;
 		}
+		wlr_log(WLR_DEBUG, "ext-copy-capture: perform_output_capture failed");
+	} else {
+		wlr_log(WLR_DEBUG, "ext-copy-capture: source is NOT output-backed");
 	}
 
+	// scene-node source
+	wlr_log(WLR_DEBUG, "ext-copy-capture: checking toplevel sources");
+	struct bwm_toplevel *tl;
+	wl_list_for_each(tl, &server.toplevels, link) {
+		if (tl->image_capture_source != source)
+			continue;
+		wlr_log(WLR_DEBUG, "ext-copy-capture: found matching toplevel %p, "
+			"calling perform_scene_node_capture", (void*)tl);
+		bool block_out = tl->node && tl->node->client &&
+			tl->node->client->block_out_from_screenshare;
+		if (perform_scene_node_capture(frame, source,
+				tl->image_capture, block_out)) {
+			session->frame = NULL;
+			frame_destroy(frame);
+			return;
+		}
+		wlr_log(WLR_DEBUG, "ext-copy-capture: perform_scene_node_capture failed");
+		break;
+	}
+
+	struct bwm_xwayland_view *xw;
+	wl_list_for_each(xw, &server.xwayland.views, link) {
+		if (xw->image_capture_source != source)
+			continue;
+		wlr_log(WLR_DEBUG, "ext-copy-capture: found matching xwayland view %p, "
+			"calling perform_scene_node_capture", (void*)xw);
+		bool block_out = xw->node && xw->node->client &&
+			xw->node->client->block_out_from_screenshare;
+		if (perform_scene_node_capture(frame, source,
+				xw->image_capture, block_out)) {
+			session->frame = NULL;
+			frame_destroy(frame);
+			return;
+		}
+		wlr_log(WLR_DEBUG, "ext-copy-capture: perform_scene_node_capture failed");
+		break;
+	}
+
+	wlr_log(WLR_DEBUG, "ext-copy-capture: no matching source found, sending failed");
 	ext_image_copy_capture_frame_v1_send_failed(frame->resource,
 		EXT_IMAGE_COPY_CAPTURE_FRAME_V1_FAILURE_REASON_UNKNOWN);
 	session->frame = NULL;
@@ -821,35 +995,42 @@ static void send_buffer_constraints(struct bwm_copy_session *session,
 	ext_image_copy_capture_session_v1_send_buffer_size(session->resource,
 		source->width, source->height);
 
-	for (size_t i = 0; i < source->shm_formats_len; i++)
+	if (source->shm_formats_len) {
+		for (size_t i = 0; i < source->shm_formats_len; i++)
+			ext_image_copy_capture_session_v1_send_shm_format(
+				session->resource, drm_format_to_wl_shm(source->shm_formats[i]));
+	} else {
 		ext_image_copy_capture_session_v1_send_shm_format(
-			session->resource, drm_format_to_wl_shm(source->shm_formats[i]));
-
-	if (source->dmabuf_device) {
-		dev_t dev = source->dmabuf_device;
-		uint32_t dev_arr[2] = { (uint32_t)(dev >> 32), (uint32_t)dev };
-		struct wl_array arr;
-		wl_array_init(&arr);
-		uint32_t *d = wl_array_add(&arr, sizeof(dev_arr));
-		if (d)
-			memcpy(d, dev_arr, sizeof(dev_arr));
-		ext_image_copy_capture_session_v1_send_dmabuf_device(
-			session->resource, &arr);
-		wl_array_release(&arr);
+			session->resource, WL_SHM_FORMAT_ARGB8888);
 	}
 
-	for (size_t i = 0; i < source->dmabuf_formats.len; i++) {
-		const struct wlr_drm_format *fmt = &source->dmabuf_formats.formats[i];
-		struct wl_array mods;
-		wl_array_init(&mods);
-		for (size_t j = 0; j < fmt->len; j++) {
-			uint64_t *m = wl_array_add(&mods, sizeof(uint64_t));
-			if (m)
-				*m = fmt->modifiers[j];
+	if (source->impl == &source_impl) {
+		if (source->dmabuf_device) {
+			dev_t dev = source->dmabuf_device;
+			uint32_t dev_arr[2] = { (uint32_t)(dev >> 32), (uint32_t)dev };
+			struct wl_array arr;
+			wl_array_init(&arr);
+			uint32_t *d = wl_array_add(&arr, sizeof(dev_arr));
+			if (d)
+				memcpy(d, dev_arr, sizeof(dev_arr));
+			ext_image_copy_capture_session_v1_send_dmabuf_device(
+				session->resource, &arr);
+			wl_array_release(&arr);
 		}
-		ext_image_copy_capture_session_v1_send_dmabuf_format(
-			session->resource, fmt->format, &mods);
-		wl_array_release(&mods);
+
+		for (size_t i = 0; i < source->dmabuf_formats.len; i++) {
+			const struct wlr_drm_format *fmt = &source->dmabuf_formats.formats[i];
+			struct wl_array mods;
+			wl_array_init(&mods);
+			for (size_t j = 0; j < fmt->len; j++) {
+				uint64_t *m = wl_array_add(&mods, sizeof(uint64_t));
+				if (m)
+					*m = fmt->modifiers[j];
+			}
+			ext_image_copy_capture_session_v1_send_dmabuf_format(
+				session->resource, fmt->format, &mods);
+			wl_array_release(&mods);
+		}
 	}
 
 	ext_image_copy_capture_session_v1_send_done(session->resource);
@@ -887,6 +1068,16 @@ static void mgr_handle_create_session(struct wl_client *wl_client,
 
 	session->source_destroy.notify = session_source_destroy;
 	wl_signal_add(&wlr_source->events.destroy, &session->source_destroy);
+
+	wlr_log(WLR_DEBUG, "ext-copy-capture: create_session source=%p impl=%p "
+		"width=%d height=%d shm_fmts=%zu", (void*)wlr_source,
+		(void*)wlr_source->impl, wlr_source->width, wlr_source->height,
+		wlr_source->shm_formats_len);
+
+	if (wlr_source->impl->start) {
+		wlr_source->impl->start(wlr_source,
+			options & EXT_IMAGE_COPY_CAPTURE_MANAGER_V1_OPTIONS_PAINT_CURSORS);
+	}
 
 	send_buffer_constraints(session, wlr_source);
 }
