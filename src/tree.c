@@ -29,7 +29,7 @@ bool focus_follows_pointer = false;
 bool pointer_follows_focus = false;
 bool record_history = true;
 bool click_to_focus = false;
-bool disable_decorations = false;
+decoration_mode_t decoration_mode = DECORATION_ALWAYS;
 bool enable_animations = false;
 int mapping_events_count = 0;
 int directional_focus_tightness = 20;
@@ -387,25 +387,34 @@ void apply_layout(struct bwm_output *m, desktop_t *d, node_t *n, struct wlr_box 
       n->id, n->client->tiled_rectangle.x, n->client->tiled_rectangle.y,
       n->client->tiled_rectangle.width, n->client->tiled_rectangle.height);
   } else if (n->split_type == TYPE_TABBED && d->layout != LAYOUT_MONOCLE) {
-    int bar_h = tab_bar_height();
+    bool show_deco = decoration_mode == DECORATION_ALWAYS || decoration_mode == DECORATION_TABS;
 
-    int wg = d->window_gap;
-    struct wlr_box bar_rect = {
-      .x = rect.x,
-      .y = rect.y,
-      .width = (wg < rect.width) ? rect.width - wg : 0,
-      .height = bar_h,
-    };
+    if (show_deco) {
+      int bar_h = tab_bar_height();
 
-    if (n->tab_bar == NULL)
-      tabs_create(n);
-    tabs_arrange(n, bar_rect);
-    tabs_show(n, true);
-    tabs_update_focus(n, d->focus);
+      int wg = d->window_gap;
+      struct wlr_box bar_rect = {
+        .x = rect.x,
+        .y = rect.y,
+        .width = (wg < rect.width) ? rect.width - wg : 0,
+        .height = bar_h,
+      };
+
+      if (n->tab_bar == NULL)
+        tabs_create(n);
+      tabs_arrange(n, bar_rect);
+      tabs_show(n, true);
+      tabs_update_focus(n, d->focus);
+    } else if (n->tab_bar) {
+      tabs_show(n, false);
+    }
 
     struct wlr_box content_rect = rect;
-    content_rect.y += bar_h;
-    content_rect.height = (bar_h < content_rect.height) ? content_rect.height - bar_h : 0;
+    if (show_deco) {
+      int bar_h = tab_bar_height();
+      content_rect.y += bar_h;
+      content_rect.height = (bar_h < content_rect.height) ? content_rect.height - bar_h : 0;
+    }
 
     apply_layout_tabbed_subtree(m, d, n->first_child, content_rect, root_rect);
     apply_layout_tabbed_subtree(m, d, n->second_child, content_rect, root_rect);

@@ -2604,12 +2604,43 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
     } else {
       send_success(client_fd, gapless_monocle ? "true\n" : "false\n");
     }
-  } else if (streq("disable_decorations", *args)) {
+  } else if (streq("decoration_mode", *args)) {
     if (num >= 2) {
-      disable_decorations = (strcmp(args[1], "true") == 0);
-      send_success(client_fd, "disable_decorations set\n");
+      if (strcmp(args[1], "none") == 0)
+        decoration_mode = DECORATION_NONE;
+      else if (strcmp(args[1], "tabs") == 0)
+        decoration_mode = DECORATION_TABS;
+      else if (strcmp(args[1], "always") == 0)
+        decoration_mode = DECORATION_ALWAYS;
+      else if (strcmp(args[1], "csd") == 0)
+        decoration_mode = DECORATION_CSD;
+      else {
+        send_failure(client_fd, "config decoration_mode: expected \"none\", \"tabs\", \"always\", or \"csd\"\n");
+        return;
+      }
+      for (struct bwm_output *m = mon_head; m != NULL; m = m->next)
+        for (desktop_t *d = m->desk; d != NULL; d = d->next)
+          if (d->root != NULL)
+            tabs_rebuild(d->root);
+      transaction_commit_dirty();
+      send_success(client_fd, "decoration_mode set\n");
     } else {
-      send_success(client_fd, disable_decorations ? "true\n" : "false\n");
+      const char *mode_str;
+      switch (decoration_mode) {
+      case DECORATION_NONE:
+        mode_str = "none\n";
+        break;
+      case DECORATION_TABS:
+        mode_str = "tabs\n";
+        break;
+      case DECORATION_ALWAYS:
+        mode_str = "always\n";
+        break;
+      case DECORATION_CSD:
+        mode_str = "csd\n";
+        break;
+      }
+      send_success(client_fd, mode_str);
     }
   } else if (streq("enable_animations", *args)) {
     if (num >= 2) {

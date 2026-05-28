@@ -39,15 +39,23 @@ static void toplevel_apply_disable_decorations(struct bwm_toplevel *toplevel) {
   if (!toplevel || !toplevel->xdg_toplevel)
     return;
 
-  // if disable_decorations is enabled, always request fullscreen to hide decorations
-  if (disable_decorations)
+  // if decorations are disabled or tabs-only, request fullscreen to hide client-side decorations
+  if (decoration_mode == DECORATION_NONE || decoration_mode == DECORATION_TABS)
     wlr_xdg_toplevel_set_fullscreen(toplevel->xdg_toplevel, true);
 }
 
 static bool toplevel_should_use_server_decorations(struct bwm_toplevel *tl) {
   if (!tl || !tl->node)
     return false;
-  return tabbed_ancestor(tl->node) != NULL;
+  switch (decoration_mode) {
+  case DECORATION_NONE:
+  case DECORATION_TABS:
+  case DECORATION_CSD:
+    return false;
+  case DECORATION_ALWAYS:
+    return tabbed_ancestor(tl->node) != NULL;
+  }
+  return false;
 }
 
 void toplevel_apply_decoration_mode(struct bwm_toplevel *tl) {
@@ -1420,9 +1428,19 @@ static void handle_decoration_request_mode(struct wl_listener *listener, void *d
   if (!tl || !tl->xdg_decoration || !tl->xdg_toplevel || !tl->xdg_toplevel->base ||
     !tl->xdg_toplevel->base->initialized || !tl->node) return;
 
-  enum wlr_xdg_toplevel_decoration_v1_mode mode = tabbed_ancestor(tl->node) != NULL
-    ? WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
-    : WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
+  enum wlr_xdg_toplevel_decoration_v1_mode mode;
+  switch (decoration_mode) {
+  case DECORATION_NONE:
+  case DECORATION_TABS:
+  case DECORATION_CSD:
+    mode = WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
+    break;
+  case DECORATION_ALWAYS:
+    mode = tabbed_ancestor(tl->node) != NULL
+      ? WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
+      : WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
+    break;
+  }
 
   wlr_xdg_toplevel_decoration_v1_set_mode(tl->xdg_decoration, mode);
 }
@@ -1445,9 +1463,19 @@ void handle_new_xdg_decoration(struct wl_listener *listener, void *data) {
   wl_signal_add(&deco->events.request_mode, &tl->decoration_request_mode);
 
   if (xdg_surface->initialized && tl->node) {
-    enum wlr_xdg_toplevel_decoration_v1_mode mode = tabbed_ancestor(tl->node) != NULL
-      ? WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
-      : WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
+    enum wlr_xdg_toplevel_decoration_v1_mode mode;
+    switch (decoration_mode) {
+    case DECORATION_NONE:
+    case DECORATION_TABS:
+    case DECORATION_CSD:
+      mode = WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
+      break;
+    case DECORATION_ALWAYS:
+      mode = tabbed_ancestor(tl->node) != NULL
+        ? WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
+        : WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
+      break;
+    }
     wlr_xdg_toplevel_decoration_v1_set_mode(deco, mode);
   }
 }

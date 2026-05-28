@@ -52,21 +52,18 @@ bmsg config gapless_monocle true|false
 When true, windows are rearranged to fill gaps when windows are closed.
 
 ```
-bmsg config disable_decorations true|false
+bmsg config decoration_mode none|tabs|always|csd
 ```
 
-When true, requests all windows to render without decorations (titlebars, borders, etc.)
-by signaling them to enter fullscreen mode. This provides a clean, minimal interface while
-maintaining normal window management. Similar to dwl (Dynamic Window Leader).
+Controls how window decorations (titlebars, borders) are displayed:
 
-The compositor maintains the decoration-free state across window state changes:
-- Fullscreening/unfullscreening windows preserves the decoration-free appearance
-- Maximizing/unmaximizing windows maintains hidden decorations
-- All other window state transitions keep decorations hidden
+- **none**: All windows render without decorations by signaling them to enter fullscreen mode. Tab bars are also hidden. Provides a clean, minimal interface.
 
-New windows created after enabling this setting will have no decorations. Existing windows
-may need to be restarted for the change to take effect. Normal tiling, floating, and window
-management operations continue to work as expected.
+- **tabs**: Tab bars are shown in tabbed layouts, but clients are kept in fullscreen mode to hide client-side decorations. No CSD is visible anywhere.
+
+- **always** (default): Decorations are always visible. In tabbed layouts, server-side tab bars replace client decorations. Outside tabbed layouts, clients use their own CSD.
+
+- **csd**: Client-side decorations are always shown, even in tabbed layouts. Tab bars are hidden and every window draws its own decorations.
 
 ```
 bmsg config edge_scroller_pointer_focus true|false

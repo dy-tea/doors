@@ -34,6 +34,8 @@ typedef enum {
   STATE_FULLSCREEN
 } client_state_t;
 
+typedef enum { DECORATION_NONE, DECORATION_TABS, DECORATION_ALWAYS, DECORATION_CSD } decoration_mode_t;
+
 typedef enum { LAYER_BELOW, LAYER_NORMAL, LAYER_ABOVE } stack_layer_t;
 
 typedef enum { LAYOUT_TILED, LAYOUT_MONOCLE, LAYOUT_SCROLLER } layout_t;
@@ -180,7 +182,7 @@ extern bool focus_follows_pointer;
 extern bool pointer_follows_focus;
 extern bool record_history;
 extern bool click_to_focus;
-extern bool disable_decorations;
+extern decoration_mode_t decoration_mode;
 extern bool enable_animations;
 extern int mapping_events_count;
 

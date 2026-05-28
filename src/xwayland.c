@@ -396,8 +396,8 @@ static void xwayland_view_apply_disable_decorations(struct bwm_xwayland_view *xw
 	if (!xwayland_view || !xwayland_view->xwayland_surface)
 		return;
 
-	// if disable_decorations is enabled, always request fullscreen to hide decorations
-	if (disable_decorations)
+	// if decorations are disabled or tabs-only, request fullscreen to hide client-side decorations
+	if (decoration_mode == DECORATION_NONE || decoration_mode == DECORATION_TABS)
 		xwayland_view_set_fullscreen(xwayland_view, true);
 }
 
