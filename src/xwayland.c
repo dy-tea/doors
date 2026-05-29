@@ -654,7 +654,7 @@ static void handle_map(struct wl_listener *listener, void *data) {
 
 	xwayland_view_apply_disable_decorations(xwayland_view);
 
-	arrange(target_monitor, target_desktop, target_desktop_is_focused);
+	arrange(target_monitor, target_desktop, true);
 
 	if (!wants_float && xwayland_view->node && xwayland_view->node->client) {
 		client_t *client = xwayland_view->node->client;

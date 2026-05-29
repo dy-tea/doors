@@ -525,8 +525,7 @@ void toplevel_map(struct wl_listener *listener, void *data) {
 
   toplevel_apply_disable_decorations(toplevel);
 
-  // only use transaction for focused desktop
-  arrange(target_output, target_desktop, target_desktop_is_focused);
+  arrange(target_output, target_desktop, true);
 
   // tabbed ancestors force SSD, otherwise allow CSD
   toplevel_apply_decoration_mode(toplevel);
