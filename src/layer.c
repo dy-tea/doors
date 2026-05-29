@@ -1,4 +1,5 @@
 #include "layer.h"
+#include "animation.h"
 #include "popup.h"
 #include "server.h"
 #include "output.h"
@@ -48,6 +49,8 @@ static void layer_surface_destroy(struct wl_listener *listener, void *data) {
   (void)data;
   struct bwm_layer_surface *layer = wl_container_of(listener, layer, destroy);
 
+  animation_cancel_scene_tree(layer->scene_tree);
+
   wl_list_remove(&layer->destroy.link);
   wl_list_remove(&layer->new_popup.link);
   wl_list_remove(&layer->map.link);
@@ -76,12 +79,15 @@ static void layer_surface_map(struct wl_listener *listener, void *data) {
 
 	if (layer->layer_surface->current.layer <= ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM)
 		blur_invalidate_mica(layer->output->blur_ctx);
+
+	animation_fade_in_layer(layer);
 }
 
 static void layer_surface_unmap(struct wl_listener *listener, void *data) {
   (void)data;
   struct bwm_layer_surface *layer = wl_container_of(listener, layer, unmap);
   layer->mapped = false;
+  animation_cancel_scene_tree(layer->scene_tree);
   wlr_scene_node_set_enabled(&layer->scene_tree->node, false);
   arrange_layers(layer->output);
 }

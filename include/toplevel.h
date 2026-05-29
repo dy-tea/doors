@@ -63,6 +63,7 @@ struct bwm_toplevel {
 
   bool mapped;
   bool configured;
+  bool wants_fade;
   bool client_maximized;
 
   // tearing control

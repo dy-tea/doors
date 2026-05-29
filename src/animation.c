@@ -1,4 +1,5 @@
 #include "animation.h"
+#include "layer.h"
 #include "output.h"
 #include "toplevel.h"
 #include "tree.h"
@@ -34,6 +35,9 @@ struct bwm_animation_entry {
   uint32_t duration_ms;
   struct wl_list snapshot_buffers;
   struct wl_list updated_buffers;
+  struct bwm_output *output;
+  float from_opacity;
+  float to_opacity;
 };
 
 static struct wl_list animations;
@@ -52,6 +56,8 @@ static struct bwm_animation_entry *create_animation_entry(void) {
   wl_list_init(&entry->updated_buffers);
   entry->updated_buffers_initialized = true;
   entry->use_content_tree = false;
+  entry->from_opacity = 1.0f;
+  entry->to_opacity = 1.0f;
   wl_list_insert(&animations, &entry->link);
   wlr_log(WLR_DEBUG, "animation: created entry %p", (void *)entry);
   return entry;
@@ -76,18 +82,11 @@ static double ease_out_cubic(double t) {
   return 1.0 - inv * inv * inv;
 }
 
-static void sample_position(const struct bwm_animation_entry *entry, struct timespec now, int *x, int *y) {
-  double progress = elapsed_ms(entry->start, now) / (double)entry->duration_ms;
-  if (progress < 0.0)
-    progress = 0.0;
-  if (progress > 1.0)
-    progress = 1.0;
-
-  double eased = ease_out_cubic(progress);
-  if (x)
-    *x = (int)(entry->from.x + (entry->to.x - entry->from.x) * eased);
-  if (y)
-    *y = (int)(entry->from.y + (entry->to.y - entry->from.y) * eased);
+static void set_opacity_iterator(struct wlr_scene_buffer *buffer, int sx, int sy, void *data) {
+  (void)sx; (void)sy;
+  float *opacity = data;
+  if (buffer)
+    wlr_scene_buffer_set_opacity(buffer, *opacity);
 }
 
 static void schedule_output(struct bwm_output *output) {
@@ -220,6 +219,10 @@ void animation_init(void) {
 void animation_fini(void) {
   struct bwm_animation_entry *entry, *tmp;
   wl_list_for_each_safe(entry, tmp, &animations, link) {
+    if (entry->from_opacity != entry->to_opacity && entry->scene_tree) {
+      float full = 1.0f;
+      wlr_scene_node_for_each_buffer(&entry->scene_tree->node, set_opacity_iterator, &full);
+    }
     destroy_snapshot_buffers(entry);
     wl_list_remove(&entry->link);
     free(entry);
@@ -231,9 +234,28 @@ void animation_cancel_node(struct node_t *node) {
   if (!entry)
     return;
   wlr_log(WLR_DEBUG, "animation: cancel node %u entry=%p", node ? node->id : 0, (void*)entry);
+  if (entry->from_opacity != entry->to_opacity && entry->scene_tree) {
+    float full = 1.0f;
+    wlr_scene_node_for_each_buffer(&entry->scene_tree->node, set_opacity_iterator, &full);
+  }
   destroy_snapshot_buffers(entry);
   wl_list_remove(&entry->link);
   free(entry);
+}
+
+void animation_cancel_scene_tree(struct wlr_scene_tree *scene_tree) {
+  struct bwm_animation_entry *entry, *tmp;
+  wl_list_for_each_safe(entry, tmp, &animations, link) {
+    if (entry->scene_tree != scene_tree)
+      continue;
+    if (entry->from_opacity != entry->to_opacity) {
+      float full = 1.0f;
+      wlr_scene_node_for_each_buffer(&entry->scene_tree->node, set_opacity_iterator, &full);
+    }
+    destroy_snapshot_buffers(entry);
+    wl_list_remove(&entry->link);
+    free(entry);
+  }
 }
 
 bool animation_start_snapshot_resize(struct bwm_toplevel *toplevel, struct wlr_box from, struct wlr_box to) {
@@ -258,6 +280,8 @@ bool animation_start_snapshot_resize(struct bwm_toplevel *toplevel, struct wlr_b
   clock_gettime(CLOCK_MONOTONIC, &entry->start);
   entry->duration_ms = ANIMATION_DURATION_MS;
   entry->use_content_tree = false;
+  entry->from_opacity = 1.0f;
+  entry->to_opacity = 1.0f;
 
   destroy_snapshot_buffers(entry);
   wl_list_init(&entry->snapshot_buffers);
@@ -290,6 +314,64 @@ bool animation_start_snapshot_resize(struct bwm_toplevel *toplevel, struct wlr_b
     from.x, from.y, from.width, from.height,
     to.x, to.y, to.width, to.height);
   schedule_output(toplevel->node->output);
+  return true;
+}
+
+bool animation_fade_in(struct bwm_toplevel *toplevel) {
+  if (!toplevel || !toplevel->node || !toplevel->scene_tree || !enable_animations)
+    return false;
+
+  struct bwm_animation_entry *entry = find_animation(toplevel->node);
+  if (entry) {
+    entry->from_opacity = 0.0f;
+    entry->to_opacity = 1.0f;
+  } else {
+    entry = create_animation_entry();
+    if (!entry)
+      return false;
+
+    entry->node = toplevel->node;
+    entry->scene_tree = toplevel->scene_tree;
+    entry->output = toplevel->node->output;
+    entry->from.x = toplevel->scene_tree->node.x;
+    entry->from.y = toplevel->scene_tree->node.y;
+    entry->to = entry->from;
+    entry->from_opacity = 0.0f;
+    entry->to_opacity = 1.0f;
+    clock_gettime(CLOCK_MONOTONIC, &entry->start);
+    entry->duration_ms = ANIMATION_DURATION_MS;
+  }
+
+  float zero = 0.0f;
+  wlr_scene_node_for_each_buffer(&toplevel->scene_tree->node, set_opacity_iterator, &zero);
+
+  wlr_log(WLR_DEBUG, "animation: fade_in entry=%p", (void*)entry);
+  schedule_output(toplevel->node->output);
+  return true;
+}
+
+bool animation_fade_in_layer(struct bwm_layer_surface *layer) {
+  if (!layer || !layer->scene_tree || !layer->output || !enable_animations)
+    return false;
+
+  struct bwm_animation_entry *entry = create_animation_entry();
+  if (!entry)
+    return false;
+
+  entry->node = NULL;
+  entry->toplevel = NULL;
+  entry->scene_tree = layer->scene_tree;
+  entry->output = layer->output;
+  entry->from_opacity = 0.0f;
+  entry->to_opacity = 1.0f;
+  clock_gettime(CLOCK_MONOTONIC, &entry->start);
+  entry->duration_ms = ANIMATION_DURATION_MS;
+
+  float zero = 0.0f;
+  wlr_scene_node_for_each_buffer(&layer->scene_tree->node, set_opacity_iterator, &zero);
+
+  wlr_log(WLR_DEBUG, "animation: fade_in_layer entry=%p", (void*)entry);
+  schedule_output(entry->output);
   return true;
 }
 
@@ -338,9 +420,6 @@ bool animation_apply_geometry_from(struct node_t *node, struct wlr_scene_tree *s
     wlr_scene_node_set_position(&scene_tree->node, target.x, target.y);
     return false;
   }
-
-  wlr_log(WLR_DEBUG, "animation: apply_geometry entry=%p node=%u from=(%d,%d) to=(%d,%d)",
-   	(void*)entry, node ? node->id : 0, entry->from.x, entry->from.y, entry->to.x, entry->to.y);
 
   wlr_scene_node_set_position(&scene_tree->node, entry->from.x, entry->from.y);
   schedule_output(output);
@@ -528,7 +607,38 @@ bool animation_update_output(struct bwm_output *output, struct timespec now) {
   struct bwm_animation_entry *entry, *tmp;
 
   wl_list_for_each_safe(entry, tmp, &animations, link) {
-    if (!entry->node || !entry->scene_tree || !entry->node->client) {
+    if (!entry->node) {
+      if (entry->output != output)
+        continue;
+
+      if (!entry->scene_tree) {
+        wl_list_remove(&entry->link);
+        free(entry);
+        continue;
+      }
+
+      double progress = elapsed_ms(entry->start, now) / (double)entry->duration_ms;
+      if (progress < 0.0)
+        progress = 0.0;
+      if (progress > 1.0)
+        progress = 1.0;
+
+      double eased = ease_out_cubic(progress);
+      float opacity = (float)(entry->from_opacity + (entry->to_opacity - entry->from_opacity) * eased);
+      wlr_scene_node_for_each_buffer(&entry->scene_tree->node, set_opacity_iterator, &opacity);
+
+      if (progress >= 1.0) {
+        float full = 1.0f;
+        wlr_scene_node_for_each_buffer(&entry->scene_tree->node, set_opacity_iterator, &full);
+        wl_list_remove(&entry->link);
+        free(entry);
+      } else {
+        active = true;
+      }
+      continue;
+    }
+
+    if (!entry->scene_tree || !entry->node->client) {
       wl_list_remove(&entry->link);
       free(entry);
       continue;
@@ -562,13 +672,27 @@ bool animation_update_output(struct bwm_output *output, struct timespec now) {
       continue;
     }
 
-    int x, y;
-    sample_position(entry, now, &x, &y);
-    wlr_scene_node_set_position(&entry->scene_tree->node, x, y);
-    wlr_log(WLR_DEBUG, "animation: update entry=%p node=%u pos=(%d,%d)", (void*)entry, entry->node ? entry->node->id : 0, x, y);
-
     double progress = elapsed_ms(entry->start, now) / (double)entry->duration_ms;
+    if (progress < 0.0)
+      progress = 0.0;
+    if (progress > 1.0)
+      progress = 1.0;
+
+    double eased = ease_out_cubic(progress);
+
+    int x = (int)(entry->from.x + (entry->to.x - entry->from.x) * eased);
+    int y = (int)(entry->from.y + (entry->to.y - entry->from.y) * eased);
+    wlr_scene_node_set_position(&entry->scene_tree->node, x, y);
+
+    float cur_opacity = (float)(entry->from_opacity + (entry->to_opacity - entry->from_opacity) * eased);
+    if (entry->from_opacity != entry->to_opacity)
+      wlr_scene_node_for_each_buffer(&entry->scene_tree->node, set_opacity_iterator, &cur_opacity);
+
     if (progress >= 1.0) {
+      if (entry->from_opacity != entry->to_opacity) {
+        float full = 1.0f;
+        wlr_scene_node_for_each_buffer(&entry->scene_tree->node, set_opacity_iterator, &full);
+      }
       wl_list_remove(&entry->link);
       free(entry);
     } else {

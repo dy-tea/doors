@@ -525,6 +525,7 @@ void toplevel_map(struct wl_listener *listener, void *data) {
 
   toplevel_apply_disable_decorations(toplevel);
 
+  toplevel->wants_fade = true;
   arrange(target_output, target_desktop, true);
 
   // tabbed ancestors force SSD, otherwise allow CSD
