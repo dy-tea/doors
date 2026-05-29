@@ -257,7 +257,7 @@ static void arrange_node_geometry(node_t *node, struct bwm_transaction_inst *ins
   if (!snapshot_resize) {
     if (node->client->toplevel && node->client->toplevel->wants_fade) {
       node->client->toplevel->wants_fade = false;
-      animation_apply_geometry(node, scene_tree, *rect, true);
+      wlr_scene_node_set_position(&scene_tree->node, rect->x, rect->y);
       animation_fade_in(node->client->toplevel);
     } else if (instruction->previous_tiled_rectangle.width > 0 && instruction->previous_tiled_rectangle.height > 0) {
       animation_apply_geometry_from(node, scene_tree, instruction->previous_tiled_rectangle, *rect, true);
