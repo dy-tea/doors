@@ -8,13 +8,7 @@
 #include <wlr/types/wlr_foreign_toplevel_management_v1.h>
 #include <wlr/types/wlr_tearing_control_v1.h>
 
-struct bwm_toplevel {
-  struct wl_list link;
-  struct wlr_xdg_toplevel *xdg_toplevel;
-  struct wlr_scene_tree *scene_tree;      // Parent container
-  struct wlr_scene_tree *content_tree;    // XDG surface content
-  struct wlr_scene_tree *saved_surface_tree;  // Saved buffer snapshot
-
+struct bwm_tl_blur {
   struct wlr_scene_buffer *blur_node;
   struct wlr_scene_buffer *mica_node;
   struct wlr_scene_buffer *acrylic_node;
@@ -23,8 +17,9 @@ struct bwm_toplevel {
   GLuint blur_buf_fbo;
   struct wlr_buffer *acrylic_buf;
   GLuint acrylic_buf_fbo;
+};
 
-  // rounded borders
+struct bwm_tl_rounded {
   struct wlr_scene_buffer *border_shader_node;
   struct wlr_buffer *border_shader_buf;
   GLuint border_shader_buf_fbo;
@@ -33,10 +28,20 @@ struct bwm_toplevel {
   bool border_dirty;
   float border_color[4];
 
-  // corner mask
   struct wlr_scene_buffer *corner_mask_node;
   struct wlr_buffer *corner_mask_buf;
   GLuint corner_mask_buf_fbo;
+};
+
+struct bwm_toplevel {
+  struct wl_list link;
+  struct wlr_xdg_toplevel *xdg_toplevel;
+  struct wlr_scene_tree *scene_tree;      // Parent container
+  struct wlr_scene_tree *content_tree;    // XDG surface content
+  struct wlr_scene_tree *saved_surface_tree;  // Saved buffer snapshot
+
+  struct bwm_tl_blur *blur;
+  struct bwm_tl_rounded *rounded;
 
   struct wlr_ext_foreign_toplevel_handle_v1 *ext_foreign_toplevel;
   struct wlr_foreign_toplevel_handle_v1 *foreign_toplevel;

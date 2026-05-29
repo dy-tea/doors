@@ -223,23 +223,23 @@ void toplevel_center_and_clip_surface(struct bwm_toplevel *toplevel) {
       update_borders(toplevel->border_tree, toplevel->border_rects, content_geo, bw);
       wlr_scene_node_set_position(&toplevel->border_tree->node, (int)x - (int)bw, (int)y - (int)bw);
       update_border_colors(toplevel->border_tree, toplevel->border_rects, c);
-      if (c->border_radius > 0.0f && toplevel->border_shader_node) {
-        toplevel->border_dirty = true;
+      if (c->border_radius > 0.0f && toplevel->rounded && toplevel->rounded->border_shader_node) {
+        toplevel->rounded->border_dirty = true;
         int new_fw = border_w + 2 * (int)bw;
         int new_fh = border_h + 2 * (int)bw;
         if (new_fw > 0 && new_fh > 0)
-          wlr_scene_buffer_set_dest_size(toplevel->border_shader_node, new_fw, new_fh);
+          wlr_scene_buffer_set_dest_size(toplevel->rounded->border_shader_node, new_fw, new_fh);
       }
     } else if (container_rect) {
       struct wlr_box full_geo = {0, 0, container_rect->width, container_rect->height};
       update_borders(toplevel->border_tree, toplevel->border_rects, full_geo, bw);
       update_border_colors(toplevel->border_tree, toplevel->border_rects, c);
-      if (c->border_radius > 0.0f && toplevel->border_shader_node) {
-        toplevel->border_dirty = true;
+      if (c->border_radius > 0.0f && toplevel->rounded && toplevel->rounded->border_shader_node) {
+        toplevel->rounded->border_dirty = true;
         int new_fw = container_rect->width + 2 * (int)bw;
         int new_fh = container_rect->height + 2 * (int)bw;
         if (new_fw > 0 && new_fh > 0)
-          wlr_scene_buffer_set_dest_size(toplevel->border_shader_node, new_fw, new_fh);
+          wlr_scene_buffer_set_dest_size(toplevel->rounded->border_shader_node, new_fw, new_fh);
       }
     }
   }
@@ -722,7 +722,7 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
   const struct wlr_ext_background_effect_surface_v1_state *fx =
       wlr_ext_background_effect_v1_get_surface_state(xdg_surface->surface);
   bool wants_blur = fx && !pixman_region32_empty(&fx->blur_region);
-  bool has_blur = toplevel->blur_node != NULL;
+  bool has_blur = toplevel->blur && toplevel->blur->blur_node != NULL;
   // only update blur from protocol if it wasn't set by a rule
   if (toplevel->node && toplevel->node->client && !toplevel->node->client->blur_from_rule) {
     if (wants_blur != has_blur)
@@ -734,17 +734,23 @@ void toplevel_set_blur(struct bwm_toplevel *tl, bool enabled) {
   if (!tl || !tl->scene_tree)
     return;
 
-  if (enabled && !tl->blur_node) {
-    tl->blur_node = wlr_scene_buffer_create(tl->scene_tree, NULL);
-    if (tl->blur_node)
-      wlr_scene_node_lower_to_bottom(&tl->blur_node->node);
-  } else if (!enabled && tl->blur_node) {
-    wlr_scene_node_destroy(&tl->blur_node->node);
-    tl->blur_node = NULL;
-    if (tl->blur_buf) {
-      wlr_buffer_unlock(tl->blur_buf);
-      tl->blur_buf = NULL;
-      tl->blur_buf_fbo = 0;
+  if (enabled) {
+    if (!tl->blur) {
+      tl->blur = calloc(1, sizeof(*tl->blur));
+      if (!tl->blur) return;
+    }
+    if (!tl->blur->blur_node) {
+      tl->blur->blur_node = wlr_scene_buffer_create(tl->scene_tree, NULL);
+      if (tl->blur->blur_node)
+        wlr_scene_node_lower_to_bottom(&tl->blur->blur_node->node);
+    }
+  } else if (tl->blur && tl->blur->blur_node) {
+    wlr_scene_node_destroy(&tl->blur->blur_node->node);
+    tl->blur->blur_node = NULL;
+    if (tl->blur->blur_buf) {
+      wlr_buffer_unlock(tl->blur->blur_buf);
+      tl->blur->blur_buf = NULL;
+      tl->blur->blur_buf_fbo = 0;
     }
   }
 }
@@ -753,13 +759,19 @@ void toplevel_set_mica(struct bwm_toplevel *tl, bool enabled) {
   if (!tl || !tl->scene_tree)
     return;
 
-  if (enabled && !tl->mica_node) {
-    tl->mica_node = wlr_scene_buffer_create(tl->scene_tree, NULL);
-    if (tl->mica_node)
-      wlr_scene_node_lower_to_bottom(&tl->mica_node->node);
-  } else if (!enabled && tl->mica_node) {
-    wlr_scene_node_destroy(&tl->mica_node->node);
-    tl->mica_node = NULL;
+  if (enabled) {
+    if (!tl->blur) {
+      tl->blur = calloc(1, sizeof(*tl->blur));
+      if (!tl->blur) return;
+    }
+    if (!tl->blur->mica_node) {
+      tl->blur->mica_node = wlr_scene_buffer_create(tl->scene_tree, NULL);
+      if (tl->blur->mica_node)
+        wlr_scene_node_lower_to_bottom(&tl->blur->mica_node->node);
+    }
+  } else if (tl->blur && tl->blur->mica_node) {
+    wlr_scene_node_destroy(&tl->blur->mica_node->node);
+    tl->blur->mica_node = NULL;
   }
 }
 
@@ -767,17 +779,23 @@ void toplevel_set_acrylic(struct bwm_toplevel *tl, bool enabled) {
   if (!tl || !tl->scene_tree)
     return;
 
-  if (enabled && !tl->acrylic_node) {
-    tl->acrylic_node = wlr_scene_buffer_create(tl->scene_tree, NULL);
-    if (tl->acrylic_node)
-      wlr_scene_node_lower_to_bottom(&tl->acrylic_node->node);
-  } else if (!enabled && tl->acrylic_node) {
-    wlr_scene_node_destroy(&tl->acrylic_node->node);
-    tl->acrylic_node = NULL;
-    if (tl->acrylic_buf) {
-      wlr_buffer_unlock(tl->acrylic_buf);
-      tl->acrylic_buf = NULL;
-      tl->acrylic_buf_fbo = 0;
+  if (enabled) {
+    if (!tl->blur) {
+      tl->blur = calloc(1, sizeof(*tl->blur));
+      if (!tl->blur) return;
+    }
+    if (!tl->blur->acrylic_node) {
+      tl->blur->acrylic_node = wlr_scene_buffer_create(tl->scene_tree, NULL);
+      if (tl->blur->acrylic_node)
+        wlr_scene_node_lower_to_bottom(&tl->blur->acrylic_node->node);
+    }
+  } else if (tl->blur && tl->blur->acrylic_node) {
+    wlr_scene_node_destroy(&tl->blur->acrylic_node->node);
+    tl->blur->acrylic_node = NULL;
+    if (tl->blur->acrylic_buf) {
+      wlr_buffer_unlock(tl->blur->acrylic_buf);
+      tl->blur->acrylic_buf = NULL;
+      tl->blur->acrylic_buf_fbo = 0;
     }
   }
 }
@@ -797,40 +815,44 @@ void toplevel_set_border_radius(struct bwm_toplevel *tl, float radius) {
     tl->node->client->border_radius = radius;
 
   if (radius > 0.0f) {
-    if (!tl->corner_mask_node) {
-      tl->corner_mask_node = wlr_scene_buffer_create(tl->scene_tree, NULL);
-      if (tl->corner_mask_node) {
-        wlr_scene_node_place_above(&tl->corner_mask_node->node,
+    if (!tl->rounded) {
+      tl->rounded = calloc(1, sizeof(*tl->rounded));
+      if (!tl->rounded) return;
+    }
+    if (!tl->rounded->corner_mask_node) {
+      tl->rounded->corner_mask_node = wlr_scene_buffer_create(tl->scene_tree, NULL);
+      if (tl->rounded->corner_mask_node) {
+        wlr_scene_node_place_above(&tl->rounded->corner_mask_node->node,
             &tl->content_tree->node);
         if (tl->border_tree)
-          wlr_scene_node_place_below(&tl->corner_mask_node->node,
+          wlr_scene_node_place_below(&tl->rounded->corner_mask_node->node,
               &tl->border_tree->node);
-        tl->corner_mask_node->point_accepts_input = corner_mask_no_input;
+        tl->rounded->corner_mask_node->point_accepts_input = corner_mask_no_input;
       }
     }
-    tl->border_dirty = true;
-  } else {
-    if (tl->corner_mask_node) {
-      wlr_scene_node_destroy(&tl->corner_mask_node->node);
-      tl->corner_mask_node = NULL;
-      if (tl->corner_mask_buf) {
-        wlr_buffer_unlock(tl->corner_mask_buf);
-        tl->corner_mask_buf = NULL;
-        tl->corner_mask_buf_fbo = 0;
+    tl->rounded->border_dirty = true;
+  } else if (tl->rounded) {
+    if (tl->rounded->corner_mask_node) {
+      wlr_scene_node_destroy(&tl->rounded->corner_mask_node->node);
+      tl->rounded->corner_mask_node = NULL;
+      if (tl->rounded->corner_mask_buf) {
+        wlr_buffer_unlock(tl->rounded->corner_mask_buf);
+        tl->rounded->corner_mask_buf = NULL;
+        tl->rounded->corner_mask_buf_fbo = 0;
       }
     }
-    if (tl->border_shader_node) {
-      wlr_scene_node_destroy(&tl->border_shader_node->node);
-      tl->border_shader_node = NULL;
-      if (tl->border_shader_buf) {
-        wlr_buffer_unlock(tl->border_shader_buf);
-        tl->border_shader_buf = NULL;
-        tl->border_shader_buf_fbo = 0;
-        tl->border_shader_buf_w = 0;
-        tl->border_shader_buf_h = 0;
+    if (tl->rounded->border_shader_node) {
+      wlr_scene_node_destroy(&tl->rounded->border_shader_node->node);
+      tl->rounded->border_shader_node = NULL;
+      if (tl->rounded->border_shader_buf) {
+        wlr_buffer_unlock(tl->rounded->border_shader_buf);
+        tl->rounded->border_shader_buf = NULL;
+        tl->rounded->border_shader_buf_fbo = 0;
+        tl->rounded->border_shader_buf_w = 0;
+        tl->rounded->border_shader_buf_h = 0;
       }
     }
-    tl->border_dirty = false;
+    tl->rounded->border_dirty = false;
   }
 }
 
@@ -862,50 +884,56 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
 		toplevel->image_capture_source = NULL;
   }
 
-  if (toplevel->blur_node) {
-    wlr_scene_node_destroy(&toplevel->blur_node->node);
-    toplevel->blur_node = NULL;
-  }
-  if (toplevel->blur_buf) {
-    wlr_buffer_unlock(toplevel->blur_buf);
-    toplevel->blur_buf = NULL;
-    toplevel->blur_buf_fbo = 0;
+  if (toplevel->blur) {
+    if (toplevel->blur->blur_node) {
+      wlr_scene_node_destroy(&toplevel->blur->blur_node->node);
+      toplevel->blur->blur_node = NULL;
+    }
+    if (toplevel->blur->blur_buf) {
+      wlr_buffer_unlock(toplevel->blur->blur_buf);
+      toplevel->blur->blur_buf = NULL;
+      toplevel->blur->blur_buf_fbo = 0;
+    }
+    if (toplevel->blur->mica_node) {
+      wlr_scene_node_destroy(&toplevel->blur->mica_node->node);
+      toplevel->blur->mica_node = NULL;
+    }
+    if (toplevel->blur->acrylic_node) {
+      wlr_scene_node_destroy(&toplevel->blur->acrylic_node->node);
+      toplevel->blur->acrylic_node = NULL;
+    }
+    if (toplevel->blur->acrylic_buf) {
+      wlr_buffer_unlock(toplevel->blur->acrylic_buf);
+      toplevel->blur->acrylic_buf = NULL;
+      toplevel->blur->acrylic_buf_fbo = 0;
+    }
+    free(toplevel->blur);
+    toplevel->blur = NULL;
   }
 
-  if (toplevel->mica_node) {
-    wlr_scene_node_destroy(&toplevel->mica_node->node);
-    toplevel->mica_node = NULL;
-  }
+  if (toplevel->rounded) {
+    // border_shader_node lives inside border_tree which destroy_borders will free,
+    // but we still need to release the backing buffer.
+    if (toplevel->rounded->border_shader_buf) {
+      wlr_buffer_unlock(toplevel->rounded->border_shader_buf);
+      toplevel->rounded->border_shader_buf = NULL;
+      toplevel->rounded->border_shader_buf_fbo = 0;
+      toplevel->rounded->border_shader_buf_w = 0;
+      toplevel->rounded->border_shader_buf_h = 0;
+    }
+    toplevel->rounded->border_shader_node = NULL; // freed by destroy_borders below
 
-  if (toplevel->acrylic_node) {
-    wlr_scene_node_destroy(&toplevel->acrylic_node->node);
-    toplevel->acrylic_node = NULL;
-  }
-  if (toplevel->acrylic_buf) {
-    wlr_buffer_unlock(toplevel->acrylic_buf);
-    toplevel->acrylic_buf = NULL;
-    toplevel->acrylic_buf_fbo = 0;
-  }
-
-  // border_shader_node lives inside border_tree which destroy_borders will free,
-  // but we still need to release the backing buffer.
-  if (toplevel->border_shader_buf) {
-    wlr_buffer_unlock(toplevel->border_shader_buf);
-    toplevel->border_shader_buf = NULL;
-    toplevel->border_shader_buf_fbo = 0;
-    toplevel->border_shader_buf_w = 0;
-    toplevel->border_shader_buf_h = 0;
-  }
-  toplevel->border_shader_node = NULL; // freed by destroy_borders below
-
-  if (toplevel->corner_mask_node) {
-    wlr_scene_node_destroy(&toplevel->corner_mask_node->node);
-    toplevel->corner_mask_node = NULL;
-  }
-  if (toplevel->corner_mask_buf) {
-    wlr_buffer_unlock(toplevel->corner_mask_buf);
-    toplevel->corner_mask_buf = NULL;
-    toplevel->corner_mask_buf_fbo = 0;
+    if (toplevel->rounded->corner_mask_node) {
+      wlr_scene_node_destroy(&toplevel->rounded->corner_mask_node->node);
+      toplevel->rounded->corner_mask_node = NULL;
+    }
+    if (toplevel->rounded->corner_mask_buf) {
+      wlr_buffer_unlock(toplevel->rounded->corner_mask_buf);
+      toplevel->rounded->corner_mask_buf = NULL;
+      toplevel->rounded->corner_mask_buf_fbo = 0;
+    }
+    free(toplevel->rounded);
+    toplevel->rounded = NULL;
   }
 
   destroy_borders(&toplevel->border_tree, toplevel->border_rects);

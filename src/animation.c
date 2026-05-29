@@ -514,11 +514,11 @@ borders_update:
           cx - (int)bw, cy - (int)bw);
     }
 
-    if (entry->toplevel->border_shader_node && bw > 0) {
+    if (entry->toplevel->rounded && entry->toplevel->rounded->border_shader_node && bw > 0) {
       int new_fw = bwidth + 2 * (int)bw;
       int new_fh = bheight + 2 * (int)bw;
       if (new_fw > 0 && new_fh > 0)
-        wlr_scene_buffer_set_dest_size(entry->toplevel->border_shader_node, new_fw, new_fh);
+        wlr_scene_buffer_set_dest_size(entry->toplevel->rounded->border_shader_node, new_fw, new_fh);
     }
   }
 }

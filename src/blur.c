@@ -745,29 +745,33 @@ void blur_output_resize(struct bwm_blur_output_ctx *ctx, int width, int height,
   // Free per-toplevel blur/acrylic buffers since output dimensions changed
   struct bwm_toplevel *tl;
   wl_list_for_each(tl, &server.toplevels, link) {
-    if (tl->blur_buf) {
-      wlr_buffer_unlock(tl->blur_buf);
-      tl->blur_buf = NULL;
-      tl->blur_buf_fbo = 0;
+    if (tl->blur) {
+      if (tl->blur->blur_buf) {
+        wlr_buffer_unlock(tl->blur->blur_buf);
+        tl->blur->blur_buf = NULL;
+        tl->blur->blur_buf_fbo = 0;
+      }
+      if (tl->blur->acrylic_buf) {
+        wlr_buffer_unlock(tl->blur->acrylic_buf);
+        tl->blur->acrylic_buf = NULL;
+        tl->blur->acrylic_buf_fbo = 0;
+      }
     }
-    if (tl->acrylic_buf) {
-      wlr_buffer_unlock(tl->acrylic_buf);
-      tl->acrylic_buf = NULL;
-      tl->acrylic_buf_fbo = 0;
+    if (tl->rounded) {
+      if (tl->rounded->corner_mask_buf) {
+        wlr_buffer_unlock(tl->rounded->corner_mask_buf);
+        tl->rounded->corner_mask_buf = NULL;
+        tl->rounded->corner_mask_buf_fbo = 0;
+      }
+      if (tl->rounded->border_shader_buf) {
+        wlr_buffer_unlock(tl->rounded->border_shader_buf);
+        tl->rounded->border_shader_buf = NULL;
+        tl->rounded->border_shader_buf_fbo = 0;
+        tl->rounded->border_shader_buf_w = 0;
+        tl->rounded->border_shader_buf_h = 0;
+      }
+      tl->rounded->border_dirty = true;
     }
-    if (tl->corner_mask_buf) {
-      wlr_buffer_unlock(tl->corner_mask_buf);
-      tl->corner_mask_buf = NULL;
-      tl->corner_mask_buf_fbo = 0;
-    }
-    if (tl->border_shader_buf) {
-      wlr_buffer_unlock(tl->border_shader_buf);
-      tl->border_shader_buf = NULL;
-      tl->border_shader_buf_fbo = 0;
-      tl->border_shader_buf_w = 0;
-      tl->border_shader_buf_h = 0;
-    }
-    tl->border_dirty = true;
   }
 
   // Free per-layer-surface blur buffers since output dimensions changed
@@ -859,11 +863,11 @@ static GLuint capture_bg_to_tex1(struct bwm_output *output, struct bwm_blur_outp
   } else {
     // hide everything with blur/mica (for mica capture)
     wl_list_for_each(tl, &server.toplevels, link) {
-      tl->blur_scene_hidden = false;
-      if ((tl->blur_node || tl->mica_node) && tl->scene_tree &&
+      tl->blur->blur_scene_hidden = false;
+      if (tl->blur && (tl->blur->blur_node || tl->blur->mica_node) && tl->scene_tree &&
           tl->scene_tree->node.enabled) {
         wlr_scene_node_set_enabled(&tl->scene_tree->node, false);
-        tl->blur_scene_hidden = true;
+        tl->blur->blur_scene_hidden = true;
       }
     }
   }
@@ -889,7 +893,7 @@ static GLuint capture_bg_to_tex1(struct bwm_output *output, struct bwm_blur_outp
       wlr_scene_node_set_enabled(hide_node, true);
   } else {
     wl_list_for_each(tl, &server.toplevels, link)
-      if (tl->blur_scene_hidden)
+      if (tl->blur && tl->blur->blur_scene_hidden)
         wlr_scene_node_set_enabled(&tl->scene_tree->node, true);
   }
 
@@ -1062,18 +1066,18 @@ static bool rebuild_live_blur(struct bwm_output *output,
 
   struct bwm_toplevel *tl;
   wl_list_for_each(tl, &server.toplevels, link) {
-    if (!tl->blur_node || !tl->node || !tl->node->client) continue;
+    if (!tl->blur || !tl->blur->blur_node || !tl->node || !tl->node->client) continue;
     if (!tl->node->client->shown) continue;
     if (!tl->node->output || tl->node->output != output) continue;
 
     GLuint src = capture_bg_to_tex1(output, ctx, scene_output, false,
-        &tl->scene_tree->node, &tl->blur_scene_hidden);
+        &tl->scene_tree->node, &tl->blur->blur_scene_hidden);
     if (!src) continue;
 
     egl_make_current();
     GLuint blurred = apply_blur(ctx, src, ctx->blur_w, ctx->blur_h);
 
-    GLuint dest_fbo = ensure_output_buf(&tl->blur_buf, &tl->blur_buf_fbo, w, h);
+    GLuint dest_fbo = ensure_output_buf(&tl->blur->blur_buf, &tl->blur->blur_buf_fbo, w, h);
     if (!dest_fbo) {
       egl_unset_current();
       continue;
@@ -1125,16 +1129,16 @@ static bool rebuild_live_blur(struct bwm_output *output,
 static void push_blur_to_toplevels(struct bwm_output *output) {
   struct bwm_toplevel *tl;
   wl_list_for_each(tl, &server.toplevels, link) {
-    if (!tl->blur_node || !tl->node) continue;
+    if (!tl->blur || !tl->blur->blur_node || !tl->node) continue;
     struct bwm_output *m = tl->node->output;
     if (!m || m != output) continue;
 
-    if (!tl->blur_buf) {
-      wlr_scene_buffer_set_buffer(tl->blur_node, NULL);
+    if (!tl->blur->blur_buf) {
+      wlr_scene_buffer_set_buffer(tl->blur->blur_node, NULL);
       continue;
     }
 
-    wlr_scene_buffer_set_buffer(tl->blur_node, tl->blur_buf);
+    wlr_scene_buffer_set_buffer(tl->blur->blur_node, tl->blur->blur_buf);
 
     client_t *c = tl->node->client;
     struct wlr_box r;
@@ -1147,15 +1151,15 @@ static void push_blur_to_toplevels(struct bwm_output *output) {
 
     struct wlr_fbox src; int dw, dh;
     if (!compute_src_box(output, &r, &src, &dw, &dh)) {
-      wlr_scene_buffer_set_buffer(tl->blur_node, NULL);
-      wlr_scene_node_set_position(&tl->blur_node->node, 0, 0);
+      wlr_scene_buffer_set_buffer(tl->blur->blur_node, NULL);
+      wlr_scene_node_set_position(&tl->blur->blur_node->node, 0, 0);
       continue;
     }
     int node_ox = (r.x < output->lx) ? (output->lx - r.x) : 0;
     int node_oy = (r.y < output->ly) ? (output->ly - r.y) : 0;
-    wlr_scene_node_set_position(&tl->blur_node->node, node_ox, node_oy);
-    wlr_scene_buffer_set_source_box(tl->blur_node, &src);
-    wlr_scene_buffer_set_dest_size(tl->blur_node, dw, dh);
+    wlr_scene_node_set_position(&tl->blur->blur_node->node, node_ox, node_oy);
+    wlr_scene_buffer_set_source_box(tl->blur->blur_node, &src);
+    wlr_scene_buffer_set_dest_size(tl->blur->blur_node, dw, dh);
   }
 }
 
@@ -1248,15 +1252,15 @@ static bool rebuild_live_acrylic(struct bwm_output *output,
 
   struct bwm_toplevel *tl;
   wl_list_for_each(tl, &server.toplevels, link) {
-    if (!tl->acrylic_node || !tl->node || !tl->node->client) continue;
+    if (!tl->blur || !tl->blur->acrylic_node || !tl->node || !tl->node->client) continue;
     if (!tl->node->client->shown) continue;
     if (!tl->node->output || tl->node->output != output) continue;
 
     GLuint src = capture_bg_to_tex1(output, ctx, scene_output, false,
-      &tl->scene_tree->node, &tl->blur_scene_hidden);
+      &tl->scene_tree->node, &tl->blur->blur_scene_hidden);
     if (!src) continue;
 
-    GLuint dest_fbo = ensure_output_buf(&tl->acrylic_buf, &tl->acrylic_buf_fbo, w, h);
+    GLuint dest_fbo = ensure_output_buf(&tl->blur->acrylic_buf, &tl->blur->acrylic_buf_fbo, w, h);
     if (!dest_fbo) continue;
 
     egl_make_current();
@@ -1324,16 +1328,16 @@ static bool rebuild_live_acrylic(struct bwm_output *output,
 static void push_acrylic_to_toplevels(struct bwm_output *output) {
   struct bwm_toplevel *tl;
   wl_list_for_each(tl, &server.toplevels, link) {
-    if (!tl->acrylic_node || !tl->node) continue;
+    if (!tl->blur || !tl->blur->acrylic_node || !tl->node) continue;
     struct bwm_output *m = tl->node->output;
     if (!m || m != output) continue;
 
-    if (!tl->acrylic_buf) {
-      wlr_scene_buffer_set_buffer(tl->acrylic_node, NULL);
+    if (!tl->blur->acrylic_buf) {
+      wlr_scene_buffer_set_buffer(tl->blur->acrylic_node, NULL);
       continue;
     }
 
-    wlr_scene_buffer_set_buffer(tl->acrylic_node, tl->acrylic_buf);
+    wlr_scene_buffer_set_buffer(tl->blur->acrylic_node, tl->blur->acrylic_buf);
 
     client_t *c = tl->node->client;
     struct wlr_box r;
@@ -1346,15 +1350,15 @@ static void push_acrylic_to_toplevels(struct bwm_output *output) {
 
     struct wlr_fbox src; int dw, dh;
     if (!compute_src_box(output, &r, &src, &dw, &dh)) {
-      wlr_scene_buffer_set_buffer(tl->acrylic_node, NULL);
-      wlr_scene_node_set_position(&tl->acrylic_node->node, 0, 0);
+      wlr_scene_buffer_set_buffer(tl->blur->acrylic_node, NULL);
+      wlr_scene_node_set_position(&tl->blur->acrylic_node->node, 0, 0);
       continue;
     }
     int node_ox = (r.x < output->lx) ? (output->lx - r.x) : 0;
     int node_oy = (r.y < output->ly) ? (output->ly - r.y) : 0;
-    wlr_scene_node_set_position(&tl->acrylic_node->node, node_ox, node_oy);
-    wlr_scene_buffer_set_source_box(tl->acrylic_node, &src);
-    wlr_scene_buffer_set_dest_size(tl->acrylic_node, dw, dh);
+    wlr_scene_node_set_position(&tl->blur->acrylic_node->node, node_ox, node_oy);
+    wlr_scene_buffer_set_source_box(tl->blur->acrylic_node, &src);
+    wlr_scene_buffer_set_dest_size(tl->blur->acrylic_node, dw, dh);
   }
 }
 
@@ -1400,11 +1404,11 @@ static void push_mica_to_toplevels(struct bwm_output *output) {
 
   struct bwm_toplevel *tl;
   wl_list_for_each(tl, &server.toplevels, link) {
-    if (!tl->mica_node || !tl->node) continue;
+    if (!tl->blur || !tl->blur->mica_node || !tl->node) continue;
     struct bwm_output *m = tl->node->output;
     if (!m || m != output) continue;
 
-    wlr_scene_buffer_set_buffer(tl->mica_node, buf);
+    wlr_scene_buffer_set_buffer(tl->blur->mica_node, buf);
 
     client_t *c = tl->node->client;
     struct wlr_box r;
@@ -1418,15 +1422,15 @@ static void push_mica_to_toplevels(struct bwm_output *output) {
     struct wlr_fbox src;
     int dw, dh;
     if (!compute_src_box(output, &r, &src, &dw, &dh)) {
-      wlr_scene_buffer_set_buffer(tl->mica_node, NULL);
-      wlr_scene_node_set_position(&tl->mica_node->node, 0, 0);
+      wlr_scene_buffer_set_buffer(tl->blur->mica_node, NULL);
+      wlr_scene_node_set_position(&tl->blur->mica_node->node, 0, 0);
       continue;
     }
     int node_ox = (r.x < output->lx) ? (output->lx - r.x) : 0;
     int node_oy = (r.y < output->ly) ? (output->ly - r.y) : 0;
-    wlr_scene_node_set_position(&tl->mica_node->node, node_ox, node_oy);
-    wlr_scene_buffer_set_source_box(tl->mica_node, &src);
-    wlr_scene_buffer_set_dest_size(tl->mica_node, dw, dh);
+    wlr_scene_node_set_position(&tl->blur->mica_node->node, node_ox, node_oy);
+    wlr_scene_buffer_set_source_box(tl->blur->mica_node, &src);
+    wlr_scene_buffer_set_dest_size(tl->blur->mica_node, dw, dh);
   }
 }
 
@@ -1450,6 +1454,7 @@ static bool scene_buffer_no_input(struct wlr_scene_buffer *buffer, double *sx, d
 static bool blur_render_border(struct bwm_toplevel *tl, int content_w, int content_h) {
   if (!blur_ctx.prog_border) return false;
   if (!tl->border_tree) return false;
+  if (!tl->rounded) return false;
 
   client_t *c = tl->node->client;
   int bw_i = (int)c->border_width;
@@ -1458,15 +1463,15 @@ static bool blur_render_border(struct bwm_toplevel *tl, int content_w, int conte
   if (bw_i <= 0) return false;
   if (fw <= 0 || fh <= 0) return false;
 
-  if (!tl->border_shader_node) {
-    tl->border_shader_node = wlr_scene_buffer_create(tl->border_tree, NULL);
-    if (!tl->border_shader_node) return false;
-    wlr_scene_node_set_position(&tl->border_shader_node->node, 0, 0);
-    tl->border_shader_node->point_accepts_input = scene_buffer_no_input;
+  if (!tl->rounded->border_shader_node) {
+    tl->rounded->border_shader_node = wlr_scene_buffer_create(tl->border_tree, NULL);
+    if (!tl->rounded->border_shader_node) return false;
+    wlr_scene_node_set_position(&tl->rounded->border_shader_node->node, 0, 0);
+    tl->rounded->border_shader_node->point_accepts_input = scene_buffer_no_input;
   }
 
-  GLuint dest_fbo = ensure_sized_buf(&tl->border_shader_buf, &tl->border_shader_buf_fbo,
-    &tl->border_shader_buf_w, &tl->border_shader_buf_h, fw, fh);
+  GLuint dest_fbo = ensure_sized_buf(&tl->rounded->border_shader_buf, &tl->rounded->border_shader_buf_fbo,
+    &tl->rounded->border_shader_buf_w, &tl->rounded->border_shader_buf_h, fw, fh);
   if (!dest_fbo) return false;
 
   glEnable(GL_BLEND);
@@ -1480,17 +1485,17 @@ static bool blur_render_border(struct bwm_toplevel *tl, int content_w, int conte
   glUniform2f(blur_ctx.u_border.resolution, (float)fw, (float)fh);
   glUniform1f(blur_ctx.u_border.border_radius, c->border_radius);
   glUniform1f(blur_ctx.u_border.border_width_px, (float)bw_i);
-  glUniform4fv(blur_ctx.u_border.border_color, 1, tl->border_color);
+  glUniform4fv(blur_ctx.u_border.border_color, 1, tl->rounded->border_color);
   draw_quad();
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glDisable(GL_BLEND);
   glFlush();
 
-  wlr_scene_buffer_set_buffer(tl->border_shader_node, tl->border_shader_buf);
+  wlr_scene_buffer_set_buffer(tl->rounded->border_shader_node, tl->rounded->border_shader_buf);
   struct wlr_fbox src_box = {0, 0, (double)fw, (double)fh};
-  wlr_scene_buffer_set_source_box(tl->border_shader_node, &src_box);
-  wlr_scene_buffer_set_dest_size(tl->border_shader_node, fw, fh);
-  wlr_scene_node_set_enabled(&tl->border_shader_node->node, true);
+  wlr_scene_buffer_set_source_box(tl->rounded->border_shader_node, &src_box);
+  wlr_scene_buffer_set_dest_size(tl->rounded->border_shader_node, fw, fh);
+  wlr_scene_node_set_enabled(&tl->rounded->border_shader_node->node, true);
 
   static const float transparent[4] = {0.0f, 0.0f, 0.0f, 0.0f};
   for (int i = 0; i < 4; i++)
@@ -1509,7 +1514,7 @@ static bool rebuild_corner_masks(struct bwm_output *output,
 
   struct bwm_toplevel *tl;
   wl_list_for_each(tl, &server.toplevels, link) {
-    if (!tl->corner_mask_node || !tl->node || !tl->node->client) continue;
+    if (!tl->rounded || !tl->rounded->corner_mask_node || !tl->node || !tl->node->client) continue;
     if (!tl->node->client->shown) continue;
     if (!tl->node->output || tl->node->output != output) continue;
 
@@ -1520,13 +1525,13 @@ static bool rebuild_corner_masks(struct bwm_output *output,
     if (content_r.width <= 0 || content_r.height <= 0) continue;
 
     GLuint src = capture_bg_to_tex1(output, ctx, scene_output, false,
-      &tl->scene_tree->node, &tl->blur_scene_hidden);
+      &tl->scene_tree->node, &tl->blur->blur_scene_hidden);
     if (!src) continue;
 
     egl_make_current();
 
-    GLuint dest_fbo = ensure_output_buf(&tl->corner_mask_buf,
-      &tl->corner_mask_buf_fbo, w, h);
+    GLuint dest_fbo = ensure_output_buf(&tl->rounded->corner_mask_buf,
+      &tl->rounded->corner_mask_buf_fbo, w, h);
     if (!dest_fbo) {
     	egl_unset_current();
     	continue;
@@ -1568,33 +1573,33 @@ static bool rebuild_corner_masks(struct bwm_output *output,
 static void push_corner_masks_to_toplevels(struct bwm_output *output) {
   struct bwm_toplevel *tl;
   wl_list_for_each(tl, &server.toplevels, link) {
-    if (!tl->corner_mask_node || !tl->node || !tl->node->client) continue;
+    if (!tl->rounded || !tl->rounded->corner_mask_node || !tl->node || !tl->node->client) continue;
     struct bwm_output *m = tl->node->output;
     if (!m || m != output) continue;
 
     client_t *c = tl->node->client;
     if (c->border_radius <= 0.0f) {
-      wlr_scene_buffer_set_buffer(tl->corner_mask_node, NULL);
+      wlr_scene_buffer_set_buffer(tl->rounded->corner_mask_node, NULL);
       continue;
     }
-    if (!tl->corner_mask_buf) {
-      wlr_scene_node_set_enabled(&tl->corner_mask_node->node, false);
+    if (!tl->rounded->corner_mask_buf) {
+      wlr_scene_node_set_enabled(&tl->rounded->corner_mask_node->node, false);
       continue;
     }
 
     struct wlr_box content_r = get_client_rect(tl);
     struct wlr_fbox src; int dw, dh;
     if (!compute_src_box(output, &content_r, &src, &dw, &dh)) {
-      wlr_scene_node_set_enabled(&tl->corner_mask_node->node, false);
+      wlr_scene_node_set_enabled(&tl->rounded->corner_mask_node->node, false);
       continue;
     }
-    wlr_scene_node_set_enabled(&tl->corner_mask_node->node, true);
-    wlr_scene_buffer_set_buffer(tl->corner_mask_node, tl->corner_mask_buf);
+    wlr_scene_node_set_enabled(&tl->rounded->corner_mask_node->node, true);
+    wlr_scene_buffer_set_buffer(tl->rounded->corner_mask_node, tl->rounded->corner_mask_buf);
     int node_ox = (content_r.x < output->lx) ? (output->lx - content_r.x) : 0;
     int node_oy = (content_r.y < output->ly) ? (output->ly - content_r.y) : 0;
-    wlr_scene_node_set_position(&tl->corner_mask_node->node, node_ox, node_oy);
-    wlr_scene_buffer_set_source_box(tl->corner_mask_node, &src);
-    wlr_scene_buffer_set_dest_size(tl->corner_mask_node, dw, dh);
+    wlr_scene_node_set_position(&tl->rounded->corner_mask_node->node, node_ox, node_oy);
+    wlr_scene_buffer_set_source_box(tl->rounded->corner_mask_node, &src);
+    wlr_scene_buffer_set_dest_size(tl->rounded->corner_mask_node, dw, dh);
   }
 }
 
@@ -1789,7 +1794,7 @@ void blur_output_frame(struct bwm_output *output, struct wlr_scene_output *scene
     bool any_blur = false;
     struct bwm_toplevel *tl;
     wl_list_for_each(tl, &server.toplevels, link) {
-      if (tl->blur_node && tl->node && tl->node->client && tl->node->client->shown &&
+      if (tl->blur && tl->blur->blur_node && tl->node && tl->node->client && tl->node->client->shown &&
           tl->node->output && tl->node->output == output) {
         any_blur = true;
         break;
@@ -1818,7 +1823,7 @@ void blur_output_frame(struct bwm_output *output, struct wlr_scene_output *scene
     bool any_acrylic = false;
     struct bwm_toplevel *tl;
     wl_list_for_each(tl, &server.toplevels, link) {
-      if (tl->acrylic_node && tl->node && tl->node->client && tl->node->client->shown &&
+      if (tl->blur && tl->blur->acrylic_node && tl->node && tl->node->client && tl->node->client->shown &&
           tl->node->output && tl->node->output == output) {
         any_acrylic = true;
         break;
@@ -1840,11 +1845,11 @@ void blur_output_frame(struct bwm_output *output, struct wlr_scene_output *scene
   {
     struct bwm_toplevel *tl;
     wl_list_for_each(tl, &server.toplevels, link) {
-      if (!tl->border_dirty) continue;
+      if (!tl->rounded || !tl->rounded->border_dirty) continue;
       if (!tl->node || !tl->node->client || !tl->node->client->shown) continue;
       if (!tl->node->output || tl->node->output != output) continue;
       client_t *c = tl->node->client;
-      if (c->border_radius <= 0.0f) { tl->border_dirty = false; continue; }
+      if (c->border_radius <= 0.0f) { tl->rounded->border_dirty = false; continue; }
 
       struct wlr_box content_r = get_client_rect(tl);
       if (c->state == STATE_TILED && tl->geometry.width > 0 && tl->geometry.height > 0) {
@@ -1856,7 +1861,7 @@ void blur_output_frame(struct bwm_output *output, struct wlr_scene_output *scene
       egl_make_current();
       blur_render_border(tl, content_r.width, content_r.height);
       egl_unset_current();
-      tl->border_dirty = false;
+      tl->rounded->border_dirty = false;
     }
   }
 
@@ -1865,7 +1870,7 @@ void blur_output_frame(struct bwm_output *output, struct wlr_scene_output *scene
     bool any_cm = false;
     struct bwm_toplevel *tl;
     wl_list_for_each(tl, &server.toplevels, link) {
-      if (tl->corner_mask_node && tl->node && tl->node->client &&
+      if (tl->rounded && tl->rounded->corner_mask_node && tl->node && tl->node->client &&
           tl->node->client->border_radius > 0.0f &&
           tl->node->output && tl->node->output == output) {
         any_cm = true;

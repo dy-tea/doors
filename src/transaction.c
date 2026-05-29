@@ -297,13 +297,13 @@ static void arrange_node_geometry(node_t *node, struct bwm_transaction_inst *ins
       update_borders(tl->border_tree, tl->border_rects, geo, bw);
       wlr_scene_node_set_position(&tl->border_tree->node, border_x, border_y);
       update_border_colors(tl->border_tree, tl->border_rects, node->client);
-      if (node->client->border_radius > 0.0f) {
-        tl->border_dirty = true;
-        if (tl->border_shader_node) {
+      if (node->client->border_radius > 0.0f && tl->rounded) {
+        tl->rounded->border_dirty = true;
+        if (tl->rounded->border_shader_node) {
           int new_fw = geo.width + 2 * (int)bw;
           int new_fh = geo.height + 2 * (int)bw;
           if (new_fw > 0 && new_fh > 0)
-            wlr_scene_buffer_set_dest_size(tl->border_shader_node, new_fw, new_fh);
+            wlr_scene_buffer_set_dest_size(tl->rounded->border_shader_node, new_fw, new_fh);
         }
       }
     } else if (node->client->xwayland_view) {

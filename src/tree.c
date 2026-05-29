@@ -1643,13 +1643,13 @@ void update_border_colors(struct wlr_scene_tree *border_tree, struct wlr_scene_r
   float color[4];
   get_border_color(client, color);
 
-  if (client->border_radius > 0.0f && client->toplevel) {
+  if (client->border_radius > 0.0f && client->toplevel && client->toplevel->rounded) {
     struct bwm_toplevel *tl = client->toplevel;
-    tl->border_color[0] = color[0];
-    tl->border_color[1] = color[1];
-    tl->border_color[2] = color[2];
-    tl->border_color[3] = color[3];
-    tl->border_dirty = true;
+    tl->rounded->border_color[0] = color[0];
+    tl->rounded->border_color[1] = color[1];
+    tl->rounded->border_color[2] = color[2];
+    tl->rounded->border_color[3] = color[3];
+    tl->rounded->border_dirty = true;
     static const float transparent[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     for (int i = 0; i < 4; i++)
       if (rects[i])
