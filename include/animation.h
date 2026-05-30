@@ -25,8 +25,11 @@ bool animation_start_snapshot_resize(struct bwm_toplevel *toplevel, struct wlr_b
 
 bool animation_fade_in(struct bwm_toplevel *toplevel);
 bool animation_fade_in_layer(struct bwm_layer_surface *layer);
+bool animation_fade_out(struct bwm_toplevel *toplevel);
+bool animation_fade_out_layer(struct bwm_layer_surface *layer);
 
 void animation_cancel_node(struct node_t *node);
+bool animation_has_fade_out(struct wlr_scene_tree *scene_tree);
 void animation_cancel_scene_tree(struct wlr_scene_tree *scene_tree);
 
 bool animation_update_output(struct bwm_output *output, struct timespec now);

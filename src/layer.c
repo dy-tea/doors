@@ -45,6 +45,34 @@ void layer_surface_set_blur(struct bwm_layer_surface *ls, bool enabled) {
   }
 }
 
+static void layer_surface_save_buffer_iterator(struct wlr_scene_buffer *buffer,
+    int sx, int sy, void *data) {
+  struct wlr_scene_tree *tree = data;
+  if (!buffer || !buffer->buffer)
+    return;
+
+  struct wlr_scene_buffer *sbuf = wlr_scene_buffer_create(tree, NULL);
+  if (!sbuf)
+    return;
+
+  wlr_scene_buffer_set_dest_size(sbuf, buffer->dst_width, buffer->dst_height);
+  wlr_scene_buffer_set_opaque_region(sbuf, &buffer->opaque_region);
+  wlr_scene_buffer_set_source_box(sbuf, &buffer->src_box);
+  wlr_scene_node_set_position(&sbuf->node, sx, sy);
+  wlr_scene_buffer_set_transform(sbuf, buffer->transform);
+  wlr_scene_buffer_set_buffer(sbuf, buffer->buffer);
+}
+
+static void layer_surface_save_buffer(struct bwm_layer_surface *layer) {
+  if (!layer || !layer->saved_tree)
+    return;
+
+  wlr_scene_node_for_each_buffer(&layer->scene_tree->node,
+    layer_surface_save_buffer_iterator, layer->saved_tree);
+  wlr_log(WLR_DEBUG, "layer: save_buffer: saved_tree children=%d",
+    wl_list_length(&layer->saved_tree->children));
+}
+
 static void layer_surface_destroy(struct wl_listener *listener, void *data) {
   (void)data;
   struct bwm_layer_surface *layer = wl_container_of(listener, layer, destroy);
@@ -87,8 +115,27 @@ static void layer_surface_unmap(struct wl_listener *listener, void *data) {
   (void)data;
   struct bwm_layer_surface *layer = wl_container_of(listener, layer, unmap);
   layer->mapped = false;
-  animation_cancel_scene_tree(layer->scene_tree);
-  wlr_scene_node_set_enabled(&layer->scene_tree->node, false);
+
+  if (!enable_animations) {
+    animation_cancel_scene_tree(layer->scene_tree);
+    wlr_scene_node_set_enabled(&layer->scene_tree->node, false);
+  } else {
+    struct wlr_scene_node *child;
+    wl_list_for_each(child, &layer->scene_tree->children, link)
+      wlr_scene_node_set_enabled(child, true);
+
+    layer->saved_tree = wlr_scene_tree_create(&server.scene->tree);
+    if (!layer->saved_tree || !animation_fade_out_layer(layer)) {
+      if (layer->saved_tree)
+        wlr_scene_node_destroy(&layer->saved_tree->node);
+      layer->saved_tree = NULL;
+      animation_cancel_scene_tree(layer->scene_tree);
+      wlr_scene_node_set_enabled(&layer->scene_tree->node, false);
+    } else {
+      layer_surface_save_buffer(layer);
+    }
+  }
+
   arrange_layers(layer->output);
 }
 

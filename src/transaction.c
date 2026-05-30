@@ -176,8 +176,10 @@ static void arrange_node_geometry(node_t *node, struct bwm_transaction_inst *ins
   }
 
   if (node->destroying) {
-    if (instruction->scene_tree)
-      wlr_scene_node_set_enabled(&instruction->scene_tree->node, false);
+    if (instruction->scene_tree) {
+      if (!animation_has_fade_out(instruction->scene_tree))
+        wlr_scene_node_set_enabled(&instruction->scene_tree->node, false);
+    }
     return;
   }
 

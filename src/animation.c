@@ -29,6 +29,7 @@ struct bwm_animation_entry {
   struct node_t *node;
   struct bwm_toplevel *toplevel;
   struct wlr_scene_tree *scene_tree;
+  struct wlr_scene_tree *saved_tree;
   struct wlr_box from;
   struct wlr_box to;
   struct timespec start;
@@ -252,6 +253,8 @@ void animation_cancel_scene_tree(struct wlr_scene_tree *scene_tree) {
       float full = 1.0f;
       wlr_scene_node_for_each_buffer(&entry->scene_tree->node, set_opacity_iterator, &full);
     }
+    if (entry->saved_tree)
+      wlr_scene_node_destroy(&entry->saved_tree->node);
     destroy_snapshot_buffers(entry);
     wl_list_remove(&entry->link);
     free(entry);
@@ -373,6 +376,65 @@ bool animation_fade_in_layer(struct bwm_layer_surface *layer) {
   wlr_log(WLR_DEBUG, "animation: fade_in_layer entry=%p", (void*)entry);
   schedule_output(entry->output);
   return true;
+}
+
+bool animation_fade_out(struct bwm_toplevel *toplevel) {
+  if (!toplevel || !toplevel->scene_tree || !toplevel->node ||
+      !toplevel->node->output || !enable_animations)
+    return false;
+
+  struct bwm_animation_entry *entry = create_animation_entry();
+  if (!entry)
+    return false;
+
+  entry->node = NULL;
+  entry->toplevel = toplevel;
+  entry->scene_tree = toplevel->scene_tree;
+  entry->output = toplevel->node->output;
+  entry->from_opacity = 1.0f;
+  entry->to_opacity = 0.0f;
+  clock_gettime(CLOCK_MONOTONIC, &entry->start);
+  entry->duration_ms = ANIMATION_DURATION_MS;
+
+  wlr_log(WLR_DEBUG, "animation: fade_out entry=%p", (void*)entry);
+  schedule_output(entry->output);
+  return true;
+}
+
+bool animation_fade_out_layer(struct bwm_layer_surface *layer) {
+  if (!layer || !layer->saved_tree || !layer->output || !enable_animations)
+    return false;
+
+  struct bwm_animation_entry *entry = create_animation_entry();
+  if (!entry)
+    return false;
+
+  entry->node = NULL;
+  entry->toplevel = NULL;
+  entry->scene_tree = layer->saved_tree;
+  entry->output = layer->output;
+  entry->from_opacity = 1.0f;
+  entry->to_opacity = 0.0f;
+  entry->saved_tree = layer->saved_tree;
+  clock_gettime(CLOCK_MONOTONIC, &entry->start);
+  entry->duration_ms = ANIMATION_DURATION_MS;
+
+  wlr_log(WLR_DEBUG, "animation: fade_out_layer entry=%p saved_tree=%p",
+    (void*)entry, (void*)layer->saved_tree);
+  schedule_output(entry->output);
+  return true;
+}
+
+bool animation_has_fade_out(struct wlr_scene_tree *scene_tree) {
+  if (!scene_tree)
+    return false;
+
+  struct bwm_animation_entry *entry;
+  wl_list_for_each(entry, &animations, link)
+    if (entry->scene_tree == scene_tree && entry->to_opacity < entry->from_opacity)
+      return true;
+
+  return false;
 }
 
 bool animation_apply_geometry(struct node_t *node, struct wlr_scene_tree *scene_tree, struct wlr_box target, bool animate) {
@@ -608,8 +670,10 @@ bool animation_update_output(struct bwm_output *output, struct timespec now) {
 
   wl_list_for_each_safe(entry, tmp, &animations, link) {
     if (!entry->node) {
-      if (entry->output != output)
+      if (entry->output != output) {
+        wlr_log(WLR_DEBUG, "animation: skip entry=%p output mismatch", (void*)entry);
         continue;
+      }
 
       if (!entry->scene_tree) {
         wl_list_remove(&entry->link);
@@ -630,6 +694,10 @@ bool animation_update_output(struct bwm_output *output, struct timespec now) {
       if (progress >= 1.0) {
         float full = 1.0f;
         wlr_scene_node_for_each_buffer(&entry->scene_tree->node, set_opacity_iterator, &full);
+        if (entry->to_opacity < entry->from_opacity)
+          wlr_scene_node_set_enabled(&entry->scene_tree->node, false);
+        if (entry->saved_tree)
+          wlr_scene_node_destroy(&entry->saved_tree->node);
         wl_list_remove(&entry->link);
         free(entry);
       } else {

@@ -10,6 +10,7 @@ struct bwm_layer_surface {
   struct wlr_layer_surface_v1 *layer_surface;
   struct wlr_scene_tree *scene_tree;
   struct wlr_scene_layer_surface_v1 *scene_layer;
+  struct wlr_scene_tree *saved_tree;
   struct bwm_output *output;
   bool mapped;
 

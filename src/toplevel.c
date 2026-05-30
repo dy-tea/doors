@@ -585,7 +585,8 @@ void toplevel_unmap(struct wl_listener *listener, void *data) {
   if (toplevel->node == NULL)
     return;
 
-  animation_cancel_node(toplevel->node);
+  if (!animation_fade_out(toplevel))
+    animation_cancel_node(toplevel->node);
 
   if (toplevel->node->client && toplevel->node->client->shown)
     toplevel_save_buffer(toplevel);
