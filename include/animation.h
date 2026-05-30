@@ -20,6 +20,10 @@ bool animation_apply_geometry(struct node_t *node, struct wlr_scene_tree *scene_
 bool animation_apply_geometry_from(struct node_t *node, struct wlr_scene_tree *scene_tree,
   struct wlr_box from, struct wlr_box target, bool animate);
 
+bool animation_start_workspace_slide(struct bwm_output *output,
+  struct node_t *node, struct wlr_scene_tree *scene_tree,
+  struct wlr_box from, struct wlr_box to, bool slide_out);
+
 bool animation_start_snapshot_resize(struct bwm_toplevel *toplevel, struct wlr_box from,
 	struct wlr_box to);
 

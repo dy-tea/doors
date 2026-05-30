@@ -1,4 +1,5 @@
 #include "workspace.h"
+#include "animation.h"
 #include "server.h"
 #include "types.h"
 #include "output.h"
@@ -12,6 +13,7 @@
 extern struct bwm_server server;
 
 static void handle_workspace_request(struct wl_listener *listener, void *data);
+static void update_all_toplevels_visibility(struct bwm_output *m, desktop_t *current_desktop);
 
 static struct wlr_ext_workspace_handle_v1 *find_workspace_by_name(const char *name) {
   struct wlr_ext_workspace_handle_v1 *workspace;
@@ -240,6 +242,131 @@ static void update_all_toplevels_visibility(struct bwm_output *m, desktop_t *cur
   }
 }
 
+static void workspace_switch_animate(struct bwm_output *output,
+    desktop_t *old_desk, desktop_t *new_desk) {
+  int dx = 0, dy = 0;
+  int slide_dist;
+  bool forward = true;
+
+  // skip if animations are disabled
+  if (old_desk == new_desk || !enable_animations)
+    return;
+
+  desktop_t *walk = old_desk;
+  while (walk) {
+    if (walk == new_desk) {
+      forward = false;
+      break;
+    }
+    walk = walk->next;
+  }
+
+  if (workspace_anim_direction == WORKSPACE_ANIM_VERTICAL) {
+    slide_dist = output->height;
+    dy = forward ? slide_dist : -slide_dist;
+    if (workspace_anim_slide_up)
+      dy = -dy;
+  } else {
+    slide_dist = output->width;
+    dx = forward ? slide_dist : -slide_dist;
+    if (workspace_anim_slide_up)
+      dx = -dx;
+  }
+
+
+  // create slide-out animations for old desktop windows
+  if (old_desk && old_desk->root) {
+    node_t *n = first_extrema(old_desk->root);
+    while (n) {
+      if (n->client) {
+        struct wlr_scene_tree *tree = client_get_scene_tree(n->client);
+        if (tree && tree->node.enabled) {
+          struct wlr_box from = {tree->node.x, tree->node.y, 0, 0};
+          struct wlr_box to = {from.x + dx, from.y + dy, 0, 0};
+          animation_start_workspace_slide(output, n, tree, from, to, true);
+        }
+      }
+      n = next_leaf(n, old_desk->root);
+    }
+  }
+
+  output->desk = new_desk;
+
+  // update visibility
+  update_all_toplevels_visibility(output, new_desk);
+
+  // re-enable old desktop windows for slide-out animation
+  if (old_desk && old_desk->root) {
+    node_t *n = first_extrema(old_desk->root);
+    while (n) {
+      if (n->client) {
+        struct wlr_scene_tree *tree = client_get_scene_tree(n->client);
+        if (tree) {
+          n->client->shown = true;
+          wlr_scene_node_set_enabled(&tree->node, true);
+        }
+      }
+      n = next_leaf(n, old_desk->root);
+    }
+  }
+
+  if (new_desk && new_desk->root) {
+    node_t *n = first_extrema(new_desk->root);
+    while (n) {
+      if (n->client) {
+        struct wlr_scene_tree *tree = client_get_scene_tree(n->client);
+        if (tree) {
+          wlr_scene_node_set_enabled(&tree->node, true);
+          wlr_scene_node_set_position(&tree->node,
+              tree->node.x - dx, tree->node.y - dy);
+          n->client->committed_tiled_rectangle = (struct wlr_box){0, 0, 0, 0};
+        }
+      }
+      n = next_leaf(n, new_desk->root);
+    }
+  }
+
+  // arrange new desktop
+  if (new_desk->root) {
+    arrange(output, new_desk, true);
+    if (new_desk->focus)
+      focus_node(output, new_desk, new_desk->focus);
+  }
+
+  // override transaction's animation for new windows
+  if (new_desk && new_desk->root) {
+    node_t *n = first_extrema(new_desk->root);
+    while (n) {
+      if (n->client) {
+        struct wlr_scene_tree *tree = client_get_scene_tree(n->client);
+        if (tree) {
+          struct wlr_box target = n->pending.rectangle;
+          struct wlr_box from = {target.x - dx, target.y - dy, 0, 0};
+          wlr_scene_node_set_position(&tree->node, from.x, from.y);
+          animation_start_workspace_slide(output, n, tree, from, target, false);
+        }
+      }
+      n = next_leaf(n, new_desk->root);
+    }
+  }
+
+  // update workspace protocol
+  struct wlr_ext_workspace_handle_v1 *old_ws = workspace_get_active();
+  if (old_ws)
+    wlr_ext_workspace_handle_v1_set_active(old_ws, false);
+
+  struct wlr_ext_workspace_handle_v1 *new_ws = find_workspace_by_name(new_desk->name);
+  if (new_ws) {
+    wlr_ext_workspace_handle_v1_set_active(new_ws, true);
+    wlr_ext_workspace_handle_v1_set_hidden(new_ws, false);
+  }
+
+  wlr_output_schedule_frame(output->wlr_output);
+  wlr_log(WLR_DEBUG, "Switched from %s to %s (animated slide %s)",
+    old_desk ? old_desk->name : "NULL", new_desk->name,
+    workspace_anim_direction == WORKSPACE_ANIM_VERTICAL ? "vertical" : "horizontal");
+}
+
 void workspace_switch_to_desktop(const char *name) {
   if (!server.workspace_manager)
     return;
@@ -258,24 +385,23 @@ void workspace_switch_to_desktop(const char *name) {
 
   desktop_t *old_desktop = server.focused_output->desk;
 
+  if (enable_animations && old_desktop && old_desktop != d &&
+      server.focused_output) {
+    workspace_switch_animate(server.focused_output, old_desktop, d);
+    return;
+  }
+
   server.focused_output->desk = d;
 
   wlr_log(WLR_DEBUG, "Switching from %s to %s",
-          old_desktop ? old_desktop->name : "NULL", d->name);
-
-  struct wlr_ext_workspace_handle_v1 *old = workspace_get_active();
-  if (old)
-    wlr_ext_workspace_handle_v1_set_active(old, false);
-
-  wlr_ext_workspace_handle_v1_set_active(workspace, true);
-  wlr_ext_workspace_handle_v1_set_hidden(workspace, false);
+    old_desktop ? old_desktop->name : "NULL", d->name);
 
   update_all_toplevels_visibility(server.focused_output, d);
 
   if (d->root == NULL) {
     wlr_log(WLR_DEBUG, "Desktop %s has no root, skipping arrange/focus", name);
     wlr_log(WLR_INFO, "Switched to desktop: %s", name);
-    return;
+    goto finish;
   }
 
   arrange(server.focused_output, d, true);
@@ -284,6 +410,14 @@ void workspace_switch_to_desktop(const char *name) {
     focus_node(server.focused_output, d, d->focus);
 
   wlr_log(WLR_INFO, "Switched to desktop: %s", name);
+
+finish:
+  struct wlr_ext_workspace_handle_v1 *old = workspace_get_active();
+  if (old)
+    wlr_ext_workspace_handle_v1_set_active(old, false);
+
+  wlr_ext_workspace_handle_v1_set_active(workspace, true);
+  wlr_ext_workspace_handle_v1_set_hidden(workspace, false);
 }
 
 void workspace_switch_to_desktop_by_index(int index) {

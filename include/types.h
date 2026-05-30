@@ -46,6 +46,8 @@ typedef enum { FIRST_CHILD, SECOND_CHILD } child_polarity_t;
 
 typedef enum { FLIP_HORIZONTAL, FLIP_VERTICAL } flip_t;
 
+typedef enum { WORKSPACE_ANIM_VERTICAL, WORKSPACE_ANIM_HORIZONTAL } workspace_anim_direction_t;
+
 // structures
 typedef struct {
   int top;
@@ -184,6 +186,8 @@ extern bool record_history;
 extern bool click_to_focus;
 extern decoration_mode_t decoration_mode;
 extern bool enable_animations;
+extern workspace_anim_direction_t workspace_anim_direction;
+extern bool workspace_anim_slide_up;
 extern int mapping_events_count;
 
 // Transaction system settings

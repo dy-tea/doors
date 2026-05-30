@@ -26,6 +26,8 @@ struct bwm_animation_entry {
   bool snapshot_buffers_initialized;
   bool updated_buffers_initialized;
   bool use_content_tree;
+  bool workspace_switch;
+  bool slide_out;
   struct node_t *node;
   struct bwm_toplevel *toplevel;
   struct wlr_scene_tree *scene_tree;
@@ -425,6 +427,39 @@ bool animation_fade_out_layer(struct bwm_layer_surface *layer) {
   return true;
 }
 
+bool animation_start_workspace_slide(struct bwm_output *output,
+    struct node_t *node, struct wlr_scene_tree *scene_tree,
+    struct wlr_box from, struct wlr_box to, bool slide_out) {
+  if (!node || !scene_tree || !output || !enable_animations)
+    return false;
+
+  animation_cancel_node(node);
+
+  struct bwm_animation_entry *entry = find_animation(node);
+  if (!entry) {
+    entry = create_animation_entry();
+    if (!entry)
+      return false;
+  }
+
+  entry->node = node;
+  entry->scene_tree = scene_tree;
+  entry->from = from;
+  entry->to = to;
+  entry->workspace_switch = true;
+  entry->slide_out = slide_out;
+  clock_gettime(CLOCK_MONOTONIC, &entry->start);
+  entry->duration_ms = ANIMATION_DURATION_MS;
+  entry->from_opacity = 1.0f;
+  entry->to_opacity = 1.0f;
+
+  wlr_scene_node_set_position(&scene_tree->node, entry->from.x, entry->from.y);
+  schedule_output(output);
+  wlr_log(WLR_DEBUG, "animation: workspace_slide entry=%p node=%u from=(%d,%d) to=(%d,%d)", 
+    (void*)entry, node->id, from.x, from.y, to.x, to.y);
+  return true;
+}
+
 bool animation_has_fade_out(struct wlr_scene_tree *scene_tree) {
   if (!scene_tree)
     return false;
@@ -761,6 +796,13 @@ bool animation_update_output(struct bwm_output *output, struct timespec now) {
         float full = 1.0f;
         wlr_scene_node_for_each_buffer(&entry->scene_tree->node, set_opacity_iterator, &full);
       }
+
+      if (entry->workspace_switch && entry->slide_out && entry->node && entry->node->client) {
+        entry->node->client->shown = false;
+        wlr_scene_node_set_enabled(&entry->scene_tree->node, false);
+        wlr_log(WLR_DEBUG, "animation: workspace slide-out complete, disabled node=%u", entry->node->id);
+      }
+
       wl_list_remove(&entry->link);
       free(entry);
     } else {

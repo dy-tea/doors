@@ -2649,6 +2649,27 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
     } else {
       send_success(client_fd, enable_animations ? "true\n" : "false\n");
     }
+  } else if (streq("workspace_anim_direction", *args)) {
+    if (num >= 2) {
+      if (streq(args[1], "vertical")) {
+        workspace_anim_direction = WORKSPACE_ANIM_VERTICAL;
+        send_success(client_fd, "workspace_anim_direction set to vertical\n");
+      } else if (streq(args[1], "horizontal")) {
+        workspace_anim_direction = WORKSPACE_ANIM_HORIZONTAL;
+        send_success(client_fd, "workspace_anim_direction set to horizontal\n");
+      } else {
+        send_failure(client_fd, "workspace_anim_direction: must be 'vertical' or 'horizontal'\n");
+      }
+    } else {
+      send_success(client_fd, workspace_anim_direction == WORKSPACE_ANIM_VERTICAL ? "vertical\n" : "horizontal\n");
+    }
+  } else if (streq("workspace_anim_slide_up", *args)) {
+    if (num >= 2) {
+      workspace_anim_slide_up = (strcmp(args[1], "true") == 0);
+      send_success(client_fd, "workspace_anim_slide_up set\n");
+    } else {
+      send_success(client_fd, workspace_anim_slide_up ? "true\n" : "false\n");
+    }
   } else if (streq("edge_scroller_pointer_focus", *args)) {
     if (num >= 2) {
       edge_scroller_pointer_focus = (strcmp(args[1], "true") == 0);
