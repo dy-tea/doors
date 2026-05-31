@@ -67,11 +67,15 @@ static void output_source_request_frame(
 	(void)schedule_frame;
 }
 
-static void block_windows(struct bwm_image_copy_source *src,
-		struct wlr_render_pass *pass, float scale) {
-	struct bwm_output *bwm_output = output_from_wlr_output(src->output);
-	if (!bwm_output)
-		return;
+#define MAX_BLOCKED_WINDOWS 128
+
+struct blocked_node_state {
+	struct wlr_scene_node *node;
+	bool was_enabled;
+};
+
+static int disable_blocked_windows(struct blocked_node_state *states, int max_states) {
+	int count = 0;
 
 	struct bwm_toplevel *tl;
 	wl_list_for_each(tl, &server.toplevels, link) {
@@ -83,38 +87,14 @@ static void block_windows(struct bwm_image_copy_source *src,
 		if (!c->shown && c->state != STATE_FULLSCREEN)
 			continue;
 
-		struct wlr_box win_rect = {0};
-		switch (c->state) {
-		case STATE_TILED:
-		case STATE_PSEUDO_TILED:
-			win_rect = c->tiled_rectangle;
+		if (count >= max_states)
 			break;
-		case STATE_FLOATING:
-			win_rect = c->floating_rectangle;
-			break;
-		case STATE_FULLSCREEN:
-			win_rect = bwm_output->rectangle;
-			break;
-		}
-		if (win_rect.width == 0 || win_rect.height == 0)
-			continue;
-
-		int abs_x, abs_y;
-		wlr_scene_node_coords(&tl->scene_tree->node, &abs_x, &abs_y);
-
-		int bw = (int)border_width;
-		struct wlr_box block_box = {
-			.x = (int)((abs_x - bwm_output->rectangle.x - bw) * scale),
-			.y = (int)((abs_y - bwm_output->rectangle.y - bw) * scale),
-			.width = (int)((win_rect.width + 2 * bw) * scale),
-			.height = (int)((win_rect.height + 2 * bw) * scale),
-		};
-
-		wlr_render_pass_add_rect(pass, &(struct wlr_render_rect_options){
-			.box = block_box,
-			.color = { 0, 0, 0, 1 },
-			.blend_mode = WLR_RENDER_BLEND_MODE_NONE,
-		});
+		wlr_log(WLR_DEBUG, "ext-copy-capture: disabling toplevel scene_tree=%p"
+			" app_id=%s", (void*)&tl->scene_tree->node, c->app_id);
+		states[count].node = &tl->scene_tree->node;
+		states[count].was_enabled = tl->scene_tree->node.enabled;
+		wlr_scene_node_set_enabled(&tl->scene_tree->node, false);
+		count++;
 	}
 
 	struct bwm_xwayland_view *xw;
@@ -127,39 +107,22 @@ static void block_windows(struct bwm_image_copy_source *src,
 		if (!c->shown && c->state != STATE_FULLSCREEN)
 			continue;
 
-		struct wlr_box win_rect = {0};
-		switch (c->state) {
-		case STATE_TILED:
-		case STATE_PSEUDO_TILED:
-			win_rect = c->tiled_rectangle;
+		if (count >= max_states)
 			break;
-		case STATE_FLOATING:
-			win_rect = c->floating_rectangle;
-			break;
-		case STATE_FULLSCREEN:
-			win_rect = bwm_output->rectangle;
-			break;
-		}
-		if (win_rect.width == 0 || win_rect.height == 0)
-			continue;
-
-		int abs_x, abs_y;
-		wlr_scene_node_coords(&xw->scene_tree->node, &abs_x, &abs_y);
-
-		int bw = (int)border_width;
-		struct wlr_box block_box = {
-			.x = (int)((abs_x - bwm_output->rectangle.x - bw) * scale),
-			.y = (int)((abs_y - bwm_output->rectangle.y - bw) * scale),
-			.width = (int)((win_rect.width + 2 * bw) * scale),
-			.height = (int)((win_rect.height + 2 * bw) * scale),
-		};
-
-		wlr_render_pass_add_rect(pass, &(struct wlr_render_rect_options){
-			.box = block_box,
-			.color = { 0, 0, 0, 1 },
-			.blend_mode = WLR_RENDER_BLEND_MODE_NONE,
-		});
+		wlr_log(WLR_DEBUG, "ext-copy-capture: disabling xwayland scene_tree=%p"
+			" title=%s", (void*)&xw->scene_tree->node, c->title);
+		states[count].node = &xw->scene_tree->node;
+		states[count].was_enabled = xw->scene_tree->node.enabled;
+		wlr_scene_node_set_enabled(&xw->scene_tree->node, false);
+		count++;
 	}
+
+	return count;
+}
+
+static void restore_blocked_windows(struct blocked_node_state *states, int count) {
+	for (int i = 0; i < count; i++)
+		wlr_scene_node_set_enabled(states[i].node, states[i].was_enabled);
 }
 
 static void output_source_copy_frame(struct wlr_ext_image_capture_source_v1 *base,
@@ -415,134 +378,21 @@ static void frame_handle_damage_buffer(struct wl_client *wl_client,
 		&frame->buffer_damage, x, y, width, height);
 }
 
-static void block_windows_cpu(void *data, uint32_t width, uint32_t height,
-		size_t stride, struct bwm_image_copy_source *src, float scale) {
-	struct bwm_output *bwm_output = output_from_wlr_output(src->output);
-	if (!bwm_output)
-		return;
-
-	int count = 0;
-
-	struct bwm_toplevel *tl;
-	wl_list_for_each(tl, &server.toplevels, link) {
-		if (!tl->node || !tl->node->client)
-			continue;
-		client_t *c = tl->node->client;
-		if (!c->block_out_from_screenshare)
-			continue;
-		if (!c->shown && c->state != STATE_FULLSCREEN)
-			continue;
-
-		struct wlr_box win_rect = {0};
-		switch (c->state) {
-		case STATE_TILED:
-		case STATE_PSEUDO_TILED:
-			win_rect = c->tiled_rectangle;
-			break;
-		case STATE_FLOATING:
-			win_rect = c->floating_rectangle;
-			break;
-		case STATE_FULLSCREEN:
-			win_rect = bwm_output->rectangle;
-			break;
-		}
-		if (win_rect.width == 0 || win_rect.height == 0)
-			continue;
-
-		int abs_x, abs_y;
-		wlr_scene_node_coords(&tl->scene_tree->node, &abs_x, &abs_y);
-
-		int bw = (int)border_width;
-		int bx = (int)((abs_x - bwm_output->rectangle.x - bw) * scale);
-		int by = (int)((abs_y - bwm_output->rectangle.y - bw) * scale);
-		int bw_w = (int)((win_rect.width + 2 * bw) * scale);
-		int bw_h = (int)((win_rect.height + 2 * bw) * scale);
-
-		wlr_log(WLR_DEBUG, "ext-copy-capture: CPU block-out tl abs=(%d,%d) "
-			"win_rect=(%d,%d,%d,%d) out_rect=(%d,%d) bw=%d "
-			"box=(%d,%d,%d,%d) capture=(%dx%d) scale=%.1f",
-			abs_x, abs_y, win_rect.x, win_rect.y,
-			win_rect.width, win_rect.height,
-			bwm_output->rectangle.x, bwm_output->rectangle.y,
-			bw, bx, by, bw_w, bw_h, width, height, scale);
-
-		if (bx < 0) { bw_w += bx; bx = 0; }
-		if (by < 0) { bw_h += by; by = 0; }
-		if (bx + bw_w > (int)width) bw_w = (int)width - bx;
-		if (by + bw_h > (int)height) bw_h = (int)height - by;
-		if (bw_w <= 0 || bw_h <= 0)
-			continue;
-
-		for (int row = 0; row < bw_h; row++) {
-			uint32_t *pixels = (uint32_t *)((uint8_t *)data + (by + row) * stride);
-			for (int col = 0; col < bw_w; col++) {
-				pixels[bx + col] = 0xFF000000;
-			}
-		}
-		count++;
-	}
-
-	struct bwm_xwayland_view *xw;
-	wl_list_for_each(xw, &server.xwayland.views, link) {
-		if (!xw->node || !xw->node->client)
-			continue;
-		client_t *c = xw->node->client;
-		if (!c->block_out_from_screenshare)
-			continue;
-		if (!c->shown && c->state != STATE_FULLSCREEN)
-			continue;
-
-		struct wlr_box win_rect = {0};
-		switch (c->state) {
-		case STATE_TILED:
-		case STATE_PSEUDO_TILED:
-			win_rect = c->tiled_rectangle;
-			break;
-		case STATE_FLOATING:
-			win_rect = c->floating_rectangle;
-			break;
-		case STATE_FULLSCREEN:
-			win_rect = bwm_output->rectangle;
-			break;
-		}
-		if (win_rect.width == 0 || win_rect.height == 0)
-			continue;
-
-		int abs_x, abs_y;
-		wlr_scene_node_coords(&xw->scene_tree->node, &abs_x, &abs_y);
-
-		int bw = (int)border_width;
-		int bx = (int)((abs_x - bwm_output->rectangle.x - bw) * scale);
-		int by = (int)((abs_y - bwm_output->rectangle.y - bw) * scale);
-		int bw_w = (int)((win_rect.width + 2 * bw) * scale);
-		int bw_h = (int)((win_rect.height + 2 * bw) * scale);
-
-		wlr_log(WLR_DEBUG, "ext-copy-capture: CPU block-out xw abs=(%d,%d) "
-			"box=(%d,%d,%d,%d) scale=%.1f",
-			abs_x, abs_y, bx, by, bw_w, bw_h, scale);
-
-		if (bx < 0) { bw_w += bx; bx = 0; }
-		if (by < 0) { bw_h += by; by = 0; }
-		if (bx + bw_w > (int)width) bw_w = (int)width - bx;
-		if (by + bw_h > (int)height) bw_h = (int)height - by;
-		if (bw_w <= 0 || bw_h <= 0)
-			continue;
-
-		for (int row = 0; row < bw_h; row++) {
-			uint32_t *pixels = (uint32_t *)((uint8_t *)data + (by + row) * stride);
-			for (int col = 0; col < bw_w; col++) {
-				pixels[bx + col] = 0xFF000000;
-			}
-		}
-		count++;
-	}
-
-	wlr_log(WLR_DEBUG, "ext-copy-capture: CPU block-out applied %d windows", count);
-}
-
 static bool perform_output_capture(struct bwm_copy_frame *frame,
 		struct bwm_image_copy_source *src) {
 	struct wlr_output *output = src->output;
+
+	struct blocked_node_state blocked_states[MAX_BLOCKED_WINDOWS];
+	int nblocked = disable_blocked_windows(blocked_states, MAX_BLOCKED_WINDOWS);
+	bool ok = false;
+
+	wlr_log(WLR_DEBUG, "ext-copy-capture: blocked windows found=%d", nblocked);
+
+	if (nblocked > 0 && src->last_buffer) {
+		wlr_log(WLR_DEBUG, "ext-copy-capture: invalidating cached buffer");
+		wlr_buffer_unlock(src->last_buffer);
+		src->last_buffer = NULL;
+	}
 
 	if (!src->last_buffer) {
 		wlr_log(WLR_DEBUG, "ext-copy-capture: no buffer, rendering fresh frame");
@@ -550,7 +400,7 @@ static bool perform_output_capture(struct bwm_copy_frame *frame,
 			wlr_scene_get_scene_output(server.scene, output);
 		if (!scene_output) {
 			wlr_log(WLR_DEBUG, "ext-copy-capture: no scene output");
-			return false;
+			goto out;
 		}
 		wlr_damage_ring_add_whole(&scene_output->damage_ring);
 		struct wlr_output_state tmp_state;
@@ -559,7 +409,7 @@ static bool perform_output_capture(struct bwm_copy_frame *frame,
 		if (!wlr_scene_output_build_state(scene_output, &tmp_state, NULL)) {
 			wlr_log(WLR_DEBUG, "ext-copy-capture: scene build failed");
 			wlr_output_state_finish(&tmp_state);
-			return false;
+			goto out;
 		}
 		src->last_buffer = tmp_state.buffer;
 		wlr_buffer_lock(src->last_buffer);
@@ -577,7 +427,7 @@ static bool perform_output_capture(struct bwm_copy_frame *frame,
 		src->last_buffer);
 	if (!texture) {
 		wlr_log(WLR_DEBUG, "ext-copy-capture: failed to create texture");
-		return false;
+		goto out;
 	}
 
 	wlr_log(WLR_DEBUG, "ext-copy-capture: texture=%p phys=%dx%d logical=%dx%d",
@@ -601,18 +451,16 @@ static bool perform_output_capture(struct bwm_copy_frame *frame,
 			},
 		});
 
-		block_windows(src, pass, output->scale);
-
 		wlr_render_pass_submit(pass);
 		wlr_texture_destroy(texture);
 		wlr_log(WLR_DEBUG, "ext-copy-capture: direct render completed OK");
-		goto send_ready;
+		ok = true;
+		goto out;
 	}
 
 	wlr_log(WLR_DEBUG, "ext-copy-capture: direct render failed, "
-		"falling back to SHM read-pixels + CPU block-out");
+		"falling back to SHM read-pixels path");
 
-	// Client buffer is SHM; read texture directly into client buffer
 	uint32_t dst_format;
 	size_t dst_stride;
 	void *dst_data;
@@ -622,7 +470,7 @@ static bool perform_output_capture(struct bwm_copy_frame *frame,
 			&dst_data, &dst_format, &dst_stride)) {
 		wlr_texture_destroy(texture);
 		wlr_log(WLR_DEBUG, "ext-copy-capture: client buffer not writable");
-		return false;
+		goto out;
 	}
 
 	wlr_log(WLR_DEBUG, "ext-copy-capture: client fmt=0x%x stride=%zu "
@@ -638,20 +486,20 @@ static bool perform_output_capture(struct bwm_copy_frame *frame,
 		wlr_buffer_end_data_ptr_access(frame->buffer);
 		wlr_texture_destroy(texture);
 		wlr_log(WLR_DEBUG, "ext-copy-capture: read_pixels failed");
-		return false;
+		goto out;
 	}
 
 	wlr_texture_destroy(texture);
-	wlr_log(WLR_DEBUG, "ext-copy-capture: read_pixels OK, applying CPU block-out");
-
-	// apply block-out rectangles on the client buffer
-	block_windows_cpu(dst_data, phys_w, phys_h, dst_stride, src,
-		output->scale);
 
 	wlr_log(WLR_DEBUG, "ext-copy-capture: SHM path completed OK");
 	wlr_buffer_end_data_ptr_access(frame->buffer);
+	ok = true;
 
-send_ready:
+out:
+	restore_blocked_windows(blocked_states, nblocked);
+	if (!ok)
+		return false;
+
 	ext_image_copy_capture_frame_v1_send_transform(frame->resource,
 		WL_OUTPUT_TRANSFORM_NORMAL);
 
