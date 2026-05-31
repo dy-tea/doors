@@ -863,8 +863,9 @@ static GLuint capture_bg_to_tex1(struct bwm_output *output, struct bwm_blur_outp
   } else {
     // hide everything with blur/mica (for mica capture)
     wl_list_for_each(tl, &server.toplevels, link) {
+      if (!tl->blur) continue;
       tl->blur->blur_scene_hidden = false;
-      if (tl->blur && (tl->blur->blur_node || tl->blur->mica_node) && tl->scene_tree &&
+      if ((tl->blur->blur_node || tl->blur->mica_node) && tl->scene_tree &&
           tl->scene_tree->node.enabled) {
         wlr_scene_node_set_enabled(&tl->scene_tree->node, false);
         tl->blur->blur_scene_hidden = true;
