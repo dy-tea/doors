@@ -1,4 +1,4 @@
-# bwm
+# bwm (working name)
 
 _Wayland compositor based on bspwm_
 
