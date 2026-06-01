@@ -245,14 +245,31 @@ void toplevel_center_and_clip_surface(struct bwm_toplevel *toplevel) {
   }
 
   if (!wl_list_empty(&toplevel->content_tree->children)) {
-    if (clip_to_geometry) {
-      struct wlr_box clip = {
-        .x = toplevel->geometry.x,
-        .y = toplevel->geometry.y,
-        .width = container_rect->width,
-        .height = container_rect->height
-      };
+    int clip_w = container_rect->width;
+    int clip_h = container_rect->height;
+    // for tiled surfaces where surface is smaller than container in one dimension,
+    // clip to surface geometry to avoid showing empty container space
+    if (tiled && toplevel->geometry.width > 0 && toplevel->geometry.height > 0) {
+      if ((int)toplevel->geometry.width < container_rect->width)
+        clip_w = toplevel->geometry.width;
+      else if ((int)toplevel->geometry.width > container_rect->width)
+        clip_w = container_rect->width;
+      if ((int)toplevel->geometry.height < container_rect->height)
+        clip_h = toplevel->geometry.height;
+      else if ((int)toplevel->geometry.height > container_rect->height)
+        clip_h = container_rect->height;
+    }
 
+    // when surface is wider/taller than container, we still need to clip to container
+    // to prevent the surface from extending past the window borders
+    struct wlr_box clip = {
+      .x = toplevel->geometry.x,
+      .y = toplevel->geometry.y,
+      .width = clip_w,
+      .height = clip_h
+    };
+
+    if (clip_to_geometry) {
       wlr_scene_subsurface_tree_set_clip(&toplevel->content_tree->node, &clip);
     } else {
       wlr_scene_subsurface_tree_set_clip(&toplevel->content_tree->node, NULL);

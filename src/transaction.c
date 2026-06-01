@@ -274,8 +274,11 @@ static void arrange_node_geometry(node_t *node, struct bwm_transaction_inst *ins
     if (node->client->toplevel) {
       unsigned int bw = node->client->border_width;
       struct bwm_toplevel *tl = node->client->toplevel;
+      // surface geometry differs from container in either dimension
       bool undersized = instruction->state != STATE_FLOATING && instruction->state != STATE_FULLSCREEN &&
-        tl->geometry.width > 0 && tl->geometry.height > 0 && ((int)tl->geometry.width < rect->width || (int)tl->geometry.height < rect->height);
+        tl->geometry.width > 0 && tl->geometry.height > 0 &&
+        ((int)tl->geometry.width < rect->width || (int)tl->geometry.height < rect->height ||
+         (int)tl->geometry.width > rect->width || (int)tl->geometry.height > rect->height);
       struct wlr_box geo;
       int border_x, border_y;
       if (undersized) {
@@ -286,6 +289,7 @@ static void arrange_node_geometry(node_t *node, struct bwm_transaction_inst *ins
         wlr_log(WLR_DEBUG, "arrange_node_geom: undersized node=%u geo=(%dx%d) rect=(%dx%d) center=(%d,%d)",
           node->id, tl->geometry.width, tl->geometry.height,
           rect->width, rect->height, cx, cy);
+        // use the smaller of surface geometry or container for border size
         geo = (struct wlr_box){
           0, 0,
           (int)tl->geometry.width < rect->width ? (int)tl->geometry.width : rect->width,

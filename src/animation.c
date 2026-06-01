@@ -455,7 +455,7 @@ bool animation_start_workspace_slide(struct bwm_output *output,
 
   wlr_scene_node_set_position(&scene_tree->node, entry->from.x, entry->from.y);
   schedule_output(output);
-  wlr_log(WLR_DEBUG, "animation: workspace_slide entry=%p node=%u from=(%d,%d) to=(%d,%d)", 
+  wlr_log(WLR_DEBUG, "animation: workspace_slide entry=%p node=%u from=(%d,%d) to=(%d,%d)",
     (void*)entry, node->id, from.x, from.y, to.x, to.y);
   return true;
 }
@@ -549,11 +549,24 @@ static void update_snapshot_entry(struct bwm_animation_entry *entry,
   wlr_scene_node_set_position(&entry->toplevel->scene_tree->node, x, y);
 
   if (entry->use_content_tree && entry->toplevel->content_tree) {
+    // clip to the smaller of surface geometry or animation target to prevent over/under-rendering
+    int clip_w = width;
+    int clip_h = height;
+    if (entry->toplevel->geometry.width > 0 && entry->toplevel->geometry.height > 0) {
+      if ((int)entry->toplevel->geometry.width < width)
+        clip_w = entry->toplevel->geometry.width;
+      else if ((int)entry->toplevel->geometry.width > width)
+        clip_w = width;
+      if ((int)entry->toplevel->geometry.height < height)
+        clip_h = entry->toplevel->geometry.height;
+      else if ((int)entry->toplevel->geometry.height > height)
+        clip_h = height;
+    }
     struct wlr_box clip = {
       .x = entry->toplevel->geometry.x,
       .y = entry->toplevel->geometry.y,
-      .width = width,
-      .height = height,
+      .width = clip_w,
+      .height = clip_h,
     };
     wlr_scene_subsurface_tree_set_clip(&entry->toplevel->content_tree->node, &clip);
 
@@ -631,6 +644,13 @@ static void update_snapshot_entry(struct bwm_animation_entry *entry,
         int dy = (int)(copy->y * scale_y);
         int dw = (int)(copy->width * scale_x);
         int dh = (int)(copy->height * scale_y);
+        // clip to surface geometry when saved buffer is larger
+        if (entry->toplevel && entry->toplevel->geometry.width > 0 && entry->toplevel->geometry.height > 0) {
+          int max_w = MIN(width, entry->toplevel->geometry.width);
+          int max_h = MIN(height, entry->toplevel->geometry.height);
+          if (dw > max_w) dw = max_w;
+          if (dh > max_h) dh = max_h;
+        }
         if (dw <= 0) dw = 1;
         if (dh <= 0) dh = 1;
         wlr_scene_buffer_set_source_box(copy->buffer, &full_src);
@@ -647,6 +667,14 @@ static void update_snapshot_entry(struct bwm_animation_entry *entry,
       if (vis_x2 > width) vis_x2 = width;
       int vis_y2 = copy->y + copy->height;
       if (vis_y2 > height) vis_y2 = height;
+
+      // clip to surface geometry when saved buffer is larger
+      if (entry->toplevel && entry->toplevel->geometry.width > 0 && entry->toplevel->geometry.height > 0) {
+        int max_w = MIN(width, entry->toplevel->geometry.width);
+        int max_h = MIN(height, entry->toplevel->geometry.height);
+        if (vis_x2 > max_w) vis_x2 = max_w;
+        if (vis_y2 > max_h) vis_y2 = max_h;
+      }
 
       if (vis_x2 <= vis_x1 || vis_y2 <= vis_y1) {
         wlr_scene_node_set_position(&copy->buffer->node, vis_x1, vis_y1);
