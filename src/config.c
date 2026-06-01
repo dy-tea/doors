@@ -27,6 +27,8 @@ size_t num_keybinds = 0;
 keybind_t bell_bind = {0};
 gesturebind_t gesture_bindings[MAX_GESTUREBINDS];
 size_t num_gesturebinds = 0;
+hotcornerbind_t hotcorner_bindings[MAX_HOTCORNERBINDS];
+size_t num_hotcornerbinds = 0;
 submap_t *active_submap = NULL;
 
 #define MAX_SUBMAPS 32
@@ -475,9 +477,76 @@ static void parse_gesture_hotkey_line(const char *gesture_str, const char *comma
   }
 }
 
+static void add_hotcornerbind(int corner_x, int corner_y, bind_action_t action, int desktop_index, const char *external_cmd) {
+  if (num_hotcornerbinds >= MAX_HOTCORNERBINDS) {
+    wlr_log(WLR_ERROR, "Maximum number of hotcorner binds reached");
+    return;
+  }
+
+  hotcornerbind_t *hc = &hotcorner_bindings[num_hotcornerbinds++];
+  hc->corner_x = corner_x;
+  hc->corner_y = corner_y;
+  if (corner_x == -1 && corner_y == -1)
+    hc->corner = HOTCORNER_TOPLEFT;
+  else if (corner_x == 1 && corner_y == -1)
+    hc->corner = HOTCORNER_TOPRIGHT;
+  else if (corner_x == -1 && corner_y == 1)
+    hc->corner = HOTCORNER_BOTTOMLEFT;
+  else if (corner_x == 1 && corner_y == 1)
+    hc->corner = HOTCORNER_BOTTOMRIGHT;
+  else
+    hc->corner = HOTCORNER_NONE;
+  hc->action = action;
+  hc->desktop_index = desktop_index;
+  if (external_cmd)
+    snprintf(hc->external_cmd, sizeof(hc->external_cmd), "%s", external_cmd);
+  else
+    hc->external_cmd[0] = '\0';
+
+  wlr_log(WLR_DEBUG, "Added hotcornerbind: corner=%d (%d,%d) action=%d",
+          hc->corner, corner_x, corner_y, action);
+}
+
+static void parse_hotcorner_hotkey_line(const char *hotcorner_str, const char *command_str) {
+  int corner_x = 0, corner_y = 0;
+
+  // parse corner
+  if (strcasecmp(hotcorner_str, "topleft") == 0) {
+    corner_x = -1;
+    corner_y = -1;
+  } else if (strcasecmp(hotcorner_str, "topright") == 0) {
+    corner_x = 1;
+    corner_y = -1;
+  } else if (strcasecmp(hotcorner_str, "bottomleft") == 0) {
+    corner_x = -1;
+    corner_y = 1;
+  } else if (strcasecmp(hotcorner_str, "bottomright") == 0) {
+    corner_x = 1;
+    corner_y = 1;
+  } else {
+    wlr_log(WLR_ERROR, "Unknown hotcorner '%s'", hotcorner_str);
+    return;
+  }
+
+  int desktop_index = 0;
+  char submap_name[MAXLEN];
+  submap_name[0] = '\0';
+  bind_action_t action = parse_action(command_str, &desktop_index, submap_name);
+
+  if (action != BIND_EXTERNAL)
+    add_hotcornerbind(corner_x, corner_y, action, desktop_index, NULL);
+  else
+    add_hotcornerbind(corner_x, corner_y, action, desktop_index, command_str);
+}
+
 static void parse_hotkey_line(const char *hotkey_str, const char *command_str) {
   if (strncmp(hotkey_str, "gesture ", 8) == 0) {
     parse_gesture_hotkey_line(hotkey_str + 8, command_str);
+    return;
+  }
+
+  if (strncmp(hotkey_str, "hotcorner ", 10) == 0) {
+    parse_hotcorner_hotkey_line(hotkey_str + 10, command_str);
     return;
   }
 
@@ -633,6 +702,7 @@ static submap_t *find_or_create_submap(const char *name) {
 void load_hotkeys(const char *config_path) {
   num_keybinds = 0;
   num_submaps = 0;
+  num_hotcornerbinds = 0;
   active_submap = NULL;
   current_parsing_submap = NULL;
 
@@ -763,7 +833,7 @@ void load_hotkeys(const char *config_path) {
   current_parsing_submap = NULL;
 
   fclose(f);
-  wlr_log(WLR_INFO, "Loaded %zu keybinds and %zu submaps from %s", num_keybinds, num_submaps, config_path);
+  wlr_log(WLR_INFO, "Loaded %zu keybinds, %zu gesturebinds, %zu hotcornerbinds and %zu submaps from %s", num_keybinds, num_gesturebinds, num_hotcornerbinds, num_submaps, config_path);
 }
 
 static void setup_inotify_watch(const char *config_path) {
@@ -1255,4 +1325,184 @@ void execute_gesturebind(gesturebind_t *gb) {
 
 void reload_gesturebinds(void) {
   num_gesturebinds = 0;
+}
+
+bool hotcornerbind_matches(hotcornerbind_t *hc, int corner_x, int corner_y) {
+  if (!hc) return false;
+  return hc->corner_x == corner_x && hc->corner_y == corner_y;
+}
+
+hotcornerbind_t *hotcorner_bind_match(int corner_x, int corner_y) {
+  for (size_t i = 0; i < num_hotcornerbinds; i++) {
+    if (hotcornerbind_matches(&hotcorner_bindings[i], corner_x, corner_y))
+      return &hotcorner_bindings[i];
+  }
+  return NULL;
+}
+
+void execute_hotcornerbind(hotcornerbind_t *hc) {
+  if (!hc) return;
+
+  switch (hc->action) {
+    case BIND_QUIT:
+      wl_display_terminate(server.wl_display);
+      break;
+    case BIND_NODE_FOCUS:
+      break;
+    case BIND_NODE_CLOSE:
+      close_focused();
+      break;
+    case BIND_NODE_STATE_TILED:
+      break;
+    case BIND_NODE_STATE_FLOATING:
+      toggle_floating();
+      break;
+    case BIND_NODE_STATE_FULLSCREEN:
+      toggle_fullscreen();
+      break;
+    case BIND_NODE_TO_DESKTOP:
+      if (hc->desktop_index > 0) {
+        send_to_desktop(hc->desktop_index - 1);
+      }
+      break;
+    case BIND_DESKTOP_FOCUS:
+      if (hc->desktop_index > 0) {
+        workspace_switch_to_desktop_by_index(hc->desktop_index - 1);
+      }
+      break;
+    case BIND_DESKTOP_LAYOUT_TILED:
+      break;
+    case BIND_DESKTOP_LAYOUT_MONOCLE:
+      toggle_monocle();
+      break;
+    case BIND_FOCUS_WEST:
+      focus_west();
+      break;
+    case BIND_FOCUS_SOUTH:
+      focus_south();
+      break;
+    case BIND_FOCUS_NORTH:
+      focus_north();
+      break;
+    case BIND_FOCUS_EAST:
+      focus_east();
+      break;
+    case BIND_SWAP_WEST:
+      swap_west();
+      break;
+    case BIND_SWAP_SOUTH:
+      swap_south();
+      break;
+    case BIND_SWAP_NORTH:
+      swap_north();
+      break;
+    case BIND_SWAP_EAST:
+      swap_east();
+      break;
+    case BIND_PRESEL_WEST:
+      presel_west();
+      break;
+    case BIND_PRESEL_SOUTH:
+      presel_south();
+      break;
+    case BIND_PRESEL_NORTH:
+      presel_north();
+      break;
+    case BIND_PRESEL_EAST:
+      presel_east();
+      break;
+    case BIND_PRESEL_CANCEL:
+      cancel_presel();
+      break;
+    case BIND_TOGGLE_FLOATING:
+      toggle_floating();
+      break;
+    case BIND_TOGGLE_FULLSCREEN:
+      toggle_fullscreen();
+      break;
+    case BIND_TOGGLE_PSEUDO_TILED:
+      toggle_pseudo_tiled();
+      break;
+    case BIND_TOGGLE_MONOCLE:
+      toggle_monocle();
+      break;
+    case BIND_ROTATE_CW:
+      rotate_clockwise();
+      break;
+    case BIND_ROTATE_CCW:
+      rotate_counterclockwise();
+      break;
+    case BIND_FLIP_HORIZONTAL:
+      flip_horizontal();
+      break;
+    case BIND_FLIP_VERTICAL:
+      flip_vertical();
+      break;
+    case BIND_RESIZE_LEFT:
+      resize_left();
+      break;
+    case BIND_RESIZE_RIGHT:
+      resize_right();
+      break;
+    case BIND_RESIZE_UP:
+      resize_up();
+      break;
+    case BIND_RESIZE_DOWN:
+      resize_down();
+      break;
+    case BIND_DESKTOP_NEXT:
+      focus_next_desktop();
+      break;
+    case BIND_DESKTOP_PREV:
+      focus_prev_desktop();
+      break;
+    case BIND_SEND_TO_DESKTOP_NEXT:
+      send_to_next_desktop();
+      break;
+    case BIND_SEND_TO_DESKTOP_PREV:
+      send_to_prev_desktop();
+      break;
+    case BIND_DESKTOP_1:
+    case BIND_DESKTOP_2:
+    case BIND_DESKTOP_3:
+    case BIND_DESKTOP_4:
+    case BIND_DESKTOP_5:
+    case BIND_DESKTOP_6:
+    case BIND_DESKTOP_7:
+    case BIND_DESKTOP_8:
+    case BIND_DESKTOP_9:
+    case BIND_DESKTOP_10:
+      workspace_switch_to_desktop_by_index(hc->action - BIND_DESKTOP_1);
+      break;
+    case BIND_SEND_TO_DESKTOP_1:
+    case BIND_SEND_TO_DESKTOP_2:
+    case BIND_SEND_TO_DESKTOP_3:
+    case BIND_SEND_TO_DESKTOP_4:
+    case BIND_SEND_TO_DESKTOP_5:
+    case BIND_SEND_TO_DESKTOP_6:
+    case BIND_SEND_TO_DESKTOP_7:
+    case BIND_SEND_TO_DESKTOP_8:
+    case BIND_SEND_TO_DESKTOP_9:
+    case BIND_SEND_TO_DESKTOP_10:
+      send_to_desktop(hc->action - BIND_SEND_TO_DESKTOP_1);
+      break;
+    case BIND_EXTERNAL:
+    case BIND_NONE:
+      if (hc->external_cmd[0] != '\0') {
+        if (fork() == 0) {
+          execl("/bin/sh", "/bin/sh", "-c", hc->external_cmd, NULL);
+          _exit(1);
+        }
+      }
+      break;
+    case BIND_ENTER_SUBMAP:
+    case BIND_EXIT_SUBMAP:
+    case BIND_INTERACTIVE_MOVE:
+    case BIND_INTERACTIVE_RESIZE:
+      break;
+  }
+}
+
+void reload_hotcornerbinds(void) {
+  num_hotcornerbinds = 0;
 }

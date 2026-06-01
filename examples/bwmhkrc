@@ -93,6 +93,10 @@ gesture pinch:in
 gesture pinch:out
 	bmsg node --state fullscreen
 
+# Hot corner bindings
+hotcorner topleft
+	bmsg desktop --layout monocle
+
 # Focus submap
 # enter submap with alt + shift + f
 alt + shift + f -> @focus

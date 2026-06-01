@@ -588,6 +588,16 @@ gesture hold:*
 	bmsg desktop -f -l prev
 ```
 
+### Hot Corner Bindings
+
+Hot corner bindings trigger when the cursor enters a corner region of the focused output. They provide a convenient way to execute commands by moving the mouse to screen corners.
+
+Format:
+```
+hotcorner topleft|topright|bottomleft|bottomright
+	<command>
+```
+
 ### Output Commands
 
 ```

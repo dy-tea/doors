@@ -7,6 +7,7 @@
 
 #define MAX_KEYBINDS 256
 #define MAX_GESTUREBINDS 64
+#define MAX_HOTCORNERBINDS 16
 #define MAXLEN 256
 
 typedef struct submap submap_t;
@@ -106,6 +107,15 @@ typedef struct {
   char external_cmd[MAXLEN];
 } gesturebind_t;
 
+typedef struct {
+  enum hotcorner corner;
+  int corner_x;
+  int corner_y;
+  bind_action_t action;
+  int desktop_index;
+  char external_cmd[MAXLEN];
+} hotcornerbind_t;
+
 struct submap {
   char name[MAXLEN];
   keybind_t keybinds[MAX_KEYBINDS];
@@ -118,6 +128,8 @@ extern size_t num_keybinds;
 extern keybind_t bell_bind;
 extern gesturebind_t gesture_bindings[MAX_GESTUREBINDS];
 extern size_t num_gesturebinds;
+extern hotcornerbind_t hotcorner_bindings[MAX_HOTCORNERBINDS];
+extern size_t num_hotcornerbinds;
 extern submap_t *active_submap;
 
 void config_init(void);
@@ -142,3 +154,8 @@ void set_keyboard_grouping(keyboard_grouping_t grouping);
 bool gesturebind_matches(gesturebind_t *gb, enum gesture_type type, uint8_t fingers);
 void execute_gesturebind(gesturebind_t *gb);
 void reload_gesturebinds(void);
+
+bool hotcornerbind_matches(hotcornerbind_t *hc, int corner_x, int corner_y);
+hotcornerbind_t *hotcorner_bind_match(int corner_x, int corner_y);
+void execute_hotcornerbind(hotcornerbind_t *hc);
+void reload_hotcornerbinds(void);

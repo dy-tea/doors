@@ -22,6 +22,14 @@ enum gesture_direction {
 	GESTURE_DIRECTION_COUNTERCLOCKWISE = 1 << 7,
 };
 
+enum hotcorner {
+	HOTCORNER_NONE = 0,
+	HOTCORNER_TOPLEFT,
+	HOTCORNER_TOPRIGHT,
+	HOTCORNER_BOTTOMLEFT,
+	HOTCORNER_BOTTOMRIGHT,
+};
+
 const char *gesture_type_string(enum gesture_type type);
 const char *gesture_direction_string(enum gesture_direction direction);
 

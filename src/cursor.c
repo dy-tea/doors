@@ -15,6 +15,7 @@
 #include <linux/input-event-codes.h>
 #include <math.h>
 #include <stdlib.h>
+#include <time.h>
 #include <wlr/xwayland.h>
 #include <wayland-server-core.h>
 #include <wayland-util.h>
@@ -42,7 +43,26 @@ extern submap_t *active_submap;
 extern bool keybind_matches(keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode);
 extern void execute_keybind(keybind_t *kb);
 extern bool handle_keybind_raw(uint32_t modifiers, uint32_t keycode, bool pressed);
+extern hotcornerbind_t hotcorner_bindings[];
+extern size_t num_hotcornerbinds;
+extern bool hotcornerbind_matches(hotcornerbind_t *hc, int corner_x, int corner_y);
+extern hotcornerbind_t *hotcorner_bind_match(int corner_x, int corner_y);
+extern void execute_hotcornerbind(hotcornerbind_t *hc);
 extern bool gapless_monocle;
+
+// Hot corner settings
+static int hotcorner_threshold = 20;
+static int hotcorner_cooldown_ms = 300;
+static uint32_t hotcorner_last_trigger = 0;
+static int hotcorner_current_x = 0;
+static int hotcorner_current_y = 0;
+
+// get current time in milliseconds
+static uint32_t get_time_ms(void) {
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return (uint32_t)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+}
 
 static void cursor_constrain(struct wlr_pointer_constraint_v1 *constraint);
 
@@ -435,6 +455,45 @@ static void process_cursor_motion(uint32_t time, double dx, double dy, double dx
   } else if (server.cursor_mode == CURSOR_RESIZE) {
     process_cursor_resize();
     return;
+  }
+
+  // hot corner detection
+  if (server.focused_output && num_hotcornerbinds > 0) {
+    struct wlr_box output_box;
+    wlr_output_layout_get_box(server.output_layout, server.focused_output->wlr_output, &output_box);
+
+    int corner_x = 0;
+    int corner_y = 0;
+
+    double cx = server.cursor->x;
+    double cy = server.cursor->y;
+
+    if (cx <= output_box.x + hotcorner_threshold)
+      corner_x = -1;
+    else if (cx >= output_box.x + output_box.width - hotcorner_threshold)
+      corner_x = 1;
+
+    if (cy <= output_box.y + hotcorner_threshold)
+      corner_y = -1;
+    else if (cy >= output_box.y + output_box.height - hotcorner_threshold)
+      corner_y = 1;
+
+    if (corner_x != hotcorner_current_x || corner_y != hotcorner_current_y) {
+      hotcorner_current_x = corner_x;
+      hotcorner_current_y = corner_y;
+
+      if (corner_x != 0 && corner_y != 0) {
+        uint32_t now = get_time_ms();
+        if (now - hotcorner_last_trigger > (uint32_t)hotcorner_cooldown_ms) {
+          hotcornerbind_t *hc = hotcorner_bind_match(corner_x, corner_y);
+          if (hc) {
+            hotcorner_last_trigger = now;
+            wlr_log(WLR_DEBUG, "Hot corner triggered: (%d,%d)", corner_x, corner_y);
+            execute_hotcornerbind(hc);
+          }
+        }
+      }
+    }
   }
 
   if (server.seat->drag && server.seat->drag->icon && server.seat->drag->icon->data) {
