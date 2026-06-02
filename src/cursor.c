@@ -33,6 +33,7 @@
 #include <wlr/types/wlr_pointer_constraints_v1.h>
 #include <wlr/types/wlr_cursor_shape_v1.h>
 #include <wlr/types/wlr_virtual_pointer_v1.h>
+#include <wlr/types/wlr_pointer_warp_v1.h>
 #include <wlr/util/region.h>
 #include <wlr/util/log.h>
 #include <wlr/util/box.h>
@@ -1285,4 +1286,39 @@ void handle_new_virtual_pointer(struct wl_listener *listener, void *data) {
 	wlr_cursor_attach_input_device(server.cursor, device);
 	if (event->suggested_output)
 		wlr_cursor_map_input_to_output(server.cursor, device, event->suggested_output);
+}
+
+void handle_pointer_warp(struct wl_listener *listener, void *data) {
+	(void)listener;
+	struct wlr_pointer_warp_v1_event_warp *event = data;
+
+	struct wl_client *focused_client = NULL;
+	struct wlr_surface *focused_surface = server.seat->pointer_state.focused_surface;
+	if (focused_surface != NULL)
+		focused_client = wl_resource_get_client(focused_surface->resource);
+
+	if (focused_surface != NULL || event->seat_client->client != focused_client) {
+		wlr_log(WLR_DEBUG, "denying request to warp cursor from unfocused client");
+		return;
+	}
+
+	struct wlr_box surface_box = {
+		.width = event->surface->current.width,
+		.height = event->surface->current.height
+	};
+
+	if (!wlr_box_contains_point(&surface_box, event->x, event->y)) {
+		wlr_log(WLR_DEBUG, "denying request to warp cursor outside of surface");
+		return;
+	}
+
+	struct bwm_toplevel *toplevel = event->surface->data;
+	if (toplevel == NULL)
+		return;
+
+	double lx = event->x + toplevel->node->pending.rectangle.x - toplevel->node->rectangle.x;
+	double ly = event->y + toplevel->node->pending.rectangle.y - toplevel->node->rectangle.y;
+	wlr_cursor_warp(server.cursor, NULL, lx, ly);
+	wlr_seat_pointer_warp(event->seat_client->seat, event->x, event->y);
+	cursor_rebase();
 }

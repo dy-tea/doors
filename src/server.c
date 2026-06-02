@@ -77,6 +77,7 @@
 #include <wlr/types/wlr_linux_drm_syncobj_v1.h>
 #include <wlr/types/wlr_xdg_system_bell_v1.h>
 #include <wlr/types/wlr_virtual_keyboard_v1.h>
+#include <wlr/types/wlr_pointer_warp_v1.h>
 
 void handle_request_start_drag(struct wl_listener *listener, void *data);
 void handle_start_drag(struct wl_listener *listener, void *data);
@@ -237,6 +238,11 @@ void server_init(void) {
 
   server.new_pointer_constraint.notify = handle_pointer_constraint;
   wl_signal_add(&server.pointer_constraints->events.new_constraint, &server.new_pointer_constraint);
+
+  // pointer warp
+  server.pointer_warp_manager = wlr_pointer_warp_v1_create(server.wl_display, 1);
+  server.pointer_warp.notify = handle_pointer_warp;
+  wl_signal_add(&server.pointer_warp_manager->events.warp, &server.pointer_warp);
 
   // cursor shape
   server.cursor_shape_manager = wlr_cursor_shape_manager_v1_create(server.wl_display, 1);
@@ -653,6 +659,8 @@ void server_fini(void) {
   wl_list_remove(&server.pinch_end.link);
   wl_list_remove(&server.hold_begin.link);
   wl_list_remove(&server.hold_end.link);
+
+  wl_list_remove(&server.pointer_warp.link);
 
   wl_list_remove(&server.tearing_control_new_object.link);
 

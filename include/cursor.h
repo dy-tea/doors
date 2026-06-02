@@ -47,3 +47,4 @@ void cursor_rebase(void);
 void *desktop_type_at(double lx, double ly, struct wlr_surface **surface, double *sx, double *sy);
 
 void handle_new_virtual_pointer(struct wl_listener *listener, void *data);
+void handle_pointer_warp(struct wl_listener *listener, void *data);

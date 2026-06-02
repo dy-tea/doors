@@ -93,6 +93,9 @@ struct bwm_server {
   struct wlr_virtual_pointer_manager_v1 *virtual_pointer_manager;
   struct wl_listener new_virtual_pointer;
 
+  struct wlr_pointer_warp_v1 *pointer_warp_manager;
+  struct wl_listener pointer_warp;
+
   struct wlr_virtual_keyboard_manager_v1 *virtual_keyboard_manager;
   struct wl_listener new_virtual_keyboard;
 
