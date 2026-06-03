@@ -9,12 +9,12 @@
 
 // forward declarations
 struct node_t;
-struct bwm_toplevel;
+struct toplevel_t;
 
-struct bwm_transaction_inst {
-  struct bwm_transaction *transaction;
+typedef struct transaction_inst_t {
+  struct transaction_t *transaction;
   struct node_t *node;
-  struct wl_list link;  // bwm_transaction::instructions
+  struct wl_list link;  // transaction_t::instructions
 
   // saved state
   struct wlr_box rectangle;
@@ -33,15 +33,15 @@ struct bwm_transaction_inst {
 
   // scene tree snapshot during alive state
   struct wlr_scene_tree *scene_tree;
-};
+} transaction_inst_t;
 
-struct bwm_transaction {
+typedef struct transaction_t {
   struct wl_event_source *timer;
   struct wl_list instructions;
   size_t num_waiting;
   size_t num_configures;
   struct timespec commit_time;
-};
+} transaction_t;
 
 /**
  * Find all dirty nodes, create and commit a transaction containing them,
@@ -61,7 +61,7 @@ void transaction_commit_dirty_client(void);
  *
  * Returns true if this instruction was found and marked ready.
  */
-bool transaction_notify_view_ready_by_serial(struct bwm_toplevel *toplevel,
+bool transaction_notify_view_ready_by_serial(struct toplevel_t *toplevel,
                                               uint32_t serial);
 
 /**
@@ -71,7 +71,7 @@ bool transaction_notify_view_ready_by_serial(struct bwm_toplevel *toplevel,
  * This can be used as a fallback for clients that don't properly track serials.
  * Returns true if this instruction was found and marked ready.
  */
-bool transaction_notify_view_ready_by_geometry(struct bwm_toplevel *toplevel,
+bool transaction_notify_view_ready_by_geometry(struct toplevel_t *toplevel,
                                                 int x, int y, int width, int height);
 
 /**

@@ -24,7 +24,9 @@ enum cursor_mode {
   CURSOR_RESIZE,
 };
 
-struct bwm_server {
+typedef struct output_t output_t;
+
+typedef struct server_t {
   struct wl_display *wl_display;
   struct wlr_backend *backend;
   struct wlr_session *session;
@@ -77,7 +79,7 @@ struct bwm_server {
   struct wl_listener cursor_request_set_shape;
 
   struct wlr_pointer_gestures_v1 *pointer_gestures;
-  struct gesture_tracker gesture_tracker;
+  gesture_tracker_t gesture_tracker;
   struct wl_listener hold_begin;
   struct wl_listener hold_end;
   struct wl_listener pinch_begin;
@@ -149,13 +151,13 @@ struct bwm_server {
   // input method support
   struct wlr_input_method_manager_v2 *input_method_manager;
   struct wlr_text_input_manager_v3 *text_input_manager;
-  struct bwm_ime_relay *input_method_relay;
+  struct ime_relay_t *input_method_relay;
 
   // cursor state
   enum cursor_mode cursor_mode;
-  struct bwm_toplevel *grabbed_toplevel;
-  struct bwm_xwayland_view *grabbed_xwayland_view;
-  struct bwm_xwayland_view *last_focused_xwayland_view;
+  toplevel_t *grabbed_toplevel;
+  xwayland_toplevel_t *grabbed_xwayland_view;
+  xwayland_toplevel_t *last_focused_xwayland_view;
   double grab_x, grab_y;
   struct wlr_box grab_geobox;
   uint32_t resize_edges;
@@ -169,7 +171,7 @@ struct bwm_server {
   double tiled_resize_initial_ratio_v;
   double tiled_resize_initial_ratio_h;
 
-  struct bwm_output *focused_output;
+  output_t *focused_output;
 
   // workspace tracking
   struct wlr_ext_workspace_manager_v1 *workspace_manager;
@@ -178,14 +180,14 @@ struct bwm_server {
   struct wlr_ext_background_effect_manager_v1 *bg_effect_manager;
 
   // xwayland
-  struct bwm_xwayland xwayland;
+  xwayland_t xwayland;
   struct wl_listener xwayland_surface;
   struct wl_listener xwayland_ready;
-};
+} server_t;
 
-extern struct bwm_server server;
+extern struct server_t server;
 
-void begin_interactive(struct bwm_toplevel *toplevel, enum cursor_mode mode, uint32_t edges);
+void begin_interactive(struct toplevel_t *toplevel, enum cursor_mode mode, uint32_t edges);
 
 void handle_new_tearing_hint(struct wl_listener *listener, void *data);
 

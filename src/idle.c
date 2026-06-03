@@ -25,7 +25,7 @@ void update_idle_inhibitors(struct wlr_surface *sans) {
 
 void handle_idle_inhibitor_destroy(struct wl_listener *listener, void *data) {
 	(void)data;
-	struct bwm_idle_inhibitor *idle = wl_container_of(listener, idle, destroy);
+	idle_inhibitor_t *idle = wl_container_of(listener, idle, destroy);
 	wl_list_remove(&idle->destroy.link);
 	update_idle_inhibitors(wlr_surface_get_root_surface(idle->idle_inhibitor->surface));
 	free(idle);
@@ -35,7 +35,7 @@ void handle_new_idle_inhibitor(struct wl_listener *listener, void *data) {
 	(void)listener;
 	struct wlr_idle_inhibitor_v1 *idle_inhibitor = data;
 
-	struct bwm_idle_inhibitor *idle = calloc(1, sizeof(struct bwm_idle_inhibitor));
+	idle_inhibitor_t *idle = calloc(1, sizeof(*idle));
 	idle->idle_inhibitor = idle_inhibitor;
 
 	idle->destroy.notify = handle_idle_inhibitor_destroy;

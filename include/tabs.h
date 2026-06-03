@@ -8,23 +8,23 @@
 #define TAB_BAR_HEIGHT 22
 #define TAB_BAR_BORDER 1
 
-struct bwm_tab_entry {
+typedef struct tab_entry_t {
   node_t *leaf;
   struct wlr_scene_tree *tree;
   struct wlr_scene_rect *bg;
   struct wlr_scene_rect *border;
-  struct bwm_text_node *label;
+  struct text_node_t *label;
   struct wlr_box hit_box;
-};
+} tab_entry_t;
 
-struct bwm_tab_bar {
+typedef struct tab_bar_t {
   node_t *owner;
   struct wlr_scene_tree *tree;
   struct wlr_scene_rect *bg;
-  struct bwm_tab_entry *entries;
+  tab_entry_t *entries;
   size_t entry_count;
   struct wlr_box rect;
-};
+} tab_bar_t;
 
 extern float color_bar_bg[4];
 extern float color_tab_bg[4];

@@ -14,7 +14,7 @@
 #include <wlr/types/wlr_scene.h>
 #include <wlr/util/log.h>
 
-extern struct bwm_server server;
+extern struct server_t server;
 
 float color_bar_bg[4] = {0.10f, 0.10f, 0.12f, 1.0f};
 float color_tab_bg[4] = {0.18f, 0.18f, 0.20f, 1.0f};
@@ -123,7 +123,7 @@ static const char *leaf_label(node_t *leaf) {
   return "(untitled)";
 }
 
-static void destroy_entries(struct bwm_tab_bar *bar) {
+static void destroy_entries(struct tab_bar_t *bar) {
   if (bar == NULL || bar->entries == NULL)
     return;
   for (size_t i = 0; i < bar->entry_count; i++)
@@ -134,14 +134,14 @@ static void destroy_entries(struct bwm_tab_bar *bar) {
   bar->entry_count = 0;
 }
 
-static void build_entries(struct bwm_tab_bar *bar) {
+static void build_entries(struct tab_bar_t *bar) {
   destroy_entries(bar);
 
   size_t count = count_leaves(bar->owner);
   if (count == 0)
     return;
 
-  bar->entries = calloc(count, sizeof(struct bwm_tab_entry));
+  bar->entries = calloc(count, sizeof(tab_entry_t));
   if (!bar->entries)
     return;
 
@@ -151,7 +151,7 @@ static void build_entries(struct bwm_tab_bar *bar) {
   collect_leaves(bar->owner, leaves, count);
 
   for (size_t i = 0; i < count; i++) {
-    struct bwm_tab_entry *e = &bar->entries[i];
+    tab_entry_t *e = &bar->entries[i];
     e->leaf = leaves[i];
 
     e->tree = wlr_scene_tree_create(bar->tree);
@@ -163,7 +163,7 @@ static void build_entries(struct bwm_tab_bar *bar) {
 
     float text_color[4];
     memcpy(text_color, color_tab_text, sizeof(text_color));
-    e->label = bwm_text_node_create(e->tree, leaf_label(leaves[i]), text_color, false);
+    e->label = text_node_create(e->tree, leaf_label(leaves[i]), text_color, false);
   }
 
   free(leaves);
@@ -176,7 +176,7 @@ void tabs_create(node_t *n) {
   if (n->tab_bar != NULL)
     return;
 
-  struct bwm_tab_bar *bar = calloc(1, sizeof(*bar));
+  struct tab_bar_t *bar = calloc(1, sizeof(*bar));
   if (!bar)
     return;
   bar->owner = n;
@@ -195,7 +195,7 @@ void tabs_create(node_t *n) {
 void tabs_destroy(node_t *n) {
   if (n == NULL || n->tab_bar == NULL)
     return;
-  struct bwm_tab_bar *bar = n->tab_bar;
+  struct tab_bar_t *bar = n->tab_bar;
   destroy_entries(bar);
   if (bar->tree)
     wlr_scene_node_destroy(&bar->tree->node);
@@ -214,7 +214,7 @@ void tabs_rebuild(node_t *n) {
 void tabs_arrange(node_t *n, struct wlr_box rect) {
   if (n == NULL || n->tab_bar == NULL)
     return;
-  struct bwm_tab_bar *bar = n->tab_bar;
+  struct tab_bar_t *bar = n->tab_bar;
   bar->rect = rect;
 
   if (bar->tree == NULL)
@@ -236,7 +236,7 @@ void tabs_arrange(node_t *n, struct wlr_box rect) {
 
   int x = 0;
   for (int i = 0; i < n_entries; i++) {
-    struct bwm_tab_entry *e = &bar->entries[i];
+    tab_entry_t *e = &bar->entries[i];
     int w = per + (i < remainder ? 1 : 0);
 
     if (e->tree)
@@ -251,8 +251,8 @@ void tabs_arrange(node_t *n, struct wlr_box rect) {
     if (e->label) {
       int label_max = w - 8;
       if (label_max < 0) label_max = 0;
-      bwm_text_node_set_max_width(e->label, label_max);
-      int text_h = bwm_text_node_default_height();
+      text_node_set_max_width(e->label, label_max);
+      int text_h = text_node_default_height();
       int label_y = (TAB_BAR_HEIGHT - TAB_BAR_BORDER - text_h) / 2;
       if (label_y < 0) label_y = 0;
       wlr_scene_node_set_position(e->label->node, 4, label_y);
@@ -281,14 +281,14 @@ void tabs_update_focus(node_t *n, node_t *focus) {
 
   node_t *active = tab_focus_leaf(n, focus);
   for (size_t i = 0; i < n->tab_bar->entry_count; i++) {
-    struct bwm_tab_entry *e = &n->tab_bar->entries[i];
+    tab_entry_t *e = &n->tab_bar->entries[i];
     bool is_active = (e->leaf == active);
     if (e->bg)
       wlr_scene_rect_set_color(e->bg, is_active ? color_tab_bg_active : color_tab_bg);
     if (e->label) {
       float c[4];
       memcpy(c, is_active ? color_tab_text_active : color_tab_text, sizeof(c));
-      bwm_text_node_set_color(e->label, c);
+      text_node_set_color(e->label, c);
     }
   }
 }
@@ -300,9 +300,9 @@ void tabs_update_label_for_leaf(node_t *leaf) {
   if (t == NULL || t->tab_bar == NULL)
     return;
   for (size_t i = 0; i < t->tab_bar->entry_count; i++) {
-    struct bwm_tab_entry *e = &t->tab_bar->entries[i];
+    tab_entry_t *e = &t->tab_bar->entries[i];
     if (e->leaf == leaf && e->label)
-      bwm_text_node_set_text(e->label, leaf_label(leaf));
+      text_node_set_text(e->label, leaf_label(leaf));
   }
 }
 
@@ -312,7 +312,7 @@ node_t *tabs_hit_test(node_t *n, double lx, double ly) {
   if (!n->tab_bar->tree->node.enabled)
     return NULL;
   for (size_t i = 0; i < n->tab_bar->entry_count; i++) {
-    struct bwm_tab_entry *e = &n->tab_bar->entries[i];
+    tab_entry_t *e = &n->tab_bar->entries[i];
     if (e->leaf == NULL || e->leaf->destroying)
       continue;
     if (lx >= e->hit_box.x && lx < e->hit_box.x + e->hit_box.width &&

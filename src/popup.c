@@ -13,7 +13,7 @@
 static void create_xdg_popup(struct wlr_xdg_popup *xdg_popup,
 	struct wlr_scene_tree *parent_tree, struct wlr_scene_tree *image_capture_parent_tree);
 
-void popup_unconstrain(struct bwm_popup *popup) {
+void popup_unconstrain(popup_t *popup) {
 	int lx, ly;
   wlr_scene_node_coords(&popup->parent_tree->node.parent->node, &lx, &ly);
 
@@ -21,7 +21,7 @@ void popup_unconstrain(struct bwm_popup *popup) {
   if (wlr_output == NULL)
   	return;
 
-  struct bwm_output *output = wlr_output->data;
+  output_t *output = wlr_output->data;
   if (output == NULL)
   	return;
 
@@ -37,13 +37,13 @@ void popup_unconstrain(struct bwm_popup *popup) {
 }
 
 void popup_new_popup(struct wl_listener *listener, void *data) {
-  struct bwm_popup *popup = wl_container_of(listener, popup, new_popup);
+  struct popup_t *popup = wl_container_of(listener, popup, new_popup);
   create_xdg_popup(data, popup->parent_tree, popup->image_capture_tree);
 }
 
 void popup_commit(struct wl_listener *listener, void *data) {
 	(void)data;
-  struct bwm_popup *popup = wl_container_of(listener, popup, commit);
+  struct popup_t *popup = wl_container_of(listener, popup, commit);
 
   if (!popup->xdg_popup->base->initial_commit)
     return;
@@ -53,13 +53,13 @@ void popup_commit(struct wl_listener *listener, void *data) {
 
 void popup_reposition(struct wl_listener *listener, void *data) {
 	(void)data;
-  struct bwm_popup *popup = wl_container_of(listener, popup, reposition);
+  struct popup_t *popup = wl_container_of(listener, popup, reposition);
   popup_unconstrain(popup);
 }
 
 void popup_destroy(struct wl_listener *listener, void *data) {
 	(void)data;
-  struct bwm_popup *popup = wl_container_of(listener, popup, destroy);
+  struct popup_t *popup = wl_container_of(listener, popup, destroy);
 
   wl_list_remove(&popup->commit.link);
   wl_list_remove(&popup->reposition.link);
@@ -71,7 +71,7 @@ void popup_destroy(struct wl_listener *listener, void *data) {
 
 static void create_xdg_popup(struct wlr_xdg_popup *xdg_popup,
 	struct wlr_scene_tree *parent_tree, struct wlr_scene_tree *image_capture_parent_tree) {
-  struct bwm_popup *popup = calloc(1, sizeof(struct bwm_popup));
+  struct popup_t *popup = calloc(1, sizeof(struct popup_t));
   popup->xdg_popup = xdg_popup;
   popup->parent_tree = wlr_scene_xdg_surface_create(parent_tree, xdg_popup->base);
   xdg_popup->base->data = popup->parent_tree;
@@ -96,12 +96,12 @@ static void create_xdg_popup(struct wlr_xdg_popup *xdg_popup,
 
 void handle_new_xdg_popup(struct wl_listener *listener, void *data) {
 	struct wlr_xdg_popup *xdg_popup = data;
-	struct bwm_toplevel *toplevel = wl_container_of(listener, toplevel, new_xdg_popup);
+	toplevel_t *toplevel = wl_container_of(listener, toplevel, new_xdg_popup);
   create_xdg_popup(xdg_popup, toplevel->scene_tree, toplevel->image_capture_tree);
 }
 
 void handle_new_layer_popup(struct wl_listener *listener, void *data) {
   struct wlr_xdg_popup *xdg_popup = data;
-  struct bwm_layer_surface *layer = wl_container_of(listener, layer, new_popup);
+  layer_surface_t *layer = wl_container_of(listener, layer, new_popup);
   create_xdg_popup(xdg_popup, layer->scene_tree, NULL);
 }

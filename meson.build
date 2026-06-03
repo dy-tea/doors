@@ -1,5 +1,5 @@
 project(
-	'bwm',
+	'doors',
 	'c',
 	default_options: ['warning_level=3'],
 )
@@ -79,7 +79,7 @@ subdir('src' / 'shaders')
 inc = include_directories(['include'])
 
 executable(
-	'bwm',
+	'doors',
 	[
 		'src' / 'main.c',
 		'src' / 'server.c',
@@ -120,7 +120,15 @@ executable(
 	install_dir: get_option('bindir'),
 )
 
-executable('bmsg', 'bmsg' / 'bmsg.c', install: true, install_dir: get_option('bindir'))
+executable(
+	'doorsctl',
+	'doorsctl' / 'doorsctl.c',
+	install: true,
+	install_dir: get_option('bindir'),
+)
 
-install_data('bwm.desktop', install_dir: '/usr/share/wayland-sessions')
-install_data('bwm-portals.conf', install_dir: get_option('datadir') / 'xdg-desktop-portal')
+install_data('doors.desktop', install_dir: '/usr/share/wayland-sessions')
+install_data(
+	'doors-portals.conf',
+	install_dir: get_option('datadir') / 'xdg-desktop-portal',
+)

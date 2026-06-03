@@ -19,7 +19,7 @@ void output_config_init(void) {
 }
 
 struct output_config *output_config_create(const char *name) {
-  struct output_config *oc = calloc(1, sizeof(struct output_config));
+  struct output_config *oc = calloc(1, sizeof(*oc));
   if (!oc)
     return NULL;
 
@@ -90,10 +90,10 @@ void output_config_apply(struct output_config *oc) {
   if (!oc)
     return;
 
-  struct bwm_output *output = NULL;
+  output_t *output = NULL;
   struct wlr_output *wlr_output = NULL;
 
-  for (struct bwm_output *o = mon_head; o != NULL; o = o->next) {
+  for (output_t *o = mon_head; o != NULL; o = o->next) {
     if (strcmp(o->wlr_output->name, oc->name) == 0) {
       output = o;
       wlr_output = o->wlr_output;
@@ -230,7 +230,7 @@ void output_apply_all_config(void) {
     output_config_apply(oc);
 }
 
-void output_config_update_from_wlr_output(struct bwm_output *output) {
+void output_config_update_from_wlr_output(output_t *output) {
   struct output_config *oc = output_config_find(output->wlr_output->name);
   if (!oc) {
     oc = output_config_create(output->wlr_output->name);
@@ -245,7 +245,7 @@ void output_update_manager_config(void) {
 
   struct wlr_output_configuration_v1 *config = wlr_output_configuration_v1_create();
 
-  for (struct bwm_output *output = mon_head; output != NULL; output = output->next) {
+  for (output_t *output = mon_head; output != NULL; output = output->next) {
     struct wlr_output_configuration_head_v1 *head =
         wlr_output_configuration_head_v1_create(config, output->wlr_output);
 

@@ -24,14 +24,14 @@
 #include <wlr/types/wlr_virtual_keyboard_v1.h>
 #include <wlr/util/log.h>
 
-extern struct bwm_server server;
+extern struct server_t server;
 
 extern keybind_t keybinds[MAX_KEYBINDS];
 extern size_t num_keybinds;
 extern submap_t *active_submap;
 
 static void destroy_empty_wlr_keyboard_group(void *data) {
-  struct bwm_keyboard_group *group = data;
+  struct keyboard_group_t *group = data;
   struct wlr_keyboard_group *wlr_group = group->wlr_group;
   wlr_keyboard_group_destroy(wlr_group);
   free(group);
@@ -39,8 +39,8 @@ static void destroy_empty_wlr_keyboard_group(void *data) {
 
 bool handle_keybind_raw(uint32_t modifiers, uint32_t keycode, bool pressed);
 
-static struct bwm_output *find_monitor_for_desktop(desktop_t *d) {
-  struct bwm_output *m = mon_head;
+static output_t *find_monitor_for_desktop(desktop_t *d) {
+  output_t *m = mon_head;
   while (m != NULL) {
     desktop_t *desk = m->desk_head;
     while (desk != NULL) {
@@ -56,7 +56,7 @@ static struct bwm_output *find_monitor_for_desktop(desktop_t *d) {
 void handle_new_keyboard(struct wlr_input_device *device) {
   struct wlr_keyboard *wlr_keyboard = wlr_keyboard_from_input_device(device);
 
-  struct bwm_keyboard *keyboard = calloc(1, sizeof(struct bwm_keyboard));
+  keyboard_t *keyboard = calloc(1, sizeof(*keyboard));
   keyboard->wlr_keyboard = wlr_keyboard;
 
   input_config_t *config = input_config_get_for_device(device->name, INPUT_CONFIG_TYPE_KEYBOARD);
@@ -92,8 +92,7 @@ void handle_new_keyboard(struct wlr_input_device *device) {
 
 void keyboard_modifiers(struct wl_listener *listener, void *data) {
 	(void)data;
-  struct bwm_keyboard *keyboard =
-      wl_container_of(listener, keyboard, modifiers);
+  keyboard_t *keyboard = wl_container_of(listener, keyboard, modifiers);
   wlr_seat_set_keyboard(server.seat, keyboard->wlr_keyboard);
 
   if (!input_method_keyboard_grab_forward_modifiers(keyboard->wlr_keyboard))
@@ -102,7 +101,7 @@ void keyboard_modifiers(struct wl_listener *listener, void *data) {
 }
 
 void keyboard_key(struct wl_listener *listener, void *data) {
-  struct bwm_keyboard *keyboard = wl_container_of(listener, keyboard, key);
+  keyboard_t *keyboard = wl_container_of(listener, keyboard, key);
   struct wlr_keyboard_key_event *event = data;
   struct wlr_seat *seat = server.seat;
 
@@ -141,7 +140,7 @@ void keyboard_key(struct wl_listener *listener, void *data) {
 }
 
 void keyboard_destroy(struct wl_listener *listener, void *data) {
-  struct bwm_keyboard *keyboard = wl_container_of(listener, keyboard, destroy);
+  keyboard_t *keyboard = wl_container_of(listener, keyboard, destroy);
   struct wlr_input_device *device = data;
   (void)device;
 
@@ -167,7 +166,7 @@ void keyboard_destroy(struct wl_listener *listener, void *data) {
   free(keyboard);
 }
 
-extern void begin_interactive(struct bwm_toplevel *toplevel, enum cursor_mode mode, uint32_t edges);
+extern void begin_interactive(struct toplevel_t *toplevel, enum cursor_mode mode, uint32_t edges);
 
 // keybind handling using raw keycode (for number keys 1-0)
 bool handle_keybind_raw(uint32_t modifiers, uint32_t keycode, bool pressed) {
@@ -424,7 +423,7 @@ void toggle_block_out_from_screenshare(void) {
     n->client->block_out_from_screenshare);
 
   if (n->client->toplevel) {
-    struct bwm_toplevel *tl = n->client->toplevel;
+    struct toplevel_t *tl = n->client->toplevel;
     if (n->client->block_out_from_screenshare && tl->image_capture_surface) {
       wlr_scene_node_destroy(&tl->image_capture_surface->buffer->node);
       tl->image_capture_surface = NULL;
@@ -433,7 +432,7 @@ void toggle_block_out_from_screenshare(void) {
         &tl->image_capture->tree, tl->xdg_toplevel->base->surface);
     }
   } else if (n->client->xwayland_view) {
-    struct bwm_xwayland_view *xw = n->client->xwayland_view;
+    struct xwayland_toplevel_t *xw = n->client->xwayland_view;
     if (n->client->block_out_from_screenshare && xw->image_capture_surface) {
       wlr_scene_node_destroy(&xw->image_capture_surface->buffer->node);
       xw->image_capture_surface = NULL;
@@ -492,7 +491,7 @@ void toggle_floating(void) {
         n->id);
 
     if (n->client->toplevel) {
-      struct bwm_toplevel *tl = n->client->toplevel;
+      struct toplevel_t *tl = n->client->toplevel;
       int off_x = (n->client->tiled_rectangle.width - tl->geometry.width) / 2;
       int off_y = (n->client->tiled_rectangle.height - tl->geometry.height) / 2;
       n->client->floating_rectangle = (struct wlr_box){
@@ -692,7 +691,7 @@ void send_to_desktop(int desktop_index) {
     }
   }
 
-  struct bwm_output *target_mon = find_monitor_for_desktop(target);
+  output_t *target_mon = find_monitor_for_desktop(target);
   if (target_mon == NULL) {
     wlr_log(WLR_ERROR, "Could not find monitor for desktop: %s", target->name);
     return;
@@ -729,7 +728,7 @@ void send_to_desktop_by_name(const char *name) {
 
   desktop_t *src_desk = mon->desk;
 
-  struct bwm_output *target_mon = find_monitor_for_desktop(target);
+  output_t *target_mon = find_monitor_for_desktop(target);
   if (target_mon == NULL) {
     wlr_log(WLR_ERROR, "Could not find monitor for desktop: %s", target->name);
     return;
@@ -1079,11 +1078,11 @@ static bool repeat_info_match(struct wlr_keyboard *a, struct wlr_keyboard *b) {
 }
 
 // Remove a keyboard from its group (if any)
-void keyboard_group_remove(struct bwm_keyboard *keyboard) {
+void keyboard_group_remove(keyboard_t *keyboard) {
   if (!keyboard->group)
     return;
 
-  struct bwm_keyboard_group *group = keyboard->group;
+  keyboard_group_t *group = keyboard->group;
   struct wlr_keyboard_group *wlr_group = group->wlr_group;
 
   wlr_log(WLR_DEBUG, "Removing keyboard %p from group %p", (void*)keyboard, (void*)wlr_group);
@@ -1112,11 +1111,11 @@ void keyboard_group_remove(struct bwm_keyboard *keyboard) {
   }
 }
 
-void keyboard_group_remove_invalid(struct bwm_keyboard *keyboard) {
+void keyboard_group_remove_invalid(keyboard_t *keyboard) {
   if (!keyboard->group)
     return;
 
-  struct bwm_keyboard_group *group = keyboard->group;
+  keyboard_group_t *group = keyboard->group;
   keyboard_grouping_t grouping = get_keyboard_grouping();
 
   bool should_remove = false;
@@ -1138,7 +1137,7 @@ void keyboard_group_remove_invalid(struct bwm_keyboard *keyboard) {
     keyboard_group_remove(keyboard);
 }
 
-void keyboard_group_add(struct bwm_keyboard *keyboard) {
+void keyboard_group_add(keyboard_t *keyboard) {
   keyboard_grouping_t grouping = get_keyboard_grouping();
 
   if (grouping == KEYBOARD_GROUP_NONE) {
@@ -1150,7 +1149,7 @@ void keyboard_group_add(struct bwm_keyboard *keyboard) {
     return;
   }
 
-  struct bwm_keyboard_group *group;
+  keyboard_group_t *group;
   wl_list_for_each(group, &server.keyboard_groups, link) {
     if (wlr_keyboard_keymaps_match(keyboard->wlr_keyboard->keymap, group->wlr_group->keyboard.keymap) &&
         repeat_info_match(keyboard->wlr_keyboard, &group->wlr_group->keyboard)) {
@@ -1163,7 +1162,7 @@ void keyboard_group_add(struct bwm_keyboard *keyboard) {
     }
   }
 
-  struct bwm_keyboard_group *new_group = calloc(1, sizeof(struct bwm_keyboard_group));
+  keyboard_group_t *new_group = calloc(1, sizeof(*new_group));
   if (!new_group) {
     wlr_log(WLR_ERROR, "Failed to allocate keyboard group");
     return;
@@ -1178,11 +1177,10 @@ void keyboard_group_add(struct bwm_keyboard *keyboard) {
   new_group->wlr_group->data = new_group;
 
   wlr_keyboard_set_keymap(&new_group->wlr_group->keyboard, keyboard->wlr_keyboard->keymap);
-  wlr_keyboard_set_repeat_info(&new_group->wlr_group->keyboard,
-                               keyboard->wlr_keyboard->repeat_info.rate,
-                               keyboard->wlr_keyboard->repeat_info.delay);
+  wlr_keyboard_set_repeat_info(&new_group->wlr_group->keyboard, keyboard->wlr_keyboard->repeat_info.rate,
+    keyboard->wlr_keyboard->repeat_info.delay);
 
-  struct bwm_keyboard *rep = calloc(1, sizeof(struct bwm_keyboard));
+  keyboard_t *rep = calloc(1, sizeof(*rep));
   if (!rep) {
     wlr_log(WLR_ERROR, "Failed to allocate group representative keyboard");
     wlr_keyboard_group_destroy(new_group->wlr_group);
@@ -1216,7 +1214,7 @@ void keyboard_group_add(struct bwm_keyboard *keyboard) {
 }
 
 void keyboard_reapply_grouping(void) {
-  struct bwm_keyboard *keyboard, *tmp;
+  keyboard_t *keyboard, *tmp;
   wl_list_for_each_safe(keyboard, tmp, &server.physical_keyboards, all_link) {
     if (keyboard->group) {
       keyboard_group_remove(keyboard);
@@ -1232,7 +1230,7 @@ void keyboard_reapply_grouping(void) {
   }
 
   if (!server.seat->keyboard_state.keyboard && !wl_list_empty(&server.keyboards)) {
-    struct bwm_keyboard *first = wl_container_of(server.keyboards.next, first, active_link);
+    keyboard_t *first = wl_container_of(server.keyboards.next, first, active_link);
     if (first)
       wlr_seat_set_keyboard(server.seat, first->wlr_keyboard);
   }

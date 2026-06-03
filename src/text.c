@@ -52,10 +52,10 @@ static const struct wlr_buffer_impl cairo_buffer_impl = {
   .end_data_ptr_access = cairo_buffer_end_data_ptr_access,
 };
 
-struct bwm_text_buffer {
+struct text_buffer_t {
   struct wlr_scene_buffer *buffer_node;
   char *text;
-  struct bwm_text_node props;
+  struct text_node_t props;
 
   bool visible;
   float scale;
@@ -64,9 +64,9 @@ struct bwm_text_buffer {
   struct wl_listener destroy;
 };
 
-int bwm_text_node_default_height(void) { return text_height; }
+int text_node_default_height(void) { return text_height; }
 
-static int get_text_width(const struct bwm_text_node *props) {
+static int get_text_width(const struct text_node_t *props) {
   int width = props->width;
   if (props->max_width >= 0 && props->max_width < width)
     width = props->max_width;
@@ -101,7 +101,7 @@ settext_default:
   return layout;
 }
 
-static void text_calc_size(struct bwm_text_buffer *buffer) {
+static void text_calc_size(struct text_buffer_t *buffer) {
   cairo_surface_t *recorder = cairo_recording_surface_create(CAIRO_CONTENT_COLOR_ALPHA, NULL);
   cairo_t *c = cairo_create(recorder);
   cairo_surface_destroy(recorder);
@@ -128,7 +128,7 @@ static void text_calc_size(struct bwm_text_buffer *buffer) {
     buffer->props.height);
 }
 
-static void render_backing_buffer(struct bwm_text_buffer *buffer) {
+static void render_backing_buffer(struct text_buffer_t *buffer) {
   if (!buffer->visible)
     return;
 
@@ -195,7 +195,7 @@ static void render_backing_buffer(struct bwm_text_buffer *buffer) {
 }
 
 static void handle_outputs_update(struct wl_listener *listener, void *data) {
-  struct bwm_text_buffer *buffer =
+  struct text_buffer_t *buffer =
       wl_container_of(listener, buffer, outputs_update);
   struct wlr_scene_outputs_update_event *event = data;
 
@@ -216,7 +216,7 @@ static void handle_outputs_update(struct wl_listener *listener, void *data) {
 
 static void handle_destroy(struct wl_listener *listener, void *data) {
   (void)data;
-  struct bwm_text_buffer *buffer = wl_container_of(listener, buffer, destroy);
+  struct text_buffer_t *buffer = wl_container_of(listener, buffer, destroy);
 
   wl_list_remove(&buffer->outputs_update.link);
   wl_list_remove(&buffer->destroy.link);
@@ -225,9 +225,9 @@ static void handle_destroy(struct wl_listener *listener, void *data) {
   free(buffer);
 }
 
-struct bwm_text_node *bwm_text_node_create(struct wlr_scene_tree *parent, const char *text,
+text_node_t *text_node_create(struct wlr_scene_tree *parent, const char *text,
 		float color[4], bool pango_markup) {
-  struct bwm_text_buffer *buffer = calloc(1, sizeof(*buffer));
+  struct text_buffer_t *buffer = calloc(1, sizeof(*buffer));
   if (!buffer)
     return NULL;
 
@@ -265,31 +265,30 @@ struct bwm_text_node *bwm_text_node_create(struct wlr_scene_tree *parent, const 
   return &buffer->props;
 }
 
-void bwm_text_node_set_color(struct bwm_text_node *node, float color[4]) {
+void text_node_set_color(text_node_t *node, float color[4]) {
   if (!node)
     return;
   if (memcmp(node->color, color, sizeof(float) * 4) == 0)
     return;
   memcpy(node->color, color, sizeof(float) * 4);
-  struct bwm_text_buffer *buffer = wl_container_of(node, buffer, props);
+  struct text_buffer_t *buffer = wl_container_of(node, buffer, props);
   render_backing_buffer(buffer);
 }
 
-void bwm_text_node_set_background(struct bwm_text_node *node,
-                                  float background[4]) {
+void text_node_set_background(text_node_t *node, float background[4]) {
   if (!node)
     return;
   if (memcmp(node->background, background, sizeof(float) * 4) == 0)
     return;
   memcpy(node->background, background, sizeof(float) * 4);
-  struct bwm_text_buffer *buffer = wl_container_of(node, buffer, props);
+  struct text_buffer_t *buffer = wl_container_of(node, buffer, props);
   render_backing_buffer(buffer);
 }
 
-void bwm_text_node_set_text(struct bwm_text_node *node, const char *text) {
+void text_node_set_text(text_node_t *node, const char *text) {
   if (!node)
     return;
-  struct bwm_text_buffer *buffer = wl_container_of(node, buffer, props);
+  struct text_buffer_t *buffer = wl_container_of(node, buffer, props);
   if (!text)
     text = "";
   if (strcmp(buffer->text, text) == 0)
@@ -303,10 +302,10 @@ void bwm_text_node_set_text(struct bwm_text_node *node, const char *text) {
   render_backing_buffer(buffer);
 }
 
-void bwm_text_node_set_max_width(struct bwm_text_node *node, int max_width) {
+void text_node_set_max_width(text_node_t *node, int max_width) {
   if (!node)
     return;
-  struct bwm_text_buffer *buffer = wl_container_of(node, buffer, props);
+  struct text_buffer_t *buffer = wl_container_of(node, buffer, props);
   if (max_width == buffer->props.max_width)
     return;
   buffer->props.max_width = max_width;

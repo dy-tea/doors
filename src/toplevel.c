@@ -28,14 +28,14 @@
 #include <wlr/util/log.h>
 #include <pixman.h>
 
-extern struct bwm_server server;
+extern struct server_t server;
 
 static void handle_foreign_activate_request(struct wl_listener *listener, void *data);
 static void handle_foreign_fullscreen_request(struct wl_listener *listener, void *data);
 static void handle_foreign_close_request(struct wl_listener *listener, void *data);
 static void handle_foreign_destroy(struct wl_listener *listener, void *data);
 
-static void toplevel_apply_disable_decorations(struct bwm_toplevel *toplevel) {
+static void toplevel_apply_disable_decorations(toplevel_t *toplevel) {
   if (!toplevel || !toplevel->xdg_toplevel)
     return;
 
@@ -44,7 +44,7 @@ static void toplevel_apply_disable_decorations(struct bwm_toplevel *toplevel) {
     wlr_xdg_toplevel_set_fullscreen(toplevel->xdg_toplevel, true);
 }
 
-static bool toplevel_should_use_server_decorations(struct bwm_toplevel *tl) {
+static bool toplevel_should_use_server_decorations(struct toplevel_t *tl) {
   if (!tl || !tl->node)
     return false;
   switch (decoration_mode) {
@@ -58,7 +58,7 @@ static bool toplevel_should_use_server_decorations(struct bwm_toplevel *tl) {
   return false;
 }
 
-void toplevel_apply_decoration_mode(struct bwm_toplevel *tl) {
+void toplevel_apply_decoration_mode(struct toplevel_t *tl) {
   if (!tl || !tl->xdg_decoration || !tl->xdg_toplevel || !tl->xdg_toplevel->base)
     return;
 
@@ -73,7 +73,7 @@ void toplevel_apply_decoration_mode(struct bwm_toplevel *tl) {
   wlr_xdg_toplevel_decoration_v1_set_mode(tl->xdg_decoration, mode);
 }
 
-static void update_ext_foreign_toplevel(struct bwm_toplevel *toplevel) {
+static void update_ext_foreign_toplevel(toplevel_t *toplevel) {
   if (!toplevel->ext_foreign_toplevel || !toplevel->node || !toplevel->node->client)
     return;
 
@@ -88,7 +88,7 @@ static void update_ext_foreign_toplevel(struct bwm_toplevel *toplevel) {
   wlr_ext_foreign_toplevel_handle_v1_update_state(toplevel->ext_foreign_toplevel, &state);
 }
 
-void update_foreign_toplevel_state(struct bwm_toplevel *toplevel) {
+void update_foreign_toplevel_state(toplevel_t *toplevel) {
   if (!toplevel->foreign_toplevel || !toplevel->node || !toplevel->node->client)
     return;
 
@@ -104,12 +104,12 @@ void update_foreign_toplevel_state(struct bwm_toplevel *toplevel) {
 static void handle_foreign_activate_request(struct wl_listener *listener, void *data) {
   struct wlr_foreign_toplevel_handle_v1_activated_event *event = data;
   (void)event;
-  struct bwm_toplevel *toplevel = wl_container_of(listener, toplevel, foreign_activate_request);
+  toplevel_t *toplevel = wl_container_of(listener, toplevel, foreign_activate_request);
 
   if (!toplevel->node || !toplevel->node->client)
     return;
 
-  struct bwm_output *m = toplevel->node->output;
+  output_t *m = toplevel->node->output;
   desktop_t *d = m ? m->desk : NULL;
 
   if (!d)
@@ -120,7 +120,7 @@ static void handle_foreign_activate_request(struct wl_listener *listener, void *
     d->focus = NULL;
 
     if (prev->client && prev->client->toplevel) {
-      struct bwm_toplevel *prev_toplevel = prev->client->toplevel;
+      struct toplevel_t *prev_toplevel = prev->client->toplevel;
       wlr_xdg_toplevel_set_activated(prev_toplevel->xdg_toplevel, false);
       if (prev_toplevel->foreign_toplevel)
         wlr_foreign_toplevel_handle_v1_set_activated(prev_toplevel->foreign_toplevel, false);
@@ -132,12 +132,12 @@ static void handle_foreign_activate_request(struct wl_listener *listener, void *
 
 static void handle_foreign_fullscreen_request(struct wl_listener *listener, void *data) {
   struct wlr_foreign_toplevel_handle_v1_fullscreen_event *event = data;
-  struct bwm_toplevel *toplevel = wl_container_of(listener, toplevel, foreign_fullscreen_request);
+  toplevel_t *toplevel = wl_container_of(listener, toplevel, foreign_fullscreen_request);
 
   if (toplevel->node == NULL || toplevel->node->client == NULL)
     return;
 
-  struct bwm_output *m = toplevel->node->output;
+  output_t *m = toplevel->node->output;
   desktop_t *d = m ? m->desk : NULL;
 
   if (event->fullscreen) {
@@ -157,13 +157,13 @@ static void handle_foreign_fullscreen_request(struct wl_listener *listener, void
 
 static void handle_foreign_close_request(struct wl_listener *listener, void *data) {
   (void)data;
-  struct bwm_toplevel *toplevel = wl_container_of(listener, toplevel, foreign_close_request);
+  toplevel_t *toplevel = wl_container_of(listener, toplevel, foreign_close_request);
   wlr_xdg_toplevel_send_close(toplevel->xdg_toplevel);
 }
 
 static void handle_foreign_destroy(struct wl_listener *listener, void *data) {
   (void)data;
-  struct bwm_toplevel *toplevel = wl_container_of(listener, toplevel, foreign_destroy);
+  toplevel_t *toplevel = wl_container_of(listener, toplevel, foreign_destroy);
 
   wl_list_remove(&toplevel->foreign_activate_request.link);
   wl_list_remove(&toplevel->foreign_fullscreen_request.link);
@@ -171,7 +171,7 @@ static void handle_foreign_destroy(struct wl_listener *listener, void *data) {
   wl_list_remove(&toplevel->foreign_destroy.link);
 }
 
-void toplevel_center_and_clip_surface(struct bwm_toplevel *toplevel) {
+void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
   if (!toplevel || !toplevel->content_tree || !toplevel->node || !toplevel->node->client)
     return;
 
@@ -188,7 +188,7 @@ void toplevel_center_and_clip_surface(struct bwm_toplevel *toplevel) {
     if (floating) {
       container_rect = &c->floating_rectangle;
     } else if (fullscreen) {
-      struct bwm_output *m = toplevel->node->output;
+      output_t *m = toplevel->node->output;
       container_rect = m ? &m->rectangle : &c->tiled_rectangle;
     } else {
       container_rect = &c->tiled_rectangle;
@@ -279,14 +279,14 @@ void toplevel_center_and_clip_surface(struct bwm_toplevel *toplevel) {
 
 void toplevel_map(struct wl_listener *listener, void *data) {
 	(void)data;
-  struct bwm_toplevel *toplevel = wl_container_of(listener, toplevel, map);
+  toplevel_t *toplevel = wl_container_of(listener, toplevel, map);
 
   wlr_log(WLR_INFO, "Toplevel mapped");
 
   toplevel->mapped = true;
   toplevel->configured = false;
 
-  struct bwm_output *m = server.focused_output;
+  output_t *m = server.focused_output;
   if (m == NULL) {
     wlr_log(WLR_ERROR, "No monitor available for toplevel");
     return;
@@ -294,8 +294,8 @@ void toplevel_map(struct wl_listener *listener, void *data) {
 
   desktop_t *d = m->desk;
   if (d == NULL) {
-    // Try to find a valid output with a desk
-    struct bwm_output *valid_output = output_get_valid();
+    // try to find a valid output with a desk
+    output_t *valid_output = output_get_valid();
     if (valid_output) {
       m = valid_output;
       d = m->desk;
@@ -358,10 +358,10 @@ void toplevel_map(struct wl_listener *listener, void *data) {
   }
 
   // find target monitor
-  struct bwm_output *target_output = m;
+  output_t *target_output = m;
   if (rule && rule->has_monitor) {
   	wlr_log(WLR_DEBUG, "  Rule specifies monitor: %s", rule->monitor);
-   	struct bwm_output *new_monitor = find_output_by_name(rule->monitor);
+   	struct output_t *new_monitor = find_output_by_name(rule->monitor);
     if (new_monitor) {
     	target_output = new_monitor;
      wlr_log(WLR_DEBUG, "  Target desktop changed to: %s", target_output->name);
@@ -580,7 +580,7 @@ void toplevel_freeze_sibling_buffers(desktop_t *d, node_t *n) {
 
 void toplevel_unmap(struct wl_listener *listener, void *data) {
   (void)data;
-  struct bwm_toplevel *toplevel = wl_container_of(listener, toplevel, unmap);
+  struct toplevel_t *toplevel = wl_container_of(listener, toplevel, unmap);
 
   wlr_log(WLR_INFO, "Toplevel unmapped");
 
@@ -610,7 +610,7 @@ void toplevel_unmap(struct wl_listener *listener, void *data) {
 
   node_t *n = toplevel->node;
 
-  struct bwm_output *m = mon;
+  output_t *m = mon;
   desktop_t *d = NULL;
 
   // find the actual desktop this node belongs to by walking up to root
@@ -672,7 +672,7 @@ void toplevel_unmap(struct wl_listener *listener, void *data) {
 
 void toplevel_commit(struct wl_listener *listener, void *data) {
 	(void)data;
-  struct bwm_toplevel *toplevel = wl_container_of(listener, toplevel, commit);
+  struct toplevel_t *toplevel = wl_container_of(listener, toplevel, commit);
   struct wlr_xdg_surface *xdg_surface = toplevel->xdg_toplevel->base;
 
   if (xdg_surface->initial_commit) {
@@ -749,7 +749,7 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
   }
 }
 
-void toplevel_set_blur(struct bwm_toplevel *tl, bool enabled) {
+void toplevel_set_blur(struct toplevel_t *tl, bool enabled) {
   if (!tl || !tl->scene_tree)
     return;
 
@@ -774,7 +774,7 @@ void toplevel_set_blur(struct bwm_toplevel *tl, bool enabled) {
   }
 }
 
-void toplevel_set_mica(struct bwm_toplevel *tl, bool enabled) {
+void toplevel_set_mica(struct toplevel_t *tl, bool enabled) {
   if (!tl || !tl->scene_tree)
     return;
 
@@ -794,7 +794,7 @@ void toplevel_set_mica(struct bwm_toplevel *tl, bool enabled) {
   }
 }
 
-void toplevel_set_acrylic(struct bwm_toplevel *tl, bool enabled) {
+void toplevel_set_acrylic(struct toplevel_t *tl, bool enabled) {
   if (!tl || !tl->scene_tree)
     return;
 
@@ -826,7 +826,7 @@ static bool corner_mask_no_input(struct wlr_scene_buffer *buffer, double *sx, do
   return false;
 }
 
-void toplevel_set_border_radius(struct bwm_toplevel *tl, float radius) {
+void toplevel_set_border_radius(struct toplevel_t *tl, float radius) {
   if (!tl || !tl->scene_tree || !tl->content_tree)
     return;
 
@@ -877,7 +877,7 @@ void toplevel_set_border_radius(struct bwm_toplevel *tl, float radius) {
 
 void toplevel_destroy(struct wl_listener *listener, void *data) {
   (void)data;
-  struct bwm_toplevel *toplevel = wl_container_of(listener, toplevel, destroy);
+  struct toplevel_t *toplevel = wl_container_of(listener, toplevel, destroy);
 
   wlr_log(WLR_INFO, "Toplevel destroyed");
 
@@ -977,7 +977,7 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
 
 void toplevel_request_move(struct wl_listener *listener, void *data) {
 	(void)data;
-  struct bwm_toplevel *toplevel = wl_container_of(listener, toplevel, request_move);
+  struct toplevel_t *toplevel = wl_container_of(listener, toplevel, request_move);
   wlr_log(WLR_DEBUG, "Toplevel requested move");
   if (toplevel->node && toplevel->node->client && toplevel->node->client->state == STATE_FLOATING)
     begin_interactive(toplevel, CURSOR_MOVE, 0);
@@ -987,7 +987,7 @@ void toplevel_request_move(struct wl_listener *listener, void *data) {
 
 void toplevel_request_resize(struct wl_listener *listener, void *data) {
   struct wlr_xdg_toplevel_resize_event *event = data;
-  struct bwm_toplevel *toplevel = wl_container_of(listener, toplevel, request_resize);
+  struct toplevel_t *toplevel = wl_container_of(listener, toplevel, request_resize);
   wlr_log(WLR_DEBUG, "Toplevel requested resize");
   if (!event || !toplevel->node || !toplevel->node->client)
     return;
@@ -999,7 +999,7 @@ void toplevel_request_resize(struct wl_listener *listener, void *data) {
 
 void toplevel_request_maximize(struct wl_listener *listener, void *data) {
 	(void)data;
-  struct bwm_toplevel *toplevel = wl_container_of(listener, toplevel, request_maximize);
+  struct toplevel_t *toplevel = wl_container_of(listener, toplevel, request_maximize);
 
   if (!toplevel->xdg_toplevel->base->initialized)
   	return;
@@ -1023,7 +1023,7 @@ void toplevel_request_maximize(struct wl_listener *listener, void *data) {
 
 void toplevel_request_fullscreen(struct wl_listener *listener, void *data) {
 	(void)data;
-  struct bwm_toplevel *toplevel = wl_container_of(listener, toplevel, request_fullscreen);
+  struct toplevel_t *toplevel = wl_container_of(listener, toplevel, request_fullscreen);
 
   if (!toplevel->xdg_toplevel->base->initialized)
   	return;
@@ -1035,7 +1035,7 @@ void toplevel_request_fullscreen(struct wl_listener *listener, void *data) {
   if (requested_fullscreen == (toplevel->node->client->state == STATE_FULLSCREEN))
     return;
 
-  struct bwm_output *m = toplevel->node->output;
+  output_t *m = toplevel->node->output;
   desktop_t *d = m ? m->desk : NULL;
 
   if (requested_fullscreen) {
@@ -1058,7 +1058,7 @@ void toplevel_request_fullscreen(struct wl_listener *listener, void *data) {
 
 void toplevel_set_title(struct wl_listener *listener, void *data) {
 	(void)data;
-  struct bwm_toplevel *toplevel = wl_container_of(listener, toplevel, set_title);
+  struct toplevel_t *toplevel = wl_container_of(listener, toplevel, set_title);
 
   if (toplevel->node && toplevel->node->client) {
     const char *title = toplevel->xdg_toplevel->title;
@@ -1080,7 +1080,7 @@ void toplevel_set_title(struct wl_listener *listener, void *data) {
 
 void toplevel_set_app_id(struct wl_listener *listener, void *data) {
 	(void)data;
-  struct bwm_toplevel *toplevel = wl_container_of(listener, toplevel, set_app_id);
+  struct toplevel_t *toplevel = wl_container_of(listener, toplevel, set_app_id);
 
   if (toplevel->node && toplevel->node->client) {
     const char *app_id = toplevel->xdg_toplevel->app_id;
@@ -1100,7 +1100,7 @@ void toplevel_set_app_id(struct wl_listener *listener, void *data) {
   }
 }
 
-void focus_toplevel(struct bwm_toplevel *toplevel) {
+void focus_toplevel(struct toplevel_t *toplevel) {
   if (toplevel == NULL || toplevel->xdg_toplevel == NULL)
     return;
 
@@ -1144,7 +1144,7 @@ void focus_toplevel(struct bwm_toplevel *toplevel) {
 
   // update borders
   if (toplevel->node) {
-    struct bwm_output *m = toplevel->node->output;
+    output_t *m = toplevel->node->output;
     desktop_t *d = m ? m->desk : NULL;
     if (d && d->root != NULL) {
       for (node_t *node = first_extrema(d->root); node != NULL; node = next_leaf(node, d->root)) {
@@ -1162,7 +1162,7 @@ void focus_toplevel(struct bwm_toplevel *toplevel) {
   }
 }
 
-void toplevel_apply_geometry(struct bwm_toplevel *toplevel) {
+void toplevel_apply_geometry(struct toplevel_t *toplevel) {
   if (toplevel == NULL || toplevel->node == NULL ||
       toplevel->node->client == NULL)
     return;
@@ -1171,7 +1171,7 @@ void toplevel_apply_geometry(struct bwm_toplevel *toplevel) {
   struct wlr_box *rect;
 
   if (c->state == STATE_FULLSCREEN) {
-    struct bwm_output *m = toplevel->node->output;
+    output_t *m = toplevel->node->output;
     if (m)
       rect = &m->rectangle;
     else return;
@@ -1194,7 +1194,7 @@ void handle_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 
   wlr_log(WLR_INFO, "New XDG toplevel");
 
-  struct bwm_toplevel *toplevel = calloc(1, sizeof(struct bwm_toplevel));
+  struct toplevel_t *toplevel = calloc(1, sizeof(struct toplevel_t));
 
   toplevel->xdg_toplevel = xdg_toplevel;
   toplevel->mapped = false;
@@ -1286,7 +1286,7 @@ void handle_new_xdg_toplevel(struct wl_listener *listener, void *data) {
   wl_list_insert(&server.toplevels, &toplevel->link);
 }
 
-bool toplevel_is_ready(struct bwm_toplevel *toplevel) {
+bool toplevel_is_ready(struct toplevel_t *toplevel) {
   return toplevel &&
          toplevel->mapped &&
          toplevel->xdg_toplevel &&
@@ -1328,7 +1328,7 @@ static void save_buffer_iterator(struct wlr_scene_buffer *buffer,
           buffer->dst_width, buffer->dst_height, sx, sy);
 }
 
-void toplevel_save_buffer(struct bwm_toplevel *toplevel) {
+void toplevel_save_buffer(struct toplevel_t *toplevel) {
   if (!toplevel || !toplevel->scene_tree || !toplevel->content_tree)
     return;
 
@@ -1372,7 +1372,7 @@ void toplevel_save_buffer(struct bwm_toplevel *toplevel) {
   }
 }
 
-void toplevel_remove_saved_buffer(struct bwm_toplevel *toplevel) {
+void toplevel_remove_saved_buffer(struct toplevel_t *toplevel) {
   if (!toplevel || !toplevel->saved_surface_tree)
     return;
 
@@ -1397,7 +1397,7 @@ static void send_frame_done_iterator(struct wlr_scene_buffer *scene_buffer,
   wlr_surface_send_frame_done(scene_surface->surface, when);
 }
 
-void toplevel_send_frame_done(struct bwm_toplevel *toplevel) {
+void toplevel_send_frame_done(struct toplevel_t *toplevel) {
   if (!toplevel || !toplevel->content_tree)
     return;
 
@@ -1417,7 +1417,7 @@ void handle_new_toplevel_capture_request(struct wl_listener *listener, void *dat
 	struct wlr_ext_image_capture_source_v1 **image_capture_source_ptr = NULL;
 	struct wlr_scene *image_capture = NULL;
 
-	struct bwm_toplevel *tl;
+	struct toplevel_t *tl;
 	wl_list_for_each(tl, &server.toplevels, link) {
 		if (tl == handle_data) {
 			image_capture_source_ptr = &tl->image_capture_source;
@@ -1427,7 +1427,7 @@ void handle_new_toplevel_capture_request(struct wl_listener *listener, void *dat
 	}
 
 	if (image_capture_source_ptr == NULL) {
-		struct bwm_xwayland_view *xwayland_view = handle_data;
+		struct xwayland_toplevel_t *xwayland_view = handle_data;
 		image_capture_source_ptr = &xwayland_view->image_capture_source;
 		image_capture = xwayland_view->image_capture;
 	}
@@ -1450,9 +1450,9 @@ void handle_new_toplevel_capture_request(struct wl_listener *listener, void *dat
 		request, *image_capture_source_ptr);
 }
 
-static struct bwm_toplevel *toplevel_for_xdg_surface(
+static struct toplevel_t *toplevel_for_xdg_surface(
     struct wlr_xdg_surface *surface) {
-  struct bwm_toplevel *tl;
+  struct toplevel_t *tl;
   wl_list_for_each(tl, &server.toplevels, link) {
     if (tl->xdg_toplevel && tl->xdg_toplevel->base == surface)
       return tl;
@@ -1462,7 +1462,7 @@ static struct bwm_toplevel *toplevel_for_xdg_surface(
 
 static void handle_decoration_destroy(struct wl_listener *listener, void *data) {
   (void)data;
-  struct bwm_toplevel *tl = wl_container_of(listener, tl, decoration_destroy);
+  struct toplevel_t *tl = wl_container_of(listener, tl, decoration_destroy);
   wl_list_remove(&tl->decoration_destroy.link);
   wl_list_remove(&tl->decoration_request_mode.link);
   tl->xdg_decoration = NULL;
@@ -1470,7 +1470,7 @@ static void handle_decoration_destroy(struct wl_listener *listener, void *data) 
 
 static void handle_decoration_request_mode(struct wl_listener *listener, void *data) {
   (void)data;
-  struct bwm_toplevel *tl = wl_container_of(listener, tl, decoration_request_mode);
+  struct toplevel_t *tl = wl_container_of(listener, tl, decoration_request_mode);
   if (!tl || !tl->xdg_decoration || !tl->xdg_toplevel || !tl->xdg_toplevel->base ||
     !tl->xdg_toplevel->base->initialized || !tl->node) return;
 
@@ -1495,7 +1495,7 @@ void handle_new_xdg_decoration(struct wl_listener *listener, void *data) {
   (void)listener;
   struct wlr_xdg_toplevel_decoration_v1 *deco = data;
   struct wlr_xdg_surface *xdg_surface = deco->toplevel->base;
-  struct bwm_toplevel *tl = toplevel_for_xdg_surface(xdg_surface);
+  struct toplevel_t *tl = toplevel_for_xdg_surface(xdg_surface);
 
   if (tl == NULL)
     return;
@@ -1526,6 +1526,6 @@ void handle_new_xdg_decoration(struct wl_listener *listener, void *data) {
   }
 }
 
-bool toplevel_can_tear(struct bwm_toplevel *toplevel) {
+bool toplevel_can_tear(struct toplevel_t *toplevel) {
 	return toplevel->tearing_hint == WP_TEARING_CONTROL_V1_PRESENTATION_HINT_ASYNC;
 }

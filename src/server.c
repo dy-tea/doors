@@ -92,7 +92,7 @@ void handle_drm_lease_request(struct wl_listener *listener, void *data);
 static void handle_ring_system_bell(struct wl_listener *listener, void *data);
 
 void server_init(void) {
-  server = (struct bwm_server){0};
+  server = (struct server_t){0};
 
   server.wl_display = wl_display_create();
   server.backend = wlr_backend_autocreate(wl_display_get_event_loop(server.wl_display), &server.session);
@@ -483,7 +483,7 @@ static void apply_output_head_config(struct wlr_output_configuration_head_v1 *co
   if (!output)
     return;
 
-  struct bwm_output *bwm_output = output_from_wlr_output(output);
+  output_t *doors_output = output_from_wlr_output(output);
 
   struct wlr_output_state state;
   wlr_output_state_init(&state);
@@ -506,8 +506,8 @@ static void apply_output_head_config(struct wlr_output_configuration_head_v1 *co
   wlr_output_commit_state(output, &state);
   wlr_output_state_finish(&state);
 
-  if (bwm_output)
-    output_update_scale(bwm_output, config_head->state.scale);
+  if (doors_output)
+    output_update_scale(doors_output, config_head->state.scale);
 
   if (config_head->state.x >= 0 && config_head->state.y >= 0)
     wlr_output_layout_add(server.output_layout, output, config_head->state.x, config_head->state.y);
@@ -580,7 +580,7 @@ int server_run(void) {
   }
 
   setenv("WAYLAND_DISPLAY", socket, true);
-  setenv("XDG_CURRENT_DESKTOP", "bwm", true);
+  setenv("XDG_CURRENT_DESKTOP", "doors", true);
 
   // add IPC socket to event loop
   struct wl_event_loop *event_loop = wl_display_get_event_loop(server.wl_display);
@@ -607,7 +607,7 @@ void server_restart(void) {
   wl_display_terminate(server.wl_display);
 
   if (fork() == 0)
-  	execl("/bin/sh", "/bin/sh", "bwm", (char *)NULL);
+  	execl("/bin/sh", "/bin/sh", "doors", (char *)NULL);
 }
 
 void server_fini(void) {
@@ -735,7 +735,7 @@ void handle_xdg_activation_request_activate(struct wl_listener *listener, void *
   if (event->surface == NULL)
     return;
 
-  struct bwm_toplevel *toplevel = event->surface->data;
+  struct toplevel_t *toplevel = event->surface->data;
   if (toplevel == NULL)
     return;
 

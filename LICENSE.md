@@ -630,7 +630,7 @@ attach them to the start of each source file to most effectively state
 the exclusion of warranty; and each file should have at least the
 "copyright" line and a pointer to where the full notice is found.
 
-        bwm - bspwm for wayland
+        doors wayland compositor
         Copyright (C) 2026  Dylan Donnell
 
         This program is free software: you can redistribute it and/or modify
@@ -652,7 +652,7 @@ mail.
 If the program does terminal interaction, make it output a short
 notice like this when it starts in an interactive mode:
 
-        bwm  Copyright (C) 2026  Dylan Donnell
+        doors  Copyright (C) 2026  Dylan Donnell
         This program comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
         This is free software, and you are welcome to redistribute it
         under certain conditions; type `show c' for details.

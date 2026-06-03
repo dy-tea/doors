@@ -75,16 +75,13 @@ static enum gesture_direction gesture_parse_direction(const char *dir_str) {
 	return GESTURE_DIRECTION_NONE;
 }
 
-char *gesture_parse(const char *input, struct gesture *output) {
-	if (!input || !output) {
-		return "invalid input";
-	}
+char *gesture_parse(const char *input, struct gesture_t *output) {
+	if (!input || !output) return "invalid input";
 
-	memset(output, 0, sizeof(struct gesture));
+	memset(output, 0, sizeof(struct gesture_t));
 
 	char *input_copy = strdup(input);
-	if (!input_copy)
-		return "memory allocation failed";
+	if (!input_copy) return "memory allocation failed";
 
 	char *saveptr = NULL;
 	char *token = strtok_r(input_copy, ":", &saveptr);
@@ -144,9 +141,8 @@ char *gesture_parse(const char *input, struct gesture *output) {
 	return NULL;
 }
 
-char *gesture_to_string(struct gesture *gesture) {
-	if (!gesture)
-		return strdup("");
+char *gesture_to_string(struct gesture_t *gesture) {
+	if (!gesture) return strdup("");
 
 	char buf[256] = {0};
 	snprintf(buf, sizeof(buf), "%s", gesture_type_string(gesture->type));
@@ -196,64 +192,47 @@ char *gesture_to_string(struct gesture *gesture) {
 	return strdup(buf);
 }
 
-bool gesture_check(struct gesture *target, enum gesture_type type, uint8_t fingers) {
-	if (!target || target->type != type)
-		return false;
-
-	if (target->fingers != GESTURE_FINGERS_ANY && target->fingers != fingers)
-		return false;
+bool gesture_check(struct gesture_t *target, enum gesture_type type, uint8_t fingers) {
+	if (!target || target->type != type) return false;
+	if (target->fingers != GESTURE_FINGERS_ANY && target->fingers != fingers) return false;
 
 	return true;
 }
 
-bool gesture_match(struct gesture *target, struct gesture *to_match, bool exact) {
-	if (!target || !to_match)
-		return false;
+bool gesture_match(struct gesture_t *target, struct gesture_t *to_match, bool exact) {
+	if (!target || !to_match) return false;
+	if (target->type != to_match->type) return false;
+	if (target->fingers != GESTURE_FINGERS_ANY && target->fingers != to_match->fingers) return false;
 
-	if (target->type != to_match->type)
-		return false;
-
-	if (target->fingers != GESTURE_FINGERS_ANY && target->fingers != to_match->fingers)
-		return false;
-
-	if (exact)
-		return target->directions == to_match->directions;
+	if (exact) return target->directions == to_match->directions;
 
 	return (target->directions & to_match->directions) != 0;
 }
 
-bool gesture_equal(struct gesture *a, struct gesture *b) {
-	if (!a || !b)
-		return false;
+bool gesture_equal(struct gesture_t *a, struct gesture_t *b) {
+	if (!a || !b) return false;
 
-	return a->type == b->type &&
-		a->fingers == b->fingers &&
+	return a->type == b->type && a->fingers == b->fingers &&
 		a->directions == b->directions;
 }
 
-int8_t gesture_compare(struct gesture *a, struct gesture *b) {
-	if (!a || !b)
-		return -1;
+int8_t gesture_compare(struct gesture_t *a, struct gesture_t *b) {
+	if (!a || !b) return -1;
+	if (a->type != b->type) return -1;
 
-	if (a->type != b->type)
-		return -1;
-
-	if (a->fingers != b->fingers)
-		return (a->fingers > b->fingers) ? 1 : -1;
+	if (a->fingers != b->fingers) return (a->fingers > b->fingers) ? 1 : -1;
 
 	int a_bits = __builtin_popcount(a->directions);
 	int b_bits = __builtin_popcount(b->directions);
 
-	if (a_bits == b_bits)
-		return 0;
+	if (a_bits == b_bits) return 0;
 
 	return (a_bits > b_bits) ? 1 : -1;
 }
 
-void gesture_tracker_begin(struct gesture_tracker *tracker,
-		enum gesture_type type, uint8_t fingers) {
-	if (!tracker)
-		return;
+void gesture_tracker_begin(struct gesture_tracker_t *tracker, enum gesture_type type,
+		uint8_t fingers) {
+	if (!tracker) return;
 
 	tracker->type = type;
 	tracker->fingers = fingers;
@@ -263,32 +242,25 @@ void gesture_tracker_begin(struct gesture_tracker *tracker,
 	tracker->rotation = 0;
 }
 
-bool gesture_tracker_check(struct gesture_tracker *tracker,
-		enum gesture_type type) {
-	if (!tracker)
-		return false;
+bool gesture_tracker_check(struct gesture_tracker_t *tracker, enum gesture_type type) {
+	if (!tracker) return false;
 
 	return tracker->type == type && tracker->fingers > 0;
 }
 
-void gesture_tracker_update(struct gesture_tracker *tracker, double dx,
+void gesture_tracker_update(struct gesture_tracker_t *tracker, double dx,
 		double dy, double scale, double rotation) {
-	if (!tracker)
-		return;
+	if (!tracker) return;
 
 	tracker->dx += dx;
 	tracker->dy += dy;
 
-	if (!isnan(scale))
-		tracker->scale = scale;
-
-	if (!isnan(rotation))
-		tracker->rotation = rotation;
+	if (!isnan(scale)) tracker->scale = scale;
+	if (!isnan(rotation)) tracker->rotation = rotation;
 }
 
-void gesture_tracker_cancel(struct gesture_tracker *tracker) {
-	if (!tracker)
-		return;
+void gesture_tracker_cancel(struct gesture_tracker_t *tracker) {
+	if (!tracker) return;
 
 	tracker->type = GESTURE_TYPE_NONE;
 	tracker->fingers = 0;
@@ -298,9 +270,8 @@ void gesture_tracker_cancel(struct gesture_tracker *tracker) {
 	tracker->rotation = 0;
 }
 
-void gesture_tracker_end(struct gesture_tracker *tracker) {
-	if (!tracker)
-		return;
+void gesture_tracker_end(struct gesture_tracker_t *tracker) {
+	if (!tracker) return;
 
 	tracker->type = GESTURE_TYPE_NONE;
 	tracker->fingers = 0;

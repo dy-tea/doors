@@ -16,7 +16,7 @@
 
 #define MAX_LOG_LINES 10000
 #define MAX_LOG_FILES 5
-#define LOG_FILENAME_BASE "bwm"
+#define LOG_FILENAME_BASE "doors"
 
 static FILE *log_file = NULL;
 static char log_path[2048] = {0};
@@ -105,7 +105,7 @@ static void rotate_log_file(void) {
   struct tm *tm_info = localtime(&now);
   char time_str[32];
   strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", tm_info);
-  fprintf(log_file, "########## bwm startup (%s) ##########\n", time_str);
+  fprintf(log_file, "########## doors startup (%s) ##########\n", time_str);
   fflush(log_file);
   current_line_count++;
 }
@@ -167,7 +167,7 @@ int log_init(const char *log_file_path) {
       return -1;
     }
 
-    snprintf(log_dir, sizeof(log_dir), "%s/.cache/bwm", home);
+    snprintf(log_dir, sizeof(log_dir), "%s/.cache/doors", home);
 
     // try to create directories
     struct stat st = {0};
@@ -181,7 +181,7 @@ int log_init(const char *log_file_path) {
       }
     }
 
-    snprintf(log_path, sizeof(log_path), "%s/bwm.log", log_dir);
+    snprintf(log_path, sizeof(log_path), "%s/doors.log", log_dir);
   }
 
   // open log file for appending
@@ -212,7 +212,7 @@ int log_init(const char *log_file_path) {
   struct tm *tm_info = localtime(&now);
   char time_str[32];
   strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", tm_info);
-  fprintf(log_file, "########## bwm startup (%s) ##########\n", time_str);
+  fprintf(log_file, "########## doors startup (%s) ##########\n", time_str);
   fflush(log_file);
   current_line_count += 2;
 
@@ -239,7 +239,7 @@ int log_setup_signals(void) {
 
 void log_fini(void) {
   if (log_file) {
-    fprintf(log_file, "########## bwm shutdown ##########\n\n");
+    fprintf(log_file, "########## doors shutdown ##########\n\n");
     fflush(log_file);
     fclose(log_file);
     log_file = NULL;

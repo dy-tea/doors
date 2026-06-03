@@ -1,5 +1,5 @@
 #
-# bwm hotkey configuration
+# doors hotkey configuration
 #
 
 # terminal emulator
@@ -12,72 +12,72 @@ alt + space
 
 # close window
 alt + shift + q
-	bmsg node --close
+	doorsctl node --close
 
 # toggle fullscreen
 alt + f
-	bmsg node --state fullscreen
+	doorsctl node --state fullscreen
 
 # toggle floating
 alt + shift + space
-	bmsg node --state floating
+	doorsctl node --state floating
 
 # toggle monocle
 alt + m
-	bmsg desktop --layout monocle
+	doorsctl desktop --layout monocle
 
 # window navigation (using brace expansion)
 alt + {h,j,k,l}
-	bmsg focus {west,south,north,east}
+	doorsctl focus {west,south,north,east}
 
 # window swapping (using brace expansion)
 alt + shift + {h,j,k,l}
-	bmsg swap {west,south,north,east}
+	doorsctl swap {west,south,north,east}
 
 # cancel preselection
 alt + ctrl + space
-	bmsg presel cancel
+	doorsctl presel cancel
 
 # rotate
 alt + r
-	bmsg rotate clockwise
+	doorsctl rotate clockwise
 alt + shift + r
-	bmsg rotate counterclockwise
+	doorsctl rotate counterclockwise
 
 # flip
 alt + {comma,period}
-	bmsg flip {horizontal,vertical}
+	doorsctl flip {horizontal,vertical}
 
 # resizing tiled windows (using brace expansion)
 alt + ctrl + {h,j,k,l}
-	bmsg resize {left,down,up,right}
+	doorsctl resize {left,down,up,right}
 
 # floating window interactions (alt + mouse on floating windows)
 alt + mouse_left
-	bmsg node interactive_move
+	doorsctl node interactive_move
 alt + mouse_right
-	bmsg node interactive_resize
+	doorsctl node interactive_resize
 
 # desktop switching (1-based index)
 # Using brace expansion with range syntax
 alt + {1-9}
-	bmsg desktop {1-9}
+	doorsctl desktop {1-9}
 alt + 0
-	bmsg desktop 10
+	doorsctl desktop 10
 
 # send to desktop (1-based index)
 alt + shift + {1-9}
-	bmsg node --to-desktop {1-9}
+	doorsctl node --to-desktop {1-9}
 alt + shift + 0
-	bmsg node --to-desktop 10
+	doorsctl node --to-desktop 10
 
 # send to next/prev desktop
 alt + shift + {Right,Left}
-	bmsg send {next,prev}
+	doorsctl send {next,prev}
 
 # quit
 alt + shift + Escape
-	bmsg quit
+	doorsctl quit
 
 # executed when the system bell is rung
 bell
@@ -85,17 +85,17 @@ bell
 
 # Gesture bindings (touchpad)
 gesture swipe:3:left
-	bmsg desktop --focus prev
+	doorsctl desktop --focus prev
 gesture swipe:3:right
-	bmsg desktop --focus next
+	doorsctl desktop --focus next
 gesture pinch:in
-	bmsg node --state fullscreen
+	doorsctl node --state fullscreen
 gesture pinch:out
-	bmsg node --state fullscreen
+	doorsctl node --state fullscreen
 
 # Hot corner bindings
 hotcorner topleft
-	bmsg desktop --layout monocle
+	doorsctl desktop --layout monocle
 
 # Focus submap
 # enter submap with alt + shift + f
@@ -106,4 +106,4 @@ alt + shift + f -> @focus
   escape
     @exit
   {h,j,k,l}
-    bmsg focus {west,south,north,east}
+    doorsctl focus {west,south,north,east}

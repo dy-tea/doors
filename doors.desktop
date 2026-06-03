@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=doors
+Comment=Start a doors session
+Exec=doors
+Type=Application
+DesktopNames=doors;wlroots

@@ -11,7 +11,7 @@
 #include <wlr/backend/libinput.h>
 #include <libinput.h>
 
-extern struct bwm_server server;
+extern struct server_t server;
 
 input_config_t *input_configs[MAX_INPUT_CONFIGS];
 size_t num_input_configs = 0;
@@ -552,7 +552,7 @@ void input_apply_config(struct wlr_input_device *device) {
 }
 
 void input_apply_config_all_keyboards(void) {
-  struct bwm_keyboard *keyboard, *tmp;
+  keyboard_t *keyboard, *tmp;
   wl_list_for_each_safe(keyboard, tmp, &server.physical_keyboards, all_link) {
     input_apply_config(&keyboard->wlr_keyboard->base);
     keyboard->repeat_rate = keyboard->wlr_keyboard->repeat_info.rate;
@@ -564,7 +564,7 @@ void input_apply_config_all_keyboards(void) {
 }
 
 void input_apply_config_all_pointers(void) {
-  struct bwm_pointer *pointer;
+  struct pointer_t *pointer;
   wl_list_for_each(pointer, &server.pointers, link)
     input_apply_config(&pointer->wlr_pointer->base);
 }

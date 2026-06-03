@@ -6,7 +6,7 @@
 extern char text_font[128];
 extern int text_height;
 
-struct bwm_text_node {
+typedef struct text_node_t {
   int width;
   int max_width;
   int height;
@@ -16,14 +16,14 @@ struct bwm_text_node {
   float background[4];
 
   struct wlr_scene_node *node;
-};
+} text_node_t;
 
-struct bwm_text_node *bwm_text_node_create(struct wlr_scene_tree *parent,
+text_node_t *text_node_create(struct wlr_scene_tree *parent,
 	const char *text, float color[4], bool pango_markup);
 
-void bwm_text_node_set_color(struct bwm_text_node *node, float color[4]);
-void bwm_text_node_set_background(struct bwm_text_node *node, float background[4]);
-void bwm_text_node_set_text(struct bwm_text_node *node, const char *text);
-void bwm_text_node_set_max_width(struct bwm_text_node *node, int max_width);
+void text_node_set_color(text_node_t *node, float color[4]);
+void text_node_set_background(text_node_t *node, float background[4]);
+void text_node_set_text(text_node_t *node, const char *text);
+void text_node_set_max_width(text_node_t *node, int max_width);
 
-int bwm_text_node_default_height(void);
+int text_node_default_height(void);

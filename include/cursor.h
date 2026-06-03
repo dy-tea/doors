@@ -5,19 +5,19 @@
 #include "gesture.h"
 #include <wlr/types/wlr_pointer.h>
 
-struct bwm_pointer {
+typedef struct pointer_t {
 	struct wlr_pointer *wlr_pointer;
 	struct wl_list link;
-};
+} pointer_t;
 
-struct bwm_cursor_constraint {
+typedef struct cursor_constraint_t {
 	struct wlr_pointer_constraint_v1 *constraint;
 	struct wl_listener set_region;
 	struct wl_listener destroy;
-};
+} cursor_constraint_t;
 
-struct bwm_cursor {
-	struct gesture_tracker gesture_tracker;
+typedef struct cursor_t {
+	gesture_tracker_t gesture_tracker;
 	struct wl_listener hold_begin;
 	struct wl_listener hold_end;
 	struct wl_listener pinch_begin;
@@ -26,7 +26,7 @@ struct bwm_cursor {
 	struct wl_listener swipe_begin;
 	struct wl_listener swipe_update;
 	struct wl_listener swipe_end;
-};
+} cursor_t;
 
 void cursor_motion(struct wl_listener *listener, void *data);
 void cursor_motion_absolute(struct wl_listener *listener, void *data);
@@ -41,7 +41,7 @@ void handle_new_input(struct wl_listener *listener, void *data);
 void handle_pointer_constraint(struct wl_listener *listener, void *data);
 void handle_cursor_request_set_shape(struct wl_listener *listener, void *data);
 
-void begin_interactive(struct bwm_toplevel *toplevel, enum cursor_mode mode, uint32_t edges);
+void begin_interactive(struct toplevel_t *toplevel, enum cursor_mode mode, uint32_t edges);
 void cursor_init_gestures(void);
 void cursor_rebase(void);
 void *desktop_type_at(double lx, double ly, struct wlr_surface **surface, double *sx, double *sy);

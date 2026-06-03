@@ -1,0 +1,25 @@
+#! /bin/sh
+
+# Example doorsrc configuration
+# This file is executed at server startup
+
+# Set up desktops on HDMI-A-1 (names separated by spaces)
+doorsctl output HDMI-A-1 -d I II III IV V VI VII VIII IX X
+
+# Set border width
+doorsctl config border_width 2
+
+# Set window gap
+doorsctl config window_gap 12
+
+# Set single monocle
+doorsctl config single_monocle true
+
+# Set borderless monocle
+doorsctl config borderless_monocle true
+
+# Set gapless monocle
+doorsctl config gapless_monocle true
+
+# Enable animations
+doorsctl config enable_animations true

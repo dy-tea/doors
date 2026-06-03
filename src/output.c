@@ -23,8 +23,7 @@
 
 static void handle_output_destroy(struct wl_listener *listener, void *data);
 
-static enum wlr_scale_filter_mode get_scale_filter(struct bwm_output *output,
-		struct wlr_scene_buffer *buffer) {
+static enum wlr_scale_filter_mode get_scale_filter(output_t *output, struct wlr_scene_buffer *buffer) {
 	if (buffer->dst_width > 0 && buffer->dst_height > 0 && (
 			buffer->dst_width < buffer->WLR_PRIVATE.buffer_width ||
 			buffer->dst_height < buffer->WLR_PRIVATE.buffer_height))
@@ -44,14 +43,14 @@ static void output_configure_scene_iterator(struct wlr_scene_buffer *buffer,
 		int sx, int sy, void *data) {
 	(void)sx;
 	(void)sy;
-	struct bwm_output *output = data;
+	output_t *output = data;
 	if (!output)
 		return;
 
 	buffer->filter_mode = get_scale_filter(output, buffer);
 }
 
-static void output_configure_scene(struct bwm_output *output) {
+static void output_configure_scene(output_t *output) {
 	if (!output)
 		return;
 
@@ -82,13 +81,13 @@ static void output_configure_scene(struct bwm_output *output) {
 		output_configure_scene_iterator, output);
 }
 
-static bool output_can_tear(struct bwm_output *output) {
+static bool output_can_tear(output_t *output) {
 	return output->allow_tearing;
 }
 
 void output_frame(struct wl_listener *listener, void *data) {
 	(void)data;
-	struct bwm_output *output = wl_container_of(listener, output, frame);
+	output_t *output = wl_container_of(listener, output, frame);
 	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(server.scene, output->wlr_output);
   struct timespec now;
   bool animating = false;
@@ -133,7 +132,7 @@ void output_frame(struct wl_listener *listener, void *data) {
 }
 
 static void handle_output_present(struct wl_listener *listener, void *data) {
-  struct bwm_output *output = wl_container_of(listener, output, present);
+  output_t *output = wl_container_of(listener, output, present);
   struct wlr_output_event_present *event = data;
 
   if (!output->enabled || !event->presented)
@@ -144,15 +143,15 @@ static void handle_output_present(struct wl_listener *listener, void *data) {
 }
 
 void output_request_state(struct wl_listener *listener, void *data) {
-  struct bwm_output *output = wl_container_of(listener, output, request_state);
+  output_t *output = wl_container_of(listener, output, request_state);
   struct wlr_output_event_request_state *event = data;
   wlr_output_commit_state(output->wlr_output, event->state);
 }
 
 static void handle_output_destroy(struct wl_listener *listener, void *data) {
-	(void)data;
-  struct bwm_output *output = wl_container_of(listener, output, destroy);
-  struct bwm_layer_surface *layer, *tmp;
+  (void)data;
+  output_t *output = wl_container_of(listener, output, destroy);
+  layer_surface_t *layer, *tmp;
 
   for (size_t i = 0; i < 4; i++)
     wl_list_for_each_safe(layer, tmp, &output->layers[i], link)
@@ -192,7 +191,7 @@ static void handle_output_destroy(struct wl_listener *listener, void *data) {
 void handle_new_output(struct wl_listener *listener, void *data) {
 	(void)listener;
   struct wlr_output *wlr_output = data;
-  struct bwm_output *output = calloc(1, sizeof(struct bwm_output));
+  output_t *output = calloc(1, sizeof(*output));
   if (!output)
     return;
 
@@ -297,7 +296,7 @@ void handle_new_output(struct wl_listener *listener, void *data) {
   output_update_manager_config();
 }
 
-void output_enable(struct bwm_output *output) {
+void output_enable(output_t *output) {
   if (output->enabled)
     return;
 
@@ -319,7 +318,7 @@ void output_enable(struct bwm_output *output) {
   }
 }
 
-void output_disable(struct bwm_output *output) {
+void output_disable(output_t *output) {
   if (!output->enabled)
     return;
 
@@ -330,7 +329,7 @@ void output_disable(struct bwm_output *output) {
   }
 }
 
-void output_destroy(struct bwm_output *output) {
+void output_destroy(output_t *output) {
   if (!output)
     return;
 
@@ -346,13 +345,13 @@ void output_destroy(struct bwm_output *output) {
   free(output);
 }
 
-struct bwm_output *output_from_wlr_output(struct wlr_output *wlr_output) {
+output_t *output_from_wlr_output(struct wlr_output *wlr_output) {
   if (!wlr_output)
     return NULL;
   return wlr_output->data;
 }
 
-struct bwm_output *output_get_in_direction(struct bwm_output *reference, uint32_t direction) {
+output_t *output_get_in_direction(output_t *reference, uint32_t direction) {
   if (!reference || !direction)
     return NULL;
 
@@ -371,7 +370,7 @@ struct bwm_output *output_get_in_direction(struct bwm_output *reference, uint32_
   return output_from_wlr_output(wlr_adjacent);
 }
 
-void output_update_usable_area(struct bwm_output *output) {
+void output_update_usable_area(output_t *output) {
   if (!output || !output->enabled)
     return;
 
@@ -381,14 +380,14 @@ void output_update_usable_area(struct bwm_output *output) {
   output->usable_area.height = output->height;
 }
 
-void output_set_scale_filter(struct bwm_output *output, enum scale_filter_mode mode) {
+void output_set_scale_filter(output_t *output, enum scale_filter_mode mode) {
   if (!output)
     return;
   output->scale_filter_mode = mode;
   output_configure_scene(output);
 }
 
-void output_get_identifier(char *identifier, size_t len, struct bwm_output *output) {
+void output_get_identifier(char *identifier, size_t len, output_t *output) {
   struct wlr_output *wlr_output = output->wlr_output;
   snprintf(identifier, len, "%s %s %s",
       wlr_output->make ? wlr_output->make : "Unknown",
@@ -396,7 +395,7 @@ void output_get_identifier(char *identifier, size_t len, struct bwm_output *outp
       wlr_output->serial ? wlr_output->serial : "Unknown");
 }
 
-void output_update_scale(struct bwm_output *output, float scale) {
+void output_update_scale(output_t *output, float scale) {
   if (!output || !output->wlr_output)
     return;
 
@@ -414,7 +413,7 @@ void output_update_scale(struct bwm_output *output, float scale) {
   output->height = layout_box.height;
   output->rectangle = layout_box;
 
-  struct bwm_toplevel *toplevel;
+  struct toplevel_t *toplevel;
   wl_list_for_each(toplevel, &server.toplevels, link) {
     if (!toplevel->xdg_toplevel || !toplevel->xdg_toplevel->base ||
         !toplevel->xdg_toplevel->base->surface || !toplevel->node)
@@ -431,7 +430,7 @@ void output_update_scale(struct bwm_output *output, float scale) {
 
   // notify all layer surfaces on this output
   for (int i = 0; i < 4; i++) {
-    struct bwm_layer_surface *layer;
+    struct layer_surface_t *layer;
     wl_list_for_each(layer, &output->layers[i], link) {
       if (!layer->layer_surface || !layer->layer_surface->surface)
         continue;
@@ -452,8 +451,8 @@ void output_update_scale(struct bwm_output *output, float scale) {
   update_idle_inhibitors(NULL);
 }
 
-struct bwm_output *output_get_valid(void) {
-  for (struct bwm_output *m = mon_head; m != NULL; m = m->next)
+output_t *output_get_valid(void) {
+  for (output_t *m = mon_head; m != NULL; m = m->next)
     if (m->enabled && m->wlr_output)
       return m;
   return NULL;

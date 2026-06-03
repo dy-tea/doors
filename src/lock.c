@@ -10,7 +10,7 @@
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_session_lock_v1.h>
 
-void destroy_unlock(struct bwm_session_lock *session_lock, const bool unlock) {
+void destroy_unlock(struct session_lock_t *session_lock, const bool unlock) {
 	if (server.current_session_lock == NULL)
 		return;
 
@@ -34,7 +34,7 @@ void destroy_unlock(struct bwm_session_lock *session_lock, const bool unlock) {
 
 void destroy_lock_surface(struct wl_listener *listener, void *data) {
 	(void)data;
-	struct bwm_output *output = wl_container_of(listener, output, destroy_lock_surface);
+	output_t *output = wl_container_of(listener, output, destroy_lock_surface);
 	struct wlr_session_lock_surface_v1 *surface = output->lock_surface;
 	bool was_focused = surface->surface == server.seat->keyboard_state.focused_surface;
 
@@ -63,7 +63,7 @@ void destroy_lock_surface(struct wl_listener *listener, void *data) {
 
 void map_lock_surface(struct wl_listener *listener, void *data) {
 	(void)data;
-	struct bwm_output *output = wl_container_of(listener, output, map_lock_surface);
+	output_t *output = wl_container_of(listener, output, map_lock_surface);
 	struct wlr_session_lock_surface_v1 *surface = output->lock_surface;
 
 	if (!surface || !server.current_session_lock || !server.locked)
@@ -79,9 +79,9 @@ void map_lock_surface(struct wl_listener *listener, void *data) {
 }
 
 void lock_new_surface(struct wl_listener *listener, void *data) {
-	struct bwm_session_lock *session_lock = wl_container_of(listener, session_lock, new_surface);
+	session_lock_t *session_lock = wl_container_of(listener, session_lock, new_surface);
 	struct wlr_session_lock_surface_v1 *surface = data;
-	struct bwm_output *output = surface->output->data;
+	output_t *output = surface->output->data;
 
 	struct wlr_scene_tree *scene_tree = wlr_scene_subsurface_tree_create(session_lock->scene_tree, surface->surface);
 	surface->surface->data = scene_tree;
@@ -107,13 +107,13 @@ void lock_new_surface(struct wl_listener *listener, void *data) {
 
 void lock_unlock(struct wl_listener *listener, void *data) {
 	(void)data;
-	struct bwm_session_lock *session_lock = wl_container_of(listener, session_lock, unlock);
+	struct session_lock_t *session_lock = wl_container_of(listener, session_lock, unlock);
 	destroy_unlock(session_lock, true);
 }
 
 void lock_destroy(struct wl_listener *listener, void *data) {
 	(void)data;
-	struct bwm_session_lock *session_lock = wl_container_of(listener, session_lock, destroy);
+	struct session_lock_t *session_lock = wl_container_of(listener, session_lock, destroy);
 	destroy_unlock(session_lock, false);
 }
 
@@ -139,7 +139,7 @@ void handle_new_session_lock(struct wl_listener *listener, void *data) {
 			wlr_seat_keyboard_notify_clear_focus(server.seat);
 	}
 
-	struct bwm_session_lock *session_lock = calloc(1, sizeof(struct bwm_session_lock));
+	session_lock_t *session_lock = calloc(1, sizeof(*session_lock));
 	if (!session_lock) {
 		wlr_session_lock_v1_destroy(lock);
 		return;

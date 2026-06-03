@@ -6,8 +6,8 @@
 #include <unistd.h>
 #include <poll.h>
 
-#define BWM_SOCKET_ENV "BWM_SOCKET"
-#define BWM_BUFSIZ 4096
+#define DOORS_SOCKET_ENV "DOORS_SOCKET"
+#define DOORS_BUFSIZ 4096
 
 static void err(const char *msg) {
   fprintf(stderr, "%s", msg);
@@ -17,18 +17,18 @@ static void err(const char *msg) {
 int main(int argc, char *argv[]) {
   int sock_fd;
   struct sockaddr_un sock_address;
-  char msg[BWM_BUFSIZ], rsp[BWM_BUFSIZ];
+  char msg[DOORS_BUFSIZ], rsp[DOORS_BUFSIZ];
 
   if (argc < 2)
     err("No arguments given.\n");
 
   sock_address.sun_family = AF_UNIX;
 
-  char *sp = getenv(BWM_SOCKET_ENV);
+  char *sp = getenv(DOORS_SOCKET_ENV);
   if (sp == NULL) {
-    fprintf(stderr, "Error: BWM_SOCKET environment variable not set.\n");
-    fprintf(stderr, "This variable should be set by bwm when it starts.\n");
-    err("Make sure you are running bwm and executing bmsg from the same session.\n");
+    fprintf(stderr, "Error: DOORS_SOCKET_ENV environment variable not set.\n");
+    fprintf(stderr, "This variable should be set by doors when it starts.\n");
+    err("Make sure you are running doors and executing doorsctl from the same session.\n");
   }
 
   snprintf(sock_address.sun_path, sizeof(sock_address.sun_path), "%s", sp);
@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
   if (connect(sock_fd, (struct sockaddr *)&sock_address, sizeof(sock_address)) == -1) {
     close(sock_fd);
     fprintf(stderr, "Error: Failed to connect to socket at %s\n", sock_address.sun_path);
-    err("Is bwm running?\n");
+    err("Is doors running?\n");
   }
 
   argc--;

@@ -35,32 +35,29 @@ const char *gesture_direction_string(enum gesture_direction direction);
 
 #define GESTURE_FINGERS_ANY 0
 
-struct gesture {
+typedef struct gesture_t {
 	enum gesture_type type;
 	uint8_t fingers;
 	uint32_t directions;
-};
+} gesture_t;
 
-char *gesture_parse(const char *input, struct gesture *output);
-char *gesture_to_string(struct gesture *gesture);
-bool gesture_check(struct gesture *target, enum gesture_type type, uint8_t fingers);
-bool gesture_match(struct gesture *target, struct gesture *to_match, bool exact);
-bool gesture_equal(struct gesture *a, struct gesture *b);
-int8_t gesture_compare(struct gesture *a, struct gesture *b);
+char *gesture_parse(const char *input, gesture_t *output);
+char *gesture_to_string(gesture_t *gesture);
+bool gesture_check(gesture_t *target, enum gesture_type type, uint8_t fingers);
+bool gesture_match(gesture_t *target, gesture_t *to_match, bool exact);
+bool gesture_equal(gesture_t *a, gesture_t *b);
+int8_t gesture_compare(gesture_t *a, gesture_t *b);
 
-struct gesture_tracker {
+typedef struct gesture_tracker_t {
 	enum gesture_type type;
 	uint8_t fingers;
 	double dx, dy;
 	double scale;
 	double rotation;
-};
+} gesture_tracker_t;
 
-void gesture_tracker_begin(struct gesture_tracker *tracker,
-		enum gesture_type type, uint8_t fingers);
-bool gesture_tracker_check(struct gesture_tracker *tracker,
-		enum gesture_type type);
-void gesture_tracker_update(struct gesture_tracker *tracker, double dx,
-		double dy, double scale, double rotation);
-void gesture_tracker_cancel(struct gesture_tracker *tracker);
-void gesture_tracker_end(struct gesture_tracker *tracker);
+void gesture_tracker_begin(gesture_tracker_t *tracker, enum gesture_type type, uint8_t fingers);
+bool gesture_tracker_check(gesture_tracker_t *tracker, enum gesture_type type);
+void gesture_tracker_update(gesture_tracker_t *tracker, double dx, double dy, double scale, double rotation);
+void gesture_tracker_cancel(gesture_tracker_t *tracker);
+void gesture_tracker_end(gesture_tracker_t *tracker);

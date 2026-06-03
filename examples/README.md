@@ -1,13 +1,13 @@
-# BWM Configuration Documentation
+# DOORS Configuration Documentation
 
-BWM uses two configuration files located in `~/.config/bwm/`:
+DOORS uses two configuration files located in `~/.config/doors/`:
 
-- `bwmrc` - Startup script executed when the compositor starts
-- `bwmhkrc` - Hotkey bindings configuration
+- `doorsrc` - Startup script executed when the compositor starts
+- `doorshkrc` - Hotkey bindings configuration
 
-Both files use `bmsg` to communicate with the running compositor via IPC.
+Both files use `doorsctl` to communicate with the running compositor via IPC.
 
-## bwmrc (Startup Config)
+## doorsrc (Startup Config)
 
 This file is executed as a shell script at server startup. Use it to configure
 initial settings and set up desktops.
@@ -15,44 +15,44 @@ initial settings and set up desktops.
 ### Config Settings
 
 ```
-bmsg config border_width <pixels>
+doorsctl config border_width <pixels>
 ```
 
 Sets the border width around windows.
 
 ```
-bmsg config window_gap <pixels>
+doorsctl config window_gap <pixels>
 ```
 
 Sets the gap between windows.
 
 ```
-bmsg config single_monocle true|false
+doorsctl config single_monocle true|false
 ```
 
 When true, monocle layout shows only the focused window regardless of how many
 windows are on the desktop.
 
 ```
-bmsg config borderless_monocle true|false
+doorsctl config borderless_monocle true|false
 ```
 
 When true, removes borders in monocle layout.
 
 ```
-bmsg config borderless_singleton true|false
+doorsctl config borderless_singleton true|false
 ```
 
 When true, removes borders for singleton windows.
 
 ```
-bmsg config gapless_monocle true|false
+doorsctl config gapless_monocle true|false
 ```
 
 When true, windows are rearranged to fill gaps when windows are closed.
 
 ```
-bmsg config decoration_mode none|tabs|always|csd
+doorsctl config decoration_mode none|tabs|always|csd
 ```
 
 Controls how window decorations (titlebars, borders) are displayed:
@@ -66,91 +66,91 @@ Controls how window decorations (titlebars, borders) are displayed:
 - **csd**: Client-side decorations are always shown, even in tabbed layouts. Tab bars are hidden and every window draws its own decorations.
 
 ```
-bmsg config edge_scroller_pointer_focus true|false
+doorsctl config edge_scroller_pointer_focus true|false
 ```
 
 When true, pointer focus affects scroller behavior at edges.
 
 ```
-bmsg config scroller_default_proportion <value>
+doorsctl config scroller_default_proportion <value>
 ```
 
 Sets the default proportion for scroller layout (0.1-1.0).
 
 ```
-bmsg config scroller_default_proportion_single <value>
+doorsctl config scroller_default_proportion_single <value>
 ```
 
 Sets the default proportion for a single window in scroller layout (0.1-1.0).
 
 ```
-bmsg config scroller_proportion_preset [<values>]
+doorsctl config scroller_proportion_preset [<values>]
 ```
 
 Sets preset proportions for scroller layout (comma-separated).
 
 ```
-bmsg config scroller_focus_center true|false
+doorsctl config scroller_focus_center true|false
 ```
 
 When true, the focused window is centered in the scroller viewport.
 
 ```
-bmsg config scroller_prefer_center true|false
+doorsctl config scroller_prefer_center true|false
 ```
 
 When true, scroller layout prefers centering the focused window.
 
 ```
-bmsg config scroller_prefer_overspread true|false
+doorsctl config scroller_prefer_overspread true|false
 ```
 
 When true, scroller layout prefers spreading windows to fill available space.
 
 ```
-bmsg config scroller_ignore_proportion_single true|false
+doorsctl config scroller_ignore_proportion_single true|false
 ```
 
 When true, proportion settings are ignored for single-window scroller desktops.
 
 ```
-bmsg config scroller_structs <n>
+doorsctl config scroller_structs <n>
 ```
 
 Sets the number of visible scroller structs (non-negative integer).
 
 ```
-bmsg config tab_color_bar_bg "R G B A"
+doorsctl config tab_color_bar_bg "R G B A"
 ```
 
 Sets tab bar background color for tabbed layout.
 
 ```
-bmsg config tab_color_bg "R G B A"
+doorsctl config tab_color_bg "R G B A"
 ```
 
 Sets inactive tab background color.
 
 ```
-bmsg config tab_color_bg_active "R G B A"
+doorsctl config tab_color_bg_active "R G B A"
 ```
 
 Sets active tab background color.
 
 ```
-bmsg config tab_color_text "R G B A"
+doorsctl config tab_color_text "R G B A"
 ```
 
 Sets inactive tab text color.
 
 ```
-bmsg config tab_color_text_active "R G B A"
+doorsctl config tab_color_text_active "R G B A"
 ```
 
 Sets active tab text color.
 
 ```
-bmsg config tab_color_sep "R G B A"
+doorsctl config tab_color_sep "R G B A"
 ```
 
 Sets tab separator color.
@@ -158,121 +158,121 @@ Sets tab separator color.
 Each tab color value is four space-separated floats in the range `0.0-1.0` (`R G B A`).
 
 ```
-bmsg config text_font "<font description>"
+doorsctl config text_font "<font description>"
 ```
 
 Sets the default Pango font description used for compositor-rendered text (for example: `"Sans 10"` or `"JetBrains Mono 11"`).
 
 ```
-bmsg config text_height <pixels>
+doorsctl config text_height <pixels>
 ```
 
 Sets the default text height in pixels used for compositor-rendered text.
 
 ```
-bmsg config focus_follows_pointer true|false
+doorsctl config focus_follows_pointer true|false
 ```
 
 When true, focus follows the pointer cursor as it moves between windows.
 
 ```
-bmsg config pointer_follows_focus true|false
+doorsctl config pointer_follows_focus true|false
 ```
 
 When true, the pointer is warped to follow window focus changes.
 
 ```
-bmsg config click_to_focus true|false
+doorsctl config click_to_focus true|false
 ```
 
 When true, clicking a window focuses it.
 
 ```
-bmsg config directional_focus_tightness <0-100>
+doorsctl config directional_focus_tightness <0-100>
 ```
 
 Sets how tightly directional focus navigation favors close windows. 0=least strict, 100=most strict.
 
 ```
-bmsg config record_history true|false
+doorsctl config record_history true|false
 ```
 
 When true, focus history is recorded for cycling through previous windows.
 
 ```
-bmsg config mapping_events_count <n>
+doorsctl config mapping_events_count <n>
 ```
 
 Sets the number of recent mapping events to track (non-negative integer).
 
 ```
-bmsg config ignore_ewmh_fullscreen <0-2>
+doorsctl config ignore_ewmh_fullscreen <0-2>
 ```
 
 Controls how EWMH fullscreen requests are handled: 0=honor, 1=ignore, 2=auto.
 
 ```
-bmsg config split_ratio <value>
+doorsctl config split_ratio <value>
 ```
 
 Sets the default split ratio for new containers (0.0-1.0).
 
 ```
-bmsg config automatic_scheme longest_side|alternate|spiral
+doorsctl config automatic_scheme longest_side|alternate|spiral
 ```
 
 Sets the automatic tiling scheme: `longest_side` splits the largest container, `alternate` alternates direction, `spiral` spirals.
 
 ```
-bmsg config initial_polarity first_child|second_child
+doorsctl config initial_polarity first_child|second_child
 ```
 
 Sets the initial insertion side for new windows (first_child=left/top, second_child=right/bottom).
 
 ```
-bmsg config top_padding <pixels>
+doorsctl config top_padding <pixels>
 ```
 
 Sets the top padding (margin) for all desktops.
 
 ```
-bmsg config right_padding <pixels>
+doorsctl config right_padding <pixels>
 ```
 
 Sets the right padding for all desktops.
 
 ```
-bmsg config bottom_padding <pixels>
+doorsctl config bottom_padding <pixels>
 ```
 
 Sets the bottom padding for all desktops.
 
 ```
-bmsg config left_padding <pixels>
+doorsctl config left_padding <pixels>
 ```
 
 Sets the left padding for all desktops.
 
 ```
-bmsg config normal_border_color <color>
+doorsctl config normal_border_color <color>
 ```
 
 Sets the border color for unfocused/inactive windows.
 
 ```
-bmsg config active_border_color <color>
+doorsctl config active_border_color <color>
 ```
 
 Sets the border color for the active window within a container.
 
 ```
-bmsg config focused_border_color <color>
+doorsctl config focused_border_color <color>
 ```
 
 Sets the border color for the focused window.
 
 ```
-bmsg config presel_feedback_color <color>
+doorsctl config presel_feedback_color <color>
 ```
 
 Sets the color of the preselection feedback indicator.
@@ -280,14 +280,14 @@ Sets the color of the preselection feedback indicator.
 ### Output/Desktop Setup
 
 ```
-bmsg output <name> desktops <name1> <name2> ...
-bmsg output <name> -d <name1> <name2> ...
+doorsctl output <name> desktops <name1> <name2> ...
+doorsctl output <name> -d <name1> <name2> ...
 ```
 
 Configures desktops on the focused output. Desktop names are space-separated.
 The number of desktops is determined by the number of names provided.
 
-## bwmhkrc (Hotkey Config)
+## doorshkrc (Hotkey Config)
 
 Hotkeys are defined with one key binding per line, followed by indented command(s).
 
@@ -321,7 +321,7 @@ Mouse buttons can be used in hotkey bindings for both custom commands and built-
 
 #### Floating Window Interactions
 
-When holding Alt with a mouse button on a floating window, bwm provides built-in interactive operations:
+When holding Alt with a mouse button on a floating window, doors provides built-in interactive operations:
 
 ```
 alt + mouse_left   # Interactive move (drag to reposition)
@@ -341,124 +341,124 @@ alt + ctrl + mouse_right
 
 ### Commands
 
-All commands use the `bmsg` prefix. Commands not starting with `bmsg` are executed as shell commands.
+All commands use the `doorsctl` prefix. Commands not starting with `doorsctl` are executed as shell commands.
 
 #### Node/Window Commands
 
 ```
-bmsg node --close                  						# Close focused window
-bmsg node --focus                  						# Focus most recently focused window
-bmsg node --state tiled            						# Set focused window to tiled
-bmsg node --state floating         						# Set focused window to floating
-bmsg node --state fullscreen       						# Set focused window to fullscreen
-bmsg node --to-desktop <n>         						# Send window to desktop n (1-10)
-bmsg node --to-desktop <name>      						# Send window to named desktop
-bmsg node --flag hidden=true       						# Toggle hidden flag on window
-bmsg node --flag sticky=on         						# Toggle sticky flag on window
-bmsg node --flag private=off       						# Toggle private flag on window
-bmsg node --flag locked=true       						# Toggle locked flag on window
-bmsg node --flag marked=off        						# Toggle marked flag on window
-bmsg node --flag blur=on|off       						# Toggle blur effect on window
-bmsg node --flag mica=on|off       						# Toggle mica effect on window
-bmsg node --flag acrylic=on|off    						# Toggle acrylic effect on window
-bmsg node --flag border_radius=<float>  				# Set border radius on window
-bmsg node --move <dx> <dy>         						# Move floating window by delta x,y
-bmsg node --resize <handle> <dx> <dy>  				# Resize floating window (handle: northwest/nw/north/n/ne/east/e/southeast/se/south/s/southwest/sw/west/w/center/c)
-bmsg node --activate               						# Activate focused window
-bmsg node --kill                   						# Kill focused window
-bmsg node --to-monitor <name>      						# Send window to monitor
-bmsg node --to-node <id>           						# Send window to node with id
-bmsg node --layer below|normal|above  				# Set window layer
-bmsg node --type horizontal|vertical|tabbed  	# Set split type for container
-bmsg node --type next_tab|prev_tab            # Navigate tabs in current tabbed container
-bmsg node --ratio <value>          						# Set split ratio for container
-bmsg node --circulate forward|backward  			# Circulate focus in tree
-bmsg node --insert-receptacle      						# Insert receptacle at focused node
-bmsg node --presel-dir west|east|north|south  # Preselect direction for next window
-bmsg node --presel-ratio <value>   						# Set preselection ratio
-bmsg node --swap <id>              						# Swap with node by id
-bmsg node interactive_move         						# Interactive move (for mouse button binds on floating windows)
-bmsg node interactive_resize       						# Interactive resize (for mouse button binds on floating windows)
+doorsctl node --close                  						# Close focused window
+doorsctl node --focus                  						# Focus most recently focused window
+doorsctl node --state tiled            						# Set focused window to tiled
+doorsctl node --state floating         						# Set focused window to floating
+doorsctl node --state fullscreen       						# Set focused window to fullscreen
+doorsctl node --to-desktop <n>         						# Send window to desktop n (1-10)
+doorsctl node --to-desktop <name>      						# Send window to named desktop
+doorsctl node --flag hidden=true       						# Toggle hidden flag on window
+doorsctl node --flag sticky=on         						# Toggle sticky flag on window
+doorsctl node --flag private=off       						# Toggle private flag on window
+doorsctl node --flag locked=true       						# Toggle locked flag on window
+doorsctl node --flag marked=off        						# Toggle marked flag on window
+doorsctl node --flag blur=on|off       						# Toggle blur effect on window
+doorsctl node --flag mica=on|off       						# Toggle mica effect on window
+doorsctl node --flag acrylic=on|off    						# Toggle acrylic effect on window
+doorsctl node --flag border_radius=<float>  				# Set border radius on window
+doorsctl node --move <dx> <dy>         						# Move floating window by delta x,y
+doorsctl node --resize <handle> <dx> <dy>  				# Resize floating window (handle: northwest/nw/north/n/ne/east/e/southeast/se/south/s/southwest/sw/west/w/center/c)
+doorsctl node --activate               						# Activate focused window
+doorsctl node --kill                   						# Kill focused window
+doorsctl node --to-monitor <name>      						# Send window to monitor
+doorsctl node --to-node <id>           						# Send window to node with id
+doorsctl node --layer below|normal|above  				# Set window layer
+doorsctl node --type horizontal|vertical|tabbed  	# Set split type for container
+doorsctl node --type next_tab|prev_tab            # Navigate tabs in current tabbed container
+doorsctl node --ratio <value>          						# Set split ratio for container
+doorsctl node --circulate forward|backward  			# Circulate focus in tree
+doorsctl node --insert-receptacle      						# Insert receptacle at focused node
+doorsctl node --presel-dir west|east|north|south  # Preselect direction for next window
+doorsctl node --presel-ratio <value>   						# Set preselection ratio
+doorsctl node --swap <id>              						# Swap with node by id
+doorsctl node interactive_move         						# Interactive move (for mouse button binds on floating windows)
+doorsctl node interactive_resize       						# Interactive resize (for mouse button binds on floating windows)
 ```
 
 #### Desktop Commands
 
 ```
-bmsg desktop <n>                   # Switch to desktop n (1-10)
-bmsg desktop <name>                # Switch to named desktop
-bmsg desktop next                  # Switch to next desktop
-bmsg desktop prev                  # Switch to previous desktop
-bmsg desktop --focus <name>        # Focus named desktop
-bmsg desktop --focus next          # Focus next desktop
-bmsg desktop --focus prev          # Focus previous desktop
-bmsg desktop --layout tiled        # Set desktop to tiled layout
-bmsg desktop --layout monocle      # Set desktop to monocle layout
-bmsg desktop --layout scroller     # Set desktop to scroller layout
-bmsg desktop --rename <newname>    # Rename desktop
-bmsg desktop --swap <name>         # Swap contents with another desktop on same monitor
-bmsg desktop --remove              # Remove current desktop (fails if only desktop)
-bmsg desktop --bubble up|prev|down|next  # Reorder desktop in list
-bmsg desktop --to-monitor <name>   # Move desktop to another monitor
+doorsctl desktop <n>                   # Switch to desktop n (1-10)
+doorsctl desktop <name>                # Switch to named desktop
+doorsctl desktop next                  # Switch to next desktop
+doorsctl desktop prev                  # Switch to previous desktop
+doorsctl desktop --focus <name>        # Focus named desktop
+doorsctl desktop --focus next          # Focus next desktop
+doorsctl desktop --focus prev          # Focus previous desktop
+doorsctl desktop --layout tiled        # Set desktop to tiled layout
+doorsctl desktop --layout monocle      # Set desktop to monocle layout
+doorsctl desktop --layout scroller     # Set desktop to scroller layout
+doorsctl desktop --rename <newname>    # Rename desktop
+doorsctl desktop --swap <name>         # Swap contents with another desktop on same monitor
+doorsctl desktop --remove              # Remove current desktop (fails if only desktop)
+doorsctl desktop --bubble up|prev|down|next  # Reorder desktop in list
+doorsctl desktop --to-monitor <name>   # Move desktop to another monitor
 ```
 
 #### Focus Commands
 
 ```
-bmsg focus west|w                  # Focus window to the left
-bmsg focus east|e                  # Focus window to the right
-bmsg focus north|n                 # Focus window above
-bmsg focus south|s                  # Focus window below
+doorsctl focus west|w                  # Focus window to the left
+doorsctl focus east|e                  # Focus window to the right
+doorsctl focus north|n                 # Focus window above
+doorsctl focus south|s                  # Focus window below
 ```
 
 #### Swap Commands
 
 ```
-bmsg swap west|w                    # Swap with window to the left
-bmsg swap east|e                    # Swap with window to the right
-bmsg swap north|n                   # Swap with window above
-bmsg swap south|s                   # Swap with window below
+doorsctl swap west|w                    # Swap with window to the left
+doorsctl swap east|e                    # Swap with window to the right
+doorsctl swap north|n                   # Swap with window above
+doorsctl swap south|s                   # Swap with window below
 ```
 
 #### Preselection Commands
 
 ```
-bmsg presel west|w                  # Preselect left direction for next window
-bmsg presel east|e                   # Preselect right direction for next window
-bmsg presel north|n                  # Preselect above direction for next window
-bmsg presel south|s                  # Preselect below direction for next window
-bmsg presel cancel                   # Cancel current preselection
+doorsctl presel west|w                  # Preselect left direction for next window
+doorsctl presel east|e                   # Preselect right direction for next window
+doorsctl presel north|n                  # Preselect above direction for next window
+doorsctl presel south|s                  # Preselect below direction for next window
+doorsctl presel cancel                   # Cancel current preselection
 ```
 
 #### Toggle Commands
 
 ```
-bmsg toggle floating                # Toggle focused window floating/tiled
-bmsg toggle fullscreen              # Toggle focused window fullscreen
-bmsg toggle pseudo_tiled            # Toggle focused window pseudo-tiled
-bmsg toggle monocle                 # Toggle monocle layout on desktop
+doorsctl toggle floating                # Toggle focused window floating/tiled
+doorsctl toggle fullscreen              # Toggle focused window fullscreen
+doorsctl toggle pseudo_tiled            # Toggle focused window pseudo-tiled
+doorsctl toggle monocle                 # Toggle monocle layout on desktop
 ```
 
 #### Rotate/Flip Commands
 
 ```
-bmsg rotate clockwise|cw           # Rotate window layout clockwise
-bmsg rotate counterclockwise|ccw   # Rotate window layout counter-clockwise
-bmsg flip horizontal|h             # Flip window layout horizontally
-bmsg flip vertical|v               # Flip window layout vertically
+doorsctl rotate clockwise|cw           # Rotate window layout clockwise
+doorsctl rotate counterclockwise|ccw   # Rotate window layout counter-clockwise
+doorsctl flip horizontal|h             # Flip window layout horizontally
+doorsctl flip vertical|v               # Flip window layout vertically
 ```
 
 #### Send Commands
 
 ```
-bmsg send next                      # Send focused window to next desktop
-bmsg send prev|previous             # Send focused window to previous desktop
+doorsctl send next                      # Send focused window to next desktop
+doorsctl send prev|previous             # Send focused window to previous desktop
 ```
 
 #### Other Commands
 
 ```
-bmsg quit                           # Quit the compositor
-<shell command>                     # Execute any shell command (no bmsg prefix)
+doorsctl quit                           # Quit the compositor
+<shell command>                         # Execute any shell command (no doorsctl prefix)
 ```
 
 #### Window Rules
@@ -466,18 +466,18 @@ bmsg quit                           # Quit the compositor
 Window rules allow you to control how specific applications are managed when they open.
 
 ```
-bmsg rule -a <app_id> [options...]  # Add a new rule
-bmsg rule -r <index>                # Remove rule by index
-bmsg rule -l                        # List all rules
+doorsctl rule -a <app_id> [options...]  # Add a new rule
+doorsctl rule -r <index>                # Remove rule by index
+doorsctl rule -l                        # List all rules
 ```
 
 **Adding Rules (`-a` / `--add`):**
 Specify an app_id (or title) followed by consequence options:
 
 ```
-bmsg rule -a dev.zed.Zed desktop=I
-bmsg rule -a zen desktop=II
-bmsg rule -a vesktop desktop=III
+doorsctl rule -a dev.zed.Zed desktop=I
+doorsctl rule -a zen desktop=II
+doorsctl rule -a vesktop desktop=III
 ```
 
 **Consequence Options:**
@@ -503,29 +503,29 @@ bmsg rule -a vesktop desktop=III
 **Matching by Title:**
 
 ```
-bmsg rule -a title="Exact Window Title" desktop=I
+doorsctl rule -a title="Exact Window Title" desktop=I
 ```
 
 **Examples:**
 
 ```
 # Send Zed to desktop I, don't switch focus away from current desktop
-bmsg rule -a dev.zed.Zed desktop=I follow=off
+doorsctl rule -a dev.zed.Zed desktop=I follow=off
 
 # Send Firefox to desktop II as floating window
-bmsg rule -a firefox desktop=II state=floating
+doorsctl rule -a firefox desktop=II state=floating
 
 # Ignore a window (don't manage it)
-bmsg rule -a some-app manage=off
+doorsctl rule -a some-app manage=off
 
 # Start a window in fullscreen
-bmsg rule -a mpv state=fullscreen
+doorsctl rule -a mpv state=fullscreen
 
 # List all configured rules
-bmsg rule -l
+doorsctl rule -l
 
 # Remove rule at index 0
-bmsg rule -r 0
+doorsctl rule -r 0
 ```
 
 ### Gesture Bindings
@@ -567,25 +567,25 @@ Combine multiple directions with `+`, e.g., `left+up`
 ```
 # 3-finger swipe for desktop switching
 gesture swipe:3:left
-	bmsg desktop -f -l prev
+	doorsctl desktop -f -l prev
 gesture swipe:3:right
-	bmsg desktop -f -l next
+	doorsctl desktop -f -l next
 
 # 4-finger swipe
 gesture swipe:4:up
-	bmsg desktop -f -l next
+	doorsctl desktop -f -l next
 gesture swipe:4:down
-	bmsg desktop -f -l prev
+	doorsctl desktop -f -l prev
 
 # Pinch to toggle fullscreen
 gesture pinch:in
-	bmsg node --state fullscreen
+	doorsctl node --state fullscreen
 gesture pinch:out
-	bmsg node --state fullscreen
+	doorsctl node --state fullscreen
 
 # Hold to show desktop (any fingers)
 gesture hold:*
-	bmsg desktop -f -l prev
+	doorsctl desktop -f -l prev
 ```
 
 ### Hot Corner Bindings
@@ -601,30 +601,30 @@ hotcorner topleft|topright|bottomleft|bottomright
 ### Output Commands
 
 ```
-bmsg output list
-bmsg output <name> enable
-bmsg output <name> disable
-bmsg output <name> mode <width>x<height>[@<refresh>]
-bmsg output <name> position <x> <y>
-bmsg output <name> scale <factor>
-bmsg output <name> transform <normal|90|180|270|flipped|flipped-90|flipped-270>
-bmsg output <name> dpms on|off
-bmsg output <name> adaptive_sync on|off
-bmsg output <name> render_bit_depth 8|10
-bmsg output <name> color_profile gamma22
-bmsg output <name> color_profile srgb
-bmsg output <name> color_profile icc /path/to/profile.icc
-bmsg output <name> tearing on|off
-bmsg output <name> focus                       # Focus output
-bmsg output <name> rename <newname>            # Rename output
-bmsg output <name> desktops                    # List desktop names on output
-bmsg output <name> desktops <names...>         # Reset/replace desktops on output
-bmsg output desktops <names...>                # Reset desktops on focused output
-bmsg output <name> add-desktops <names...>     # Add desktops to output
-bmsg output <name> swap-desktops <target>      # Swap desktops with another output
-bmsg output <name> remove                      # Remove output (must have no desktops)
-bmsg output <name> rectangle <WxH:X,Y>         # Set output rectangle geometry
-bmsg output <name> reorder-desktops <names...> # Reorder desktops on output
+doorsctl output list
+doorsctl output <name> enable
+doorsctl output <name> disable
+doorsctl output <name> mode <width>x<height>[@<refresh>]
+doorsctl output <name> position <x> <y>
+doorsctl output <name> scale <factor>
+doorsctl output <name> transform <normal|90|180|270|flipped|flipped-90|flipped-270>
+doorsctl output <name> dpms on|off
+doorsctl output <name> adaptive_sync on|off
+doorsctl output <name> render_bit_depth 8|10
+doorsctl output <name> color_profile gamma22
+doorsctl output <name> color_profile srgb
+doorsctl output <name> color_profile icc /path/to/profile.icc
+doorsctl output <name> tearing on|off
+doorsctl output <name> focus                       # Focus output
+doorsctl output <name> rename <newname>            # Rename output
+doorsctl output <name> desktops                    # List desktop names on output
+doorsctl output <name> desktops <names...>         # Reset/replace desktops on output
+doorsctl output desktops <names...>                # Reset desktops on focused output
+doorsctl output <name> add-desktops <names...>     # Add desktops to output
+doorsctl output <name> swap-desktops <target>      # Swap desktops with another output
+doorsctl output <name> remove                      # Remove output (must have no desktops)
+doorsctl output <name> rectangle <WxH:X,Y>         # Set output rectangle geometry
+doorsctl output <name> reorder-desktops <names...> # Reorder desktops on output
 ```
 
 - `name` — connector name (e.g. `DP-1`, `HDMI-A-1`)
@@ -646,12 +646,12 @@ bmsg output <name> reorder-desktops <names...> # Reorder desktops on output
 
 Target specific devices:
 ```
-bmsg input <device-name> <property> <value>
-bmsg input type:keyboard <property> <value>
-bmsg input type:pointer <property> <value>
-bmsg input type:touchpad <property> <value>
-bmsg input type:touchscreen <property> <value>
-bmsg input * <property> <value>
+doorsctl input <device-name> <property> <value>
+doorsctl input type:keyboard <property> <value>
+doorsctl input type:pointer <property> <value>
+doorsctl input type:touchpad <property> <value>
+doorsctl input type:touchscreen <property> <value>
+doorsctl input * <property> <value>
 ```
 
 Keyboard properties:
@@ -688,94 +688,94 @@ Pointer/Touchpad properties:
 ### Query Commands
 
 ```
-bmsg query -T --tree               # Get window tree
-bmsg query -M --monitors           # List monitors
-bmsg query -D --desktops           # List desktops
-bmsg query -N --nodes              # List node IDs
-bmsg query -f --focused            # Get JSON info about focused node
-bmsg query ... -m <name>           # Filter results by monitor
-bmsg query ... -d <name>           # Filter results by desktop
-bmsg query ... -n <id>             # Filter results by node id
-bmsg query ... --names             # Output names instead of IDs
+doorsctl query -T --tree               # Get window tree
+doorsctl query -M --monitors           # List monitors
+doorsctl query -D --desktops           # List desktops
+doorsctl query -N --nodes              # List node IDs
+doorsctl query -f --focused            # Get JSON info about focused node
+doorsctl query ... -m <name>           # Filter results by monitor
+doorsctl query ... -d <name>           # Filter results by desktop
+doorsctl query ... -n <id>             # Filter results by node id
+doorsctl query ... --names             # Output names instead of IDs
 ```
 
 ### Config Commands
 
 ```
-bmsg config border_width [<n>]    # Get or set border width
-bmsg config window_gap [<n>]     	# Get or set window gap
-bmsg config single_monocle [true|false]
-bmsg config borderless_monocle [true|false]
-bmsg config borderless_singleton [true|false]
-bmsg config gapless_monocle [true|false]
-bmsg config enable_animations [true|false]
-bmsg config edge_scroller_pointer_focus [true|false]
-bmsg config scroller_default_proportion [<value>]
-bmsg config scroller_proportion_preset [<values>]
+doorsctl config border_width [<n>]    # Get or set border width
+doorsctl config window_gap [<n>]     	# Get or set window gap
+doorsctl config single_monocle [true|false]
+doorsctl config borderless_monocle [true|false]
+doorsctl config borderless_singleton [true|false]
+doorsctl config gapless_monocle [true|false]
+doorsctl config enable_animations [true|false]
+doorsctl config edge_scroller_pointer_focus [true|false]
+doorsctl config scroller_default_proportion [<value>]
+doorsctl config scroller_proportion_preset [<values>]
 ```
 
 ### Blur Settings
 
-BWM supports window background blur effects using OpenGL shaders. Three blur algorithms are available: `kawase` (default), `gaussian`, and `box`.
+Doors supports window background blur effects using OpenGL shaders. Three blur algorithms are available: `kawase` (default), `gaussian`, and `box`.
 
 ```
-bmsg config blur_enabled true|false
+doorsctl config blur_enabled true|false
 ```
 
 Enables or disables the blur effect (default: true).
 
 ```
-bmsg config blur_algorithm none|kawase|gaussian|box|refraction|lens_refraction
+doorsctl config blur_algorithm none|kawase|gaussian|box|refraction|lens_refraction
 ```
 
 Sets the blur algorithm (default: kawase). `refraction` and `lens_refraction` apply a glass-like distortion effect (see Refraction Settings).
 
 ```
-bmsg config blur_passes <n>
+doorsctl config blur_passes <n>
 ```
 
 Sets the number of blur passes (1-10, default: 1). Higher values create stronger blur but require more GPU processing.
 
 ```
-bmsg config blur_radius <value>
+doorsctl config blur_radius <value>
 ```
 
 Sets the blur radius (default: 5.0). Higher values create stronger blur but may cause artifacts.
 
 ```
-bmsg config blur_downsample 4
+doorsctl config blur_downsample 4
 ```
 
 Sets the blur downsample, can be between 1-8 (default: 4).
 
 ```
-bmsg config blur_vibrancy <value>
+doorsctl config blur_vibrancy <value>
 ```
 
 Enhances color saturation in blurred areas (0.0-1.0, default: 0.0). Supported for gaussian and box blur algorithms.
 Higher values create more vivid, saturated colors in the blur effect.
 
 ```
-bmsg config blur_vibrancy_darkness <value>
+doorsctl config blur_vibrancy_darkness <value>
 ```
 
 Controls how much dark/dim colors are boosted by vibrancy (0.0-1.0, default: 0.5). Only applies when vibrancy is enabled.
 
 ```
-bmsg config blur_noise_strength <value>
+doorsctl config blur_noise_strength <value>
 ```
 
 Adds noise dithering to reduce banding artifacts in smooth gradients (0.0-1.0, default: 0.0). Supported for kawase blur.
 Higher values add more visible noise/grain to reduce banding.
 
 ```
-bmsg config blur_brightness <value>
+doorsctl config blur_brightness <value>
 ```
 
 Adjusts the brightness of blurred areas (0.5-2.0, default: 1.0).
 
 ```
-bmsg config blur_contrast <value>
+doorsctl config blur_contrast <value>
 ```
 
 Adjusts the contrast of blurred areas (0.5-2.0, default: 1.0).
@@ -785,19 +785,19 @@ Adjusts the contrast of blurred areas (0.5-2.0, default: 1.0).
 Mica is a background effect that captures and tints the content behind windows.
 
 ```
-bmsg config mica_enabled true|false
+doorsctl config mica_enabled true|false
 ```
 
 Enables or disables mica effect (default: false).
 
 ```
-bmsg config mica_tint_strength <value>
+doorsctl config mica_tint_strength <value>
 ```
 
 Sets the tint strength for mica effect (0.0-1.0, default: 0.35).
 
 ```
-bmsg config mica_tint <R> <G> <B> [A]
+doorsctl config mica_tint <R> <G> <B> [A]
 ```
 
 Sets the tint color for mica effect (default: 0.12 0.12 0.14 1.0). RGBA values should be in the range 0.0-1.0.
@@ -807,31 +807,31 @@ Sets the tint color for mica effect (default: 0.12 0.12 0.14 1.0). RGBA values s
 Acrylic is a background effect that applies blur with a tinted overlay and subtle noise texture, simulating frosted glass.
 
 ```
-bmsg config acrylic_tint <R> <G> <B> [A]
+doorsctl config acrylic_tint <R> <G> <B> [A]
 ```
 
 Sets the tint color for acrylic effect (default: 1.0 1.0 1.0 1.0). RGBA values should be in the range 0.0-1.0.
 
 ```
-bmsg config acrylic_tint_strength <value>
+doorsctl config acrylic_tint_strength <value>
 ```
 
 Sets the tint strength for acrylic effect (0.0-1.0, default: 0.3).
 
 ```
-bmsg config acrylic_noise_strength <value>
+doorsctl config acrylic_noise_strength <value>
 ```
 
 Sets the noise/grain strength for acrylic effect (0.0-1.0, default: 0.02).
 
 ```
-bmsg config acrylic_light_anchor <A> <B>
+doorsctl config acrylic_light_anchor <A> <B>
 ```
 
 Sets the light anchor pos, (default: 0.5 0.5). Values should be in range -1.0 to 1.0.
 
 ```
-bmsg config acrylic_blur_passes <n>
+doorsctl config acrylic_blur_passes <n>
 ```
 
 Sets the number of blur passes for acrylic effect (0-10, default: 4). Higher values create stronger blur.
@@ -841,43 +841,43 @@ Sets the number of blur passes for acrylic effect (0-10, default: 4). Higher val
 Refraction creates a glass-like distortion effect on blurred backgrounds, similar to the "Better Blur DX" KWin effect.
 
 ```
-bmsg config refraction_strength <0.0-30.0>
+doorsctl config refraction_strength <0.0-30.0>
 ```
 
 Sets the refraction distortion strength (default: 8.0).
 
 ```
-bmsg config refraction_edge_size_px <0.0-400.0>
+doorsctl config refraction_edge_size_px <0.0-400.0>
 ```
 
 Sets the edge glow/lighting effect size in pixels (default: 230.0).
 
 ```
-bmsg config refraction_corner_radius_px <0.0-400.0>
+doorsctl config refraction_corner_radius_px <0.0-400.0>
 ```
 
 Sets the corner radius for the refraction effect in pixels (default: 80.0).
 
 ```
-bmsg config refraction_normal_pow <0.0-8.0>
+doorsctl config refraction_normal_pow <0.0-8.0>
 ```
 
 Sets the power/exponent for the refraction normal map (default: 4.0).
 
 ```
-bmsg config refraction_rgb_fringing <0.0-1.0>
+doorsctl config refraction_rgb_fringing <0.0-1.0>
 ```
 
 Sets the chromatic aberration (RGB color fringing) strength (default: 0.15).
 
 ```
-bmsg config refraction_texture_repeat_mode <0|1>
+doorsctl config refraction_texture_repeat_mode <0|1>
 ```
 
 Texture repeat mode: 0=clamp, 1=mirrored repeat (default: 1).
 
 ```
-bmsg config refraction_offset <0.0-8.0>
+doorsctl config refraction_offset <0.0-8.0>
 ```
 
 Sets the refraction offset value (default: 3.0).
@@ -887,19 +887,19 @@ Sets the refraction offset value (default: 3.0).
 Screen shaders display as a filter above content. GLSL fragment shaders are supported.
 
 ```
-bmsg config screen_shader grayscale|invert|sepia|nightlight|none
+doorsctl config screen_shader grayscale|invert|sepia|nightlight|none
 ```
 
 Enable one of the built-in shaders.
 
 ```
-bmsg config screen_shader_file <path>
+doorsctl config screen_shader_file <path>
 ```
 
 Load a screen shader from a file, full path must be specified.
 
 ```
-bmsg config screen_shader_enabled true|false
+doorsctl config screen_shader_enabled true|false
 ```
 
 Globally set if screen shaders should be enabled.
@@ -907,19 +907,19 @@ Globally set if screen shaders should be enabled.
 ### WM Commands
 
 ```
-bmsg wm --dump-state               # Dump current WM state as JSON
-bmsg wm --load-state               # Load WM state (not implemented)
-bmsg wm --add-monitor <name>       # Add a new monitor
-bmsg wm -g --get-status            # Return compositor status (monitor/desktop/node counts)
-bmsg wm -h [true|false]            # Get or set focus record history
-bmsg wm -o --adopt-orphans         # Adopt orphaned toplevels into tree
-bmsg wm -r --restart               # Restart the compositor
+doorsctl wm --dump-state               # Dump current WM state as JSON
+doorsctl wm --load-state               # Load WM state (not implemented)
+doorsctl wm --add-monitor <name>       # Add a new monitor
+doorsctl wm -g --get-status            # Return compositor status (monitor/desktop/node counts)
+doorsctl wm -h [true|false]            # Get or set focus record history
+doorsctl wm -o --adopt-orphans         # Adopt orphaned toplevels into tree
+doorsctl wm -r --restart               # Restart the compositor
 ```
 
 ### Subscribe Commands
 
 ```
-bmsg subscribe [-c <count>] [-f <fifo>] <event>...
+doorsctl subscribe [-c <count>] [-f <fifo>] <event>...
 ```
 
 Subscribe to WM events. Available event types:
@@ -950,7 +950,7 @@ all|A                 # All event types
 ### Keyboard Grouping Commands
 
 ```
-bmsg keyboard_grouping none|smart|default
+doorsctl keyboard_grouping none|smart|default
 ```
 
 Set keyboard grouping mode.
@@ -958,18 +958,18 @@ Set keyboard grouping mode.
 ### Scroller Commands
 
 ```
-bmsg scroller proportion <value>          # Set proportion for focused scroller client
-bmsg scroller stack                       # Stack focused client with previous
-bmsg scroller unstack                     # Unstack focused client from its stack
-bmsg scroller resize <delta>              # Resize focused scroller client width by delta
-bmsg scroller set_proportion <value>      # Set scroller proportion (0.1-1.0)
-bmsg scroller cycle_preset                # Cycle to next proportion preset
-bmsg scroller center                      # Center focused scroller window in viewport
+doorsctl scroller proportion <value>          # Set proportion for focused scroller client
+doorsctl scroller stack                       # Stack focused client with previous
+doorsctl scroller unstack                     # Unstack focused client from its stack
+doorsctl scroller resize <delta>              # Resize focused scroller client width by delta
+doorsctl scroller set_proportion <value>      # Set scroller proportion (0.1-1.0)
+doorsctl scroller cycle_preset                # Cycle to next proportion preset
+doorsctl scroller center                      # Center focused scroller window in viewport
 ```
 
 ### Equalize/Balance Commands
 
 ```
-bmsg equalize # Equalize window sizes in tree
-bmsg balance  # Balance window sizes in tree
+doorsctl equalize # Equalize window sizes in tree
+doorsctl balance  # Balance window sizes in tree
 ```

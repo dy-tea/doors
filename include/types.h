@@ -11,12 +11,12 @@
 struct node_t;
 struct desktop_t;
 struct client_t;
-struct bwm_output;
-struct bwm_toplevel;
-struct bwm_xwayland_view;
-struct bwm_tab_bar;
+struct output_t;
+struct toplevel_t;
+struct xwayland_toplevel_t;
+struct tab_bar_t;
 
-struct bwm_output *output_at(double x, double y);
+struct output_t *output_at(double x, double y);
 
 // enums
 typedef enum { TYPE_HORIZONTAL, TYPE_VERTICAL, TYPE_TABBED } split_type_t;
@@ -79,8 +79,8 @@ typedef struct client_t {
   struct wlr_box floating_rectangle;
   struct wlr_box tiled_rectangle;
   struct wlr_box committed_tiled_rectangle;
-  struct bwm_toplevel *toplevel;
-  struct bwm_xwayland_view *xwayland_view;
+  struct toplevel_t *toplevel;
+  struct xwayland_toplevel_t *xwayland_view;
 
   // Scroller layout properties
   float scroller_proportion;
@@ -123,11 +123,11 @@ typedef struct node_t {
   struct node_t *second_child;
   struct node_t *parent;
   client_t *client;
-  struct bwm_output *output;
+  struct output_t *output;
   struct desktop_t *desktop;
 
   // transaction support
-  struct bwm_transaction_inst *instruction;
+  struct transaction_inst_t *instruction;
   size_t ntxnrefs;
   bool dirty;
   bool destroying;
@@ -148,7 +148,7 @@ typedef struct node_t {
     bool hidden;
   } pending;
 
-  struct bwm_tab_bar *tab_bar;
+  struct tab_bar_t *tab_bar;
 } node_t;
 
 typedef struct desktop_t {
@@ -163,11 +163,11 @@ typedef struct desktop_t {
   padding_t padding;
   int window_gap;
   unsigned int border_width;
-  struct bwm_output *output;
+  struct output_t *output;
 } desktop_t;
 
 typedef struct {
-  struct bwm_output *output;
+  struct output_t *output;
   desktop_t *desktop;
   node_t *node;
 } coordinates_t;
@@ -208,9 +208,9 @@ extern char focused_border_color[16];
 extern char presel_feedback_color[16];
 
 // global state
-extern struct bwm_output *mon;
-extern struct bwm_output *mon_head;
-extern struct bwm_output *mon_tail;
+extern struct output_t *mon;
+extern struct output_t *mon_head;
+extern struct output_t *mon_tail;
 extern uint32_t next_node_id;
 extern uint32_t next_desktop_id;
 extern uint32_t next_monitor_id;

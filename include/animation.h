@@ -5,35 +5,35 @@
 #include <time.h>
 #include <wlr/util/box.h>
 
-struct bwm_output;
-struct node_t;
-struct bwm_toplevel;
-struct bwm_layer_surface;
+typedef struct output_t output_t;
+typedef struct node_t node_t;
+typedef struct toplevel_t toplevel_t;
+typedef struct layer_surface_t layer_surface_t;
 struct wlr_scene_tree;
 
 void animation_init(void);
 void animation_fini(void);
 
-bool animation_apply_geometry(struct node_t *node, struct wlr_scene_tree *scene_tree,
+bool animation_apply_geometry(node_t *node, struct wlr_scene_tree *scene_tree,
   struct wlr_box target, bool animate);
 
-bool animation_apply_geometry_from(struct node_t *node, struct wlr_scene_tree *scene_tree,
+bool animation_apply_geometry_from(node_t *node, struct wlr_scene_tree *scene_tree,
   struct wlr_box from, struct wlr_box target, bool animate);
 
-bool animation_start_workspace_slide(struct bwm_output *output,
-  struct node_t *node, struct wlr_scene_tree *scene_tree,
+bool animation_start_workspace_slide(output_t *output,
+  node_t *node, struct wlr_scene_tree *scene_tree,
   struct wlr_box from, struct wlr_box to, bool slide_out);
 
-bool animation_start_snapshot_resize(struct bwm_toplevel *toplevel, struct wlr_box from,
+bool animation_start_snapshot_resize(toplevel_t *toplevel, struct wlr_box from,
 	struct wlr_box to);
 
-bool animation_fade_in(struct bwm_toplevel *toplevel);
-bool animation_fade_in_layer(struct bwm_layer_surface *layer);
-bool animation_fade_out(struct bwm_toplevel *toplevel);
-bool animation_fade_out_layer(struct bwm_layer_surface *layer);
+bool animation_fade_in(toplevel_t *toplevel);
+bool animation_fade_in_layer(layer_surface_t *layer);
+bool animation_fade_out(toplevel_t *toplevel);
+bool animation_fade_out_layer(layer_surface_t *layer);
 
-void animation_cancel_node(struct node_t *node);
+void animation_cancel_node(node_t *node);
 bool animation_has_fade_out(struct wlr_scene_tree *scene_tree);
 void animation_cancel_scene_tree(struct wlr_scene_tree *scene_tree);
 
-bool animation_update_output(struct bwm_output *output, struct timespec now);
+bool animation_update_output(output_t *output, struct timespec now);

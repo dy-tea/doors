@@ -45,7 +45,7 @@
         ...
       }:
         stdenv.mkDerivation {
-          pname = "bwm";
+          pname = "doors";
           version = "0.0.0";
 
           src = ./.;
@@ -72,7 +72,7 @@
 
           meta = {
             description = "Wayland compositor based on bswpm, with floating, tiling and scrolling layouts.";
-            homepage = "https://github.com/dy-tea/bwm";
+            homepage = "https://github.com/dy-tea/doors";
             license = lib.licenses.gpl3;
             maintainers = ["anispwyn"];
           };

@@ -16,9 +16,9 @@
 #include <sys/inotify.h>
 #include <wayland-server-core.h>
 
-#define BWM_CONFIG_DIR "/.config/bwm"
-#define BWMRC_NAME "bwmrc"
-#define BWMHKRC_NAME "bwmhkrc"
+#define DOORS_CONFIG_DIR "/.config/doors"
+#define DOORSRC_NAME "doorsrc"
+#define DOORSHKRC_NAME "doorshkrc"
 
 static const char *custom_config_dir = NULL;
 
@@ -52,7 +52,7 @@ static const char *get_config_home(void) {
   if (xdg && xdg[0] != '\0')
     return xdg;
   static char buf[PATH_MAX];
-  snprintf(buf, sizeof(buf), "%s%s", getenv("HOME") ? getenv("HOME") : "/root", BWM_CONFIG_DIR);
+  snprintf(buf, sizeof(buf), "%s%s", getenv("HOME") ? getenv("HOME") : "/root", DOORS_CONFIG_DIR);
   return buf;
 }
 
@@ -138,7 +138,7 @@ static bind_action_t parse_action(const char *cmd, int *desktop_index, char *sub
     return BIND_ENTER_SUBMAP;
   }
 
-  if (strncmp(cmd, "bmsg ", 5) == 0) {
+  if (strncmp(cmd, "doorsctl ", 5) == 0) {
     char buf[MAXLEN];
     snprintf(buf, sizeof(buf), "%s", cmd + 5);
 
@@ -458,7 +458,7 @@ static void parse_gesture_hotkey_line(const char *gesture_str, const char *comma
   char expanded_cmd[MAXLEN];
   expand_sequence(command_buf, expanded_cmd, sizeof(expanded_cmd));
 
-  struct gesture gest;
+  gesture_t gest;
   char *err = gesture_parse(gesture_buf, &gest);
   if (err) {
     wlr_log(WLR_ERROR, "Failed to parse gesture '%s': %s", gesture_buf, err);
@@ -868,12 +868,12 @@ void config_init_with_config_dir(const char *config_dir) {
 
   const char *config_home = get_config_home();
 
-  char bwmrc_path[PATH_MAX];
-  snprintf(bwmrc_path, sizeof(bwmrc_path), "%s/%s", config_home, BWMRC_NAME);
-  run_config(bwmrc_path);
+  char doorsrc_path[PATH_MAX];
+  snprintf(doorsrc_path, sizeof(doorsrc_path), "%s/%s", config_home, DOORSRC_NAME);
+  run_config(doorsrc_path);
 
   char hotkey_path[PATH_MAX];
-  snprintf(hotkey_path, sizeof(hotkey_path), "%s/%s", config_home, BWMHKRC_NAME);
+  snprintf(hotkey_path, sizeof(hotkey_path), "%s/%s", config_home, DOORSHKRC_NAME);
   snprintf(hotkey_init_path, sizeof(hotkey_init_path), "%s", hotkey_path);
 }
 

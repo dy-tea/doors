@@ -8,7 +8,7 @@
 #include <wlr/types/wlr_foreign_toplevel_management_v1.h>
 #include <wlr/types/wlr_tearing_control_v1.h>
 
-struct bwm_tl_blur {
+typedef struct toplevel_blur_t {
   struct wlr_scene_buffer *blur_node;
   struct wlr_scene_buffer *mica_node;
   struct wlr_scene_buffer *acrylic_node;
@@ -17,9 +17,9 @@ struct bwm_tl_blur {
   GLuint blur_buf_fbo;
   struct wlr_buffer *acrylic_buf;
   GLuint acrylic_buf_fbo;
-};
+} toplevel_blur_t;
 
-struct bwm_tl_rounded {
+typedef struct toplevel_rounded_t {
   struct wlr_scene_buffer *border_shader_node;
   struct wlr_buffer *border_shader_buf;
   GLuint border_shader_buf_fbo;
@@ -31,17 +31,17 @@ struct bwm_tl_rounded {
   struct wlr_scene_buffer *corner_mask_node;
   struct wlr_buffer *corner_mask_buf;
   GLuint corner_mask_buf_fbo;
-};
+} toplevel_rounded_t;
 
-struct bwm_toplevel {
+typedef struct toplevel_t {
   struct wl_list link;
   struct wlr_xdg_toplevel *xdg_toplevel;
   struct wlr_scene_tree *scene_tree;      // Parent container
   struct wlr_scene_tree *content_tree;    // XDG surface content
   struct wlr_scene_tree *saved_surface_tree;  // Saved buffer snapshot
 
-  struct bwm_tl_blur *blur;
-  struct bwm_tl_rounded *rounded;
+  toplevel_blur_t *blur;
+  toplevel_rounded_t *rounded;
 
   struct wlr_ext_foreign_toplevel_handle_v1 *ext_foreign_toplevel;
   struct wlr_foreign_toplevel_handle_v1 *foreign_toplevel;
@@ -58,8 +58,8 @@ struct bwm_toplevel {
 
   node_t *node;
 
-  struct wlr_box geometry;  // Client-committed surface geometry
-  struct wlr_box last_configured_size;  // Last size sent via configure
+  struct wlr_box geometry;
+  struct wlr_box last_configured_size;
 
   bool mapped;
   bool configured;
@@ -92,31 +92,31 @@ struct bwm_toplevel {
   struct wl_listener foreign_fullscreen_request;
   struct wl_listener foreign_close_request;
   struct wl_listener foreign_destroy;
-};
+} toplevel_t;
 
 void handle_new_xdg_toplevel(struct wl_listener *listener, void *data);
 void handle_new_xdg_decoration(struct wl_listener *listener, void *data);
 
 // helper functions
-void focus_toplevel(struct bwm_toplevel *toplevel);
-void toplevel_apply_geometry(struct bwm_toplevel *toplevel);
-bool toplevel_is_ready(struct bwm_toplevel *toplevel);
-void update_foreign_toplevel_state(struct bwm_toplevel *toplevel);
-void toplevel_center_and_clip_surface(struct bwm_toplevel *toplevel);
+void focus_toplevel(toplevel_t *toplevel);
+void toplevel_apply_geometry(toplevel_t *toplevel);
+bool toplevel_is_ready(toplevel_t *toplevel);
+void update_foreign_toplevel_state(toplevel_t *toplevel);
+void toplevel_center_and_clip_surface(toplevel_t *toplevel);
 
 // buffer saving for transactions
-void toplevel_save_buffer(struct bwm_toplevel *toplevel);
-void toplevel_remove_saved_buffer(struct bwm_toplevel *toplevel);
-void toplevel_send_frame_done(struct bwm_toplevel *toplevel);
+void toplevel_save_buffer(toplevel_t *toplevel);
+void toplevel_remove_saved_buffer(toplevel_t *toplevel);
+void toplevel_send_frame_done(toplevel_t *toplevel);
 
 void toplevel_freeze_sibling_buffers(desktop_t *d, node_t *n);
 
 void handle_new_toplevel_capture_request(struct wl_listener *listener, void *data);
 
-void toplevel_set_blur(struct bwm_toplevel *tl, bool enabled);
-void toplevel_set_mica(struct bwm_toplevel *tl, bool enabled);
-void toplevel_set_acrylic(struct bwm_toplevel *tl, bool enabled);
-void toplevel_set_border_radius(struct bwm_toplevel *tl, float radius);
-void toplevel_apply_decoration_mode(struct bwm_toplevel *tl);
+void toplevel_set_blur(toplevel_t *tl, bool enabled);
+void toplevel_set_mica(toplevel_t *tl, bool enabled);
+void toplevel_set_acrylic(toplevel_t *tl, bool enabled);
+void toplevel_set_border_radius(toplevel_t *tl, float radius);
+void toplevel_apply_decoration_mode(toplevel_t *tl);
 
-bool toplevel_can_tear(struct bwm_toplevel *toplevel);
+bool toplevel_can_tear(toplevel_t *toplevel);

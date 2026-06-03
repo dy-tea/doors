@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-struct bwm_server server = {0};
+struct server_t server = {0};
 
 static void usage(const char *argv0) {
   printf("Usage: %s [-c <config-dir>]\n", argv0);
@@ -37,12 +37,12 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Error: Failed to initialize logging\n");
     return 1;
   }
-  
+
   if (log_setup_signals() != 0) {
     fprintf(stderr, "Error: Failed to setup signal handlers\n");
     return 1;
   }
-  
+
   config_init_with_config_dir(config_dir);
   server_init();
   int ret = server_run();

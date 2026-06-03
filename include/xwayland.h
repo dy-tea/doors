@@ -6,8 +6,7 @@
 #include <wlr/util/box.h>
 #include <xcb/xproto.h>
 
-// Forward declaration to avoid circular dependency
-struct bwm_server;
+struct server_t;
 
 enum atom_name {
 	NET_WM_WINDOW_TYPE_NORMAL,
@@ -24,14 +23,14 @@ enum atom_name {
 	ATOM_LAST,
 };
 
-struct bwm_xwayland {
+typedef struct xwayland_t {
 	struct wlr_xwayland *wlr_xwayland;
 	struct wlr_xcursor_manager *xcursor_manager;
 	xcb_atom_t atoms[ATOM_LAST];
 	struct wl_list views;
-};
+} xwayland_t;
 
-struct bwm_xwayland_view {
+typedef struct xwayland_toplevel_t {
 	node_t *node;
 	struct wlr_xwayland_surface *xwayland_surface;
 	struct wlr_scene_tree *scene_tree;
@@ -69,11 +68,11 @@ struct bwm_xwayland_view {
 	struct wl_listener associate;
 	struct wl_listener dissociate;
 	struct wl_listener override_redirect;
-	
-	struct wl_list link;
-};
 
-struct bwm_xwayland_unmanaged {
+	struct wl_list link;
+} xwayland_toplevel_t;
+
+typedef struct xwayland_unmanaged_t {
 	struct wlr_xwayland_surface *xwayland_surface;
 	struct wlr_scene_surface *surface_scene;
 
@@ -86,10 +85,10 @@ struct bwm_xwayland_unmanaged {
 	struct wl_listener unmap;
 	struct wl_listener destroy;
 	struct wl_listener override_redirect;
-};
+} xwayland_unmanaged_t;
 
 void handle_xwayland_ready(struct wl_listener *listener, void *data);
 void handle_xwayland_surface(struct wl_listener *listener, void *data);
 
-void xwayland_view_close(struct bwm_xwayland_view *xwayland_view);
-void xwayland_view_set_activated(struct bwm_xwayland_view *xwayland_view, bool activated);
+void xwayland_view_close(xwayland_toplevel_t *xwayland_view);
+void xwayland_view_set_activated(xwayland_toplevel_t *xwayland_view, bool activated);

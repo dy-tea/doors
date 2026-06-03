@@ -6,41 +6,43 @@
 #include <sys/un.h>
 #include "types.h"
 
-#define BWM_SOCKET_ENV "BWM_SOCKET"
-#define BWM_SOCKET_PATH_TEMPLATE "/run/user/%d/bwm-%d.sock"
-#define BWM_BUFSIZ 4096
+#define DOORS_SOCKET_ENV "DOORS_SOCKET"
+#define DOORS_SOCKET_PATH_TEMPLATE "/run/user/%d/doors-%d.sock"
+#define DOORS_BUFSIZ 4096
 
-#define BWM_FIFO_TEMPLATE "bwm_fifo.XXXXXX"
+#define DOORS_FIFO_TEMPLATE "doors_fifo.XXXXXX"
+
+typedef struct output_t output_t;
 
 typedef enum {
-  BWM_MASK_REPORT = 1 << 0,
-  BWM_MASK_MONITOR_ADD = 1 << 1,
-  BWM_MASK_MONITOR_REMOVE = 1 << 2,
-  BWM_MASK_MONITOR_FOCUS = 1 << 3,
-  BWM_MASK_MONITOR_CHANGE = 1 << 4,
-  BWM_MASK_DESKTOP_ADD = 1 << 5,
-  BWM_MASK_DESKTOP_REMOVE = 1 << 6,
-  BWM_MASK_DESKTOP_FOCUS = 1 << 7,
-  BWM_MASK_DESKTOP_CHANGE = 1 << 8,
-  BWM_MASK_DESKTOP_LAYOUT = 1 << 9,
-  BWM_MASK_NODE_ADD = 1 << 10,
-  BWM_MASK_NODE_REMOVE = 1 << 11,
-  BWM_MASK_NODE_FOCUS = 1 << 12,
-  BWM_MASK_NODE_CHANGE = 1 << 13,
-  BWM_MASK_NODE_STATE = 1 << 14,
-  BWM_MASK_NODE_FLAG = 1 << 15,
-  BWM_MASK_ALL = (1 << 16) - 1
-} bwm_subscriber_mask_t;
+  SUB_MASK_REPORT = 1 << 0,
+  SUB_MASK_MONITOR_ADD = 1 << 1,
+  SUB_MASK_MONITOR_REMOVE = 1 << 2,
+  SUB_MASK_MONITOR_FOCUS = 1 << 3,
+  SUB_MASK_MONITOR_CHANGE = 1 << 4,
+  SUB_MASK_DESKTOP_ADD = 1 << 5,
+  SUB_MASK_DESKTOP_REMOVE = 1 << 6,
+  SUB_MASK_DESKTOP_FOCUS = 1 << 7,
+  SUB_MASK_DESKTOP_CHANGE = 1 << 8,
+  SUB_MASK_DESKTOP_LAYOUT = 1 << 9,
+  SUB_MASK_NODE_ADD = 1 << 10,
+  SUB_MASK_NODE_REMOVE = 1 << 11,
+  SUB_MASK_NODE_FOCUS = 1 << 12,
+  SUB_MASK_NODE_CHANGE = 1 << 13,
+  SUB_MASK_NODE_STATE = 1 << 14,
+  SUB_MASK_NODE_FLAG = 1 << 15,
+  SUB_MASK_ALL = (1 << 16) - 1
+} subscriber_mask_t;
 
-typedef struct bwm_subscriber {
+typedef struct subscriber_t {
   int client_fd;
   char *fifo_path;
-  bwm_subscriber_mask_t mask;
+  subscriber_mask_t mask;
   int count;
   struct wl_event_source *event_source;
-  struct bwm_subscriber *prev;
-  struct bwm_subscriber *next;
-} bwm_subscriber_t;
+  struct subscriber_t *prev;
+  struct subscriber_t *next;
+} subscriber_t;
 
 void ipc_init(void);
 int ipc_get_socket_fd(void);
@@ -48,8 +50,8 @@ void ipc_handle_incoming(int client_fd);
 void ipc_cleanup(void);
 const char *ipc_get_socket_path(void);
 
-void ipc_put_status(bwm_subscriber_mask_t mask, const char *fmt, ...);
+void ipc_put_status(subscriber_mask_t mask, const char *fmt, ...);
 void ipc_print_report(int fd);
 
-desktop_t *find_desktop_by_name_in_monitor(struct bwm_output *mon, const char *name);
-struct bwm_output *find_output_by_name(const char *name);
+desktop_t *find_desktop_by_name_in_monitor(output_t *mon, const char *name);
+output_t *find_output_by_name(const char *name);

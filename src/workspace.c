@@ -10,10 +10,10 @@
 #include <wlr/util/log.h>
 #include <wlr/types/wlr_scene.h>
 
-extern struct bwm_server server;
+extern struct server_t server;
 
 static void handle_workspace_request(struct wl_listener *listener, void *data);
-static void update_all_toplevels_visibility(struct bwm_output *m, desktop_t *current_desktop);
+static void update_all_toplevels_visibility(output_t *m, desktop_t *current_desktop);
 
 static struct wlr_ext_workspace_handle_v1 *find_workspace_by_name(const char *name) {
   struct wlr_ext_workspace_handle_v1 *workspace;
@@ -28,7 +28,7 @@ struct desktop_t *find_desktop_by_name(const char *name) {
 
   if (name[0] == '^' && name[1] >= '1' && name[1] <= '9') {
     int mon_idx = name[1] - '1';
-    struct bwm_output *m = mon_head;
+    output_t *m = mon_head;
     for (int i = 0; m != NULL && i < mon_idx; m = m->next, i++)
     	;
     if (m && m->desk_head)
@@ -36,7 +36,7 @@ struct desktop_t *find_desktop_by_name(const char *name) {
     return NULL;
   }
 
-  struct bwm_output *m = mon_head;
+  output_t *m = mon_head;
   while (m != NULL) {
     desktop_t *d = m->desk_head;
     while (d != NULL) {
@@ -150,7 +150,7 @@ void workspace_create_desktop(const char *name) {
   wlr_log(WLR_INFO, "Created workspace: %s", name);
 }
 
-static void update_window_visibility(node_t *node, struct bwm_output *m, desktop_t *current_desktop, int *count) {
+static void update_window_visibility(node_t *node, output_t *m, desktop_t *current_desktop, int *count) {
   if (!node || !node->client)
     return;
 
@@ -160,7 +160,7 @@ static void update_window_visibility(node_t *node, struct bwm_output *m, desktop
 
   (*count)++;
 
-  struct bwm_output *node_mon = node->output;
+  output_t *node_mon = node->output;
   if (!node_mon || node_mon != m)
     return;
 
@@ -210,10 +210,10 @@ found_desktop:
   }
 }
 
-static void update_all_toplevels_visibility(struct bwm_output *m, desktop_t *current_desktop) {
+static void update_all_toplevels_visibility(output_t *m, desktop_t *current_desktop) {
   int window_count = 0;
 
-  struct bwm_toplevel *toplevel;
+  struct toplevel_t *toplevel;
   wl_list_for_each(toplevel, &server.toplevels, link) {
     if (!toplevel->mapped || !toplevel->scene_tree || !toplevel->node)
       continue;
@@ -233,7 +233,7 @@ static void update_all_toplevels_visibility(struct bwm_output *m, desktop_t *cur
     d = d->next;
   }
 
-  struct bwm_xwayland_view *xwayland_view;
+  struct xwayland_toplevel_t *xwayland_view;
   wl_list_for_each(xwayland_view, &server.xwayland.views, link) {
     if (!xwayland_view->mapped || !xwayland_view->scene_tree || !xwayland_view->node)
       continue;
@@ -242,8 +242,7 @@ static void update_all_toplevels_visibility(struct bwm_output *m, desktop_t *cur
   }
 }
 
-static void workspace_switch_animate(struct bwm_output *output,
-    desktop_t *old_desk, desktop_t *new_desk) {
+static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desktop_t *new_desk) {
   int dx = 0, dy = 0;
   int slide_dist;
   bool forward = true;

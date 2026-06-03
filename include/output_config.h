@@ -5,7 +5,7 @@
 #include <wayland-server.h>
 #include <wlr/render/color.h>
 
-struct bwm_output;
+struct output_t;
 struct wlr_output;
 
 #define MAXLEN 256
@@ -76,8 +76,8 @@ struct output_config *output_config_find(const char *name);
 void output_config_add(struct output_config *oc);
 void output_config_apply(struct output_config *oc);
 void output_apply_all_config(void);
-void output_config_update_from_wlr_output(struct bwm_output *output);
-struct bwm_output *output_from_wlr_output(struct wlr_output *wlr_output);
+void output_config_update_from_wlr_output(struct output_t *output);
+struct output_t *output_from_wlr_output(struct wlr_output *wlr_output);
 void output_set_power(struct wlr_output *wlr_output, uint32_t mode);
 void output_config_init(void);
 void output_update_manager_config(void);

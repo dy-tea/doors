@@ -17,16 +17,16 @@
 #include <wlr/types/wlr_ext_background_effect_v1.h>
 #include <wlr/types/wlr_buffer.h>
 
-extern struct bwm_server server;
+extern struct server_t server;
 
 static void layer_surface_destroy(struct wl_listener *listener, void *data);
 static void layer_surface_map(struct wl_listener *listener, void *data);
 static void layer_surface_unmap(struct wl_listener *listener, void *data);
 static void layer_surface_commit(struct wl_listener *listener, void *data);
 
-struct wlr_scene_tree *output_shell_layer(struct bwm_output *output, enum zwlr_layer_shell_v1_layer layer);
+struct wlr_scene_tree *output_shell_layer(output_t *output, enum zwlr_layer_shell_v1_layer layer);
 
-void layer_surface_set_blur(struct bwm_layer_surface *ls, bool enabled) {
+void layer_surface_set_blur(layer_surface_t *ls, bool enabled) {
   if (!ls || !ls->scene_tree)
     return;
 
@@ -63,7 +63,7 @@ static void layer_surface_save_buffer_iterator(struct wlr_scene_buffer *buffer,
   wlr_scene_buffer_set_buffer(sbuf, buffer->buffer);
 }
 
-static void layer_surface_save_buffer(struct bwm_layer_surface *layer) {
+static void layer_surface_save_buffer(struct layer_surface_t *layer) {
   if (!layer || !layer->saved_tree)
     return;
 
@@ -75,7 +75,7 @@ static void layer_surface_save_buffer(struct bwm_layer_surface *layer) {
 
 static void layer_surface_destroy(struct wl_listener *listener, void *data) {
   (void)data;
-  struct bwm_layer_surface *layer = wl_container_of(listener, layer, destroy);
+  struct layer_surface_t *layer = wl_container_of(listener, layer, destroy);
 
   animation_cancel_scene_tree(layer->scene_tree);
 
@@ -97,7 +97,7 @@ static void layer_surface_destroy(struct wl_listener *listener, void *data) {
 
 static void layer_surface_map(struct wl_listener *listener, void *data) {
 	(void)data;
-	struct bwm_layer_surface *layer = wl_container_of(listener, layer, map);
+	struct layer_surface_t *layer = wl_container_of(listener, layer, map);
 
 	layer->mapped = true;
 	arrange_layers(layer->output);
@@ -113,7 +113,7 @@ static void layer_surface_map(struct wl_listener *listener, void *data) {
 
 static void layer_surface_unmap(struct wl_listener *listener, void *data) {
   (void)data;
-  struct bwm_layer_surface *layer = wl_container_of(listener, layer, unmap);
+  struct layer_surface_t *layer = wl_container_of(listener, layer, unmap);
   layer->mapped = false;
 
   if (!enable_animations) {
@@ -141,7 +141,7 @@ static void layer_surface_unmap(struct wl_listener *listener, void *data) {
 
 static void layer_surface_commit(struct wl_listener *listener, void *data) {
   (void)data;
-  struct bwm_layer_surface *layer = wl_container_of(listener, layer, surface_commit);
+  struct layer_surface_t *layer = wl_container_of(listener, layer, surface_commit);
   struct wlr_layer_surface_v1 *layer_surface = layer->layer_surface;
 
   if (!layer_surface->initialized)
@@ -172,8 +172,8 @@ static void layer_surface_commit(struct wl_listener *listener, void *data) {
 void handle_new_layer_surface(struct wl_listener *listener, void *data) {
   (void)listener;
   struct wlr_layer_surface_v1 *layer_surface = data;
-  struct bwm_layer_surface *layer;
-  struct bwm_output *output;
+  layer_surface_t *layer;
+  output_t *output;
 
   wlr_log(WLR_INFO, "New layer surface on layer %d",
       layer_surface->pending.layer);
@@ -255,10 +255,10 @@ void handle_new_layer_surface(struct wl_listener *listener, void *data) {
   arrange_layers(output);
 }
 
-void arrange_layers(struct bwm_output *output) {
+void arrange_layers(output_t *output) {
   struct wlr_box usable_area = output->rectangle;
   struct wlr_box full_area = output->rectangle;
-  struct bwm_layer_surface *layer;
+  struct layer_surface_t *layer;
   int i;
 
   if (!output->wlr_output->enabled)
@@ -276,7 +276,7 @@ void arrange_layers(struct bwm_output *output) {
 
   if (!wlr_box_equal(&usable_area, &output->usable_area)) {
     output->usable_area = usable_area;
-    struct bwm_output *m = output;
+    output_t *m = output;
     if (m && m->desk)
       arrange(m, m->desk, true);
   }
@@ -292,7 +292,7 @@ void arrange_layers(struct bwm_output *output) {
   }
 }
 
-void focus_layer_surface(struct bwm_layer_surface *layer_surface) {
+void focus_layer_surface(struct layer_surface_t *layer_surface) {
 	if (!layer_surface->layer_surface || !layer_surface->layer_surface->surface
 		|| !layer_surface->layer_surface->surface->mapped)
 		return;
@@ -315,7 +315,7 @@ void focus_layer_surface(struct bwm_layer_surface *layer_surface) {
 	input_method_relay_set_focus(server.input_method_relay, surface);
 }
 
-struct wlr_scene_tree *output_shell_layer(struct bwm_output *output, enum zwlr_layer_shell_v1_layer layer) {
+struct wlr_scene_tree *output_shell_layer(output_t *output, enum zwlr_layer_shell_v1_layer layer) {
   switch (layer) {
   case ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND:
     return output->layer_bg;

@@ -69,7 +69,7 @@ int scroller_collect_nodes(desktop_t *d, node_t ***out_nodes) {
   return count;
 }
 
-static void scroller_arrange_stack(node_t *head_node, struct wlr_box base_geom, int gap, struct bwm_output *m) {
+static void scroller_arrange_stack(node_t *head_node, struct wlr_box base_geom, int gap, output_t *m) {
   if (!head_node || !head_node->client) return;
 
   client_t *head = head_node->client;
@@ -146,7 +146,7 @@ static void scroller_arrange_stack(node_t *head_node, struct wlr_box base_geom, 
   }
 }
 
-void scroller_arrange(struct bwm_output *m, desktop_t *d, struct wlr_box available) {
+void scroller_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
   if (!d || !d->root) return;
 
   wlr_log(WLR_DEBUG, "scroller_arrange: starting, available=(%d,%d %dx%d)",
@@ -400,7 +400,7 @@ void scroller_center_window(desktop_t *d, client_t *client) {
   }
 
   node_t *n = client->toplevel->node;
-  struct bwm_output *m = n->output;
+  output_t *m = n->output;
 
   if (!m) {
     return;

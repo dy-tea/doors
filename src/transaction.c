@@ -16,19 +16,19 @@
 
 // transaction state
 static struct {
-  struct bwm_transaction *pending_transaction;
-  struct bwm_transaction *queued_transaction;
+  struct transaction_t *pending_transaction;
+  struct transaction_t *queued_transaction;
   node_t **dirty_nodes;
   size_t dirty_count;
   size_t dirty_capacity;
 } txn_state = {0};
 
-static void transaction_commit(struct bwm_transaction *txn);
+static void transaction_commit(struct transaction_t *txn);
 static void transaction_commit_pending(void);
 static void _transaction_commit_dirty(bool server_request);
 
-static struct bwm_transaction *transaction_create(void) {
-  struct bwm_transaction *txn = calloc(1, sizeof(*txn));
+static struct transaction_t *transaction_create(void) {
+  struct transaction_t *txn = calloc(1, sizeof(*txn));
   if (!txn) {
     wlr_log(WLR_ERROR, "Failed to allocate transaction");
     return NULL;
@@ -41,12 +41,12 @@ static struct bwm_transaction *transaction_create(void) {
   return txn;
 }
 
-static void transaction_destroy(struct bwm_transaction *txn) {
+static void transaction_destroy(struct transaction_t *txn) {
   if (!txn)
     return;
 
   // free all instructions
-  struct bwm_transaction_inst *instruction, *tmp;
+  struct transaction_inst_t *instruction, *tmp;
   wl_list_for_each_safe(instruction, tmp, &txn->instructions, link) {
     node_t *node = instruction->node;
 
@@ -74,7 +74,7 @@ static void transaction_destroy(struct bwm_transaction *txn) {
 }
 
 static void copy_node_state(node_t *node,
-                           struct bwm_transaction_inst *instruction) {
+                           struct transaction_inst_t *instruction) {
   if (!node || !instruction)
     return;
 
@@ -100,12 +100,12 @@ static void copy_node_state(node_t *node,
   }
 }
 
-static void transaction_add_node(struct bwm_transaction *txn, node_t *node, bool server_request) {
+static void transaction_add_node(struct transaction_t *txn, node_t *node, bool server_request) {
   if (!txn || !node)
     return;
 
   // check if already in transaction
-  struct bwm_transaction_inst *existing;
+  struct transaction_inst_t *existing;
   wl_list_for_each(existing, &txn->instructions, link) {
     if (existing->node == node) {
       copy_node_state(node, existing);
@@ -114,7 +114,7 @@ static void transaction_add_node(struct bwm_transaction *txn, node_t *node, bool
   }
 
   // create new instruction
-  struct bwm_transaction_inst *instruction = calloc(1, sizeof(*instruction));
+  struct transaction_inst_t *instruction = calloc(1, sizeof(*instruction));
   if (!instruction) {
     wlr_log(WLR_ERROR, "Failed to allocate transaction instruction");
     return;
@@ -137,7 +137,7 @@ static void transaction_add_node(struct bwm_transaction *txn, node_t *node, bool
   wl_list_insert(&txn->instructions, &instruction->link);
 }
 
-static void copy_node_current_state(node_t *node, struct bwm_transaction_inst *instruction) {
+static void copy_node_current_state(node_t *node, struct transaction_inst_t *instruction) {
   if (!node || !instruction)
     return;
 
@@ -166,7 +166,7 @@ static void copy_node_current_state(node_t *node, struct bwm_transaction_inst *i
   node->client->committed_tiled_rectangle = instruction->tiled_rectangle;
 }
 
-static void arrange_node_geometry(node_t *node, struct bwm_transaction_inst *instruction) {
+static void arrange_node_geometry(node_t *node, struct transaction_inst_t *instruction) {
   if (!node || !instruction)
     return;
 
@@ -194,7 +194,7 @@ static void arrange_node_geometry(node_t *node, struct bwm_transaction_inst *ins
 
   struct wlr_box *rect;
   if (instruction->state == STATE_FULLSCREEN) {
-    struct bwm_output *m = node->output;
+    output_t *m = node->output;
     if (m)
       rect = &m->rectangle;
     else return;
@@ -273,7 +273,7 @@ static void arrange_node_geometry(node_t *node, struct bwm_transaction_inst *ins
   if (node->client->border_width != 0) {
     if (node->client->toplevel) {
       unsigned int bw = node->client->border_width;
-      struct bwm_toplevel *tl = node->client->toplevel;
+      struct toplevel_t *tl = node->client->toplevel;
       // surface geometry differs from container in either dimension
       bool undersized = instruction->state != STATE_FLOATING && instruction->state != STATE_FULLSCREEN &&
         tl->geometry.width > 0 && tl->geometry.height > 0 &&
@@ -355,10 +355,10 @@ static void arrange_node_geometry(node_t *node, struct bwm_transaction_inst *ins
   }
 }
 
-static bool node_in_transaction(struct bwm_transaction *txn, node_t *node) {
+static bool node_in_transaction(struct transaction_t *txn, node_t *node) {
   if (!txn || !node)
     return false;
-  struct bwm_transaction_inst *inst;
+  struct transaction_inst_t *inst;
   wl_list_for_each(inst, &txn->instructions, link)
     if (inst->node == node)
       return true;
@@ -369,7 +369,7 @@ static bool should_skip_node(node_t *node) {
   return txn_state.pending_transaction && node_in_transaction(txn_state.pending_transaction, node);
 }
 
-static void transaction_apply(struct bwm_transaction *txn) {
+static void transaction_apply(struct transaction_t *txn) {
   if (!txn) {
     wlr_log(WLR_ERROR, "transaction_apply called with NULL txn");
     return;
@@ -387,7 +387,7 @@ static void transaction_apply(struct bwm_transaction *txn) {
       txn->num_waiting, (size_t)wl_list_length(&txn->instructions));
   }
 
-  struct bwm_transaction_inst *instruction, *tmp;
+  struct transaction_inst_t *instruction, *tmp;
   wl_list_for_each_safe(instruction, tmp, &txn->instructions, link) {
     if (!instruction->node) {
       wlr_log(WLR_ERROR, "Skipping instruction with NULL node");
@@ -415,7 +415,7 @@ static void transaction_apply(struct bwm_transaction *txn) {
   }
 }
 
-static bool should_configure(node_t *node, struct bwm_transaction_inst *instruction) {
+static bool should_configure(node_t *node, struct transaction_inst_t *instruction) {
   // holy checks
   if (!node || !instruction)
     return false;
@@ -437,7 +437,7 @@ static bool should_configure(node_t *node, struct bwm_transaction_inst *instruct
   // determine target size based on state
   struct wlr_box target_rect;
   if (node->client->state == STATE_FULLSCREEN) {
-    struct bwm_output *m = node->output;
+    output_t *m = node->output;
     if (!m) return false;
     target_rect = m->rectangle;
   } else if (node->client->state == STATE_FLOATING)
@@ -462,7 +462,7 @@ static bool should_configure(node_t *node, struct bwm_transaction_inst *instruct
 }
 
 static int handle_timeout(void *data) {
-  struct bwm_transaction *txn = data;
+  struct transaction_t *txn = data;
 
   if (!txn)
     return 0;
@@ -471,7 +471,7 @@ static int handle_timeout(void *data) {
           wl_list_length(&txn->instructions) - txn->num_waiting,
           (size_t)wl_list_length(&txn->instructions));
 
-  struct bwm_transaction_inst *inst;
+  struct transaction_inst_t *inst;
   bool need_dirty_commit = false;
   wl_list_for_each(inst, &txn->instructions, link) {
     if (!inst->waiting || !inst->node->client || !inst->node->client->toplevel)
@@ -523,7 +523,7 @@ static void transaction_progress(void) {
   transaction_commit_pending();
 }
 
-static void transaction_commit(struct bwm_transaction *txn) {
+static void transaction_commit(struct transaction_t *txn) {
   if (!txn)
     return;
 
@@ -536,7 +536,7 @@ static void transaction_commit(struct bwm_transaction *txn) {
   size_t num_configures = 0;
 
   // send configure to clients and save buffers
-  struct bwm_transaction_inst *instruction;
+  struct transaction_inst_t *instruction;
   wl_list_for_each(instruction, &txn->instructions, link) {
     node_t *node = instruction->node;
 
@@ -547,7 +547,7 @@ static void transaction_commit(struct bwm_transaction *txn) {
         // determine the correct rectangle based on client state
         struct wlr_box *rect;
         if (node->client->state == STATE_FULLSCREEN) {
-          struct bwm_output *m = node->output;
+          output_t *m = node->output;
           if (m)
             rect = &m->rectangle;
           else
@@ -639,7 +639,7 @@ static void transaction_commit_pending(void) {
   if (!txn_state.pending_transaction)
     return;
 
-  struct bwm_transaction *txn = txn_state.pending_transaction;
+  struct transaction_t *txn = txn_state.pending_transaction;
   txn_state.pending_transaction = NULL;
   transaction_commit(txn);
 }
@@ -675,11 +675,11 @@ void transaction_commit_dirty_client(void) {
   _transaction_commit_dirty(false);
 }
 
-static void set_instruction_ready(struct bwm_transaction_inst *instruction) {
+static void set_instruction_ready(struct transaction_inst_t *instruction) {
   if (!instruction || !instruction->waiting)
     return;
 
-  struct bwm_transaction *txn = instruction->transaction;
+  struct transaction_t *txn = instruction->transaction;
 
   instruction->waiting = false;
   txn->num_waiting--;
@@ -690,7 +690,7 @@ static void set_instruction_ready(struct bwm_transaction_inst *instruction) {
   transaction_progress();
 }
 
-bool transaction_notify_view_ready_by_serial(struct bwm_toplevel *toplevel,
+bool transaction_notify_view_ready_by_serial(struct toplevel_t *toplevel,
 		uint32_t serial) {
   if (!toplevel || !toplevel->node)
     return false;
@@ -700,7 +700,7 @@ bool transaction_notify_view_ready_by_serial(struct bwm_toplevel *toplevel,
   if (!node->instruction)
     return false;
 
-  struct bwm_transaction_inst *instruction = node->instruction;
+  struct transaction_inst_t *instruction = node->instruction;
 
   if (instruction->serial == serial && instruction->waiting) {
     wlr_log(WLR_DEBUG, "View ready by serial %u for node %u",
@@ -716,12 +716,12 @@ void transaction_notify_view_unmapped(node_t *node) {
   if (!node || !node->instruction || !node->instruction->waiting)
     return;
 
-  struct bwm_transaction_inst *instruction = node->instruction;
+  struct transaction_inst_t *instruction = node->instruction;
   wlr_log(WLR_DEBUG, "View unmapped for node %u - marking instruction ready", node->id);
   set_instruction_ready(instruction);
 }
 
-bool transaction_notify_view_ready_by_geometry(struct bwm_toplevel *toplevel,
+bool transaction_notify_view_ready_by_geometry(struct toplevel_t *toplevel,
 		int x, int y, int width, int height) {
   if (!toplevel || !toplevel->node)
     return false;
@@ -731,7 +731,7 @@ bool transaction_notify_view_ready_by_geometry(struct bwm_toplevel *toplevel,
   if (!node->instruction)
     return false;
 
-  struct bwm_transaction_inst *instruction = node->instruction;
+  struct transaction_inst_t *instruction = node->instruction;
 
   if (instruction->waiting &&
     (int)instruction->content_rect.x == x &&

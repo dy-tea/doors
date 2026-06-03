@@ -8,8 +8,8 @@
 #include <stdint.h>
 #include "types.h"
 
-struct bwm_blur_output_ctx;
-struct desktop_t;
+typedef struct blur_output_ctx_t blur_output_ctx_t;
+typedef struct desktop_t desktop_t;
 
 enum scale_filter_mode {
 	SCALE_FILTER_AUTO,
@@ -17,7 +17,7 @@ enum scale_filter_mode {
 	SCALE_FILTER_NEAREST,
 };
 
-struct bwm_output {
+typedef struct output_t {
   struct wlr_output *wlr_output;
   struct wlr_box usable_area;
   struct wlr_scene_tree *layer_bg;
@@ -47,7 +47,7 @@ struct bwm_output {
   enum wl_output_subpixel detected_subpixel;
 
   struct wlr_color_transform *color_transform;
-  struct bwm_blur_output_ctx *blur_ctx;
+  blur_output_ctx_t *blur_ctx;
 
   char name[64]; // SMALEN
   uint32_t id;
@@ -57,21 +57,21 @@ struct bwm_output {
   int window_gap;
   unsigned int border_width;
   struct wlr_box rectangle;
-  struct desktop_t *desk;
-  struct desktop_t *desk_head;
-  struct desktop_t *desk_tail;
-  struct bwm_output *prev;
-  struct bwm_output *next;
-};
+  desktop_t *desk;
+  desktop_t *desk_head;
+  desktop_t *desk_tail;
+  struct output_t *prev;
+  struct output_t *next;
+} output_t;
 
 void handle_new_output(struct wl_listener *listener, void *data);
-void output_enable(struct bwm_output *output);
-void output_disable(struct bwm_output *output);
-void output_destroy(struct bwm_output *output);
-struct bwm_output *output_from_wlr_output(struct wlr_output *wlr_output);
-struct bwm_output *output_get_in_direction(struct bwm_output *reference, uint32_t direction);
-void output_update_usable_area(struct bwm_output *output);
-void output_set_scale_filter(struct bwm_output *output, enum scale_filter_mode mode);
-void output_get_identifier(char *identifier, size_t len, struct bwm_output *output);
-void output_update_scale(struct bwm_output *output, float scale);
-struct bwm_output *output_get_valid(void);
+void output_enable(output_t *output);
+void output_disable(output_t *output);
+void output_destroy(output_t *output);
+output_t *output_from_wlr_output(struct wlr_output *wlr_output);
+output_t *output_get_in_direction(output_t *reference, uint32_t direction);
+void output_update_usable_area(output_t *output);
+void output_set_scale_filter(output_t *output, enum scale_filter_mode mode);
+void output_get_identifier(char *identifier, size_t len, output_t *output);
+void output_update_scale(output_t *output, float scale);
+output_t *output_get_valid(void);

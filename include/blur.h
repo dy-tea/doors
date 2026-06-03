@@ -4,7 +4,7 @@
 #include <GLES2/gl2.h>
 #include <wlr/util/box.h>
 
-struct bwm_output;
+typedef struct output_t output_t;
 struct wlr_scene_output;
 struct wlr_buffer;
 struct wlr_backend;
@@ -51,7 +51,7 @@ extern float refraction_rgb_fringing;
 extern int refraction_texture_repeat_mode;
 extern float refraction_offset;
 
-struct bwm_blur_output_ctx {
+typedef struct blur_output_ctx_t {
   int width, height;
   int blur_w, blur_h;
 
@@ -72,9 +72,9 @@ struct bwm_blur_output_ctx {
   struct wlr_backend *capture_backend;
   struct wlr_output *capture_output;
   struct wlr_scene_output *capture_scene_output;
-};
+} blur_output_ctx_t;
 
-struct bwm_blur_ctx {
+typedef struct blur_ctx_t {
   bool available;
 
   GLuint prog_kawase;
@@ -133,20 +133,20 @@ struct bwm_blur_ctx {
 
   GLuint vbo;
   GLint attr_pos;
-};
+} blur_ctx_t;
 
-extern struct bwm_blur_ctx blur_ctx;
+extern blur_ctx_t blur_ctx;
 
 bool blur_init(void);
 void blur_fini(void);
 
-struct bwm_blur_output_ctx *blur_output_init(int width, int height);
-void blur_output_fini(struct bwm_blur_output_ctx *ctx);
-void blur_output_resize(struct bwm_blur_output_ctx *ctx, int width, int height, struct bwm_output *output);
+blur_output_ctx_t *blur_output_init(int width, int height);
+void blur_output_fini(blur_output_ctx_t *ctx);
+void blur_output_resize(blur_output_ctx_t *ctx, int width, int height, output_t *output);
 
-void blur_invalidate_mica(struct bwm_blur_output_ctx *ctx);
+void blur_invalidate_mica(blur_output_ctx_t *ctx);
 
-void blur_output_frame(struct bwm_output *output, struct wlr_scene_output *scene_output);
+void blur_output_frame(output_t *output, struct wlr_scene_output *scene_output);
 
 enum blur_algorithm blur_algorithm_from_str(const char *str);
 const char *blur_algorithm_to_str(enum blur_algorithm algo);
