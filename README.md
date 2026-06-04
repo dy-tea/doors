@@ -35,4 +35,4 @@ doors -c ./examples/
 
 The **doorsrc** is a bash file that is run at startup, and can be used to configure settings and launch applications (like an **.xinitrc**).
 
-The **doorskrc** is a config file for your hotkeys, and is reloaded on every save. It uses a config format similar to [sxhkd](https://github.com/baskerville/sxhkd) and can execute compositor binds by calling the `doorsctl` command.
+The **doorshkrc** is a config file for your hotkeys, and is reloaded on every save. It uses a config format similar to [sxhkd](https://github.com/baskerville/sxhkd) and can execute compositor binds by calling the `doorsctl` command.
