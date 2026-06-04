@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
 
   char *sp = getenv(DOORS_SOCKET_ENV);
   if (sp == NULL) {
-    fprintf(stderr, "Error: DOORS_SOCKET_ENV environment variable not set.\n");
+    fprintf(stderr, "Error: DOORS_SOCKET environment variable not set.\n");
     fprintf(stderr, "This variable should be set by doors when it starts.\n");
     err("Make sure you are running doors and executing doorsctl from the same session.\n");
   }

@@ -1,6 +1,6 @@
-# DOORS Configuration Documentation
+# Doors Configuration Documentation
 
-DOORS uses two configuration files located in `~/.config/doors/`:
+Doors uses two configuration files located in `~/.config/doors/`:
 
 - `doorsrc` - Startup script executed when the compositor starts
 - `doorshkrc` - Hotkey bindings configuration

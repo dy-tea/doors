@@ -40,10 +40,10 @@ static void log_callback(enum wlr_log_importance importance, const char *fmt, va
   // map importance level to string
   const char *level_str = "UNKN";
   switch (importance) {
-    case WLR_SILENT: level_str = "SILE"; break;
-    case WLR_ERROR: level_str = "ERR "; break;
+    case WLR_SILENT: level_str = "SLNT"; break;
+    case WLR_ERROR: level_str = "ERRO"; break;
     case WLR_INFO: level_str = "INFO"; break;
-    case WLR_DEBUG: level_str = "DBG "; break;
+    case WLR_DEBUG: level_str = "DEBUG"; break;
     default: level_str = "UNKN"; break;
   }
 
