@@ -862,18 +862,20 @@ static void ipc_cmd_node(char **args, int num, int client_fd) {
     wl_container_of(server.toplevels.next, toplevel, link) : NULL;
 
   if (streq("-f", *args) || streq("--focus", *args)) {
-    if (toplevel) {
-      focus_toplevel(toplevel);
+    output_t *m = server.focused_output;
+    if (m && m->desk && m->desk->focus && m->desk->focus->client) {
+      focus_node(m, m->desk, m->desk->focus);
       send_success(client_fd, "focused\n");
     } else {
-      send_failure(client_fd, "no toplevel to focus\n");
+      send_failure(client_fd, "no focused node\n");
     }
   } else if (streq("-c", *args) || streq("--close", *args)) {
-    if (toplevel && toplevel->xdg_toplevel) {
-      wlr_xdg_toplevel_send_close(toplevel->xdg_toplevel);
+    output_t *m = server.focused_output;
+    if (m && m->desk && m->desk->focus && m->desk->focus->client) {
+      kill_node(m->desk, m->desk->focus);
       send_success(client_fd, "closed\n");
     } else {
-      send_failure(client_fd, "no toplevel to close\n");
+      send_failure(client_fd, "no focused node to close\n");
     }
   } else if (streq("-t", *args) || streq("--state", *args)) {
     if (num < 2) {
@@ -1915,7 +1917,8 @@ static void ipc_cmd_desktop(char **args, int num, int client_fd) {
   }
 
   if (num < 1) {
-    send_failure(client_fd, "desktop: Missing command\n");
+    workspace_switch_to_desktop(desk->name);
+    send_success(client_fd, "focused\n");
     return;
   }
 
@@ -1929,7 +1932,7 @@ static void ipc_cmd_desktop(char **args, int num, int client_fd) {
       focus_prev_desktop();
       send_success(client_fd, "focused\n");
     } else {
-      focus_node(mon, desk, desk->focus);
+      workspace_switch_to_desktop(desk->name);
       send_success(client_fd, "focused\n");
     }
   } else if (streq("-l", *args) || streq("--layout", *args)) {
@@ -3019,6 +3022,7 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
     if (num >= 2) {
       strncpy(normal_border_color, args[1], sizeof(normal_border_color) - 1);
       normal_border_color[sizeof(normal_border_color) - 1] = '\0';
+      refresh_border_colors();
       transaction_commit_dirty();
       send_success(client_fd, "normal_border_color set\n");
     } else {
@@ -3029,6 +3033,7 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
     if (num >= 2) {
       strncpy(active_border_color, args[1], sizeof(active_border_color) - 1);
       active_border_color[sizeof(active_border_color) - 1] = '\0';
+      refresh_border_colors();
       transaction_commit_dirty();
       send_success(client_fd, "active_border_color set\n");
     } else {
@@ -3039,6 +3044,7 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
     if (num >= 2) {
       strncpy(focused_border_color, args[1], sizeof(focused_border_color) - 1);
       focused_border_color[sizeof(focused_border_color) - 1] = '\0';
+      refresh_border_colors();
       transaction_commit_dirty();
       send_success(client_fd, "focused_border_color set\n");
     } else {

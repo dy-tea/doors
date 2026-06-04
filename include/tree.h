@@ -77,12 +77,13 @@ struct wlr_scene_tree *client_get_scene_tree(client_t *client);
 
 // Border helpers
 void create_borders(struct wlr_scene_tree *parent, struct wlr_scene_tree **border_tree,
-                    struct wlr_scene_rect *rects[4]);
+ struct wlr_scene_rect *rects[4]);
 void destroy_borders(struct wlr_scene_tree **border_tree, struct wlr_scene_rect *rects[4]);
 void update_borders(struct wlr_scene_tree *border_tree, struct wlr_scene_rect *rects[4],
-                    struct wlr_box geo, unsigned int bw);
+  struct wlr_box geo, unsigned int bw);
 void update_border_colors(struct wlr_scene_tree *border_tree, struct wlr_scene_rect *rects[4],
-                          client_t *client);
+  client_t *client);
+void refresh_border_colors(void);
 
 // macros for state checking
 #define IS_TILED(c) (is_tiled(c))

@@ -1469,15 +1469,26 @@ static int hex_digit(char c) {
 }
 
 static void parse_color(const char *hex, float *color) {
-  if (!hex || strlen(hex) != 8) {
+  if (!hex) {
     color[0] = color[1] = color[2] = 0.5f;
     color[3] = 1.0f;
     return;
   }
+
+  if (*hex == '#') hex++;
+
+  size_t len = strlen(hex);
+  if (len != 6 && len != 8) {
+    color[0] = color[1] = color[2] = 0.5f;
+    color[3] = 1.0f;
+    return;
+  }
+
   color[0] = (float)(hex_digit(hex[0]) * 16 + hex_digit(hex[1])) / 255.0f;
   color[1] = (float)(hex_digit(hex[2]) * 16 + hex_digit(hex[3])) / 255.0f;
   color[2] = (float)(hex_digit(hex[4]) * 16 + hex_digit(hex[5])) / 255.0f;
-  color[3] = (float)(hex_digit(hex[6]) * 16 + hex_digit(hex[7])) / 255.0f;
+  if (len == 8) color[3] = (float)(hex_digit(hex[6]) * 16 + hex_digit(hex[7])) / 255.0f;
+  else color[3] = 1.0f;
 }
 
 static void get_border_color(client_t *client, float *color) {
@@ -1623,6 +1634,26 @@ void update_border_colors(struct wlr_scene_tree *border_tree, struct wlr_scene_r
   for (int i = 0; i < 4; i++)
     if (rects[i])
       wlr_scene_rect_set_color(rects[i], color);
+}
+
+void refresh_border_colors(void) {
+  for (output_t *m = mon_head; m != NULL; m = m->next) {
+    for (desktop_t *d = m->desk_head; d != NULL; d = d->next) {
+      if (d->root == NULL) continue;
+
+      for (node_t *n = first_extrema(d->root); n != NULL; n = next_leaf(n, d->root)) {
+        if (n->client == NULL) continue;
+
+        if (n->client->toplevel) {
+          update_border_colors(n->client->toplevel->border_tree,
+          	n->client->toplevel->border_rects, n->client);
+        } else if (n->client->xwayland_view) {
+          update_border_colors(n->client->xwayland_view->border_tree,
+          	n->client->xwayland_view->border_rects, n->client);
+        }
+      }
+    }
+  }
 }
 
 output_t *output_at(double x, double y) {
