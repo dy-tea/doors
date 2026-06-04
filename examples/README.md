@@ -631,7 +631,7 @@ doorsctl output <name> reorder-desktops <names...> # Reorder desktops on output
 - `description` — human-readable description string
 - `make` / `model` / `serial` — manufacturer, model, and serial number
 - `width` / `height` — current resolution in pixels
-- `refresh` — current refresh rate in mHz (e.g. `143856` = 143.856 Hz)
+- `refresh` — current refresh rate
 - `scale` — current scale factor
 - `phys_width` / `phys_height` — physical display size in millimeters
 - `enabled` — whether the output is currently active

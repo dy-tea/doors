@@ -162,7 +162,7 @@ static void ipc_cmd_output(char **args, int num, int client_fd) {
         "    \"serial\": \"%s\",\n"
         "    \"width\": %d,\n"
         "    \"height\": %d,\n"
-        "    \"refresh\": %d,\n"
+        "    \"refresh\": %.3f,\n"
         "    \"scale\": %.6g,\n"
         "    \"phys_width\": %d,\n"
         "    \"phys_height\": %d,\n"
@@ -173,7 +173,7 @@ static void ipc_cmd_output(char **args, int num, int client_fd) {
         wo->make ? wo->make : "",
         wo->model ? wo->model : "",
         wo->serial ? wo->serial : "",
-        wo->width, wo->height, wo->refresh,
+        wo->width, wo->height, wo->refresh / 1000.0f,
         wo->scale,
         wo->phys_width, wo->phys_height,
         wo->enabled ? "true" : "false");
@@ -242,6 +242,42 @@ static void ipc_cmd_output(char **args, int num, int client_fd) {
     oc->refresh_rate = refresh_rate;
     output_config_apply(oc);
     send_success(client_fd, "output mode set\n");
+  } else if (streq("modes", subcmd)) {
+    output_t *target = NULL;
+    for (output_t *o = mon_head; o != NULL; o = o->next) {
+      if (streq(o->name, output_name) || streq(o->wlr_output->name, output_name)) {
+        target = o;
+        break;
+      }
+    }
+
+    if (!target) {
+      send_failure(client_fd, "output modes: no such output\n");
+      return;
+    }
+
+    struct wlr_output *wo = target->wlr_output;
+    char buf[DOORS_BUFSIZ];
+    int offset = 0;
+    offset += snprintf(buf + offset, sizeof(buf) - offset, "[\n");
+    bool first = true;
+
+    struct wlr_output_mode *mode;
+    wl_list_for_each(mode, &wo->modes, link) {
+      if (!first) offset += snprintf(buf + offset, sizeof(buf) - offset, ",\n");
+
+      first = false;
+      offset += snprintf(buf + offset, sizeof(buf) - offset,
+        "  {\n"
+        "    \"width\": %d,\n"
+        "    \"height\": %d,\n"
+        "    \"refresh\": %.3f\n"
+        "  }",
+        mode->width, mode->height, mode->refresh / 1000.0f);
+    }
+
+    offset += snprintf(buf + offset, sizeof(buf) - offset, "\n]\n");
+    send_success(client_fd, buf);
   } else if (streq("position", subcmd) || streq("pos", subcmd)) {
     if (num < 3) {
       send_failure(client_fd, "output position: missing coordinates\n");
