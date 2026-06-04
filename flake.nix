@@ -62,6 +62,8 @@
                   --replace-fail "/usr/share/wayland-sessions" "${placeholder "out"}/share/wayland-sessions"
         '';
 
+        passthru.providedSessions = ["doors"];
+
         meta = {
           description = "Wayland compositor based on bswpm, with floating, tiling and scrolling layouts.";
           homepage = "https://github.com/dy-tea/doors";
@@ -73,17 +75,22 @@
     flakelight ./. {
       inherit inputs;
       systems = ["x86_64-linux"];
-      package = {pkgs, ...}: makeDoors pkgs;
-      packages.doorsctl = {pkgs, ...}:
-        (makeDoors pkgs).overrideAttrs (oldAttrs: {
-          pname = "doorsctl";
-          postInstall = ''
-            find $out -type f -not -name doorsctl -delete
-            find $out -type d -empty -delete
-          '';
-          meta = oldAttrs.meta // {
-            description = "Control client for the doors Wayland compositor";
-          };
-        });
+      packages = rec {
+        default = {pkgs, ...}: makeDoors pkgs;
+        doors = default;
+        doorsctl = {pkgs, ...}:
+          (makeDoors pkgs).overrideAttrs (oldAttrs: {
+            pname = "doorsctl";
+            postInstall = ''
+              find $out -type f -not -name doorsctl -delete
+              find $out -type d -empty -delete
+            '';
+            meta =
+              oldAttrs.meta
+              // {
+                description = "Control client for the doors Wayland compositor";
+              };
+          });
+      };
     };
 }
