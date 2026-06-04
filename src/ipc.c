@@ -858,9 +858,6 @@ static void ipc_cmd_node(char **args, int num, int client_fd) {
     return;
   }
 
-  toplevel_t *toplevel = !wl_list_empty(&server.toplevels) ?
-    wl_container_of(server.toplevels.next, toplevel, link) : NULL;
-
   if (streq("-f", *args) || streq("--focus", *args)) {
     output_t *m = server.focused_output;
     if (m && m->desk && m->desk->focus && m->desk->focus->client) {
@@ -884,24 +881,22 @@ static void ipc_cmd_node(char **args, int num, int client_fd) {
     }
     args++;
     num--;
-    client_state_t state;
     if (streq("tiled", *args)) {
-      state = STATE_TILED;
+      tile_focused();
     } else if (streq("floating", *args)) {
-      state = STATE_FLOATING;
+      toggle_floating();
     } else if (streq("fullscreen", *args)) {
-      state = STATE_FULLSCREEN;
+      toggle_fullscreen();
     } else {
       send_failure(client_fd, "node -t: unknown state\n");
       return;
     }
 
-    if (toplevel && toplevel->node) {
-      toplevel->node->client->state = state;
-      transaction_commit_dirty();
+    output_t *m = server.focused_output;
+    if (m && m->desk && m->desk->focus && m->desk->focus->client) {
       send_success(client_fd, "state changed\n");
     } else {
-      send_failure(client_fd, "no toplevel\n");
+      send_failure(client_fd, "no focused node\n");
     }
   } else if (streq("-d", *args) || streq("--to-desktop", *args)) {
     if (num < 2) {
@@ -3617,6 +3612,29 @@ static void ipc_cmd_presel(char **args, int num, int client_fd) {
   }
 }
 
+static void ipc_cmd_resize(char **args, int num, int client_fd) {
+  if (num < 1) {
+    send_failure(client_fd, "resize: missing direction\n");
+    return;
+  }
+
+  if (streq("left", *args) || streq("west", *args) || streq("w", *args)) {
+    resize_left();
+    send_success(client_fd, "resized\n");
+  } else if (streq("right", *args) || streq("east", *args) || streq("e", *args)) {
+    resize_right();
+    send_success(client_fd, "resized\n");
+  } else if (streq("up", *args) || streq("north", *args) || streq("n", *args)) {
+    resize_up();
+    send_success(client_fd, "resized\n");
+  } else if (streq("down", *args) || streq("south", *args) || streq("s", *args)) {
+    resize_down();
+    send_success(client_fd, "resized\n");
+  } else {
+    send_failure(client_fd, "resize: unknown direction\n");
+  }
+}
+
 static void ipc_cmd_toggle(char **args, int num, int client_fd) {
   if (num < 1) {
     send_failure(client_fd, "toggle: missing property\n");
@@ -4117,6 +4135,8 @@ static void process_ipc_message(char *msg, int msg_len, int client_fd) {
     ipc_cmd_swap(++args, --num, client_fd);
   } else if (streq("presel", *args)) {
     ipc_cmd_presel(++args, --num, client_fd);
+  } else if (streq("resize", *args)) {
+    ipc_cmd_resize(++args, --num, client_fd);
   } else if (streq("toggle", *args)) {
     ipc_cmd_toggle(++args, --num, client_fd);
   } else if (streq("rotate", *args)) {

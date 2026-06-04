@@ -52,6 +52,7 @@ void focus_south(void);
 // window manipulation
 void close_focused(void);
 void toggle_floating(void);
+void tile_focused(void);
 void toggle_fullscreen(void);
 void toggle_pseudo_tiled(void);
 void toggle_block_out_from_screenshare(void);
@@ -70,6 +71,7 @@ void send_to_desktop_by_name(const char *name);
 void send_to_next_desktop(void);
 void send_to_prev_desktop(void);
 void send_all_to_desktop(int desktop_index);
+void set_tiled_layout(void);
 void toggle_monocle(void);
 
 // layout

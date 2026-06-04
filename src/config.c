@@ -138,9 +138,9 @@ static bind_action_t parse_action(const char *cmd, int *desktop_index, char *sub
     return BIND_ENTER_SUBMAP;
   }
 
-  if (strncmp(cmd, "doorsctl ", 5) == 0) {
+  if (strncmp(cmd, "doorsctl ", 9) == 0) {
     char buf[MAXLEN];
-    snprintf(buf, sizeof(buf), "%s", cmd + 5);
+    snprintf(buf, sizeof(buf), "%s", cmd + 9);
 
     char *args[16];
     int argc = 0;
@@ -184,6 +184,13 @@ static bind_action_t parse_action(const char *cmd, int *desktop_index, char *sub
       if (strcmp(args[1], "right") == 0) return BIND_RESIZE_RIGHT;
       if (strcmp(args[1], "up") == 0) return BIND_RESIZE_UP;
       if (strcmp(args[1], "down") == 0) return BIND_RESIZE_DOWN;
+    }
+
+    if (strcmp(args[0], "toggle") == 0 && argc >= 2) {
+      if (strcmp(args[1], "floating") == 0) return BIND_TOGGLE_FLOATING;
+      if (strcmp(args[1], "fullscreen") == 0) return BIND_TOGGLE_FULLSCREEN;
+      if (strcmp(args[1], "pseudo_tiled") == 0) return BIND_TOGGLE_PSEUDO_TILED;
+      if (strcmp(args[1], "monocle") == 0) return BIND_TOGGLE_MONOCLE;
     }
 
     if (strcmp(args[0], "node") == 0 && argc >= 2) {
@@ -928,6 +935,7 @@ void execute_bind(bind_t b) {
       close_focused();
       break;
     case BIND_NODE_STATE_TILED:
+      tile_focused();
       break;
     case BIND_NODE_STATE_FLOATING:
       toggle_floating();
@@ -946,6 +954,7 @@ void execute_bind(bind_t b) {
       }
       break;
     case BIND_DESKTOP_LAYOUT_TILED:
+      set_tiled_layout();
       break;
     case BIND_DESKTOP_LAYOUT_MONOCLE:
       toggle_monocle();

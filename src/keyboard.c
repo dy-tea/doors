@@ -522,6 +522,27 @@ void toggle_floating(void) {
   }
 }
 
+void tile_focused(void) {
+  node_t *n = mon->desk->focus;
+  if (n == NULL) return;
+
+  if (n->client == NULL) return;
+
+  switch (n->client->state) {
+  case STATE_FLOATING:
+    toggle_floating();
+    break;
+  case STATE_PSEUDO_TILED:
+    toggle_pseudo_tiled();
+    break;
+  case STATE_TILED:
+    // xdd
+    break;
+  default:
+    set_state(mon, mon->desk, n, STATE_TILED);
+  }
+}
+
 void toggle_fullscreen(void) {
   if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL) return;
 
@@ -810,6 +831,28 @@ void toggle_monocle(void) {
           n->client->toplevel->client_maximized = true;
           wlr_xdg_toplevel_set_maximized(n->client->toplevel->xdg_toplevel, true);
         }
+      }
+    }
+  }
+
+  arrange(mon, d, true);
+
+  if (d->focus != NULL)
+  	focus_node(mon, d, d->focus);
+}
+
+void set_tiled_layout(void) {
+  desktop_t *d = mon->desk;
+  if (mon == NULL || d == NULL) return;
+
+  d->layout = LAYOUT_TILED;
+  d->user_layout = LAYOUT_TILED;
+
+  if (d->root) {
+    for (node_t *n = first_extrema(d->root); n != NULL; n = next_leaf(n, d->root)) {
+      if (n->client && n->client->toplevel && n->client->state != STATE_FULLSCREEN) {
+        n->client->toplevel->client_maximized = false;
+        wlr_xdg_toplevel_set_maximized(n->client->toplevel->xdg_toplevel, false);
       }
     }
   }
