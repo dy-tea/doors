@@ -10,9 +10,8 @@
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_session_lock_v1.h>
 
-void destroy_unlock(struct session_lock_t *session_lock, const bool unlock) {
-	if (server.current_session_lock == NULL)
-		return;
+void destroy_unlock(session_lock_t *session_lock, const bool unlock) {
+	if (server.current_session_lock == NULL) return;
 
 	wl_list_remove(&session_lock->new_surface.link);
 	wl_list_remove(&session_lock->unlock.link);
@@ -42,11 +41,8 @@ void destroy_lock_surface(struct wl_listener *listener, void *data) {
 	wl_list_remove(&output->destroy_lock_surface.link);
 	wl_list_remove(&output->map_lock_surface.link);
 
-	if (!server.locked || !server.current_session_lock)
-		return;
-
-	if (!was_focused)
-		return;
+	if (!server.locked || !server.current_session_lock) return;
+	if (!was_focused) return;
 
 	struct wlr_session_lock_surface_v1 *next;
 	wl_list_for_each(next, &server.current_session_lock->surfaces, link) {
@@ -66,11 +62,8 @@ void map_lock_surface(struct wl_listener *listener, void *data) {
 	output_t *output = wl_container_of(listener, output, map_lock_surface);
 	struct wlr_session_lock_surface_v1 *surface = output->lock_surface;
 
-	if (!surface || !server.current_session_lock || !server.locked)
-		return;
-
-	if (server.seat->keyboard_state.focused_surface)
-		return;
+	if (!surface || !server.current_session_lock || !server.locked) return;
+	if (server.seat->keyboard_state.focused_surface) return;
 
 	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server.seat);
 	if (keyboard)
@@ -107,13 +100,13 @@ void lock_new_surface(struct wl_listener *listener, void *data) {
 
 void lock_unlock(struct wl_listener *listener, void *data) {
 	(void)data;
-	struct session_lock_t *session_lock = wl_container_of(listener, session_lock, unlock);
+	session_lock_t *session_lock = wl_container_of(listener, session_lock, unlock);
 	destroy_unlock(session_lock, true);
 }
 
 void lock_destroy(struct wl_listener *listener, void *data) {
 	(void)data;
-	struct session_lock_t *session_lock = wl_container_of(listener, session_lock, destroy);
+	session_lock_t *session_lock = wl_container_of(listener, session_lock, destroy);
 	destroy_unlock(session_lock, false);
 }
 

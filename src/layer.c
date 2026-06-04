@@ -63,7 +63,7 @@ static void layer_surface_save_buffer_iterator(struct wlr_scene_buffer *buffer,
   wlr_scene_buffer_set_buffer(sbuf, buffer->buffer);
 }
 
-static void layer_surface_save_buffer(struct layer_surface_t *layer) {
+static void layer_surface_save_buffer(layer_surface_t *layer) {
   if (!layer || !layer->saved_tree)
     return;
 
@@ -75,7 +75,7 @@ static void layer_surface_save_buffer(struct layer_surface_t *layer) {
 
 static void layer_surface_destroy(struct wl_listener *listener, void *data) {
   (void)data;
-  struct layer_surface_t *layer = wl_container_of(listener, layer, destroy);
+  layer_surface_t *layer = wl_container_of(listener, layer, destroy);
 
   animation_cancel_scene_tree(layer->scene_tree);
 
@@ -97,7 +97,7 @@ static void layer_surface_destroy(struct wl_listener *listener, void *data) {
 
 static void layer_surface_map(struct wl_listener *listener, void *data) {
 	(void)data;
-	struct layer_surface_t *layer = wl_container_of(listener, layer, map);
+	layer_surface_t *layer = wl_container_of(listener, layer, map);
 
 	layer->mapped = true;
 	arrange_layers(layer->output);
@@ -113,7 +113,7 @@ static void layer_surface_map(struct wl_listener *listener, void *data) {
 
 static void layer_surface_unmap(struct wl_listener *listener, void *data) {
   (void)data;
-  struct layer_surface_t *layer = wl_container_of(listener, layer, unmap);
+  layer_surface_t *layer = wl_container_of(listener, layer, unmap);
   layer->mapped = false;
 
   if (!enable_animations) {
@@ -141,7 +141,7 @@ static void layer_surface_unmap(struct wl_listener *listener, void *data) {
 
 static void layer_surface_commit(struct wl_listener *listener, void *data) {
   (void)data;
-  struct layer_surface_t *layer = wl_container_of(listener, layer, surface_commit);
+  layer_surface_t *layer = wl_container_of(listener, layer, surface_commit);
   struct wlr_layer_surface_v1 *layer_surface = layer->layer_surface;
 
   if (!layer_surface->initialized)
@@ -162,7 +162,7 @@ static void layer_surface_commit(struct wl_listener *listener, void *data) {
 
   // check ext_background_effect_v1 state
   const struct wlr_ext_background_effect_surface_v1_state *fx =
-      wlr_ext_background_effect_v1_get_surface_state(layer_surface->surface);
+    wlr_ext_background_effect_v1_get_surface_state(layer_surface->surface);
   bool wants_blur = fx && !pixman_region32_empty(&fx->blur_region);
   bool has_blur = layer->blur_node != NULL;
   if (wants_blur != has_blur)
@@ -258,7 +258,7 @@ void handle_new_layer_surface(struct wl_listener *listener, void *data) {
 void arrange_layers(output_t *output) {
   struct wlr_box usable_area = output->rectangle;
   struct wlr_box full_area = output->rectangle;
-  struct layer_surface_t *layer;
+  layer_surface_t *layer;
   int i;
 
   if (!output->wlr_output->enabled)
@@ -292,25 +292,21 @@ void arrange_layers(output_t *output) {
   }
 }
 
-void focus_layer_surface(struct layer_surface_t *layer_surface) {
+void focus_layer_surface(layer_surface_t *layer_surface) {
 	if (!layer_surface->layer_surface || !layer_surface->layer_surface->surface
 		|| !layer_surface->layer_surface->surface->mapped)
 		return;
 
 	struct wlr_surface *surface = layer_surface->layer_surface->surface;
 
-	if (layer_surface->layer_surface->current.keyboard_interactive == ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE)
-		return;
-
-	if (layer_surface->scene_layer == NULL)
-		return;
+	if (layer_surface->layer_surface->current.keyboard_interactive == ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE) return;
+	if (layer_surface->scene_layer == NULL) return;
 
 	// notify keyboard enter
 	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server.seat);
 	if (keyboard)
 	  wlr_seat_keyboard_notify_enter(server.seat, surface, keyboard->keycodes,
-	                                  keyboard->num_keycodes,
-	                                  &keyboard->modifiers);
+	    keyboard->num_keycodes, &keyboard->modifiers);
 
 	input_method_relay_set_focus(server.input_method_relay, surface);
 }

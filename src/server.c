@@ -480,10 +480,9 @@ void handle_output_power_set_mode(struct wl_listener *listener, void *data) {
 
 static void apply_output_head_config(struct wlr_output_configuration_head_v1 *config_head) {
   struct wlr_output *output = config_head->state.output;
-  if (!output)
-    return;
+  if (!output) return;
 
-  output_t *doors_output = output_from_wlr_output(output);
+  output_t *out = output_from_wlr_output(output);
 
   struct wlr_output_state state;
   wlr_output_state_init(&state);
@@ -506,8 +505,8 @@ static void apply_output_head_config(struct wlr_output_configuration_head_v1 *co
   wlr_output_commit_state(output, &state);
   wlr_output_state_finish(&state);
 
-  if (doors_output)
-    output_update_scale(doors_output, config_head->state.scale);
+  if (out)
+    output_update_scale(out, config_head->state.scale);
 
   if (config_head->state.x >= 0 && config_head->state.y >= 0)
     wlr_output_layout_add(server.output_layout, output, config_head->state.x, config_head->state.y);
@@ -533,8 +532,7 @@ void handle_output_manager_test(struct wl_listener *listener, void *data) {
   struct wlr_output_configuration_head_v1 *head;
   wl_list_for_each(head, &config->heads, link) {
     struct wlr_output *output = head->state.output;
-    if (!output)
-      continue;
+    if (!output) continue;
 
     struct wlr_output_state state;
     wlr_output_state_init(&state);
@@ -711,8 +709,7 @@ void handle_request_start_drag(struct wl_listener *listener, void *data) {
 void handle_start_drag(struct wl_listener *listener, void *data) {
   (void)listener;
   struct wlr_drag *drag = data;
-  if (!drag->icon)
-    return;
+  if (!drag->icon) return;
 
   struct wlr_scene_node *node = &wlr_scene_drag_icon_create(server.drag_tree, drag->icon)->node;
   drag->icon->data = node;
@@ -732,12 +729,10 @@ void handle_xdg_activation_request_activate(struct wl_listener *listener, void *
   (void)listener;
   struct wlr_xdg_activation_v1_request_activate_event *event = data;
 
-  if (event->surface == NULL)
-    return;
+  if (event->surface == NULL) return;
 
-  struct toplevel_t *toplevel = event->surface->data;
-  if (toplevel == NULL)
-    return;
+  toplevel_t *toplevel = event->surface->data;
+  if (toplevel == NULL) return;
 
   wlr_scene_node_raise_to_top(&toplevel->scene_tree->node);
   focus_toplevel(toplevel);
@@ -753,8 +748,7 @@ static void handle_ring_system_bell(struct wl_listener *listener, void *data) {
   (void)listener;
   (void)data;
 
-  if (server.system_bell_timer != NULL)
-  	return;
+  if (server.system_bell_timer != NULL) return;
 
   server.system_bell_timer = wl_event_loop_add_timer(wl_display_get_event_loop(server.wl_display),
   	handle_system_bell_timer, NULL);

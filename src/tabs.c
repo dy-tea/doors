@@ -31,18 +31,18 @@ node_t *tabbed_ancestor(node_t *n) {
   for (node_t *p = n ? n->parent : NULL; p != NULL; p = p->parent)
     if (p->split_type == TYPE_TABBED)
       return p;
+
   return NULL;
 }
 
 static size_t collect_leaves(node_t *n, node_t **out, size_t cap) {
-  if (n == NULL)
-    return 0;
+  if (n == NULL) return 0;
 
   if (is_leaf(n)) {
-    if (n->client == NULL || n->client->state == STATE_FLOATING)
-      return 0;
-    if (out && cap > 0)
-      out[0] = n;
+    if (n->client == NULL || n->client->state == STATE_FLOATING) return 0;
+
+    if (out && cap > 0) out[0] = n;
+
     return 1;
   }
 
@@ -138,16 +138,13 @@ static void build_entries(struct tab_bar_t *bar) {
   destroy_entries(bar);
 
   size_t count = count_leaves(bar->owner);
-  if (count == 0)
-    return;
+  if (count == 0) return;
 
   bar->entries = calloc(count, sizeof(tab_entry_t));
-  if (!bar->entries)
-    return;
+  if (!bar->entries) return;
 
   node_t **leaves = calloc(count, sizeof(node_t *));
-  if (!leaves)
-    return;
+  if (!leaves) return;
   collect_leaves(bar->owner, leaves, count);
 
   for (size_t i = 0; i < count; i++) {
@@ -155,8 +152,7 @@ static void build_entries(struct tab_bar_t *bar) {
     e->leaf = leaves[i];
 
     e->tree = wlr_scene_tree_create(bar->tree);
-    if (!e->tree)
-      continue;
+    if (!e->tree) continue;
 
     e->bg = wlr_scene_rect_create(e->tree, 1, 1, color_tab_bg);
     e->border = wlr_scene_rect_create(e->tree, 1, TAB_BAR_BORDER, color_tab_sep);
@@ -171,14 +167,12 @@ static void build_entries(struct tab_bar_t *bar) {
 }
 
 void tabs_create(node_t *n) {
-  if (n == NULL)
-    return;
-  if (n->tab_bar != NULL)
-    return;
+  if (n == NULL) return;
+  if (n->tab_bar != NULL) return;
 
   struct tab_bar_t *bar = calloc(1, sizeof(*bar));
-  if (!bar)
-    return;
+  if (!bar) return;
+
   bar->owner = n;
 
   bar->tree = wlr_scene_tree_create(server.tile_tree);
@@ -193,40 +187,39 @@ void tabs_create(node_t *n) {
 }
 
 void tabs_destroy(node_t *n) {
-  if (n == NULL || n->tab_bar == NULL)
-    return;
-  struct tab_bar_t *bar = n->tab_bar;
+  if (n == NULL || n->tab_bar == NULL) return;
+
+  tab_bar_t *bar = n->tab_bar;
   destroy_entries(bar);
   if (bar->tree)
     wlr_scene_node_destroy(&bar->tree->node);
+
   free(bar);
   n->tab_bar = NULL;
 }
 
 void tabs_rebuild(node_t *n) {
-  if (n == NULL || n->tab_bar == NULL)
-    return;
+  if (n == NULL || n->tab_bar == NULL) return;
+
   build_entries(n->tab_bar);
   tabs_arrange(n, n->tab_bar->rect);
   tabs_update_focus(n, NULL);
 }
 
 void tabs_arrange(node_t *n, struct wlr_box rect) {
-  if (n == NULL || n->tab_bar == NULL)
-    return;
-  struct tab_bar_t *bar = n->tab_bar;
+  if (n == NULL || n->tab_bar == NULL) return;
+
+  tab_bar_t *bar = n->tab_bar;
   bar->rect = rect;
 
-  if (bar->tree == NULL)
-    return;
+  if (bar->tree == NULL) return;
 
   wlr_scene_node_set_position(&bar->tree->node, rect.x, rect.y);
 
   if (bar->bg)
     wlr_scene_rect_set_size(bar->bg, rect.width, TAB_BAR_HEIGHT);
 
-  if (bar->entry_count == 0)
-    return;
+  if (bar->entry_count == 0) return;
 
   int total_w = rect.width;
   int n_entries = (int)bar->entry_count;
@@ -270,19 +263,19 @@ void tabs_arrange(node_t *n, struct wlr_box rect) {
 }
 
 void tabs_show(node_t *n, bool show) {
-  if (n == NULL || n->tab_bar == NULL || n->tab_bar->tree == NULL)
-    return;
+  if (n == NULL || n->tab_bar == NULL || n->tab_bar->tree == NULL) return;
+
   wlr_scene_node_set_enabled(&n->tab_bar->tree->node, show);
 }
 
 void tabs_update_focus(node_t *n, node_t *focus) {
-  if (n == NULL || n->tab_bar == NULL)
-    return;
+  if (n == NULL || n->tab_bar == NULL) return;
 
   node_t *active = tab_focus_leaf(n, focus);
   for (size_t i = 0; i < n->tab_bar->entry_count; i++) {
     tab_entry_t *e = &n->tab_bar->entries[i];
     bool is_active = (e->leaf == active);
+
     if (e->bg)
       wlr_scene_rect_set_color(e->bg, is_active ? color_tab_bg_active : color_tab_bg);
     if (e->label) {
@@ -294,11 +287,11 @@ void tabs_update_focus(node_t *n, node_t *focus) {
 }
 
 void tabs_update_label_for_leaf(node_t *leaf) {
-  if (leaf == NULL)
-    return;
+  if (leaf == NULL) return;
+
   node_t *t = tabbed_ancestor(leaf);
-  if (t == NULL || t->tab_bar == NULL)
-    return;
+  if (t == NULL || t->tab_bar == NULL) return;
+
   for (size_t i = 0; i < t->tab_bar->entry_count; i++) {
     tab_entry_t *e = &t->tab_bar->entries[i];
     if (e->leaf == leaf && e->label)
@@ -307,39 +300,41 @@ void tabs_update_label_for_leaf(node_t *leaf) {
 }
 
 node_t *tabs_hit_test(node_t *n, double lx, double ly) {
-  if (n == NULL || n->tab_bar == NULL || n->tab_bar->tree == NULL)
-    return NULL;
-  if (!n->tab_bar->tree->node.enabled)
-    return NULL;
+  if (n == NULL || n->tab_bar == NULL || n->tab_bar->tree == NULL) return NULL;
+  if (!n->tab_bar->tree->node.enabled) return NULL;
+
   for (size_t i = 0; i < n->tab_bar->entry_count; i++) {
     tab_entry_t *e = &n->tab_bar->entries[i];
-    if (e->leaf == NULL || e->leaf->destroying)
-      continue;
+
+    if (e->leaf == NULL || e->leaf->destroying) continue;
+
     if (lx >= e->hit_box.x && lx < e->hit_box.x + e->hit_box.width &&
         ly >= e->hit_box.y && ly < e->hit_box.y + e->hit_box.height)
       return e->leaf;
   }
+
   return NULL;
 }
 
 static node_t *hit_test_subtree(node_t *n, double lx, double ly) {
-  if (n == NULL)
-    return NULL;
+  if (n == NULL) return NULL;
+
   if (n->split_type == TYPE_TABBED && n->tab_bar) {
     node_t *hit = tabs_hit_test(n, lx, ly);
     if (hit)
       return hit;
   }
-  if (is_leaf(n))
-    return NULL;
+
+  if (is_leaf(n)) return NULL;
+
   node_t *r = hit_test_subtree(n->first_child, lx, ly);
-  if (r)
-    return r;
+  if (r) return r;
+
   return hit_test_subtree(n->second_child, lx, ly);
 }
 
-node_t *tabs_hit_test_desktop(struct desktop_t *d, double lx, double ly) {
-  if (d == NULL || d->root == NULL)
-    return NULL;
+node_t *tabs_hit_test_desktop(desktop_t *d, double lx, double ly) {
+  if (d == NULL || d->root == NULL) return NULL;
+
   return hit_test_subtree(d->root, lx, ly);
 }

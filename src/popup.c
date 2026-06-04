@@ -18,12 +18,10 @@ void popup_unconstrain(popup_t *popup) {
   wlr_scene_node_coords(&popup->parent_tree->node.parent->node, &lx, &ly);
 
   struct wlr_output *wlr_output = wlr_output_layout_output_at(server.output_layout, lx, ly);
-  if (wlr_output == NULL)
-  	return;
+  if (wlr_output == NULL) return;
 
   output_t *output = wlr_output->data;
-  if (output == NULL)
-  	return;
+  if (output == NULL) return;
 
   struct wlr_box box = {
     output->rectangle.x - lx,
@@ -37,7 +35,7 @@ void popup_unconstrain(popup_t *popup) {
 }
 
 void popup_new_popup(struct wl_listener *listener, void *data) {
-  struct popup_t *popup = wl_container_of(listener, popup, new_popup);
+  popup_t *popup = wl_container_of(listener, popup, new_popup);
   create_xdg_popup(data, popup->parent_tree, popup->image_capture_tree);
 }
 
@@ -45,21 +43,20 @@ void popup_commit(struct wl_listener *listener, void *data) {
 	(void)data;
   struct popup_t *popup = wl_container_of(listener, popup, commit);
 
-  if (!popup->xdg_popup->base->initial_commit)
-    return;
+  if (!popup->xdg_popup->base->initial_commit) return;
 
   popup_unconstrain(popup);
 }
 
 void popup_reposition(struct wl_listener *listener, void *data) {
 	(void)data;
-  struct popup_t *popup = wl_container_of(listener, popup, reposition);
+  popup_t *popup = wl_container_of(listener, popup, reposition);
   popup_unconstrain(popup);
 }
 
 void popup_destroy(struct wl_listener *listener, void *data) {
 	(void)data;
-  struct popup_t *popup = wl_container_of(listener, popup, destroy);
+  popup_t *popup = wl_container_of(listener, popup, destroy);
 
   wl_list_remove(&popup->commit.link);
   wl_list_remove(&popup->reposition.link);
@@ -71,7 +68,7 @@ void popup_destroy(struct wl_listener *listener, void *data) {
 
 static void create_xdg_popup(struct wlr_xdg_popup *xdg_popup,
 	struct wlr_scene_tree *parent_tree, struct wlr_scene_tree *image_capture_parent_tree) {
-  struct popup_t *popup = calloc(1, sizeof(struct popup_t));
+  popup_t *popup = calloc(1, sizeof(*popup));
   popup->xdg_popup = xdg_popup;
   popup->parent_tree = wlr_scene_xdg_surface_create(parent_tree, xdg_popup->base);
   xdg_popup->base->data = popup->parent_tree;

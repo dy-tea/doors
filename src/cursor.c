@@ -82,13 +82,9 @@ static void reset_cursor_mode(void) {
   server.tiled_resize_parent_horizontal = NULL;
 }
 
-void *desktop_type_at(
-      double lx, double ly, struct wlr_surface **surface,
-      double *sx, double *sy) {
-  struct wlr_scene_node *node = wlr_scene_node_at(
-      &server.scene->tree.node, lx, ly, sx, sy);
-  if (node == NULL || node->type != WLR_SCENE_NODE_BUFFER)
-      return NULL;
+void *desktop_type_at(double lx, double ly, struct wlr_surface **surface, double *sx, double *sy) {
+  struct wlr_scene_node *node = wlr_scene_node_at(&server.scene->tree.node, lx, ly, sx, sy);
+  if (node == NULL || node->type != WLR_SCENE_NODE_BUFFER) return NULL;
 
   struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
   struct wlr_scene_surface *scene_surface = wlr_scene_surface_try_from_buffer(scene_buffer);
@@ -117,19 +113,19 @@ static node_t* find_vertical_ancestor(node_t *node) {
 }
 
 static node_t* find_horizontal_ancestor(node_t *node) {
-  if (!node || !node->parent)
-    return NULL;
+  if (!node || !node->parent) return NULL;
   node_t *p = node->parent;
+
   while (p && p->split_type != TYPE_HORIZONTAL)
     p = p->parent;
+
   return p;
 }
 
 static uint32_t get_tiled_resizable_edges(node_t *node) {
   uint32_t edges = 0;
 
-  if (!node || !node->parent)
-    return 0;
+  if (!node || !node->parent) return 0;
 
   node_t *v_ancestor = find_vertical_ancestor(node);
   if (v_ancestor) {
@@ -309,7 +305,8 @@ static void process_cursor_move(void) {
     return;
   }
 
-  if (!toplevel || !toplevel->node || !toplevel->node->client || toplevel->node->client->state != STATE_FLOATING)
+  if (!toplevel || !toplevel->node || !toplevel->node->client
+  	|| toplevel->node->client->state != STATE_FLOATING)
     return;
 
   double x = server.cursor->x - server.grab_x;
@@ -328,8 +325,8 @@ static void process_cursor_resize(void) {
     return;
   }
 
-  struct toplevel_t *toplevel = server.grabbed_toplevel;
-  struct xwayland_toplevel_t *xwayland_view = server.grabbed_xwayland_view;
+  toplevel_t *toplevel = server.grabbed_toplevel;
+  xwayland_toplevel_t *xwayland_view = server.grabbed_xwayland_view;
 
   double border_x = server.cursor->x - server.grab_x;
   double border_y = server.cursor->y - server.grab_y;
@@ -378,8 +375,7 @@ static void process_cursor_resize(void) {
     wlr_xwayland_surface_configure(xwayland_view->xwayland_surface,
       new_left, new_top, new_width, new_height);
 
-    if (!xwayland_view->node || !xwayland_view->node->client)
-      return;
+    if (!xwayland_view->node || !xwayland_view->node->client) return;
 
     // update borders
     client_t *client = xwayland_view->node->client;
@@ -525,15 +521,13 @@ static void process_cursor_motion(uint32_t time, double dx, double dy, double dx
 
       struct wlr_xdg_surface *xdg_surface = wlr_xdg_surface_try_from_wlr_surface(surface);
       if (xdg_surface != NULL && xdg_surface->role != WLR_XDG_SURFACE_ROLE_POPUP) {
-        struct toplevel_t *toplevel = type;
-        if (toplevel && toplevel->node)
-          node = toplevel->node;
+        toplevel_t *toplevel = type;
+        if (toplevel && toplevel->node) node = toplevel->node;
       } else {
         struct wlr_xwayland_surface *xwayland_surface = wlr_xwayland_surface_try_from_wlr_surface(surface);
         if (xwayland_surface != NULL) {
-          struct xwayland_toplevel_t *xwayland_view = type;
-          if (xwayland_view && xwayland_view->node)
-            node = xwayland_view->node;
+          xwayland_toplevel_t *xwayland_view = type;
+          if (xwayland_view && xwayland_view->node) node = xwayland_view->node;
         }
       }
 
@@ -545,7 +539,7 @@ static void process_cursor_motion(uint32_t time, double dx, double dy, double dx
   }
 }
 
-void begin_interactive(struct toplevel_t *toplevel, enum cursor_mode mode, uint32_t edges) {
+void begin_interactive(toplevel_t *toplevel, enum cursor_mode mode, uint32_t edges) {
   server.grabbed_toplevel = toplevel;
   server.cursor_mode = mode;
 
@@ -636,8 +630,8 @@ void cursor_button(struct wl_listener *listener, void *data) {
     if (event->button == BTN_LEFT) {
       for (output_t *m = mon_head; m != NULL; m = m->next) {
         desktop_t *d = m->desk;
-        if (d == NULL)
-          continue;
+        if (d == NULL) continue;
+
         node_t *tab_leaf = tabs_hit_test_desktop(d, server.cursor->x, server.cursor->y);
         if (tab_leaf != NULL) {
           server.focus_from_click = true;
@@ -652,21 +646,20 @@ void cursor_button(struct wl_listener *listener, void *data) {
     double sx, sy;
     struct wlr_surface *surface = NULL;
     void *type = desktop_type_at(server.cursor->x, server.cursor->y, &surface, &sx, &sy);
-    if (type == NULL)
-    	return;
+    if (type == NULL) return;
 
     struct wlr_xdg_surface *xdg_surface = wlr_xdg_surface_try_from_wlr_surface(surface);
     if (xdg_surface != NULL && xdg_surface->role == WLR_XDG_SURFACE_ROLE_POPUP) {
     	// le skip
     } else if (wlr_layer_surface_v1_try_from_wlr_surface(surface)) {
-    	struct layer_surface_t* layer = type;
+    	layer_surface_t* layer = type;
       if (layer)
       	focus_layer_surface(layer);
     } else {
     	struct wlr_xwayland_surface *xwayland_surface = wlr_xwayland_surface_try_from_wlr_surface(surface);
 
     	if (xwayland_surface != NULL) {
-    		struct xwayland_toplevel_t *xwayland_view = type;
+    		xwayland_toplevel_t *xwayland_view = type;
     		if (xwayland_view && xwayland_view->node) {
 	        output_t *m = xwayland_view->node->output;
 	        desktop_t *d = m ? m->desk : NULL;
@@ -719,8 +712,8 @@ void cursor_button(struct wl_listener *listener, void *data) {
         }
 
         if (matched_kb && (matched_kb->action == BIND_INTERACTIVE_MOVE || matched_kb->action == BIND_INTERACTIVE_RESIZE)) {
-          struct toplevel_t *toplevel = NULL;
-          if (type && ((struct toplevel_t *)type)->node)
+          toplevel_t *toplevel = NULL;
+          if (type && ((toplevel_t *)type)->node)
             toplevel = type;
 
           if (toplevel && toplevel->node && toplevel->node->client) {
@@ -848,7 +841,7 @@ void cursor_axis(struct wl_listener *listener, void *data) {
 	(void)listener;
   struct wlr_pointer_axis_event *event = data;
   wlr_seat_pointer_notify_axis(server.seat, event->time_msec, event->orientation,
-      event->delta, event->delta_discrete, event->source, event->relative_direction);
+    event->delta, event->delta_discrete, event->source, event->relative_direction);
   wlr_idle_notifier_v1_notify_activity(server.idle_notifier, server.seat);
 }
 
@@ -883,7 +876,7 @@ void handle_new_input(struct wl_listener *listener, void *data) {
   case WLR_INPUT_DEVICE_POINTER:
     wlr_cursor_attach_input_device(server.cursor, device);
     struct wlr_pointer *pointer = wlr_pointer_from_input_device(device);
-    struct pointer_t *ptr = calloc(1, sizeof(struct pointer_t));
+    pointer_t *ptr = calloc(1, sizeof(*ptr));
     ptr->wlr_pointer = pointer;
     wl_list_insert(&server.pointers, &ptr->link);
     input_apply_config(device);
@@ -895,7 +888,8 @@ void handle_new_input(struct wl_listener *listener, void *data) {
 
   uint32_t caps = WL_SEAT_CAPABILITY_POINTER;
   if (!wl_list_empty(&server.keyboards))
-      caps |= WL_SEAT_CAPABILITY_KEYBOARD;
+    caps |= WL_SEAT_CAPABILITY_KEYBOARD;
+
   wlr_seat_set_capabilities(server.seat, caps);
 }
 
@@ -908,7 +902,7 @@ void request_set_selection(struct wl_listener *listener, void *data) {
 void cursor_check_constraint_region(void) {
   struct wlr_pointer_constraint_v1 *constraint = server.active_pointer_constraint;
   pixman_region32_t *region = &constraint->region;
-  struct toplevel_t *toplevel = constraint->surface->data;
+  toplevel_t *toplevel = constraint->surface->data;
   if (server.cursor_requires_warp && toplevel) {
     server.cursor_requires_warp = false;
 
@@ -938,16 +932,14 @@ void cursor_check_constraint_region(void) {
 
 static void cursor_warp_to_constraint_hint(void) {
 	struct wlr_pointer_constraint_v1 *active = server.active_pointer_constraint;
-	if (active == NULL)
-		return;
+	if (active == NULL) return;
 
 	if (active->current.cursor_hint.enabled) {
 	  double sx = active->current.cursor_hint.x;
 	  double sy = active->current.cursor_hint.y;
 
-	  struct toplevel_t *toplevel = active->surface->data;
-	  if (!toplevel)
-	    return;
+	  toplevel_t *toplevel = active->surface->data;
+	  if (!toplevel) return;
 
 	  double lx = sx - toplevel->node->rectangle.x;
 	  double ly = sy - toplevel->node->rectangle.y;
@@ -964,8 +956,7 @@ void handle_cursor_contraint_commit(struct wl_listener *listener, void *data) {
 }
 
 static void cursor_constrain(struct wlr_pointer_constraint_v1 *constraint) {
-	if (server.active_pointer_constraint == constraint)
-    return;
+	if (server.active_pointer_constraint == constraint) return;
 
   wl_list_remove(&server.pointer_constraint_commit.link);
   if (server.active_pointer_constraint) {
@@ -987,12 +978,10 @@ static void cursor_constrain(struct wlr_pointer_constraint_v1 *constraint) {
   server.cursor_requires_warp = true;
 
   if (pixman_region32_not_empty(&constraint->current.region))
-    pixman_region32_intersect(&constraint->region,
-                              &constraint->surface->input_region,
-                              &constraint->current.region);
+    pixman_region32_intersect(&constraint->region, &constraint->surface->input_region,
+    	&constraint->current.region);
   else
-    pixman_region32_copy(&constraint->region,
-                          &constraint->surface->input_region);
+    pixman_region32_copy(&constraint->region, &constraint->surface->input_region);
 
   cursor_check_constraint_region();
 
@@ -1009,7 +998,7 @@ void handle_constraint_set_region(struct wl_listener *listener, void *data) {
 }
 
 void handle_constraint_destroy(struct wl_listener *listener, void *data) {
-	struct cursor_constraint_t *constraint = wl_container_of(listener, constraint, destroy);
+	cursor_constraint_t *constraint = wl_container_of(listener, constraint, destroy);
 	struct wlr_pointer_constraint_v1 *wlr_constraint = data;
 
 	wl_list_remove(&constraint->set_region.link);
@@ -1032,7 +1021,7 @@ void handle_pointer_constraint(struct wl_listener *listener, void *data) {
 	(void)listener;
 	struct wlr_pointer_constraint_v1 *constraint = data;
 
-	struct cursor_constraint_t *cursor_constraint = calloc(1, sizeof(struct cursor_constraint_t));
+	cursor_constraint_t *cursor_constraint = calloc(1, sizeof(*cursor_constraint));
 	cursor_constraint->constraint = constraint;
 	cursor_constraint->set_region.notify = handle_constraint_set_region;
 	wl_signal_add(&constraint->events.set_region, &cursor_constraint->set_region);
@@ -1047,8 +1036,7 @@ void handle_cursor_request_set_shape(struct wl_listener *listener, void *data) {
 	(void)listener;
 	struct wlr_cursor_shape_manager_v1_request_set_shape_event *event = data;
 
-  if (server.cursor_mode != CURSOR_PASSTHROUGH)
-    return;
+  if (server.cursor_mode != CURSOR_PASSTHROUGH) return;
 
   if (event->seat_client == server.seat->pointer_state.focused_client)
     wlr_cursor_set_xcursor(server.cursor, server.cursor_mgr, wlr_cursor_shape_v1_name(event->shape));
@@ -1058,6 +1046,7 @@ static bool gesture_binding_check(enum gesture_type type, uint8_t fingers) {
   for (size_t i = 0; i < num_gesturebinds; i++)
     if (gesturebind_matches(&gesture_bindings[i], type, fingers))
       return true;
+
   return false;
 }
 
@@ -1067,15 +1056,14 @@ static gesturebind_t *gesture_bind_match(enum gesture_type type, uint8_t fingers
 
   for (size_t i = 0; i < num_gesturebinds; i++) {
     gesturebind_t *gb = &gesture_bindings[i];
-    if (!gesturebind_matches(gb, type, fingers))
-      continue;
+    if (!gesturebind_matches(gb, type, fingers)) continue;
 
     if (gb->directions != GESTURE_DIRECTION_NONE)
       if ((directions & gb->directions) == 0)
         continue;
 
-    struct gesture_t gest = { .type = type, .fingers = fingers, .directions = directions };
-    struct gesture_t target = { .type = gb->type, .fingers = gb->fingers, .directions = gb->directions };
+    gesture_t gest = { .type = type, .fingers = fingers, .directions = directions };
+    gesture_t target = { .type = gb->type, .fingers = gb->fingers, .directions = gb->directions };
     int8_t score = gesture_compare(&gest, &target);
 
     if (score > best_score) {
@@ -1119,6 +1107,7 @@ void handle_pointer_hold_end(struct wl_listener *listener, void *data) {
   gesturebind_t *binding = gesture_bind_match(GESTURE_TYPE_HOLD, server.gesture_tracker.fingers, 0);
   if (binding)
     execute_gesturebind(binding);
+
   gesture_tracker_end(&server.gesture_tracker);
 }
 
@@ -1176,6 +1165,7 @@ void handle_pointer_pinch_end(struct wl_listener *listener, void *data) {
   gesturebind_t *binding = gesture_bind_match(GESTURE_TYPE_PINCH, server.gesture_tracker.fingers, directions);
   if (binding)
     execute_gesturebind(binding);
+
   gesture_tracker_end(&server.gesture_tracker);
 }
 
@@ -1312,9 +1302,8 @@ void handle_pointer_warp(struct wl_listener *listener, void *data) {
 		return;
 	}
 
-	struct toplevel_t *toplevel = event->surface->data;
-	if (toplevel == NULL)
-		return;
+	toplevel_t *toplevel = event->surface->data;
+	if (toplevel == NULL) return;
 
 	double lx = event->x + toplevel->node->pending.rectangle.x - toplevel->node->rectangle.x;
 	double ly = event->y + toplevel->node->pending.rectangle.y - toplevel->node->rectangle.y;

@@ -5,23 +5,20 @@
 #include "server.h"
 #include "toplevel.h"
 
-struct tearing_controller_t {
+typedef struct {
 	struct wlr_tearing_control_v1 *tearing_control;
 	struct wl_listener set_hint;
 	struct wl_listener destroy;
 	struct wl_list link;
-};
+} tearing_controller_t;
 
 static struct toplevel_t *toplevel_from_wlr_surface(struct wlr_surface *surface) {
-	if (!surface)
-		return NULL;
+	if (!surface) return NULL;
 
-	struct toplevel_t *toplevel;
+	toplevel_t *toplevel;
 	wl_list_for_each(toplevel, &server.toplevels, link) {
-		if (!toplevel->xdg_toplevel || !toplevel->xdg_toplevel->base)
-			continue;
-		if (toplevel->xdg_toplevel->base->surface == surface)
-			return toplevel;
+		if (!toplevel->xdg_toplevel || !toplevel->xdg_toplevel->base) continue;
+		if (toplevel->xdg_toplevel->base->surface == surface) return toplevel;
 	}
 
 	return NULL;
@@ -29,17 +26,17 @@ static struct toplevel_t *toplevel_from_wlr_surface(struct wlr_surface *surface)
 
 static void handle_tearing_controller_set_hint(struct wl_listener *listener, void *data) {
 	(void)data;
-	struct tearing_controller_t *controller = wl_container_of(listener, controller, set_hint);
+	tearing_controller_t *controller = wl_container_of(listener, controller, set_hint);
 
-	struct toplevel_t *toplevel = toplevel_from_wlr_surface(
-		controller->tearing_control->surface);
+	struct toplevel_t *toplevel = toplevel_from_wlr_surface(controller->tearing_control->surface);
+
 	if (toplevel)
 		toplevel->tearing_hint = controller->tearing_control->current;
 }
 
 static void handle_tearing_controller_destroy(struct wl_listener *listener,	void *data) {
 	(void)data;
-	struct tearing_controller_t *controller = wl_container_of(listener, controller, destroy);
+	tearing_controller_t *controller = wl_container_of(listener, controller, destroy);
 	wl_list_remove(&controller->set_hint.link);
 	wl_list_remove(&controller->destroy.link);
 	wl_list_remove(&controller->link);
@@ -56,9 +53,8 @@ void handle_new_tearing_hint(struct wl_listener *listener, void *data) {
 	wlr_log(WLR_DEBUG, "New presentation hint %d received for surface %p",
 		hint, (void *)tearing_control->surface);
 
-	struct tearing_controller_t *controller = calloc(1, sizeof(struct tearing_controller_t));
-	if (!controller)
-		return;
+	tearing_controller_t *controller = calloc(1, sizeof(*controller));
+	if (!controller) return;
 
 	controller->tearing_control = tearing_control;
 	controller->set_hint.notify = handle_tearing_controller_set_hint;

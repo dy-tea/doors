@@ -87,6 +87,13 @@ typedef enum {
 } keyboard_grouping_t;
 
 typedef struct {
+	bind_action_t action;
+	int desktop_index;
+	char *submap_name;
+	char *external_cmd;
+} bind_t;
+
+typedef struct {
   uint32_t modifiers;
   xkb_keysym_t keysym;
   uint32_t keycode;

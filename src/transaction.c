@@ -41,42 +41,38 @@ static struct transaction_t *transaction_create(void) {
   return txn;
 }
 
-static void transaction_destroy(struct transaction_t *txn) {
-  if (!txn)
-    return;
+static void transaction_destroy(transaction_t *txn) {
+  if (!txn) return;
 
   // free all instructions
-  struct transaction_inst_t *instruction, *tmp;
+  transaction_inst_t *instruction, *tmp;
   wl_list_for_each_safe(instruction, tmp, &txn->instructions, link) {
     node_t *node = instruction->node;
 
     wlr_log(WLR_DEBUG, "transaction_destroy: node %u ntxnrefs=%zu destroying=%d",
-            node->id, (size_t)node->ntxnrefs, node->destroying);
+      node->id, (size_t)node->ntxnrefs, node->destroying);
 
     node->ntxnrefs--;
 
     if (node->instruction == instruction)
-        node->instruction = NULL;
+      node->instruction = NULL;
 
     if (node->destroying && node->ntxnrefs == 0) {
-        wlr_log(WLR_DEBUG, "transaction_destroy: freeing destroying node %u", node->id);
-        free_node(node);
+      wlr_log(WLR_DEBUG, "transaction_destroy: freeing destroying node %u", node->id);
+      free_node(node);
     }
 
     wl_list_remove(&instruction->link);
     free(instruction);
   }
 
-  if (txn->timer)
-    wl_event_source_remove(txn->timer);
+  if (txn->timer) wl_event_source_remove(txn->timer);
 
   free(txn);
 }
 
-static void copy_node_state(node_t *node,
-                           struct transaction_inst_t *instruction) {
-  if (!node || !instruction)
-    return;
+static void copy_node_state(node_t *node, transaction_inst_t *instruction) {
+  if (!node || !instruction) return;
 
   // copy pending state to instruction
   instruction->rectangle = node->pending.rectangle;
@@ -100,12 +96,11 @@ static void copy_node_state(node_t *node,
   }
 }
 
-static void transaction_add_node(struct transaction_t *txn, node_t *node, bool server_request) {
-  if (!txn || !node)
-    return;
+static void transaction_add_node(transaction_t *txn, node_t *node, bool server_request) {
+  if (!txn || !node) return;
 
   // check if already in transaction
-  struct transaction_inst_t *existing;
+  transaction_inst_t *existing;
   wl_list_for_each(existing, &txn->instructions, link) {
     if (existing->node == node) {
       copy_node_state(node, existing);
@@ -114,7 +109,7 @@ static void transaction_add_node(struct transaction_t *txn, node_t *node, bool s
   }
 
   // create new instruction
-  struct transaction_inst_t *instruction = calloc(1, sizeof(*instruction));
+  transaction_inst_t *instruction = calloc(1, sizeof(*instruction));
   if (!instruction) {
     wlr_log(WLR_ERROR, "Failed to allocate transaction instruction");
     return;
@@ -130,16 +125,14 @@ static void transaction_add_node(struct transaction_t *txn, node_t *node, bool s
 
   // instruction is updated at commit
   node->ntxnrefs++;
-
   wlr_log(WLR_DEBUG, "transaction_add_node: node %u ntxnrefs=%zu destroying=%d",
-          node->id, (size_t)node->ntxnrefs, node->destroying);
+    node->id, (size_t)node->ntxnrefs, node->destroying);
 
   wl_list_insert(&txn->instructions, &instruction->link);
 }
 
-static void copy_node_current_state(node_t *node, struct transaction_inst_t *instruction) {
-  if (!node || !instruction)
-    return;
+static void copy_node_current_state(node_t *node, transaction_inst_t *instruction) {
+  if (!node || !instruction) return;
 
   node->current.rectangle = instruction->rectangle;
   node->current.split_ratio = instruction->split_ratio;
@@ -166,9 +159,8 @@ static void copy_node_current_state(node_t *node, struct transaction_inst_t *ins
   node->client->committed_tiled_rectangle = instruction->tiled_rectangle;
 }
 
-static void arrange_node_geometry(node_t *node, struct transaction_inst_t *instruction) {
-  if (!node || !instruction)
-    return;
+static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction) {
+  if (!node || !instruction) return;
 
   if (!node->client) {
     wlr_log(WLR_DEBUG, "Skipping arrange for node %u - client is NULL", node->id);
@@ -176,10 +168,10 @@ static void arrange_node_geometry(node_t *node, struct transaction_inst_t *instr
   }
 
   if (node->destroying) {
-    if (instruction->scene_tree) {
+    if (instruction->scene_tree)
       if (!animation_has_fade_out(instruction->scene_tree))
         wlr_scene_node_set_enabled(&instruction->scene_tree->node, false);
-    }
+
     return;
   }
 
@@ -189,14 +181,13 @@ static void arrange_node_geometry(node_t *node, struct transaction_inst_t *instr
   }
 
   bool ready = node->client->toplevel ? toplevel_is_ready(node->client->toplevel) : true;
-  if (!ready)
-    return;
+  if (!ready) return;
 
   struct wlr_box *rect;
   if (instruction->state == STATE_FULLSCREEN) {
     output_t *m = node->output;
-    if (m)
-      rect = &m->rectangle;
+
+    if (m) rect = &m->rectangle;
     else return;
   } else if (instruction->state == STATE_FLOATING)
     rect = &instruction->floating_rectangle;
@@ -213,6 +204,7 @@ static void arrange_node_geometry(node_t *node, struct transaction_inst_t *instr
     } else if (node->client->xwayland_view && node->client->xwayland_view->scene_tree) {
       wlr_scene_node_set_enabled(&node->client->xwayland_view->scene_tree->node, false);
     }
+
     return;
   }
 
@@ -355,13 +347,14 @@ static void arrange_node_geometry(node_t *node, struct transaction_inst_t *instr
   }
 }
 
-static bool node_in_transaction(struct transaction_t *txn, node_t *node) {
-  if (!txn || !node)
-    return false;
-  struct transaction_inst_t *inst;
+static bool node_in_transaction(transaction_t *txn, node_t *node) {
+  if (!txn || !node) return false;
+
+  transaction_inst_t *inst;
   wl_list_for_each(inst, &txn->instructions, link)
     if (inst->node == node)
       return true;
+
   return false;
 }
 
@@ -369,7 +362,7 @@ static bool should_skip_node(node_t *node) {
   return txn_state.pending_transaction && node_in_transaction(txn_state.pending_transaction, node);
 }
 
-static void transaction_apply(struct transaction_t *txn) {
+static void transaction_apply(transaction_t *txn) {
   if (!txn) {
     wlr_log(WLR_ERROR, "transaction_apply called with NULL txn");
     return;
@@ -379,7 +372,7 @@ static void transaction_apply(struct transaction_t *txn) {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
     double ms = (now.tv_sec - txn->commit_time.tv_sec) * 1000.0 +
-                (now.tv_nsec - txn->commit_time.tv_nsec) / 1000000.0;
+	    (now.tv_nsec - txn->commit_time.tv_nsec) / 1000000.0;
     wlr_log(WLR_INFO, "Transaction applying after %.1fms (%zu waiting, %zu total)",
       ms, txn->num_waiting, (size_t)wl_list_length(&txn->instructions));
   } else {
@@ -387,15 +380,14 @@ static void transaction_apply(struct transaction_t *txn) {
       txn->num_waiting, (size_t)wl_list_length(&txn->instructions));
   }
 
-  struct transaction_inst_t *instruction, *tmp;
+  transaction_inst_t *instruction, *tmp;
   wl_list_for_each_safe(instruction, tmp, &txn->instructions, link) {
     if (!instruction->node) {
       wlr_log(WLR_ERROR, "Skipping instruction with NULL node");
       continue;
     }
 
-    if (should_skip_node(instruction->node))
-      continue;
+    if (should_skip_node(instruction->node)) continue;
 
     wlr_log(WLR_DEBUG, "Copying state for node %u (ntxnrefs=%zu destroying=%d)",
       instruction->node->id, (size_t)instruction->node->ntxnrefs, instruction->node->destroying);
@@ -403,11 +395,8 @@ static void transaction_apply(struct transaction_t *txn) {
   }
 
   wl_list_for_each_safe(instruction, tmp, &txn->instructions, link) {
-    if (!instruction->node)
-      continue;
-
-    if (should_skip_node(instruction->node))
-      continue;
+    if (!instruction->node) continue;
+    if (should_skip_node(instruction->node)) continue;
 
     wlr_log(WLR_DEBUG, "Arranging geometry for node %u (ntxnrefs=%zu destroying=%d)",
       instruction->node->id, (size_t)instruction->node->ntxnrefs, instruction->node->destroying);
@@ -415,18 +404,13 @@ static void transaction_apply(struct transaction_t *txn) {
   }
 }
 
-static bool should_configure(node_t *node, struct transaction_inst_t *instruction) {
+static bool should_configure(node_t *node, transaction_inst_t *instruction) {
   // holy checks
-  if (!node || !instruction)
-    return false;
-  if (!node->client || !node->client->toplevel)
-    return false;
-  if (!node->client->toplevel->xdg_toplevel)
-    return false;
-  if (node->destroying)
-    return false;
-  if (!instruction->server_request)
-    return false;
+  if (!node || !instruction) return false;
+  if (!node->client || !node->client->toplevel) return false;
+  if (!node->client->toplevel->xdg_toplevel) return false;
+  if (node->destroying) return false;
+  if (!instruction->server_request) return false;
 
   // always configure if new window
   if (!node->client->toplevel->configured) {
@@ -438,7 +422,9 @@ static bool should_configure(node_t *node, struct transaction_inst_t *instructio
   struct wlr_box target_rect;
   if (node->client->state == STATE_FULLSCREEN) {
     output_t *m = node->output;
+
     if (!m) return false;
+
     target_rect = m->rectangle;
   } else if (node->client->state == STATE_FLOATING)
     target_rect = instruction->floating_rectangle;
@@ -446,45 +432,45 @@ static bool should_configure(node_t *node, struct transaction_inst_t *instructio
     target_rect = instruction->tiled_rectangle;
 
   // don't configure windows that are too small to show
-  if (target_rect.width < 1 || target_rect.height < 1)
-    return false;
+  if (target_rect.width < 1 || target_rect.height < 1) return false;
 
   // compare target size against last configured size
   struct wlr_box *last_configured = &node->client->toplevel->last_configured_size;
   bool size_changed = last_configured->width != target_rect.width ||
-                      last_configured->height != target_rect.height;
+    last_configured->height != target_rect.height;
 
   wlr_log(WLR_DEBUG, "should_configure node %u: last_configured=(%dx%d) target=(%dx%d) changed=%d",
-          node->id, last_configured->width, last_configured->height,
-          target_rect.width, target_rect.height, size_changed);
+  	node->id, last_configured->width, last_configured->height,
+	  target_rect.width, target_rect.height, size_changed);
 
   return size_changed;
 }
 
 static int handle_timeout(void *data) {
-  struct transaction_t *txn = data;
+  transaction_t *txn = data;
 
-  if (!txn)
-    return 0;
+  if (!txn) return 0;
 
   wlr_log(WLR_DEBUG, "Transaction timed out (%zu/%zu ready)",
-          wl_list_length(&txn->instructions) - txn->num_waiting,
-          (size_t)wl_list_length(&txn->instructions));
+    wl_list_length(&txn->instructions) - txn->num_waiting,
+    (size_t)wl_list_length(&txn->instructions));
 
-  struct transaction_inst_t *inst;
+  transaction_inst_t *inst;
   bool need_dirty_commit = false;
   wl_list_for_each(inst, &txn->instructions, link) {
     if (!inst->waiting || !inst->node->client || !inst->node->client->toplevel)
       continue;
+
     wlr_log(WLR_DEBUG, "Unresponsive node %u — keeping last_configured_size (%dx%d)",
-            inst->node->id,
-            inst->node->client->toplevel->last_configured_size.width,
-            inst->node->client->toplevel->last_configured_size.height);
+      inst->node->id,
+      inst->node->client->toplevel->last_configured_size.width,
+      inst->node->client->toplevel->last_configured_size.height);
+
     if (!node_in_transaction(txn_state.pending_transaction, inst->node)) {
       transaction_add_dirty_node(inst->node);
       need_dirty_commit = true;
       wlr_log(WLR_DEBUG, "Re-dirtied unresponsive node %u for re-configure",
-              inst->node->id);
+        inst->node->id);
     }
   }
 
@@ -507,11 +493,8 @@ static int handle_timeout(void *data) {
 }
 
 static void transaction_progress(void) {
-  if (!txn_state.queued_transaction)
-    return;
-
-  if (txn_state.queued_transaction->num_waiting > 0)
-    return;
+  if (!txn_state.queued_transaction) return;
+  if (txn_state.queued_transaction->num_waiting > 0) return;
 
   transaction_apply(txn_state.queued_transaction);
   cursor_rebase();
@@ -523,12 +506,11 @@ static void transaction_progress(void) {
   transaction_commit_pending();
 }
 
-static void transaction_commit(struct transaction_t *txn) {
-  if (!txn)
-    return;
+static void transaction_commit(transaction_t *txn) {
+  if (!txn) return;
 
   wlr_log(WLR_DEBUG, "transaction_commit: txn=%p with %zu instructions",
-          (void*)txn, (size_t)wl_list_length(&txn->instructions));
+    (void*)txn, (size_t)wl_list_length(&txn->instructions));
 
   if (debug_txn_timings)
     clock_gettime(CLOCK_MONOTONIC, &txn->commit_time);
@@ -560,8 +542,7 @@ static void transaction_commit(struct transaction_t *txn) {
         // send configure with new size
         instruction->serial = wlr_xdg_toplevel_set_size(
           node->client->toplevel->xdg_toplevel,
-          rect->width,
-          rect->height);
+          rect->width, rect->height);
 
         bool has_stable_frame =
           node->client->toplevel->last_configured_size.width > 0 ||
@@ -585,12 +566,8 @@ static void transaction_commit(struct transaction_t *txn) {
 
         num_configures++;
 
-        wlr_log(WLR_DEBUG,
-                "Sent configure to node %u: serial=%u size=(%dx%d) waiting=%d",
-                node->id, instruction->serial,
-                rect->width,
-                rect->height,
-                instruction->waiting);
+        wlr_log(WLR_DEBUG, "Sent configure to node %u: serial=%u size=(%dx%d) waiting=%d",
+          node->id, instruction->serial, rect->width, rect->height, instruction->waiting);
 
         toplevel_send_frame_done(node->client->toplevel);
       }
@@ -602,7 +579,7 @@ static void transaction_commit(struct transaction_t *txn) {
   txn->num_configures = num_configures;
 
   wlr_log(WLR_DEBUG, "Transaction committing with %zu configures (%zu total instructions), waiting=%zu",
-        num_configures, (size_t)wl_list_length(&txn->instructions), txn->num_waiting);
+	  num_configures, (size_t)wl_list_length(&txn->instructions), txn->num_waiting);
 
   // debug overrides
   if (debug_noatomic) {
@@ -622,8 +599,7 @@ static void transaction_commit(struct transaction_t *txn) {
     transaction_destroy(txn);
   } else {
     // set up timer for client response timeout
-    txn->timer = wl_event_loop_add_timer(
-      wl_display_get_event_loop(server.wl_display),
+    txn->timer = wl_event_loop_add_timer(wl_display_get_event_loop(server.wl_display),
       handle_timeout, txn);
 
     if (txn->timer)
@@ -634,19 +610,16 @@ static void transaction_commit(struct transaction_t *txn) {
 }
 
 static void transaction_commit_pending(void) {
-  if (txn_state.queued_transaction)
-    return;
-  if (!txn_state.pending_transaction)
-    return;
+  if (txn_state.queued_transaction) return;
+  if (!txn_state.pending_transaction) return;
 
-  struct transaction_t *txn = txn_state.pending_transaction;
+  transaction_t *txn = txn_state.pending_transaction;
   txn_state.pending_transaction = NULL;
   transaction_commit(txn);
 }
 
 static void _transaction_commit_dirty(bool server_request) {
-  if (txn_state.dirty_count == 0)
-    return;
+  if (txn_state.dirty_count == 0) return;
 
   // always accumulate dirty nodes into pending_transaction
   if (!txn_state.pending_transaction) {
@@ -667,7 +640,7 @@ static void _transaction_commit_dirty(bool server_request) {
 
 void transaction_commit_dirty(void) {
   wlr_log(WLR_DEBUG, "transaction_commit_dirty called with %zu dirty nodes",
-          txn_state.dirty_count);
+    txn_state.dirty_count);
   _transaction_commit_dirty(true);
 }
 
@@ -675,36 +648,31 @@ void transaction_commit_dirty_client(void) {
   _transaction_commit_dirty(false);
 }
 
-static void set_instruction_ready(struct transaction_inst_t *instruction) {
-  if (!instruction || !instruction->waiting)
-    return;
+static void set_instruction_ready(transaction_inst_t *instruction) {
+  if (!instruction || !instruction->waiting) return;
 
-  struct transaction_t *txn = instruction->transaction;
-
+  transaction_t *txn = instruction->transaction;
   instruction->waiting = false;
   txn->num_waiting--;
 
   wlr_log(WLR_DEBUG, "Instruction ready for node %u (%zu remaining)",
-          instruction->node->id, txn->num_waiting);
+    instruction->node->id, txn->num_waiting);
 
   transaction_progress();
 }
 
-bool transaction_notify_view_ready_by_serial(struct toplevel_t *toplevel,
+bool transaction_notify_view_ready_by_serial(toplevel_t *toplevel,
 		uint32_t serial) {
-  if (!toplevel || !toplevel->node)
-    return false;
+  if (!toplevel || !toplevel->node) return false;
 
   node_t *node = toplevel->node;
+  if (!node->instruction) return false;
 
-  if (!node->instruction)
-    return false;
-
-  struct transaction_inst_t *instruction = node->instruction;
+  transaction_inst_t *instruction = node->instruction;
 
   if (instruction->serial == serial && instruction->waiting) {
     wlr_log(WLR_DEBUG, "View ready by serial %u for node %u",
-            serial, node->id);
+      serial, node->id);
     set_instruction_ready(instruction);
     return true;
   }
@@ -713,25 +681,21 @@ bool transaction_notify_view_ready_by_serial(struct toplevel_t *toplevel,
 }
 
 void transaction_notify_view_unmapped(node_t *node) {
-  if (!node || !node->instruction || !node->instruction->waiting)
-    return;
+  if (!node || !node->instruction || !node->instruction->waiting) return;
 
-  struct transaction_inst_t *instruction = node->instruction;
+  transaction_inst_t *instruction = node->instruction;
   wlr_log(WLR_DEBUG, "View unmapped for node %u - marking instruction ready", node->id);
   set_instruction_ready(instruction);
 }
 
-bool transaction_notify_view_ready_by_geometry(struct toplevel_t *toplevel,
+bool transaction_notify_view_ready_by_geometry(toplevel_t *toplevel,
 		int x, int y, int width, int height) {
-  if (!toplevel || !toplevel->node)
-    return false;
+  if (!toplevel || !toplevel->node) return false;
 
   node_t *node = toplevel->node;
+  if (!node->instruction) return false;
 
-  if (!node->instruction)
-    return false;
-
-  struct transaction_inst_t *instruction = node->instruction;
+  transaction_inst_t *instruction = node->instruction;
 
   if (instruction->waiting &&
     (int)instruction->content_rect.x == x &&
@@ -740,7 +704,7 @@ bool transaction_notify_view_ready_by_geometry(struct toplevel_t *toplevel,
     (int)instruction->content_rect.height == height) {
 
     wlr_log(WLR_DEBUG, "View ready by geometry (%d,%d %dx%d) for node %u",
-            x, y, width, height, node->id);
+      x, y, width, height, node->id);
     set_instruction_ready(instruction);
     return true;
   }
@@ -781,20 +745,19 @@ void transaction_fini(void) {
 }
 
 void transaction_add_dirty_node(node_t *node) {
-  if (!node || node->dirty)
-    return;
+  if (!node || node->dirty) return;
 
   node->dirty = true;
 
   // add to dirty list
   if (txn_state.dirty_count >= txn_state.dirty_capacity) {
     txn_state.dirty_capacity = txn_state.dirty_capacity == 0 ? 32 :
-                                txn_state.dirty_capacity * 2;
+      txn_state.dirty_capacity * 2;
     txn_state.dirty_nodes = realloc(txn_state.dirty_nodes,
-                                    txn_state.dirty_capacity * sizeof(node_t*));
+      txn_state.dirty_capacity * sizeof(node_t*));
   }
   txn_state.dirty_nodes[txn_state.dirty_count++] = node;
 
   wlr_log(WLR_DEBUG, "transaction_add_dirty_node: node %u (total=%zu)",
-          node->id, txn_state.dirty_count);
+    node->id, txn_state.dirty_count);
 }

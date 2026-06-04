@@ -20,8 +20,7 @@ void output_config_init(void) {
 
 struct output_config *output_config_create(const char *name) {
   struct output_config *oc = calloc(1, sizeof(*oc));
-  if (!oc)
-    return NULL;
+  if (!oc) return NULL;
 
   oc->name = strdup(name);
   oc->enable = OUTPUT_CONFIG_ENABLE_AUTO;
@@ -247,7 +246,7 @@ void output_update_manager_config(void) {
 
   for (output_t *output = mon_head; output != NULL; output = output->next) {
     struct wlr_output_configuration_head_v1 *head =
-        wlr_output_configuration_head_v1_create(config, output->wlr_output);
+      wlr_output_configuration_head_v1_create(config, output->wlr_output);
 
     struct wlr_output_head_v1_state *state = &head->state;
     state->enabled = output->wlr_output->enabled;
@@ -263,7 +262,7 @@ void output_update_manager_config(void) {
         output->wlr_output->adaptive_sync_status == WLR_OUTPUT_ADAPTIVE_SYNC_ENABLED;
 
     struct wlr_output_layout_output *layout_output =
-        wlr_output_layout_get(server.output_layout, output->wlr_output);
+      wlr_output_layout_get(server.output_layout, output->wlr_output);
     if (layout_output) {
       state->x = layout_output->x;
       state->y = layout_output->y;

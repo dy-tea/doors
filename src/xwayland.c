@@ -139,6 +139,7 @@ static void unmanaged_handle_map(struct wl_listener *listener, void *data) {
 				xwayland_toplevel_t *parent_view = xsurface->parent->data;
 				wlr_log(WLR_INFO, "Parent view found: scene_tree=%p node=%p",
 					(void*)parent_view->scene_tree, (void*)parent_view->node);
+
 				if (parent_view->xwayland_surface && parent_view->node) {
 					// convert from X11 space to screen space
 					int x_offset = xsurface->x - parent_view->xwayland_surface->x;
@@ -150,6 +151,7 @@ static void unmanaged_handle_map(struct wl_listener *listener, void *data) {
 						abs_x = parent_view->node->rectangle.x + x_offset;
 						abs_y = parent_view->node->rectangle.y + y_offset;
 					}
+
 					wlr_log(WLR_INFO, "Parent X11 at (%d,%d), node at (%d,%d), popup X11 at (%d,%d), offset (%d,%d), final: (%d,%d)",
 						parent_view->xwayland_surface->x, parent_view->xwayland_surface->y,
 						parent_view->node->rectangle.x, parent_view->node->rectangle.y,
@@ -169,9 +171,11 @@ add_abs:
 			if (!focused_view) {
 				wlr_log(WLR_INFO, "last_focused is NULL, searching for any mapped xwayland window");
 				output_t *mon = server.focused_output ? server.focused_output : mon_head;
+
 				if (mon && mon->desk) {
 					desktop_t *d = mon->desk;
 					node_t *n = d->root;
+
 					while (n && !focused_view) {
 						if (n->client && n->client->toplevel == NULL) {
 							if (n->rectangle.x > 0 || n->rectangle.y > 0 ||
@@ -183,11 +187,13 @@ add_abs:
 									abs_x = n->rectangle.x + xsurface->x;
 									abs_y = n->rectangle.y + xsurface->y;
 								}
+
 								wlr_log(WLR_INFO, "Using found node position, final: (%d,%d)", abs_x, abs_y);
 								focused_view = (xwayland_toplevel_t *)1;
 								break;
 							}
 						}
+
 						if (n->first_child) {
 							n = n->first_child;
 						} else if (n->second_child) {
@@ -200,6 +206,7 @@ add_abs:
 								}
 								n = n->parent;
 							}
+
 							if (!n->parent) break;
 						}
 					}
@@ -557,21 +564,13 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	output_t *target_monitor = target_desktop->output ? target_desktop->output : mon;
 	node->output = target_monitor;
 
-	if (rule && rule->has_hidden)
-		node->hidden = rule->hidden;
-
-	if (rule && rule->has_sticky)
-		node->sticky = rule->sticky;
-
-	if (rule && rule->has_locked)
-		node->locked = rule->locked;
-
-	if (rule && rule->has_block_out_from_screenshare)
-		client->block_out_from_screenshare = rule->block_out_from_screenshare;
-
-	if (rule && (rule->has_scroller_proportion || rule->has_scroller_proportion_single)) {
-		scroller_apply_client_rules(client,
-			rule->has_scroller_proportion ? rule->scroller_proportion : 0.0f,
+	if (rule) {
+		if (rule->has_hidden) node->hidden = rule->hidden;
+		if (rule->has_sticky) node->sticky = rule->sticky;
+		if (rule->has_locked) node->locked = rule->locked;
+		if (rule->has_block_out_from_screenshare) client->block_out_from_screenshare = rule->block_out_from_screenshare;
+		if (rule->has_scroller_proportion || rule->has_scroller_proportion_single)
+			scroller_apply_client_rules(client, rule->has_scroller_proportion ? rule->scroller_proportion : 0.0f,
 			rule->has_scroller_proportion_single ? rule->scroller_proportion_single : 0.0f);
 	}
 
@@ -613,11 +612,13 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	} else {
 		if (client->state != STATE_PSEUDO_TILED)
 			client->state = STATE_TILED;
+
 		node->rectangle.width = xsurface->width;
 		node->rectangle.height = xsurface->height;
 		client->shown = true;
 		wlr_scene_node_set_enabled(&xwayland_view->scene_tree->node, true);
 		wlr_scene_node_set_enabled(&xwayland_view->content_tree->node, true);
+
 		wlr_log(WLR_DEBUG, "XWayland window will be tiled, scene_tree=%p enabled=%d",
 			(void*)xwayland_view->scene_tree,
 			xwayland_view->scene_tree->node.enabled);
@@ -694,6 +695,7 @@ static void handle_unmap(struct wl_listener *listener, void *data) {
 	if (xwayland_view->node) {
 		output_t *mon = xwayland_view->node->output;
 		desktop_t *desk = NULL;
+
 		if (mon) {
 			for (desktop_t *d = mon->desk_head; d; d = d->next) {
 				node_t *n = d->root;
@@ -820,8 +822,7 @@ static void handle_request_fullscreen(struct wl_listener *listener, void *data) 
 	struct wlr_xwayland_surface *xsurface = xwayland_view->xwayland_surface;
 
 	node_t *node = xwayland_view->node;
-	if (!node || !node->client || !node->output || !node->desktop)
-		return;
+	if (!node || !node->client || !node->output || !node->desktop) return;
 
 	client_t *client = node->client;
 	output_t *m = node->output;
@@ -1177,8 +1178,10 @@ void handle_xwayland_ready(struct wl_listener *listener, void *data) {
 	for (size_t i = 0; i < ATOM_LAST; i++) {
 		xcb_generic_error_t *error = NULL;
 		xcb_intern_atom_reply_t *reply = xcb_intern_atom_reply(xcb_conn, cookies[i], &error);
+
 		if (reply != NULL && error == NULL)
 			xwayland->atoms[i] = reply->atom;
+
 		free(reply);
 		free(error);
 	}

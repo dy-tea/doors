@@ -92,8 +92,7 @@ void output_frame(struct wl_listener *listener, void *data) {
   struct timespec now;
   bool animating = false;
 
-	if (!scene_output)
-		return;
+	if (!scene_output) return;
 
 	output_configure_scene(output);
   clock_gettime(CLOCK_MONOTONIC, &now);
@@ -192,8 +191,7 @@ void handle_new_output(struct wl_listener *listener, void *data) {
 	(void)listener;
   struct wlr_output *wlr_output = data;
   output_t *output = calloc(1, sizeof(*output));
-  if (!output)
-    return;
+  if (!output) return;
 
   output->wlr_output = wlr_output;
   wlr_output_init_render(wlr_output, server.allocator, server.renderer);
@@ -346,14 +344,13 @@ void output_destroy(output_t *output) {
 }
 
 output_t *output_from_wlr_output(struct wlr_output *wlr_output) {
-  if (!wlr_output)
-    return NULL;
+  if (!wlr_output) return NULL;
+
   return wlr_output->data;
 }
 
 output_t *output_get_in_direction(output_t *reference, uint32_t direction) {
-  if (!reference || !direction)
-    return NULL;
+  if (!reference || !direction) return NULL;
 
   struct wlr_box output_box;
   wlr_output_layout_get_box(server.output_layout, reference->wlr_output, &output_box);
@@ -361,18 +358,16 @@ output_t *output_get_in_direction(output_t *reference, uint32_t direction) {
   int lx = output_box.x + output_box.width / 2;
   int ly = output_box.y + output_box.height / 2;
 
-  struct wlr_output *wlr_adjacent = wlr_output_layout_adjacent_output(
-      server.output_layout, direction, reference->wlr_output, lx, ly);
+  struct wlr_output *wlr_adjacent = wlr_output_layout_adjacent_output(server.output_layout,
+		direction, reference->wlr_output, lx, ly);
 
-  if (!wlr_adjacent)
-    return NULL;
+  if (!wlr_adjacent) return NULL;
 
   return output_from_wlr_output(wlr_adjacent);
 }
 
 void output_update_usable_area(output_t *output) {
-  if (!output || !output->enabled)
-    return;
+  if (!output || !output->enabled) return;
 
   output->usable_area.x = 0;
   output->usable_area.y = 0;
@@ -381,8 +376,8 @@ void output_update_usable_area(output_t *output) {
 }
 
 void output_set_scale_filter(output_t *output, enum scale_filter_mode mode) {
-  if (!output)
-    return;
+  if (!output) return;
+
   output->scale_filter_mode = mode;
   output_configure_scene(output);
 }
@@ -390,14 +385,13 @@ void output_set_scale_filter(output_t *output, enum scale_filter_mode mode) {
 void output_get_identifier(char *identifier, size_t len, output_t *output) {
   struct wlr_output *wlr_output = output->wlr_output;
   snprintf(identifier, len, "%s %s %s",
-      wlr_output->make ? wlr_output->make : "Unknown",
-      wlr_output->model ? wlr_output->model : "Unknown",
-      wlr_output->serial ? wlr_output->serial : "Unknown");
+    wlr_output->make ? wlr_output->make : "Unknown",
+    wlr_output->model ? wlr_output->model : "Unknown",
+    wlr_output->serial ? wlr_output->serial : "Unknown");
 }
 
 void output_update_scale(output_t *output, float scale) {
-  if (!output || !output->wlr_output)
-    return;
+  if (!output || !output->wlr_output) return;
 
   struct wlr_output *wlr_output = output->wlr_output;
 
@@ -413,7 +407,7 @@ void output_update_scale(output_t *output, float scale) {
   output->height = layout_box.height;
   output->rectangle = layout_box;
 
-  struct toplevel_t *toplevel;
+  toplevel_t *toplevel;
   wl_list_for_each(toplevel, &server.toplevels, link) {
     if (!toplevel->xdg_toplevel || !toplevel->xdg_toplevel->base ||
         !toplevel->xdg_toplevel->base->surface || !toplevel->node)
@@ -430,10 +424,9 @@ void output_update_scale(output_t *output, float scale) {
 
   // notify all layer surfaces on this output
   for (int i = 0; i < 4; i++) {
-    struct layer_surface_t *layer;
+    layer_surface_t *layer;
     wl_list_for_each(layer, &output->layers[i], link) {
-      if (!layer->layer_surface || !layer->layer_surface->surface)
-        continue;
+      if (!layer->layer_surface || !layer->layer_surface->surface) continue;
 
       struct wlr_surface *surface = layer->layer_surface->surface;
       wlr_log(WLR_DEBUG, "Notifying layer surface of scale %.2f", scale);
@@ -455,5 +448,6 @@ output_t *output_get_valid(void) {
   for (output_t *m = mon_head; m != NULL; m = m->next)
     if (m->enabled && m->wlr_output)
       return m;
+
   return NULL;
 }

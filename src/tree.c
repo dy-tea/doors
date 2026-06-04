@@ -64,8 +64,7 @@ uint32_t next_monitor_id = 1;
 
 node_t *make_node(uint32_t id) {
   node_t *n = (node_t *)calloc(1, sizeof(node_t));
-  if (n == NULL)
-    return NULL;
+  if (n == NULL) return NULL;
 
   n->id = id != 0 ? id : next_node_id++;
   n->split_type = TYPE_VERTICAL;
@@ -107,8 +106,7 @@ node_t *make_node(uint32_t id) {
 
 client_t *make_client(void) {
   client_t *c = (client_t *)calloc(1, sizeof(client_t));
-  if (c == NULL)
-    return NULL;
+  if (c == NULL) return NULL;
 
   c->state = STATE_TILED;
   c->last_state = STATE_TILED;
@@ -118,15 +116,14 @@ client_t *make_client(void) {
   c->shown = false;
   c->border_width = border_width;
 
-  // Initialize scroller properties
+  // initialize scroller properties
   scroller_init_client(c);
 
   return c;
 }
 
 void free_node(node_t *n) {
-  if (n == NULL)
-    return;
+  if (n == NULL) return;
 
   animation_cancel_node(n);
 
@@ -154,13 +151,11 @@ void free_node(node_t *n) {
 }
 
 bool is_leaf(node_t *n) {
-  return (n != NULL && n->first_child == NULL &&
-          n->second_child == NULL);
+  return (n != NULL && n->first_child == NULL && n->second_child == NULL);
 }
 
 bool is_tiled(client_t *c) {
-  return c != NULL &&
-         (c->state == STATE_TILED || c->state == STATE_PSEUDO_TILED);
+  return c != NULL && (c->state == STATE_TILED || c->state == STATE_PSEUDO_TILED);
 }
 
 bool is_floating(client_t *c) {
@@ -176,68 +171,72 @@ bool is_second_child(node_t *n) {
 }
 
 unsigned int clients_count_in(node_t *n) {
-  if (n == NULL)
-    return 0;
-  if (is_leaf(n))
-    return n->client != NULL ? 1 : 0;
+  if (n == NULL) return 0;
+
+  if (is_leaf(n)) return n->client != NULL ? 1 : 0;
+
   return clients_count_in(n->first_child) + clients_count_in(n->second_child);
 }
 
 int tiled_count(node_t *n, bool include_receptacles) {
-  if (n == NULL)
-    return 0;
+  if (n == NULL) return 0;
 
   if (is_leaf(n)) {
     if (n->client == NULL)
       return include_receptacles ? 1 : 0;
+
     return IS_TILED(n->client) ? 1 : 0;
   }
 
   return tiled_count(n->first_child, include_receptacles) +
-         tiled_count(n->second_child, include_receptacles);
+    tiled_count(n->second_child, include_receptacles);
 }
 
 node_t *brother_tree(node_t *n) {
-  if (n == NULL || n->parent == NULL)
-    return NULL;
+  if (n == NULL || n->parent == NULL) return NULL;
+
   return is_first_child(n) ? n->parent->second_child : n->parent->first_child;
 }
 
 node_t *first_extrema(node_t *n) {
-  if (n == NULL)
-    return NULL;
+  if (n == NULL) return NULL;
+
   for (; !is_leaf(n); n = n->first_child)
     ;
+
   return n;
 }
 
 node_t *second_extrema(node_t *n) {
-  if (n == NULL)
-    return NULL;
+  if (n == NULL) return NULL;
+
   for (; !is_leaf(n); n = n->second_child)
     ;
+
   return n;
 }
 
 node_t *next_leaf(node_t *n, node_t *r) {
-  if (n == NULL || n == r)
-    return NULL;
+  if (n == NULL || n == r) return NULL;
+
   node_t *p = n;
   for (; is_second_child(p) && p != r; p = p->parent)
     ;
-  if (p == r || p->parent == NULL)
-    return NULL;
+
+  if (p == r || p->parent == NULL) return NULL;
+
   return first_extrema(p->parent->second_child);
 }
 
 node_t *prev_leaf(node_t *n, node_t *r) {
-  if (n == NULL || n == r)
-    return NULL;
+  if (n == NULL || n == r) return NULL;
+
   node_t *p = n;
   for (; is_first_child(p) && p != r; p = p->parent)
     ;
-  if (p == r || p->parent == NULL)
-    return NULL;
+
+  if (p == r || p->parent == NULL) return NULL;
+
   return second_extrema(p->parent->first_child);
 }
 
@@ -249,21 +248,20 @@ void arrange(output_t *m, desktop_t *d, bool use_transaction) {
   }
 
   struct wlr_box rect;
-  if (m)
-    rect = m->usable_area;
-  else
-    rect = m->rectangle;
+  if (m) rect = m->usable_area;
+  else   rect = m->rectangle;
 
   rect.x += m->padding.left + d->padding.left;
   rect.y += m->padding.top + d->padding.top;
   rect.width -= m->padding.left + d->padding.left + d->padding.right + m->padding.right;
   rect.height -= m->padding.top + d->padding.top + d->padding.bottom + m->padding.bottom;
 
-  // Handle scroller layout separately
+  // handle scroller layout separately
   if (d->layout == LAYOUT_SCROLLER) {
     scroller_arrange(m, d, rect);
     if (use_transaction)
       transaction_commit_dirty();
+
     return;
   }
 
@@ -289,8 +287,7 @@ void arrange(output_t *m, desktop_t *d, bool use_transaction) {
 
 static void render_leaf(output_t *m, desktop_t *d, node_t *n,
   	struct wlr_box rect, struct wlr_box root_rect, bool omit_window_gap) {
-  if (n == NULL || n->client == NULL)
-    return;
+  if (n == NULL || n->client == NULL) return;
 
   unsigned int bw = n->client->border_width;
 
@@ -303,17 +300,20 @@ static void render_leaf(output_t *m, desktop_t *d, node_t *n,
     r = root_rect;
     int wg = gapless_monocle ? 0 : d->window_gap;
     int bleed = wg + 2 * bw;
+
     r.x += bw;
     r.y += bw;
     r.width = (bleed < r.width ? r.width - bleed : 0);
     r.height = (bleed < r.height ? r.height - bleed : 0);
   } else {
     r = rect;
+
     int wg;
     if (omit_window_gap)
       wg = 0;
     else
       wg = (gapless_monocle && d->layout == LAYOUT_MONOCLE) ? 0 : d->window_gap;
+
     int bleed = wg + 2 * bw;
     r.x += bw;
     r.y += bw;
@@ -337,10 +337,8 @@ static void render_leaf(output_t *m, desktop_t *d, node_t *n,
 
 static void apply_layout_tabbed_subtree(output_t *m, desktop_t *d, node_t *n,
     struct wlr_box content_rect, struct wlr_box root_rect) {
-  if (n == NULL)
-    return;
-  if (n->client && n->client->state == STATE_FLOATING)
-    return;
+  if (n == NULL) return;
+  if (n->client && n->client->state == STATE_FLOATING) return;
 
   n->pending.rectangle = content_rect;
   n->output = m;
@@ -357,14 +355,11 @@ static void apply_layout_tabbed_subtree(output_t *m, desktop_t *d, node_t *n,
 
 void apply_layout(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect,
 	struct wlr_box root_rect) {
-  if (n == NULL)
-    return;
+  if (n == NULL) return;
 
   // skip hidden or floating nodes from tiled layout
-  if (n->hidden)
-    return;
-  if (n->client && n->client->state == STATE_FLOATING)
-    return;
+  if (n->hidden) return;
+  if (n->client && n->client->state == STATE_FLOATING) return;
 
   // set pending
   n->pending.rectangle = rect;
@@ -372,7 +367,7 @@ void apply_layout(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect,
   node_set_dirty(n);
 
   wlr_log(WLR_DEBUG, "apply_layout: node %u pending_rect=(%d,%d %dx%d)",
-          n->id, rect.x, rect.y, rect.width, rect.height);
+    n->id, rect.x, rect.y, rect.width, rect.height);
 
   if (is_leaf(n)) {
     wlr_log(WLR_DEBUG, "apply_layout: node %u is_leaf, n->client=%p", n->id, (void*)n->client);
@@ -423,12 +418,11 @@ void apply_layout(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect,
     node_t *active = tab_focus_leaf(n, d->focus);
     for (node_t *leaf = first_extrema(n); leaf != NULL && leaf != n;
          leaf = next_leaf(leaf, n)) {
-      if (leaf->client == NULL)
-        continue;
-      if (leaf->client->state == STATE_FLOATING)
-        continue;
+      if (leaf->client == NULL) continue;
+      if (leaf->client->state == STATE_FLOATING) continue;
       bool show = (leaf == active);
       leaf->client->shown = show;
+
       struct wlr_scene_tree *st = client_get_scene_tree(leaf->client);
       if (st)
         wlr_scene_node_set_enabled(&st->node, show);
@@ -438,6 +432,7 @@ void apply_layout(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect,
         toplevel_send_frame_done(leaf->client->toplevel);
       }
     }
+
     return;
   } else {
     struct wlr_box first_rect;
@@ -458,15 +453,16 @@ void apply_layout(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect,
 
     if (n->first_child != NULL && !first_valid) {
       wlr_log(WLR_ERROR, "Node %u has invalid/destroying/freed first_child pointer %p (destroying=%d), nulling",
-              n->id, (void*)n->first_child,
-              n->first_child && (uintptr_t)n->first_child->client != sentinel ? n->first_child->destroying : -1);
+        n->id, (void*)n->first_child,
+        n->first_child && (uintptr_t)n->first_child->client != sentinel ? n->first_child->destroying : -1);
       n->first_child = NULL;
       first_valid = false;
     }
+
     if (n->second_child != NULL && !second_valid) {
       wlr_log(WLR_ERROR, "Node %u has invalid/destroying/freed second_child pointer %p (destroying=%d), nulling",
-              n->id, (void*)n->second_child,
-              n->second_child && (uintptr_t)n->second_child->client != sentinel ? n->second_child->destroying : -1);
+        n->id, (void*)n->second_child,
+        n->second_child && (uintptr_t)n->second_child->client != sentinel ? n->second_child->destroying : -1);
       n->second_child = NULL;
       second_valid = false;
     }
@@ -515,6 +511,7 @@ void apply_layout(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect,
       } else {
         first_rect = rect;
         second_rect = rect;
+
         int fence = (int)(n->split_ratio * rect.width);
         uint16_t first_min = n->first_child ? n->first_child->constraints.min_width : 0;
         uint16_t second_min = n->second_child ? n->second_child->constraints.min_width : 0;
@@ -524,6 +521,7 @@ void apply_layout(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect,
           else if (fence > rect.width - second_min)
             fence = rect.width - second_min;
         }
+
         first_rect.width = fence;
         second_rect.x += fence;
         second_rect.width = rect.width - fence;
@@ -538,6 +536,7 @@ void apply_layout(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect,
       } else {
         first_rect = rect;
         second_rect = rect;
+
         int fence = (int)(n->split_ratio * rect.height);
         uint16_t first_min = n->first_child ? n->first_child->constraints.min_height : 0;
         uint16_t second_min = n->second_child ? n->second_child->constraints.min_height : 0;
@@ -547,6 +546,7 @@ void apply_layout(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect,
           else if (fence > rect.height - second_min)
             fence = rect.height - second_min;
         }
+
         first_rect.height = fence;
         second_rect.y += fence;
         second_rect.height = rect.height - fence;
@@ -559,8 +559,8 @@ void apply_layout(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect,
 }
 
 unsigned int node_area(node_t *n) {
-  if (n == NULL)
-    return 0;
+  if (n == NULL) return 0;
+
   return n->rectangle.width * n->rectangle.height;
 }
 
@@ -568,10 +568,9 @@ node_t *find_public(desktop_t *d) {
   unsigned int b_area = 0;
   node_t *b = NULL;
 
-  for (node_t *n = first_extrema(d->root); n != NULL;
-       n = next_leaf(n, d->root)) {
-    if (n->vacant)
-      continue;
+  for (node_t *n = first_extrema(d->root); n != NULL; n = next_leaf(n, d->root)) {
+    if (n->vacant) continue;
+
     unsigned int n_area = node_area(n);
     if (n_area > b_area && (n->presel != NULL || !n->private_node)) {
       b = n;
@@ -583,8 +582,7 @@ node_t *find_public(desktop_t *d) {
 }
 
 node_t *insert_node(desktop_t *d, node_t *n, node_t *f) {
-  if (d == NULL || n == NULL)
-    return NULL;
+  if (d == NULL || n == NULL) return NULL;
 
   n->desktop = d;
 
@@ -607,8 +605,7 @@ node_t *insert_node(desktop_t *d, node_t *n, node_t *f) {
     return NULL;
   }
 
-  if (f == NULL)
-    f = d->root;
+  if (f == NULL) f = d->root;
 
   // fall back to the tree root to avoid corrupting the tree structure
   if (f != NULL && f != d->root && f->parent == NULL) {
@@ -677,20 +674,15 @@ node_t *insert_node(desktop_t *d, node_t *n, node_t *f) {
 
       // determine split type
       if (p == NULL || automatic_scheme == SCHEME_LONGEST_SIDE || single_tiled) {
-        c->split_type = f->rectangle.width >= f->rectangle.height
-                            ? TYPE_VERTICAL
-                            : TYPE_HORIZONTAL;
+        c->split_type = f->rectangle.width >= f->rectangle.height ? TYPE_VERTICAL : TYPE_HORIZONTAL;
       } else if (automatic_scheme == SCHEME_ALTERNATE) {
         node_t *q = p;
         for (; q != NULL && (q->first_child->vacant || q->second_child->vacant); q = q->parent)
           ;
-        if (q == NULL)
-          q = p;
-        if (q != NULL)
-          c->split_type = (q->split_type == TYPE_HORIZONTAL) ? TYPE_VERTICAL
-                                                             : TYPE_HORIZONTAL;
-        else
-          c->split_type = TYPE_VERTICAL;
+
+        if (q == NULL) q = p;
+        if (q != NULL) c->split_type = (q->split_type == TYPE_HORIZONTAL) ? TYPE_VERTICAL : TYPE_HORIZONTAL;
+        else c->split_type = TYPE_VERTICAL;
       } else {
         c->split_type = TYPE_VERTICAL;
       }
@@ -805,8 +797,7 @@ node_t *insert_node(desktop_t *d, node_t *n, node_t *f) {
 }
 
 void remove_node(desktop_t *d, node_t *n) {
-  if (n == NULL || d == NULL)
-    return;
+  if (n == NULL || d == NULL) return;
 
   wlr_log(WLR_DEBUG, "remove_node: node=%u state=%d parent=%u root=%u focus=%u",
     n->id, n->client ? (int)n->client->state : -1,
@@ -861,7 +852,7 @@ void remove_node(desktop_t *d, node_t *n) {
     if (b == NULL) {
     	// remove your existence if you don't have a brother
       wlr_log(WLR_ERROR, "remove_node: Node %u brother is NULL, clearing desktop %s root (tree corrupted)",
-              n->id, d->name);
+        n->id, d->name);
       d->root = NULL;
       d->focus = NULL;
       return;
@@ -966,8 +957,7 @@ void remove_node(desktop_t *d, node_t *n) {
 }
 
 void close_node(node_t *n) {
-  if (n == NULL || n->client == NULL)
-    return;
+  if (n == NULL || n->client == NULL) return;
 
   if (n->client->toplevel != NULL)
   	wlr_xdg_toplevel_send_close(n->client->toplevel->xdg_toplevel);
@@ -976,8 +966,7 @@ void close_node(node_t *n) {
 }
 
 void kill_node(desktop_t *d, node_t *n) {
-  if (n == NULL)
-    return;
+  if (n == NULL) return;
 
   // freeze buffers before closing nodes
   toplevel_freeze_sibling_buffers(d, n);
@@ -986,8 +975,7 @@ void kill_node(desktop_t *d, node_t *n) {
 }
 
 bool focus_node(output_t *m, desktop_t *d, node_t *n) {
-  if (m == NULL || d == NULL || n == NULL)
-    return false;
+  if (m == NULL || d == NULL || n == NULL) return false;
 
   d->focus = n;
   mon = m;
@@ -1029,12 +1017,12 @@ bool focus_node(output_t *m, desktop_t *d, node_t *n) {
       tabs_update_focus(t, n);
       for (node_t *leaf = first_extrema(t); leaf != NULL && leaf != t;
            leaf = next_leaf(leaf, t)) {
-        if (leaf->client == NULL)
-          continue;
-        if (leaf->client->state == STATE_FLOATING)
-          continue;
+        if (leaf->client == NULL) continue;
+        if (leaf->client->state == STATE_FLOATING) continue;
+
         bool show = (leaf == n);
         leaf->client->shown = show;
+
         struct wlr_scene_tree *st = client_get_scene_tree(leaf->client);
         if (st)
           wlr_scene_node_set_enabled(&st->node, show);
@@ -1052,14 +1040,14 @@ bool focus_node(output_t *m, desktop_t *d, node_t *n) {
   // update border colors for all visible clients on this desktop
   if (is_current_desktop && d->root != NULL) {
     for (node_t *node = first_extrema(d->root); node != NULL; node = next_leaf(node, d->root)) {
-      if (node->client == NULL)
-        continue;
+      if (node->client == NULL) continue;
+
       if (node->client->toplevel) {
         update_border_colors(node->client->toplevel->border_tree,
-                            node->client->toplevel->border_rects, node->client);
+          node->client->toplevel->border_rects, node->client);
       } else if (node->client->xwayland_view) {
         update_border_colors(node->client->xwayland_view->border_tree,
-                            node->client->xwayland_view->border_rects, node->client);
+          node->client->xwayland_view->border_rects, node->client);
       }
     }
   }
@@ -1081,8 +1069,7 @@ bool activate_node(output_t *m, desktop_t *d, node_t *n) {
 }
 
 bool is_adjacent(node_t *a, node_t *b, direction_t dir) {
-  if (a == NULL || b == NULL)
-    return false;
+  if (a == NULL || b == NULL) return false;
 
   struct wlr_box ra = a->rectangle;
   struct wlr_box rb = b->rectangle;
@@ -1102,8 +1089,7 @@ bool is_adjacent(node_t *a, node_t *b, direction_t dir) {
 }
 
 node_t *find_fence(node_t *n, direction_t dir) {
-  if (n == NULL)
-    return NULL;
+  if (n == NULL) return NULL;
 
   node_t *p = n->parent;
 
@@ -1118,8 +1104,7 @@ node_t *find_fence(node_t *n, direction_t dir) {
           (horizontal && p->split_type == TYPE_HORIZONTAL)) {
         bool first = (dir == DIR_WEST || dir == DIR_NORTH);
 
-        if (first != is_first_child(n))
-          return brother;
+        if (first != is_first_child(n)) return brother;
       }
     }
 
@@ -1131,8 +1116,7 @@ node_t *find_fence(node_t *n, direction_t dir) {
 }
 
 void swap_nodes(output_t *m1, desktop_t *d1, node_t *n1, output_t *m2, desktop_t *d2, node_t *n2) {
-  if (n1 == NULL || n2 == NULL || n1 == n2)
-    return;
+  if (n1 == NULL || n2 == NULL || n1 == n2) return;
 
   bool n1_focused = (d1->focus == n1);
   bool n2_focused = (d2->focus == n2);
@@ -1178,8 +1162,7 @@ void swap_nodes(output_t *m1, desktop_t *d1, node_t *n1, output_t *m2, desktop_t
 }
 
 bool set_state(output_t *m, desktop_t *d, node_t *n, client_state_t s) {
-  if (n == NULL || n->client == NULL)
-    return false;
+  if (n == NULL || n->client == NULL) return false;
 
   n->client->last_state = n->client->state;
   n->client->state = s;
@@ -1189,8 +1172,7 @@ bool set_state(output_t *m, desktop_t *d, node_t *n, client_state_t s) {
 }
 
 void set_floating(output_t *m, desktop_t *d, node_t *n, bool value) {
-  if (n == NULL || n->client == NULL)
-    return;
+  if (n == NULL || n->client == NULL) return;
 
   if (value) {
     n->hidden = true;
@@ -1203,8 +1185,7 @@ void set_floating(output_t *m, desktop_t *d, node_t *n, bool value) {
 
 presel_t *make_presel(void) {
   presel_t *p = (presel_t *)calloc(1, sizeof(presel_t));
-  if (p == NULL)
-    return NULL;
+  if (p == NULL) return NULL;
 
   p->split_ratio = 0.5;
   p->split_dir = DIR_EAST;
@@ -1213,8 +1194,7 @@ presel_t *make_presel(void) {
 }
 
 void presel_dir(node_t *n, direction_t dir) {
-  if (n == NULL || !is_leaf(n))
-    return;
+  if (n == NULL || !is_leaf(n)) return;
 
   if (n->presel == NULL)
     n->presel = make_presel();
@@ -1224,16 +1204,15 @@ void presel_dir(node_t *n, direction_t dir) {
   if (n->client) {
     if (n->client->toplevel)
       update_border_colors(n->client->toplevel->border_tree,
-                           n->client->toplevel->border_rects, n->client);
+        n->client->toplevel->border_rects, n->client);
     else if (n->client->xwayland_view)
       update_border_colors(n->client->xwayland_view->border_tree,
-                           n->client->xwayland_view->border_rects, n->client);
+        n->client->xwayland_view->border_rects, n->client);
   }
 }
 
 void presel_cancel(node_t *n) {
-  if (n == NULL || n->presel == NULL)
-    return;
+  if (n == NULL || n->presel == NULL) return;
 
   free(n->presel);
   n->presel = NULL;
@@ -1241,16 +1220,15 @@ void presel_cancel(node_t *n) {
   if (n->client) {
     if (n->client->toplevel)
       update_border_colors(n->client->toplevel->border_tree,
-                           n->client->toplevel->border_rects, n->client);
+        n->client->toplevel->border_rects, n->client);
     else if (n->client->xwayland_view)
       update_border_colors(n->client->xwayland_view->border_tree,
-                           n->client->xwayland_view->border_rects, n->client);
+        n->client->xwayland_view->border_rects, n->client);
   }
 }
 
 void rotate_tree(node_t *n, int deg) {
-  if (n == NULL || is_leaf(n) || deg == 0)
-    return;
+  if (n == NULL || is_leaf(n) || deg == 0) return;
 
   node_t *tmp;
 
@@ -1283,8 +1261,7 @@ void rotate_tree(node_t *n, int deg) {
 }
 
 void flip_tree(node_t *n, flip_t flp) {
-  if (n == NULL || is_leaf(n))
-    return;
+  if (n == NULL || is_leaf(n)) return;
 
   // flip if split direction matched flip type
   if ((flp == FLIP_HORIZONTAL && n->split_type == TYPE_HORIZONTAL) ||
@@ -1299,11 +1276,8 @@ void flip_tree(node_t *n, flip_t flp) {
 }
 
 static void equalize_rec(node_t *n) {
-  if (n == NULL)
-    return;
-
-  if (is_leaf(n))
-    return;
+  if (n == NULL) return;
+  if (is_leaf(n)) return;
 
   n->split_ratio = 0.5;
 
@@ -1312,18 +1286,14 @@ static void equalize_rec(node_t *n) {
 }
 
 void equalize_tree(node_t *n) {
-  if (n == NULL)
-    return;
+  if (n == NULL) return;
 
   equalize_rec(n);
 }
 
 static void balance_rec(node_t *n) {
-  if (n == NULL)
-    return;
-
-  if (is_leaf(n))
-    return;
+  if (n == NULL) return;
+  if (is_leaf(n)) return;
 
   unsigned int c1 = clients_count_in(n->first_child);
   unsigned int total = c1 + clients_count_in(n->second_child);
@@ -1335,15 +1305,14 @@ static void balance_rec(node_t *n) {
 }
 
 void balance_tree(node_t *n) {
-  if (n == NULL)
-    return;
+  if (n == NULL) return;
 
   balance_rec(n);
 }
 
 struct wlr_box get_rectangle(output_t *m, node_t *n) {
-  if (n != NULL)
-    return n->rectangle;
+  if (n != NULL) return n->rectangle;
+
   return m->rectangle;
 }
 
@@ -1386,47 +1355,43 @@ void node_set_pending_hidden(node_t *n, bool hidden) {
 }
 
 struct wlr_scene_tree *client_get_scene_tree(client_t *client) {
-  if (!client)
-    return NULL;
+  if (!client) return NULL;
 
-  if (client->toplevel)
-    return client->toplevel->scene_tree;
-
-  if (client->xwayland_view)
-    return client->xwayland_view->scene_tree;
+  if (client->toplevel) return client->toplevel->scene_tree;
+  if (client->xwayland_view) return client->xwayland_view->scene_tree;
 
   return NULL;
 }
 
 void print_tree(node_t *n, int depth) {
-  if (n == NULL)
-    return;
+  if (n == NULL) return;
 
   for (int i = 0; i < depth; i++)
     printf("  ");
 
   if (is_leaf(n)) {
     printf("node %u: rect=(%d,%d %dx%d)", n->id, n->rectangle.x, n->rectangle.y,
-           n->rectangle.width, n->rectangle.height);
+      n->rectangle.width, n->rectangle.height);
+
     if (n->client) {
       printf(" client=%s", n->client->app_id[0] ? n->client->app_id : "(none)");
     } else {
       printf(" client=NULL");
     }
+
     printf("\n");
   } else {
     const char *st = n->split_type == TYPE_VERTICAL ? "V" : "H";
     printf("node %u: rect=(%d,%d %dx%d) split=%s ratio=%.2f\n", n->id,
-           n->rectangle.x, n->rectangle.y, n->rectangle.width, n->rectangle.height,
-           st, n->split_ratio);
+      n->rectangle.x, n->rectangle.y, n->rectangle.width, n->rectangle.height,
+      st, n->split_ratio);
     print_tree(n->first_child, depth + 1);
     print_tree(n->second_child, depth + 1);
   }
 }
 
 static bool validate_subtree(node_t *n, node_t *expected_parent, int depth) {
-  if (n == NULL)
-    return true;
+  if (n == NULL) return true;
 
   if (depth > 64) {
     wlr_log(WLR_ERROR, "validate_tree: depth limit reached at node %u, possible cycle", n->id);
@@ -1441,8 +1406,7 @@ static bool validate_subtree(node_t *n, node_t *expected_parent, int depth) {
     return false;
   }
 
-  if (is_leaf(n))
-    return true;
+  if (is_leaf(n)) return true;
 
   bool ok = true;
   if (n->first_child == NULL) {
@@ -1453,8 +1417,7 @@ static bool validate_subtree(node_t *n, node_t *expected_parent, int depth) {
     wlr_log(WLR_ERROR, "validate_tree: internal node %u has NULL second_child", n->id);
     ok = false;
   }
-  if (!ok)
-    return false;
+  if (!ok) return false;
 
   ok &= validate_subtree(n->first_child, n, depth + 1);
   ok &= validate_subtree(n->second_child, n, depth + 1);
@@ -1462,8 +1425,7 @@ static bool validate_subtree(node_t *n, node_t *expected_parent, int depth) {
 }
 
 void validate_tree(const char *context, desktop_t *d) {
-  if (d == NULL)
-    return;
+  if (d == NULL) return;
 
   if (d->root == NULL) {
     wlr_log(WLR_DEBUG, "validate_tree [%s]: root is NULL", context);
@@ -1471,9 +1433,8 @@ void validate_tree(const char *context, desktop_t *d) {
   }
 
   if (d->root->parent != NULL) {
-    wlr_log(WLR_ERROR,
-            "validate_tree [%s]: d->root (node %u) has non-NULL parent (node %u), second tree detected",
-            context, d->root->id, d->root->parent->id);
+    wlr_log(WLR_ERROR, "validate_tree [%s]: d->root (node %u) has non-NULL parent (node %u), second tree detected",
+      context, d->root->id, d->root->parent->id);
     return;
   }
 
@@ -1545,7 +1506,7 @@ static void get_border_color(client_t *client, float *color) {
 
   // check if this client's node has an active preselection
   node_t *n = client->toplevel ? client->toplevel->node :
-              client->xwayland_view ? client->xwayland_view->node : NULL;
+  	client->xwayland_view ? client->xwayland_view->node : NULL;
   if (n && n->presel) {
     parse_color(presel_feedback_color, color);
     return;
@@ -1564,7 +1525,7 @@ static void get_border_color(client_t *client, float *color) {
 }
 
 void create_borders(struct wlr_scene_tree *parent, struct wlr_scene_tree **border_tree,
-                    struct wlr_scene_rect *rects[4]) {
+	  struct wlr_scene_rect *rects[4]) {
   if (border_width == 0) {
     if (*border_tree) {
       wlr_scene_node_destroy(&(*border_tree)->node);
@@ -1577,8 +1538,7 @@ void create_borders(struct wlr_scene_tree *parent, struct wlr_scene_tree **borde
 
   // create border tree container
   *border_tree = wlr_scene_tree_create(parent);
-  if (!*border_tree)
-    return;
+  if (!*border_tree) return;
 
   static const float transparent[4] = {0.0f, 0.0f, 0.0f, 0.0f};
   rects[0] = wlr_scene_rect_create(*border_tree, 0, border_width, transparent);
@@ -1597,7 +1557,7 @@ void destroy_borders(struct wlr_scene_tree **border_tree, struct wlr_scene_rect 
 }
 
 void update_borders(struct wlr_scene_tree *border_tree, struct wlr_scene_rect *rects[4],
-                    struct wlr_box geo, unsigned int bw) {
+		struct wlr_box geo, unsigned int bw) {
   if (!border_tree || bw == 0) {
     if (border_tree)
       wlr_scene_node_set_enabled(&border_tree->node, false);
@@ -1617,16 +1577,19 @@ void update_borders(struct wlr_scene_tree *border_tree, struct wlr_scene_rect *r
     wlr_scene_node_set_position(&rects[0]->node, 0, 0);
     wlr_scene_rect_set_size(rects[0], w + 2 * bwi, bwi);
   }
+
   // bottom
   if (rects[1]) {
     wlr_scene_node_set_position(&rects[1]->node, 0, h + bwi);
     wlr_scene_rect_set_size(rects[1], w + 2 * bwi, bwi);
   }
+
   // left
   if (rects[2]) {
     wlr_scene_node_set_position(&rects[2]->node, 0, bwi);
     wlr_scene_rect_set_size(rects[2], bwi, h);
   }
+
   // right
   if (rects[3]) {
     wlr_scene_node_set_position(&rects[3]->node, w + bwi, bwi);
@@ -1635,9 +1598,8 @@ void update_borders(struct wlr_scene_tree *border_tree, struct wlr_scene_rect *r
 }
 
 void update_border_colors(struct wlr_scene_tree *border_tree, struct wlr_scene_rect *rects[4],
-                          client_t *client) {
-  if (border_width == 0 || !border_tree)
-    return;
+		client_t *client) {
+  if (border_width == 0 || !border_tree) return;
 
   float color[4];
   get_border_color(client, color);
@@ -1649,10 +1611,12 @@ void update_border_colors(struct wlr_scene_tree *border_tree, struct wlr_scene_r
     tl->rounded->border_color[2] = color[2];
     tl->rounded->border_color[3] = color[3];
     tl->rounded->border_dirty = true;
+
     static const float transparent[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     for (int i = 0; i < 4; i++)
       if (rects[i])
         wlr_scene_rect_set_color(rects[i], transparent);
+
     return;
   }
 
@@ -1665,5 +1629,6 @@ output_t *output_at(double x, double y) {
   for (output_t *m = mon_head; m != NULL; m = m->next)
     if (wlr_box_contains_point(&m->rectangle, (int)x, (int)y))
       return m;
+
   return NULL;
 }

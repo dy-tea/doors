@@ -92,7 +92,7 @@ static void scroller_arrange_stack(node_t *head_node, struct wlr_box base_geom, 
     head->tiled_rectangle = r;
 
     wlr_log(WLR_DEBUG, "scroller_arrange_stack: setting node %u geom=(%d,%d %dx%d)",
-            head_node->id, r.x, r.y, r.width, r.height);
+      head_node->id, r.x, r.y, r.width, r.height);
     node_set_pending_rectangle(head_node, base_geom);
     head_node->output = m;
     node_set_dirty(head_node);
@@ -391,29 +391,24 @@ void scroller_cycle_proportion_preset(client_t *client) {
   head->scroller_proportion = new_proportion;
 
   wlr_log(WLR_INFO, "scroller_cycle_proportion_preset: %.2f -> %.2f (preset %d/%d)",
-          current_prop, new_proportion, next_index + 1, scroller_proportion_preset_count);
+  current_prop, new_proportion, next_index + 1, scroller_proportion_preset_count);
 }
 
 void scroller_center_window(desktop_t *d, client_t *client) {
-  if (!d || !client || !client->toplevel || !client->toplevel->node) {
+  if (!d || !client || !client->toplevel || !client->toplevel->node)
     return;
-  }
 
   node_t *n = client->toplevel->node;
   output_t *m = n->output;
 
-  if (!m) {
-    return;
-  }
+  if (!m) return;
 
   if (d->layout != LAYOUT_SCROLLER) {
     wlr_log(WLR_DEBUG, "scroller_center_window: not in scroller layout");
     return;
   }
 
-  if (d->focus != n) {
-    d->focus = n;
-  }
+  if (d->focus != n) d->focus = n;
 
   bool old_center = scroller_focus_center;
   scroller_focus_center = true;

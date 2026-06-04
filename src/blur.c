@@ -708,7 +708,7 @@ void blur_output_fini(blur_output_ctx_t *ctx) {
 }
 
 void blur_output_resize(blur_output_ctx_t *ctx, int width, int height,
-    struct output_t *output) {
+    output_t *output) {
   if (!ctx || !blur_ctx.available) return;
   int ds = blur_downsample > 0 ? blur_downsample : 1;
   int new_bw = (width  / ds) > 0 ? (width  / ds) : 1;
@@ -811,13 +811,11 @@ static bool compute_src_box(output_t *output, const struct wlr_box *r,
   	sh += sy;
    	sy = 0.0f;
   }
-  if (sx >= bw || sy >= bh || sw <= 0.0f || sh <= 0.0f)
-    return false;
+  if (sx >= bw || sy >= bh || sw <= 0.0f || sh <= 0.0f) return false;
 
   if (sx + sw > bw) sw = bw - sx;
   if (sy + sh > bh) sh = bh - sy;
-  if (sw <= 0.0f || sh <= 0.0f)
-    return false;
+  if (sw <= 0.0f || sh <= 0.0f) return false;
 
   *src_out = (struct wlr_fbox){
     .x = sx,
@@ -834,13 +832,11 @@ static GLuint capture_bg_to_tex1(output_t *output, blur_output_ctx_t *ctx,
     struct wlr_scene_node *hide_node, bool *hide_flag) {
   int w = output->width, h = output->height;
 
-  if (!ctx->capture_output || !ctx->capture_scene_output)
-    return 0;
+  if (!ctx->capture_output || !ctx->capture_scene_output) return 0;
 
   wlr_scene_output_set_position(ctx->capture_scene_output, output->lx, output->ly);
 
-  if (w <= 0 || h <= 0)
-    return 0;
+  if (w <= 0 || h <= 0) return 0;
 
   wlr_scene_node_set_enabled(&server.top_tree->node, false);
   wlr_scene_node_set_enabled(&server.full_tree->node, false);
@@ -879,11 +875,9 @@ static GLuint capture_bg_to_tex1(output_t *output, blur_output_ctx_t *ctx,
   wlr_output_state_set_enabled(&cap_state, true);
   wlr_output_state_set_custom_mode(&cap_state, w, h, 0);
 
-  bool ok = wlr_scene_output_build_state(ctx->capture_scene_output,
-    &cap_state, NULL);
+  bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
 
-  if (ok)
-    wlr_output_commit_state(ctx->capture_output, &cap_state);
+  if (ok) wlr_output_commit_state(ctx->capture_output, &cap_state);
 
   egl_make_current();
   glFlush();
@@ -994,8 +988,7 @@ static GLuint capture_bg_to_tex1(output_t *output, blur_output_ctx_t *ctx,
   return result;
 }
 
-// ensure buf/fbo are allocated; returns fbo or 0 on failure. Must be called
-// inside egl_make_current(). Allocates once; subsequent calls reuse the buffer.
+// ensure buf/fbo are allocated; returns fbo or 0 on failure
 static GLuint ensure_output_buf(struct wlr_buffer **buf_out, GLuint *fbo_out,
     int w, int h) {
   if (*buf_out)
@@ -1070,7 +1063,7 @@ static bool rebuild_live_blur(output_t *output, struct wlr_scene_output *scene_o
     if (!tl->node->output || tl->node->output != output) continue;
 
     GLuint src = capture_bg_to_tex1(output, ctx, scene_output, false,
-        &tl->scene_tree->node, &tl->blur->blur_scene_hidden);
+      &tl->scene_tree->node, &tl->blur->blur_scene_hidden);
     if (!src) continue;
 
     egl_make_current();
@@ -1109,8 +1102,7 @@ static bool rebuild_live_blur(output_t *output, struct wlr_scene_output *scene_o
       glUniform1i(blur_ctx.u_corner_mask.tex, 0);
       glUniform2f(blur_ctx.u_corner_mask.win_pos_uv, win_u, win_v);
       glUniform2f(blur_ctx.u_corner_mask.win_size_uv, win_sw, win_sh);
-      glUniform2f(blur_ctx.u_corner_mask.win_size_px,
-          (float)content_r.width, (float)content_r.height);
+      glUniform2f(blur_ctx.u_corner_mask.win_size_px, (float)content_r.width, (float)content_r.height);
       glUniform1f(blur_ctx.u_corner_mask.border_radius_px, inner_r);
       draw_quad();
       glDisable(GL_BLEND);
@@ -1141,12 +1133,9 @@ static void push_blur_to_toplevels(output_t *output) {
 
     client_t *c = tl->node->client;
     struct wlr_box r;
-    if (c->state == STATE_FULLSCREEN && tl->node->output)
-      r = tl->node->output->rectangle;
-    else if (c->state == STATE_FLOATING)
-      r = c->floating_rectangle;
-    else
-      r = c->tiled_rectangle;
+    if (c->state == STATE_FULLSCREEN && tl->node->output) r = tl->node->output->rectangle;
+    else if (c->state == STATE_FLOATING)                  r = c->floating_rectangle;
+    else                                                  r = c->tiled_rectangle;
 
     struct wlr_fbox src; int dw, dh;
     if (!compute_src_box(output, &r, &src, &dw, &dh)) {
@@ -1242,7 +1231,7 @@ static void push_blur_to_layers(output_t *output) {
   }
 }
 
-static bool rebuild_live_acrylic(struct output_t *output, struct wlr_scene_output *scene_output) {
+static bool rebuild_live_acrylic(output_t *output, struct wlr_scene_output *scene_output) {
   blur_output_ctx_t *ctx = output->blur_ctx;
   int w = output->width, h = output->height;
   bool any = false;
@@ -1306,8 +1295,7 @@ static bool rebuild_live_acrylic(struct output_t *output, struct wlr_scene_outpu
       glUniform1i(blur_ctx.u_corner_mask.tex, 0);
       glUniform2f(blur_ctx.u_corner_mask.win_pos_uv, win_u, win_v);
       glUniform2f(blur_ctx.u_corner_mask.win_size_uv, win_sw, win_sh);
-      glUniform2f(blur_ctx.u_corner_mask.win_size_px,
-          (float)content_r.width, (float)content_r.height);
+      glUniform2f(blur_ctx.u_corner_mask.win_size_px, (float)content_r.width, (float)content_r.height);
       glUniform1f(blur_ctx.u_corner_mask.border_radius_px, inner_r);
       draw_quad();
       glDisable(GL_BLEND);
@@ -1322,7 +1310,7 @@ static bool rebuild_live_acrylic(struct output_t *output, struct wlr_scene_outpu
   return any;
 }
 
-static void push_acrylic_to_toplevels(struct output_t *output) {
+static void push_acrylic_to_toplevels(output_t *output) {
   toplevel_t *tl;
   wl_list_for_each(tl, &server.toplevels, link) {
     if (!tl->blur || !tl->blur->acrylic_node || !tl->node) continue;
@@ -1338,12 +1326,9 @@ static void push_acrylic_to_toplevels(struct output_t *output) {
 
     client_t *c = tl->node->client;
     struct wlr_box r;
-    if (c->state == STATE_FULLSCREEN && tl->node->output)
-      r = tl->node->output->rectangle;
-    else if (c->state == STATE_FLOATING)
-      r = c->floating_rectangle;
-    else
-      r = c->tiled_rectangle;
+    if (c->state == STATE_FULLSCREEN && tl->node->output) r = tl->node->output->rectangle;
+    else if (c->state == STATE_FLOATING)                  r = c->floating_rectangle;
+    else                                                  r = c->tiled_rectangle;
 
     struct wlr_fbox src; int dw, dh;
     if (!compute_src_box(output, &r, &src, &dw, &dh)) {
@@ -1409,12 +1394,9 @@ static void push_mica_to_toplevels(output_t *output) {
 
     client_t *c = tl->node->client;
     struct wlr_box r;
-    if (c->state == STATE_FULLSCREEN && tl->node->output)
-      r = tl->node->output->rectangle;
-    else if (c->state == STATE_FLOATING)
-      r = c->floating_rectangle;
-    else
-      r = c->tiled_rectangle;
+    if (c->state == STATE_FULLSCREEN && tl->node->output) r = tl->node->output->rectangle;
+    else if (c->state == STATE_FLOATING)                  r = c->floating_rectangle;
+    else                                                  r = c->tiled_rectangle;
 
     struct wlr_fbox src;
     int dw, dh;
@@ -1433,12 +1415,9 @@ static void push_mica_to_toplevels(output_t *output) {
 
 static struct wlr_box get_client_rect(toplevel_t *tl) {
   client_t *c = tl->node->client;
-  if (c->state == STATE_FULLSCREEN && tl->node->output)
-    return tl->node->output->rectangle;
-  else if (c->state == STATE_FLOATING)
-    return c->floating_rectangle;
-  else
-    return c->tiled_rectangle;
+  if (c->state == STATE_FULLSCREEN && tl->node->output) return tl->node->output->rectangle;
+  else if (c->state == STATE_FLOATING)                  return c->floating_rectangle;
+  else                                                  return c->tiled_rectangle;
 }
 
 static bool scene_buffer_no_input(struct wlr_scene_buffer *buffer, double *sx, double *sy) {
@@ -1602,13 +1581,11 @@ static void push_corner_masks_to_toplevels(output_t *output) {
 static GLuint capture_full_scene_to_tex(output_t *output, blur_output_ctx_t *ctx, struct wlr_scene_output *real_scene_output) {
   int w = output->width, h = output->height;
 
-  if (!ctx->capture_output || !ctx->capture_scene_output || !ctx->screen_fbo)
-    return 0;
+  if (!ctx->capture_output || !ctx->capture_scene_output || !ctx->screen_fbo) return 0;
 
   wlr_scene_output_set_position(ctx->capture_scene_output, output->lx, output->ly);
 
-  if (w <= 0 || h <= 0)
-    return 0;
+  if (w <= 0 || h <= 0) return 0;
 
   // hide the shader overlay to avoid a feedback loop
   if (server.shader_tree)
@@ -1622,8 +1599,7 @@ static GLuint capture_full_scene_to_tex(output_t *output, blur_output_ctx_t *ctx
   wlr_output_state_set_custom_mode(&cap_state, w, h, 0);
 
   bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
-  if (ok)
-    wlr_output_commit_state(ctx->capture_output, &cap_state);
+  if (ok) wlr_output_commit_state(ctx->capture_output, &cap_state);
 
   egl_make_current();
   glFlush();

@@ -39,20 +39,21 @@ static image_copy_source_t *source_from_base(struct wlr_ext_image_capture_source
 }
 
 static void output_source_destroy_internal(image_copy_source_t *src) {
-	if (!src)
-		return;
+	if (!src) return;
+
 	wlr_ext_image_capture_source_v1_finish(&src->base);
 	wl_list_remove(&src->output_commit.link);
 	wl_list_remove(&src->output_destroy.link);
 	wl_list_remove(&src->base_destroy.link);
+
 	if (src->last_buffer)
 		wlr_buffer_unlock(src->last_buffer);
+
 	free(src->base.shm_formats);
 	free(src);
 }
 
-static void output_source_start(struct wlr_ext_image_capture_source_v1 *base,
-		bool with_cursors) {
+static void output_source_start(struct wlr_ext_image_capture_source_v1 *base, bool with_cursors) {
 	(void)base;
 	(void)with_cursors;
 }
@@ -78,18 +79,16 @@ static int disable_blocked_windows(struct blocked_node_state *states, int max_st
 
 	toplevel_t *tl;
 	wl_list_for_each(tl, &server.toplevels, link) {
-		if (!tl->node || !tl->node->client)
-			continue;
-		client_t *c = tl->node->client;
-		if (!c->block_out_from_screenshare)
-			continue;
-		if (!c->shown && c->state != STATE_FULLSCREEN)
-			continue;
+		if (!tl->node || !tl->node->client) continue;
 
-		if (count >= max_states)
-			break;
+		client_t *c = tl->node->client;
+		if (!c->block_out_from_screenshare) continue;
+		if (!c->shown && c->state != STATE_FULLSCREEN) continue;
+
+		if (count >= max_states) break;
 		wlr_log(WLR_DEBUG, "ext-copy-capture: disabling toplevel scene_tree=%p"
 			" app_id=%s", (void*)&tl->scene_tree->node, c->app_id);
+
 		states[count].node = &tl->scene_tree->node;
 		states[count].was_enabled = tl->scene_tree->node.enabled;
 		wlr_scene_node_set_enabled(&tl->scene_tree->node, false);
@@ -98,18 +97,16 @@ static int disable_blocked_windows(struct blocked_node_state *states, int max_st
 
 	xwayland_toplevel_t *xw;
 	wl_list_for_each(xw, &server.xwayland.views, link) {
-		if (!xw->node || !xw->node->client)
-			continue;
-		client_t *c = xw->node->client;
-		if (!c->block_out_from_screenshare)
-			continue;
-		if (!c->shown && c->state != STATE_FULLSCREEN)
-			continue;
+		if (!xw->node || !xw->node->client) continue;
 
-		if (count >= max_states)
-			break;
+		client_t *c = xw->node->client;
+		if (!c->block_out_from_screenshare) continue;
+		if (!c->shown && c->state != STATE_FULLSCREEN) continue;
+
+		if (count >= max_states) break;
 		wlr_log(WLR_DEBUG, "ext-copy-capture: disabling xwayland scene_tree=%p"
 			" title=%s", (void*)&xw->scene_tree->node, c->title);
+
 		states[count].node = &xw->scene_tree->node;
 		states[count].was_enabled = xw->scene_tree->node.enabled;
 		wlr_scene_node_set_enabled(&xw->scene_tree->node, false);
@@ -153,10 +150,8 @@ static void source_handle_output_commit(struct wl_listener *listener, void *data
 	struct wlr_output_event_commit *event = data;
 	struct wlr_output *output = src->output;
 
-	if ((event->state->committed & WLR_OUTPUT_STATE_ENABLED) && !output->enabled)
-		return;
-	if (!(event->state->committed & WLR_OUTPUT_STATE_BUFFER))
-		return;
+	if ((event->state->committed & WLR_OUTPUT_STATE_ENABLED) && !output->enabled) return;
+	if (!(event->state->committed & WLR_OUTPUT_STATE_BUFFER)) return;
 
 	if (src->last_buffer)
 		wlr_buffer_unlock(src->last_buffer);
@@ -196,8 +191,7 @@ static void source_handle_base_destroy(struct wl_listener *listener, void *data)
 
 static image_copy_source_t *create_output_source(struct wlr_output *wlr_output) {
 	image_copy_source_t *src = calloc(1, sizeof(*src));
-	if (!src)
-		return NULL;
+	if (!src) return NULL;
 
 	wlr_ext_image_capture_source_v1_init(&src->base, &source_impl);
 
@@ -236,8 +230,7 @@ static void output_mgr_handle_create_source(struct wl_client *wl_client,
 		struct wl_resource *mgr_resource, uint32_t id, struct wl_resource *output_resource) {
 	(void)mgr_resource;
 	struct wlr_output *wlr_output = wlr_output_from_resource(output_resource);
-	if (!wlr_output)
-		return;
+	if (!wlr_output) return;
 
 	image_copy_source_t *src = create_output_source(wlr_output);
 	if (!src) {
@@ -307,11 +300,12 @@ copy_session_t *session_from_resource(struct wl_resource *resource);
 copy_frame_t *frame_from_resource(struct wl_resource *resource);
 
 static void frame_destroy(copy_frame_t *frame) {
-	if (!frame)
-		return;
+	if (!frame) return;
+
 	wl_resource_set_user_data(frame->resource, NULL);
 	if (frame->buffer)
 		wlr_buffer_unlock(frame->buffer);
+
 	pixman_region32_fini(&frame->buffer_damage);
 	free(frame);
 }
@@ -486,8 +480,7 @@ static bool perform_output_capture(copy_frame_t *frame, image_copy_source_t *src
 
 out:
 	restore_blocked_windows(blocked_states, nblocked);
-	if (!ok)
-		return false;
+	if (!ok) return false;
 
 	ext_image_copy_capture_frame_v1_send_transform(frame->resource,
 		WL_OUTPUT_TRANSFORM_NORMAL);
@@ -515,13 +508,11 @@ static void capture_render_buffer_iter(struct wlr_scene_buffer *scene_buffer,
 		int sx, int sy, void *user_data) {
 	capture_render_ctx_t *ctx = user_data;
 
-	if (!scene_buffer->buffer)
-		return;
+	if (!scene_buffer->buffer) return;
 
 	struct wlr_texture *tex = wlr_texture_from_buffer(server.renderer,
 		scene_buffer->buffer);
-	if (!tex)
-		return;
+	if (!tex) return;
 
 	if (ctx->textures_len >= ctx->textures_cap) {
 		size_t new_cap = ctx->textures_cap ? ctx->textures_cap * 2 : 8;
@@ -708,8 +699,7 @@ send_ready:
 static void frame_handle_capture(struct wl_client *wl_client, struct wl_resource *frame_resource) {
 	(void)wl_client;
 	copy_frame_t *frame = frame_from_resource(frame_resource);
-	if (!frame)
-		return;
+	if (!frame) return;
 
 	if (!frame->buffer) {
 		wl_resource_post_error(frame->resource,
@@ -761,30 +751,33 @@ static void frame_handle_capture(struct wl_client *wl_client, struct wl_resource
 	wlr_log(WLR_DEBUG, "ext-copy-capture: checking toplevel sources");
 	toplevel_t *tl;
 	wl_list_for_each(tl, &server.toplevels, link) {
-		if (tl->image_capture_source != source)
-			continue;
+		if (tl->image_capture_source != source) continue;
+
 		wlr_log(WLR_DEBUG, "ext-copy-capture: found matching toplevel %p, "
 			"calling perform_scene_node_capture", (void*)tl);
 		bool block_out = tl->node && tl->node->client &&
 			tl->node->client->block_out_from_screenshare;
+
 		if (perform_scene_node_capture(frame, source,
 				tl->image_capture, block_out)) {
 			session->frame = NULL;
 			frame_destroy(frame);
 			return;
 		}
+
 		wlr_log(WLR_DEBUG, "ext-copy-capture: perform_scene_node_capture failed");
 		break;
 	}
 
 	xwayland_toplevel_t *xw;
 	wl_list_for_each(xw, &server.xwayland.views, link) {
-		if (xw->image_capture_source != source)
-			continue;
+		if (xw->image_capture_source != source) continue;
+
 		wlr_log(WLR_DEBUG, "ext-copy-capture: found matching xwayland view %p, "
 			"calling perform_scene_node_capture", (void*)xw);
 		bool block_out = xw->node && xw->node->client &&
 			xw->node->client->block_out_from_screenshare;
+
 		if (perform_scene_node_capture(frame, source,
 				xw->image_capture, block_out)) {
 			session->frame = NULL;
@@ -824,11 +817,12 @@ static void session_source_destroy(struct wl_listener *listener, void *data) {
 }
 
 static void session_destroy(copy_session_t *session) {
-	if (!session)
-		return;
+	if (!session) return;
+
 	wl_list_remove(&session->source_destroy.link);
 	if (session->source)
 		session->source = NULL;
+
 	wl_resource_set_user_data(session->resource, NULL);
 	free(session);
 }
@@ -842,8 +836,7 @@ static void session_handle_resource_destroy(struct wl_resource *resource) {
 static void session_handle_create_frame(struct wl_client *wl_client,
 		struct wl_resource *session_resource, uint32_t id) {
 	copy_session_t *session = session_from_resource(session_resource);
-	if (!session)
-		return;
+	if (!session) return;
 
 	if (session->frame) {
 		wl_resource_post_error(session->resource,
@@ -901,8 +894,7 @@ static uint32_t drm_format_to_wl_shm(uint32_t fmt) {
 }
 
 static void send_buffer_constraints(copy_session_t *session, struct wlr_ext_image_capture_source_v1 *source) {
-	if (!source)
-		return;
+	if (!source) return;
 
 	ext_image_copy_capture_session_v1_send_buffer_size(session->resource,
 		source->width, source->height);
@@ -923,8 +915,10 @@ static void send_buffer_constraints(copy_session_t *session, struct wlr_ext_imag
 			struct wl_array arr;
 			wl_array_init(&arr);
 			uint32_t *d = wl_array_add(&arr, sizeof(dev_arr));
+
 			if (d)
 				memcpy(d, dev_arr, sizeof(dev_arr));
+
 			ext_image_copy_capture_session_v1_send_dmabuf_device(
 				session->resource, &arr);
 			wl_array_release(&arr);
@@ -955,8 +949,7 @@ static void mgr_handle_create_session(struct wl_client *wl_client,
 	(void)mgr_resource;
 
 	struct wlr_ext_image_capture_source_v1 *wlr_source = wlr_ext_image_capture_source_v1_from_resource(source_resource);
-	if (!wlr_source)
-		return;
+	if (!wlr_source) return;
 
 	copy_session_t *session = calloc(1, sizeof(*session));
 	if (!session) {
@@ -1055,28 +1048,24 @@ static copy_mgr_t *copy_mgr = NULL;
 
 void image_copy_capture_init(void) {
 	output_mgr = calloc(1, sizeof(*output_mgr));
-	if (!output_mgr)
-		goto err_out;
+	if (!output_mgr) goto err_out;
 
 	output_mgr->global = wl_global_create(server.wl_display,
 		&ext_output_image_capture_source_manager_v1_interface, 1,
 		output_mgr, output_mgr_bind);
-	if (!output_mgr->global)
-		goto err_out;
+	if (!output_mgr->global) goto err_out;
 
 	output_mgr->display_destroy.notify = output_mgr_display_destroy;
 	wl_display_add_destroy_listener(server.wl_display,
 		&output_mgr->display_destroy);
 
 	copy_mgr = calloc(1, sizeof(*copy_mgr));
-	if (!copy_mgr)
-		goto err_out;
+	if (!copy_mgr) goto err_out;
 
 	copy_mgr->global = wl_global_create(server.wl_display,
 		&ext_image_copy_capture_manager_v1_interface, 1,
 		copy_mgr, copy_mgr_bind);
-	if (!copy_mgr->global)
-		goto err_out;
+	if (!copy_mgr->global) goto err_out;
 
 	copy_mgr->display_destroy.notify = copy_mgr_display_destroy;
 	wl_display_add_destroy_listener(server.wl_display,
