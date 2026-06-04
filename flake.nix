@@ -9,14 +9,14 @@
         ((wlroots_0_20.overrideAttrs {
           version = "0.21.0";
           src = let
-            rev = "28d11d058053fb8596c18c01bb83592a884e02b6";
+            rev = "a94cd29eb13fc2fb68f2fe2d053fef29fb6ae712";
           in
             pkgs.fetchFromGitLab {
               domain = "gitlab.freedesktop.org";
               owner = "wlroots";
               repo = "wlroots";
               inherit rev;
-              hash = "sha256-QJ4WrRB46Sn1GyYLvTdEtZAQd1FNAVTDC2OyH4iRadk=";
+              hash = "sha256-4CSASFBiQFjTHw/73sKKqKLcVYOaRBxaNT7bBAaxHVM=";
             };
         }).override {enableXWayland = true;})
 
@@ -34,48 +34,56 @@
         # include <drm_fourcc.h>
         libdrm.dev
       ];
+
+    makeDoors = pkgs:
+      pkgs.stdenv.mkDerivation {
+        pname = "doors";
+        version = "0.0.0";
+
+        src = ./.;
+
+        nativeBuildInputs = with pkgs; [
+          pkg-config
+          meson
+          ninja
+          perl
+        ];
+
+        NIX_CFLAGS_COMPILE = "-I${pkgs.libdrm.dev}/include/libdrm";
+
+        buildInputs = commonPackages pkgs;
+        patchPhase = ''
+          # it needs to be an executable to make patchShebangs run
+          chmod +x src/shaders/embed.pl
+          patchShebangs src/shaders/embed.pl
+
+          # this should be handled by package maintainer not your buildscript D:
+          substituteInPlace meson.build \
+                  --replace-fail "/usr/share/wayland-sessions" "${placeholder "out"}/share/wayland-sessions"
+        '';
+
+        meta = {
+          description = "Wayland compositor based on bswpm, with floating, tiling and scrolling layouts.";
+          homepage = "https://github.com/dy-tea/doors";
+          license = pkgs.lib.licenses.gpl3;
+          maintainers = ["anispwyn"];
+        };
+      };
   in
     flakelight ./. {
       inherit inputs;
       systems = ["x86_64-linux"];
-      package = {
-        pkgs,
-        stdenv,
-        lib,
-        ...
-      }:
-        stdenv.mkDerivation {
-          pname = "doors";
-          version = "0.0.0";
-
-          src = ./.;
-
-          nativeBuildInputs = with pkgs; [
-            pkg-config
-            meson
-            ninja
-            perl
-          ];
-
-          NIX_CFLAGS_COMPILE = "-I${pkgs.libdrm.dev}/include/libdrm";
-
-          buildInputs = commonPackages pkgs;
-          patchPhase = ''
-            # it needs to be an executable to make patchShebangs run
-            chmod +x src/shaders/embed.pl
-            patchShebangs src/shaders/embed.pl
-
-            # this should be handled by package maintainer not your buildscript D:
-            substituteInPlace meson.build \
-                    --replace-fail "/usr/share/wayland-sessions" "${placeholder "out"}/share/wayland-sessions"
+      package = {pkgs, ...}: makeDoors pkgs;
+      packages.doorsctl = {pkgs, ...}:
+        (makeDoors pkgs).overrideAttrs (oldAttrs: {
+          pname = "doorsctl";
+          postInstall = ''
+            find $out -type f -not -name doorsctl -delete
+            find $out -type d -empty -delete
           '';
-
-          meta = {
-            description = "Wayland compositor based on bswpm, with floating, tiling and scrolling layouts.";
-            homepage = "https://github.com/dy-tea/doors";
-            license = lib.licenses.gpl3;
-            maintainers = ["anispwyn"];
+          meta = oldAttrs.meta // {
+            description = "Control client for the doors Wayland compositor";
           };
-        };
+        });
     };
 }
