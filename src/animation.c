@@ -685,6 +685,8 @@ static void update_snapshot_entry(animation_entry_t *entry, struct timespec now)
   int height = (int)(entry->from.height + (entry->to.height - entry->from.height) * eased);
 
   if (entry->from.width <= 0 || entry->from.height <= 0) return;
+  if (width < 1) width = 1;
+  if (height < 1) height = 1;
 
   double scale_x = (double)width / (double)entry->from.width;
   double scale_y = (double)height / (double)entry->from.height;

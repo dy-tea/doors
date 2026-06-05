@@ -1572,7 +1572,7 @@ void destroy_borders(struct wlr_scene_tree **border_tree, struct wlr_scene_rect 
 
 void update_borders(struct wlr_scene_tree *border_tree, struct wlr_scene_rect *rects[4],
 		struct wlr_box geo, unsigned int bw) {
-  if (!border_tree || bw == 0) {
+  if (!border_tree || bw == 0 || geo.width < 1 || geo.height < 1) {
     if (border_tree)
       wlr_scene_node_set_enabled(&border_tree->node, false);
     return;
