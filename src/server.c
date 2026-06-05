@@ -19,6 +19,7 @@
 #include "screencopy.h"
 #include "copy_capture.h"
 #include "animation.h"
+#include "bezier.h"
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -454,6 +455,7 @@ void server_init(void) {
 
   transaction_init();
   animation_init();
+  bezier_init();
   workspace_init();
   ipc_init();
   rule_init();

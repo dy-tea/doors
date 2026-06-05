@@ -1,9 +1,11 @@
 #include "animation.h"
+#include "bezier.h"
 #include "layer.h"
 #include "output.h"
 #include "toplevel.h"
 #include "tree.h"
 #include "types.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_scene.h>
@@ -41,10 +43,72 @@ typedef struct {
   output_t *output;
   float from_opacity;
   float to_opacity;
+  char bezier_name[64];
 } animation_entry_t;
 
 static struct wl_list animations;
-static const uint32_t ANIMATION_DURATION_MS = 180;
+static uint32_t ANIMATION_DURATION_MS = 180;
+static char default_bezier_name[64] = "default";
+
+#define ANIM_TYPE_COUNT 7
+static const char *anim_type_names[ANIM_TYPE_COUNT] = {
+  "geometry", "resize", "fade_in", "fade_out", "fade_in_layer", "fade_out_layer", "workspace_slide"
+};
+
+typedef struct {
+  char bezier_name[64];
+  uint32_t duration_ms;
+} animation_type_config_t;
+
+static animation_type_config_t anim_type_configs[ANIM_TYPE_COUNT];
+
+static void apply_config_to_entry(animation_entry_t *entry, int type_index) {
+  if (type_index >= 0 && type_index < ANIM_TYPE_COUNT) {
+    animation_type_config_t *cfg = &anim_type_configs[type_index];
+
+    if (cfg->bezier_name[0] != '\0' && bezier_exists(cfg->bezier_name))
+      snprintf(entry->bezier_name, sizeof(entry->bezier_name), "%s", cfg->bezier_name);
+
+    if (cfg->duration_ms > 0)
+      entry->duration_ms = cfg->duration_ms;
+  }
+}
+
+int animation_type_from_name(const char *name) {
+  for (int i = 0; i < ANIM_TYPE_COUNT; i++)
+    if (strcmp(name, anim_type_names[i]) == 0)
+      return i;
+
+  return -1;
+}
+
+bool animation_set_type_config(const char *type_name, const char *bezier_name, uint32_t duration_ms) {
+  int idx = animation_type_from_name(type_name);
+  if (idx < 0) return false;
+
+  if (bezier_name) {
+    if (bezier_name[0] == '\0' || bezier_exists(bezier_name))
+      snprintf(anim_type_configs[idx].bezier_name, sizeof(anim_type_configs[idx].bezier_name), "%s", bezier_name);
+    else
+      return false;
+  }
+  if (duration_ms > 0)
+    anim_type_configs[idx].duration_ms = duration_ms;
+
+  return true;
+}
+
+const char *animation_type_get_bezier(const char *type_name) {
+  int idx = animation_type_from_name(type_name);
+  if (idx < 0) return NULL;
+  return anim_type_configs[idx].bezier_name[0] ? anim_type_configs[idx].bezier_name : NULL;
+}
+
+uint32_t animation_type_get_duration(const char *type_name) {
+  int idx = animation_type_from_name(type_name);
+  if (idx < 0) return 0;
+  return anim_type_configs[idx].duration_ms;
+}
 
 static void snapshot_buffer_iterator(struct wlr_scene_buffer *buffer, int sx, int sy, void *data);
 static void updated_buffer_iterator(struct wlr_scene_buffer *buffer, int sx, int sy, void *data);
@@ -80,9 +144,30 @@ static double elapsed_ms(struct timespec start, struct timespec now) {
     (now.tv_nsec - start.tv_nsec) / 1000000.0;
 }
 
-static double ease_out_cubic(double t) {
-  double inv = 1.0 - t;
-  return 1.0 - inv * inv * inv;
+void animation_set_bezier(const char *name) {
+  if (name && name[0] != '\0') {
+    if (bezier_exists(name)) {
+      snprintf(default_bezier_name, sizeof(default_bezier_name), "%s", name);
+      wlr_log(WLR_DEBUG, "animation: default bezier set to '%s'", name);
+    } else {
+      wlr_log(WLR_ERROR, "animation: no such bezier curve '%s'", name);
+    }
+  }
+}
+
+const char *animation_get_bezier(void) {
+  return default_bezier_name;
+}
+
+void animation_set_duration(uint32_t ms) {
+  if (ms > 0) {
+    ANIMATION_DURATION_MS = ms;
+    wlr_log(WLR_DEBUG, "animation: default duration set to %u ms", ms);
+  }
+}
+
+uint32_t animation_get_duration(void) {
+  return ANIMATION_DURATION_MS;
 }
 
 static void set_opacity_iterator(struct wlr_scene_buffer *buffer, int sx, int sy, void *data) {
@@ -280,6 +365,7 @@ bool animation_start_snapshot_resize(toplevel_t *toplevel, struct wlr_box from, 
   entry->to = to;
   clock_gettime(CLOCK_MONOTONIC, &entry->start);
   entry->duration_ms = ANIMATION_DURATION_MS;
+  apply_config_to_entry(entry, 1);
   entry->use_content_tree = false;
   entry->from_opacity = 1.0f;
   entry->to_opacity = 1.0f;
@@ -343,6 +429,7 @@ bool animation_fade_in(struct toplevel_t *toplevel) {
     entry->to_opacity = 1.0f;
     clock_gettime(CLOCK_MONOTONIC, &entry->start);
     entry->duration_ms = ANIMATION_DURATION_MS;
+    apply_config_to_entry(entry, 2);
   }
 
   float zero = 0.0f;
@@ -368,6 +455,7 @@ bool animation_fade_in_layer(layer_surface_t *layer) {
   entry->to_opacity = 1.0f;
   clock_gettime(CLOCK_MONOTONIC, &entry->start);
   entry->duration_ms = ANIMATION_DURATION_MS;
+  apply_config_to_entry(entry, 4);
 
   float zero = 0.0f;
   wlr_scene_node_for_each_buffer(&layer->scene_tree->node, set_opacity_iterator, &zero);
@@ -393,6 +481,7 @@ bool animation_fade_out(toplevel_t *toplevel) {
   entry->to_opacity = 0.0f;
   clock_gettime(CLOCK_MONOTONIC, &entry->start);
   entry->duration_ms = ANIMATION_DURATION_MS;
+  apply_config_to_entry(entry, 3);
 
   wlr_log(WLR_DEBUG, "animation: fade_out entry=%p", (void*)entry);
   schedule_output(entry->output);
@@ -415,6 +504,7 @@ bool animation_fade_out_layer(layer_surface_t *layer) {
   entry->saved_tree = layer->saved_tree;
   clock_gettime(CLOCK_MONOTONIC, &entry->start);
   entry->duration_ms = ANIMATION_DURATION_MS;
+  apply_config_to_entry(entry, 5);
 
   wlr_log(WLR_DEBUG, "animation: fade_out_layer entry=%p saved_tree=%p",
     (void*)entry, (void*)layer->saved_tree);
@@ -442,6 +532,7 @@ bool animation_start_workspace_slide(output_t *output, node_t *node,
   entry->slide_out = slide_out;
   clock_gettime(CLOCK_MONOTONIC, &entry->start);
   entry->duration_ms = ANIMATION_DURATION_MS;
+  apply_config_to_entry(entry, 6);
   entry->from_opacity = 1.0f;
   entry->to_opacity = 1.0f;
 
@@ -501,6 +592,7 @@ bool animation_apply_geometry_from(node_t *node, struct wlr_scene_tree *scene_tr
   entry->to = target;
   entry->start = now;
   entry->duration_ms = ANIMATION_DURATION_MS;
+  apply_config_to_entry(entry, 0);
 
   if (entry->from.x == entry->to.x && entry->from.y == entry->to.y) {
     animation_cancel_node(node);
@@ -522,7 +614,8 @@ static void update_snapshot_entry(animation_entry_t *entry, struct timespec now)
   if (progress > 1.0)
     progress = 1.0;
 
-  double eased = ease_out_cubic(progress);
+  const char *bname = entry->bezier_name[0] ? entry->bezier_name : default_bezier_name;
+  double eased = bezier_evaluate(bname, progress);
   int x = (int)(entry->from.x + (entry->to.x - entry->from.x) * eased);
   int y = (int)(entry->from.y + (entry->to.y - entry->from.y) * eased);
   int width = (int)(entry->from.width + (entry->to.width - entry->from.width) * eased);
@@ -738,7 +831,8 @@ bool animation_update_output(output_t *output, struct timespec now) {
       if (progress < 0.0) progress = 0.0;
       if (progress > 1.0) progress = 1.0;
 
-      double eased = ease_out_cubic(progress);
+      const char *bname = entry->bezier_name[0] ? entry->bezier_name : default_bezier_name;
+      double eased = bezier_evaluate(bname, progress);
       float opacity = (float)(entry->from_opacity + (entry->to_opacity - entry->from_opacity) * eased);
       wlr_scene_node_for_each_buffer(&entry->scene_tree->node, set_opacity_iterator, &opacity);
 
@@ -797,7 +891,8 @@ bool animation_update_output(output_t *output, struct timespec now) {
     if (progress < 0.0) progress = 0.0;
     if (progress > 1.0) progress = 1.0;
 
-    double eased = ease_out_cubic(progress);
+    const char *bname = entry->bezier_name[0] ? entry->bezier_name : default_bezier_name;
+    double eased = bezier_evaluate(bname, progress);
 
     int x = (int)(entry->from.x + (entry->to.x - entry->from.x) * eased);
     int y = (int)(entry->from.y + (entry->to.y - entry->from.y) * eased);

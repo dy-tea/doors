@@ -14,6 +14,8 @@
 #include "keyboard.h"
 #include "rule.h"
 #include "config.h"
+#include "animation.h"
+#include "bezier.h"
 #include "scroller.h"
 #include "text.h"
 #include <stdio.h>
@@ -3571,6 +3573,73 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
     } else {
       send_success(client_fd, screen_shader_enabled ? "true\n" : "false\n");
     }
+  } else if (streq("animation_bezier", *args)) {
+    if (num >= 2) {
+      if (bezier_exists(args[1])) {
+        animation_set_bezier(args[1]);
+        send_success(client_fd, "animation_bezier set\n");
+      } else {
+        send_failure(client_fd, "config animation_bezier: no such bezier curve\n");
+      }
+    } else {
+      char buf[96];
+      snprintf(buf, sizeof(buf), "%s\n", animation_get_bezier());
+      send_success(client_fd, buf);
+    }
+  } else if (streq("animation_duration", *args)) {
+    if (num >= 2) {
+      int val = atoi(args[1]);
+      if (val > 0) {
+        animation_set_duration((uint32_t)val);
+        send_success(client_fd, "animation_duration set\n");
+      } else {
+        send_failure(client_fd, "config animation_duration: must be > 0\n");
+      }
+    } else {
+      char buf[64];
+      snprintf(buf, sizeof(buf), "%u\n", animation_get_duration());
+      send_success(client_fd, buf);
+    }
+  } else if (streq("animation", *args)) {
+    if (num < 2) {
+      send_failure(client_fd, "config animation: expected <type> [bezier|duration] [value]\n");
+    } else if (num >= 3 && streq("bezier", args[2])) {
+      const char *bname = num >= 4 ? args[3] : "";
+      if (bname[0] != '\0' && !bezier_exists(bname)) {
+        send_failure(client_fd, "config animation: no such bezier curve\n");
+      } else if (animation_set_type_config(args[1], bname, 0)) {
+        send_success(client_fd, "animation type bezier set\n");
+      } else {
+        send_failure(client_fd, "config animation: unknown type\n");
+      }
+    } else if (num >= 3 && streq("duration", args[2])) {
+      if (num < 4) {
+        send_failure(client_fd, "config animation <type> duration: expected value\n");
+      } else {
+        int val = atoi(args[3]);
+        if (val <= 0) {
+          send_failure(client_fd, "config animation <type> duration: must be > 0\n");
+        } else if (animation_set_type_config(args[1], NULL, (uint32_t)val)) {
+          send_success(client_fd, "animation type duration set\n");
+        } else {
+          send_failure(client_fd, "config animation: unknown type\n");
+        }
+      }
+    } else {
+      // query type config
+      int idx = animation_type_from_name(args[1]);
+      if (idx < 0) {
+        send_failure(client_fd, "config animation: unknown type\n");
+      } else {
+        const char *bname = animation_type_get_bezier(args[1]);
+        uint32_t dur = animation_type_get_duration(args[1]);
+        char buf[192];
+        snprintf(buf, sizeof(buf), "bezier: %s\nduration: %u\n",
+          bname ? bname : "(global default)",
+          dur > 0 ? dur : animation_get_duration());
+        send_success(client_fd, buf);
+      }
+    }
   } else {
     send_failure(client_fd, "config: unknown setting\n");
   }
@@ -4191,6 +4260,18 @@ static void process_ipc_message(char *msg, int msg_len, int client_fd) {
      ipc_cmd_keyboard_grouping(++args, --num, client_fd);
    } else if (streq("scroller", *args)) {
      ipc_cmd_scroller(++args, --num, client_fd);
+   } else if (streq("bezier", *args)) {
+     ++args; --num;
+     if (num < 5) {
+       send_failure(client_fd, "usage: bezier <name> <p1x> <p1y> <p2x> <p2y>\n");
+     } else {
+       double p1x = atof(args[1]), p1y = atof(args[2]);
+       double p2x = atof(args[3]), p2y = atof(args[4]);
+       if (bezier_add(args[0], p1x, p1y, p2x, p2y))
+         send_success(client_fd, "bezier curve added\n");
+       else
+         send_failure(client_fd, "failed to add bezier curve\n");
+     }
    } else {
      send_failure(client_fd, "unknown command\n");
    }

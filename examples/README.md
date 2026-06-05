@@ -712,7 +712,95 @@ doorsctl config enable_animations [true|false]
 doorsctl config edge_scroller_pointer_focus [true|false]
 doorsctl config scroller_default_proportion [<value>]
 doorsctl config scroller_proportion_preset [<values>]
+doorsctl config animation_bezier [<name>]
+doorsctl config animation_duration [<ms>]
+doorsctl config animation <type> [bezier|duration] [<value>]
 ```
+
+### Animation Settings
+
+Doors supports per-type animation configuration with custom bezier curves.
+
+```
+doorsctl config enable_animations true|false
+```
+
+Globally enable or disable all animations (default: false).
+
+```
+doorsctl bezier <name> <p1x> <p1y> <p2x> <p2y>
+```
+
+Register named cubic bezier curves for use as animation easing functions. A cubic bezier is defined by two control points — P0=(0,0) and P3=(1,1) are implicit.
+
+- `<name>` — Name to reference this curve by
+- `<p1x> <p1y>` — First control point (x and y, 0.0—1.0)
+- `<p2x> <p2y>` — Second control point (x and y, 0.0—1.0)
+
+Built-in curves:
+
+| Name          | Equivalent CSS                     |
+|---------------|------------------------------------|
+| `default`     | `cubic-bezier(1/3, 1, 2/3, 1)`     |
+| `linear`      | `cubic-bezier(0, 0, 1, 1)`         |
+| `ease`        | `cubic-bezier(0.25, 0.1, 0.25, 1)` |
+| `ease_in`     | `cubic-bezier(0.42, 0, 1, 1)`      |
+| `ease_out`    | `cubic-bezier(0, 0, 0.58, 1)`      |
+| `ease_in_out` | `cubic-bezier(0.42, 0, 0.58, 1)`   |
+
+#### Global Animation Defaults
+
+```
+doorsctl config animation_bezier [<name>]
+```
+
+Get or set the global default bezier curve used for all animations when no
+per-type override is configured.
+
+```
+doorsctl config animation_duration [<ms>]
+```
+
+Get or set the global default animation duration in milliseconds (default: 180).
+
+#### Per-Type Animation Configuration
+
+Each animation type can have its own bezier curve and duration, overriding the global defaults. The animation types are:
+
+| Type              | Description                          |
+|-------------------|--------------------------------------|
+| `geometry`        | Window movement and position changes |
+| `resize`          | Snapshot window resize animations    |
+| `fade_in`         | Windows appearing (fade in)          |
+| `fade_out`        | Windows closing (fade out)           |
+| `fade_in_layer`   | Layer surfaces appearing             |
+| `fade_out_layer`  | Layer surfaces closing               |
+| `workspace_slide` | Workspace switching slide            |
+
+
+```
+doorsctl config animation <type> bezier <name>
+```
+
+Set a per-type bezier.
+
+```
+doorsctl config animation <type> duration <ms>
+```
+
+Set a per-type duration (ms).
+
+```
+doorsctl config animation <type>
+```
+
+Query the current config for a type.
+
+```
+doorsctl config animation <type> bezier ""
+```
+
+Clear a per-type override (revert to global default).
 
 ### Blur Settings
 
