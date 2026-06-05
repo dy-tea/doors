@@ -1118,6 +1118,9 @@ node_t *find_fence(node_t *n, direction_t dir) {
 void swap_nodes(output_t *m1, desktop_t *d1, node_t *n1, output_t *m2, desktop_t *d2, node_t *n2) {
   if (n1 == NULL || n2 == NULL || n1 == n2) return;
 
+  animation_cancel_node(n1);
+  animation_cancel_node(n2);
+
   bool n1_focused = (d1->focus == n1);
   bool n2_focused = (d2->focus == n2);
 
