@@ -686,6 +686,8 @@ void server_fini(void) {
 		wl_list_remove(&server.drm_lease_request.link);
 #endif
 
+  wlr_backend_destroy(server.backend);
+
   blur_fini();
 
   wlr_scene_node_destroy(&server.scene->tree.node);
@@ -693,7 +695,7 @@ void server_fini(void) {
   wlr_xcursor_manager_destroy(server.cursor_mgr);
   wlr_allocator_destroy(server.allocator);
   wlr_renderer_destroy(server.renderer);
-  wlr_backend_destroy(server.backend);
+
   wl_display_destroy(server.wl_display);
 }
 
