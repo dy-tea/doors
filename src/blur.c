@@ -1161,6 +1161,45 @@ static bool rebuild_live_blur_layers(output_t *output, struct wlr_scene_output *
     wl_list_for_each(ls, &output->layers[i], link) {
       if (!ls->blur_node || !ls->mapped) continue;
 
+      // get blur region bounds
+      int nboxes;
+      pixman_box32_t *boxes = pixman_region32_rectangles(&ls->blur_region, &nboxes);
+      if (nboxes == 0) continue;
+
+      // get surface position to convert blur region to output coordinates
+      int lx, ly;
+      if (!wlr_scene_node_coords(&ls->scene_tree->node, &lx, &ly)) continue;
+
+      // convert to output-local coordinates
+      int out_lx = lx - output->lx;
+      int out_ly = ly - output->ly;
+
+      // find the bounding box of all rectangles in the blur region
+      int blur_r_x1 = boxes[0].x1 + out_lx, blur_r_y1 = boxes[0].y1 + out_ly;
+      int blur_r_x2 = boxes[0].x2 + out_lx, blur_r_y2 = boxes[0].y2 + out_ly;
+      for (int b = 1; b < nboxes; b++) {
+        int box_x1 = boxes[b].x1 + out_lx, box_y1 = boxes[b].y1 + out_ly;
+        int box_x2 = boxes[b].x2 + out_lx, box_y2 = boxes[b].y2 + out_ly;
+        if (box_x1 < blur_r_x1) blur_r_x1 = box_x1;
+        if (box_y1 < blur_r_y1) blur_r_y1 = box_y1;
+        if (box_x2 > blur_r_x2) blur_r_x2 = box_x2;
+        if (box_y2 > blur_r_y2) blur_r_y2 = box_y2;
+      }
+
+      int blur_width = blur_r_x2 - blur_r_x1;
+      int blur_height = blur_r_y2 - blur_r_y1;
+      if (blur_width <= 0 || blur_height <= 0) continue;
+
+      // store the blur region offset for push_blur_to_layers
+      ls->blur_region_offset_x = boxes[0].x1;
+      ls->blur_region_offset_y = boxes[0].y1;
+      for (int b = 1; b < nboxes; b++) {
+        if (boxes[b].x1 < ls->blur_region_offset_x) ls->blur_region_offset_x = boxes[b].x1;
+        if (boxes[b].y1 < ls->blur_region_offset_y) ls->blur_region_offset_y = boxes[b].y1;
+      }
+      ls->blur_region_width = blur_width;
+      ls->blur_region_height = blur_height;
+
       GLuint src = capture_bg_to_tex1(output, ctx, scene_output, false,
         &ls->scene_tree->node, &ls->blur_scene_hidden);
       if (!src) continue;
@@ -1174,15 +1213,29 @@ static bool rebuild_live_blur_layers(output_t *output, struct wlr_scene_output *
         continue;
       }
 
+      // clear with transparent, draw the blurred texture clipped to the blur region
       glDisable(GL_BLEND);
       glDisable(GL_SCISSOR_TEST);
+      glDisable(GL_STENCIL_TEST);
       glBindFramebuffer(GL_FRAMEBUFFER, dest_fbo);
       glViewport(0, 0, w, h);
+      glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+      glClear(GL_COLOR_BUFFER_BIT);
+
+      // draw the blurred texture only within the blur region rectangles
+      glEnable(GL_SCISSOR_TEST);
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, blurred);
       glUseProgram(blur_ctx.prog_blit);
       glUniform1i(blur_ctx.u_blit.tex, 0);
-      draw_quad();
+      for (int b = 0; b < nboxes; b++) {
+        int box_x1 = boxes[b].x1 + out_lx;
+        int box_y1 = boxes[b].y1 + out_ly;
+        glScissor(box_x1, box_y1, boxes[b].x2 - boxes[b].x1, boxes[b].y2 - boxes[b].y1);
+        draw_quad();
+      }
+
+      glDisable(GL_SCISSOR_TEST);
       glBindTexture(GL_TEXTURE_2D, 0);
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
       glFlush();
@@ -1204,17 +1257,30 @@ static void push_blur_to_layers(output_t *output) {
         continue;
       }
 
+      // get blur region bounds
+      if (ls->blur_region_width <= 0 || ls->blur_region_height <= 0) {
+        wlr_scene_buffer_set_buffer(ls->blur_node, NULL);
+        continue;
+      }
+
       wlr_scene_buffer_set_buffer(ls->blur_node, ls->blur_buf);
 
+      // get surface position for source box calculation
       int lx, ly;
       if (!wlr_scene_node_coords(&ls->scene_tree->node, &lx, &ly)) {
         wlr_scene_buffer_set_buffer(ls->blur_node, NULL);
         continue;
       }
 
-      int sw = ls->layer_surface->surface->current.width;
-      int sh = ls->layer_surface->surface->current.height;
-      struct wlr_box r = { .x = lx, .y = ly, .width = sw, .height = sh };
+      // position blur_node at the blur region offset within the scene_tree
+      int blur_r_x = ls->blur_region_offset_x;
+      int blur_r_y = ls->blur_region_offset_y;
+      int blur_r_w = ls->blur_region_width;
+      int blur_r_h = ls->blur_region_height;
+
+      // Compute the source box in output-local coordinates
+      // r is the blur region in layout (absolute) coordinates
+      struct wlr_box r = { .x = lx + blur_r_x, .y = ly + blur_r_y, .width = blur_r_w, .height = blur_r_h };
 
       struct wlr_fbox src; int dw, dh;
       if (!compute_src_box(output, &r, &src, &dw, &dh)) {
@@ -1222,9 +1288,12 @@ static void push_blur_to_layers(output_t *output) {
         wlr_scene_node_set_position(&ls->blur_node->node, 0, 0);
         continue;
       }
-      int node_ox = (r.x < output->lx) ? (output->lx - r.x) : 0;
-      int node_oy = (r.y < output->ly) ? (output->ly - r.y) : 0;
-      wlr_scene_node_set_position(&ls->blur_node->node, node_ox, node_oy);
+
+      int offset_x = (r.x < output->lx) ? (output->lx - r.x) : 0;
+      int offset_y = (r.y < output->ly) ? (output->ly - r.y) : 0;
+
+      // Position at blur region offset within surface
+      wlr_scene_node_set_position(&ls->blur_node->node, blur_r_x + offset_x, blur_r_y + offset_y);
       wlr_scene_buffer_set_source_box(ls->blur_node, &src);
       wlr_scene_buffer_set_dest_size(ls->blur_node, dw, dh);
     }

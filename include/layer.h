@@ -4,6 +4,7 @@
 #include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_scene.h>
 #include <GLES2/gl2.h>
+#include <pixman.h>
 
 typedef struct output_t output_t;
 
@@ -20,6 +21,9 @@ typedef struct layer_surface_t {
   struct wlr_buffer *blur_buf;
   GLuint blur_buf_fbo;
   bool blur_scene_hidden;
+  pixman_region32_t blur_region;  // blur region in surface-local coordinates
+  int blur_region_offset_x, blur_region_offset_y;
+  int blur_region_width, blur_region_height;
 
   struct wl_listener new_popup;
   struct wl_listener destroy;

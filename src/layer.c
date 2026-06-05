@@ -37,6 +37,11 @@ void layer_surface_set_blur(layer_surface_t *ls, bool enabled) {
   } else if (!enabled && ls->blur_node) {
     wlr_scene_node_destroy(&ls->blur_node->node);
     ls->blur_node = NULL;
+    pixman_region32_clear(&ls->blur_region);
+    ls->blur_region_offset_x = 0;
+    ls->blur_region_offset_y = 0;
+    ls->blur_region_width = 0;
+    ls->blur_region_height = 0;
     if (ls->blur_buf) {
       wlr_buffer_unlock(ls->blur_buf);
       ls->blur_buf = NULL;
@@ -85,6 +90,8 @@ static void layer_surface_destroy(struct wl_listener *listener, void *data) {
   wl_list_remove(&layer->unmap.link);
   wl_list_remove(&layer->surface_commit.link);
   wl_list_remove(&layer->link);
+
+  pixman_region32_fini(&layer->blur_region);
 
   if (layer->blur_buf) {
     wlr_buffer_unlock(layer->blur_buf);
@@ -164,9 +171,13 @@ static void layer_surface_commit(struct wl_listener *listener, void *data) {
   const struct wlr_ext_background_effect_surface_v1_state *fx =
     wlr_ext_background_effect_v1_get_surface_state(layer_surface->surface);
   bool wants_blur = fx && !pixman_region32_empty(&fx->blur_region);
-  bool has_blur = layer->blur_node != NULL;
-  if (wants_blur != has_blur)
+  bool had_blur = layer->blur_node != NULL;
+  if (wants_blur != had_blur)
     layer_surface_set_blur(layer, wants_blur);
+
+  // update blur region if blur is enabled
+  if (fx && layer->blur_node)
+    pixman_region32_copy(&layer->blur_region, &fx->blur_region);
 }
 
 void handle_new_layer_surface(struct wl_listener *listener, void *data) {
@@ -204,6 +215,7 @@ void handle_new_layer_surface(struct wl_listener *listener, void *data) {
   layer->layer_surface = layer_surface;
   layer->output = output;
   layer_surface->data = layer;
+  pixman_region32_init(&layer->blur_region);
 
   struct wlr_scene_tree *layer_tree;
   switch (layer_surface->pending.layer) {
