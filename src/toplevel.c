@@ -30,6 +30,39 @@
 
 extern struct server_t server;
 
+static struct wlr_fbox clamp_scene_buffer_source_box(struct wlr_scene_buffer *buffer,
+    struct wlr_fbox box) {
+  if (!buffer || !buffer->buffer) return (struct wlr_fbox){0};
+
+  if (box.x < 0.0f) {
+    box.width += box.x;
+    box.x = 0.0f;
+  }
+  if (box.y < 0.0f) {
+    box.height += box.y;
+    box.y = 0.0f;
+  }
+
+  float max_w = (float)buffer->buffer->width;
+  float max_h = (float)buffer->buffer->height;
+
+  if (max_w < 1.0f || max_h < 1.0f) return (struct wlr_fbox){0, 0, 1, 1};
+
+  if (box.x > max_w) box.x = max_w;
+  if (box.y > max_h) box.y = max_h;
+  if (box.x + box.width > max_w) box.width = max_w - box.x;
+  if (box.y + box.height > max_h) box.height = max_h - box.y;
+
+  if (box.width < 1.0f) box.width = 1.0f;
+  if (box.height < 1.0f) box.height = 1.0f;
+  if (box.x + box.width > max_w) box.x = max_w - box.width;
+  if (box.y + box.height > max_h) box.y = max_h - box.height;
+  if (box.x < 0.0f) box.x = 0.0f;
+  if (box.y < 0.0f) box.y = 0.0f;
+
+  return box;
+}
+
 static void handle_foreign_activate_request(struct wl_listener *listener, void *data);
 static void handle_foreign_fullscreen_request(struct wl_listener *listener, void *data);
 static void handle_foreign_close_request(struct wl_listener *listener, void *data);
@@ -572,6 +605,7 @@ void toplevel_unmap(struct wl_listener *listener, void *data) {
   toplevel->configured = false;
 
   toplevel->image_capture_surface = NULL;
+  animation_cancel_toplevel(toplevel);
 
   if (toplevel->ext_foreign_toplevel) {
     wlr_ext_foreign_toplevel_handle_v1_destroy(toplevel->ext_foreign_toplevel);
@@ -668,22 +702,6 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
   }
 
   if (toplevel->mapped && toplevel->xdg_toplevel->base->surface->mapped) {
-    uint32_t serial = toplevel->xdg_toplevel->base->current.configure_serial;
-    bool successful = transaction_notify_view_ready_by_serial(toplevel, serial);
-
-    if (successful)
-      wlr_log(WLR_DEBUG, "Transaction completed for serial=%u", serial);
-
-    // ack as configured if serial is non-zero
-    if (!toplevel->configured && serial != 0) {
-      toplevel->configured = true;
-      wlr_log(WLR_DEBUG, "Toplevel marked configured via serial=%u (transaction match=%d)",
-      serial, successful);
-    }
-
-    if (toplevel->saved_surface_tree && !successful)
-      toplevel_send_frame_done(toplevel);
-
     struct wlr_box *new_geo = &xdg_surface->geometry;
     bool new_size = new_geo->width != toplevel->geometry.width ||
       new_geo->height != toplevel->geometry.height ||
@@ -708,6 +726,22 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
         }
       }
     }
+
+    uint32_t serial = toplevel->xdg_toplevel->base->current.configure_serial;
+    bool successful = transaction_notify_view_ready_by_serial(toplevel, serial);
+
+    if (successful)
+      wlr_log(WLR_DEBUG, "Transaction completed for serial=%u", serial);
+
+    // ack as configured if serial is non-zero
+    if (!toplevel->configured && serial != 0) {
+      toplevel->configured = true;
+      wlr_log(WLR_DEBUG, "Toplevel marked configured via serial=%u (transaction match=%d)",
+      serial, successful);
+    }
+
+    if (toplevel->saved_surface_tree && !successful)
+      toplevel_send_frame_done(toplevel);
 
     toplevel_center_and_clip_surface(toplevel);
   }
@@ -860,6 +894,8 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
 
   wlr_log(WLR_INFO, "Toplevel destroyed");
 
+  animation_cancel_toplevel(toplevel);
+
   if (toplevel->ext_foreign_toplevel) {
     wlr_ext_foreign_toplevel_handle_v1_destroy(toplevel->ext_foreign_toplevel);
     toplevel->ext_foreign_toplevel = NULL;
@@ -943,7 +979,7 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
 
   destroy_borders(&toplevel->border_tree, toplevel->border_rects);
 
-  toplevel->saved_surface_tree = NULL;
+  toplevel_remove_saved_buffer(toplevel);
 
   wl_list_remove(&toplevel->map.link);
   wl_list_remove(&toplevel->unmap.link);
@@ -1283,7 +1319,8 @@ static void save_buffer_iterator(struct wlr_scene_buffer *buffer,
 
   wlr_scene_buffer_set_dest_size(sbuf, buffer->dst_width, buffer->dst_height);
   wlr_scene_buffer_set_opaque_region(sbuf, &buffer->opaque_region);
-  wlr_scene_buffer_set_source_box(sbuf, &buffer->src_box);
+  struct wlr_fbox src_box = clamp_scene_buffer_source_box(buffer, buffer->src_box);
+  wlr_scene_buffer_set_source_box(sbuf, &src_box);
   wlr_scene_node_set_position(&sbuf->node, sx, sy);
   wlr_scene_buffer_set_transform(sbuf, buffer->transform);
   wlr_scene_buffer_set_buffer(sbuf, buffer->buffer);

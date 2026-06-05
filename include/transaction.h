@@ -30,6 +30,7 @@ typedef struct transaction_inst_t {
   uint32_t serial;
   bool waiting;
   bool server_request;
+  bool require_geometry_match;
 
   // scene tree snapshot during alive state
   struct wlr_scene_tree *scene_tree;

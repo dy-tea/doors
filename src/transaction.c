@@ -547,6 +547,8 @@ static void transaction_commit(transaction_t *txn) {
         bool has_stable_frame =
           node->client->toplevel->last_configured_size.width > 0 ||
           node->client->toplevel->last_configured_size.height > 0;
+        instruction->require_geometry_match = has_stable_frame &&
+          node->client->shown && node->client->toplevel->configured;
 
         // update last configured size to prevent feedback loops
         node->client->toplevel->last_configured_size.width = rect->width;

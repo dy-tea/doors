@@ -203,6 +203,39 @@ static void schedule_output(output_t *output) {
   wlr_output_schedule_frame(output->wlr_output);
 }
 
+static struct wlr_fbox clamp_buffer_source_box(struct wlr_scene_buffer *buffer,
+    struct wlr_fbox box) {
+  if (!buffer || !buffer->buffer)
+    return (struct wlr_fbox){0};
+
+  if (box.x < 0.0f) {
+    box.width += box.x;
+    box.x = 0.0f;
+  }
+  if (box.y < 0.0f) {
+    box.height += box.y;
+    box.y = 0.0f;
+  }
+
+  float max_w = (float)buffer->buffer->width;
+  float max_h = (float)buffer->buffer->height;
+  if (max_w < 1.0f || max_h < 1.0f)
+    return (struct wlr_fbox){0, 0, 1, 1};
+  if (box.x > max_w) box.x = max_w;
+  if (box.y > max_h) box.y = max_h;
+  if (box.x + box.width > max_w) box.width = max_w - box.x;
+  if (box.y + box.height > max_h) box.height = max_h - box.y;
+
+  if (box.width < 1.0f) box.width = 1.0f;
+  if (box.height < 1.0f) box.height = 1.0f;
+  if (box.x + box.width > max_w) box.x = max_w - box.width;
+  if (box.y + box.height > max_h) box.y = max_h - box.height;
+  if (box.x < 0.0f) box.x = 0.0f;
+  if (box.y < 0.0f) box.y = 0.0f;
+
+  return box;
+}
+
 static void snapshot_buffer_iterator(struct wlr_scene_buffer *buffer, int sx, int sy, void *data) {
   animation_entry_t *entry = data;
 
@@ -230,7 +263,8 @@ static void updated_buffer_iterator(struct wlr_scene_buffer *buffer, int sx, int
 
   wlr_scene_buffer_set_dest_size(sbuf, buffer->dst_width, buffer->dst_height);
   wlr_scene_buffer_set_opaque_region(sbuf, &buffer->opaque_region);
-  wlr_scene_buffer_set_source_box(sbuf, &buffer->src_box);
+  struct wlr_fbox src_box = clamp_buffer_source_box(buffer, buffer->src_box);
+  wlr_scene_buffer_set_source_box(sbuf, &src_box);
   wlr_scene_node_set_position(&sbuf->node, sx, sy);
   wlr_scene_buffer_set_transform(sbuf, buffer->transform);
   wlr_scene_buffer_set_buffer(sbuf, buffer->buffer);
@@ -280,6 +314,7 @@ static void content_buffer_clip_iterator(struct wlr_scene_buffer *buffer, int sx
     .height = (float)(vis_y2 - vis_y1),
   };
 
+  src_fbox = clamp_buffer_source_box(buffer, src_fbox);
   wlr_scene_buffer_set_source_box(buffer, &src_fbox);
   wlr_scene_node_set_position(&buffer->node, vis_x1, vis_y1);
   wlr_scene_buffer_set_dest_size(buffer, (int)src_fbox.width, (int)src_fbox.height);
@@ -393,6 +428,33 @@ void animation_cancel_node(struct node_t *node) {
   destroy_snapshot_buffers(entry);
   wl_list_remove(&entry->link);
   free(entry);
+}
+
+void animation_cancel_toplevel(struct toplevel_t *toplevel) {
+  if (!toplevel) return;
+
+  animation_entry_t *entry, *tmp;
+  wl_list_for_each_safe(entry, tmp, &animations, link) {
+    if (entry->toplevel != toplevel &&
+        entry->scene_tree != toplevel->scene_tree &&
+        entry->scene_tree != toplevel->content_tree &&
+        entry->scene_tree != toplevel->saved_surface_tree)
+      continue;
+
+    wlr_log(WLR_DEBUG, "animation: cancel toplevel entry=%p node=%u",
+      (void*)entry, entry->node ? entry->node->id : 0);
+
+    if (entry->from_opacity != entry->to_opacity && entry->scene_tree) {
+      float full = 1.0f;
+      wlr_scene_node_for_each_buffer(&entry->scene_tree->node, set_opacity_iterator, &full);
+    }
+
+    destroy_snapshot_buffers(entry);
+    wl_list_remove(&entry->link);
+    free(entry);
+  }
+
+  toplevel_remove_saved_buffer(toplevel);
 }
 
 void animation_cancel_scene_tree(struct wlr_scene_tree *scene_tree) {
@@ -768,6 +830,7 @@ static void update_snapshot_entry(animation_entry_t *entry, struct timespec now)
 	        .height = (float)(vis_y2 - vis_y1),
 	      };
 
+	      src_fbox = clamp_buffer_source_box(copy->buffer, src_fbox);
 	      wlr_scene_buffer_set_source_box(copy->buffer, &src_fbox);
 	      wlr_scene_node_set_position(&copy->buffer->node, vis_x1, vis_y1);
 	      wlr_scene_buffer_set_dest_size(copy->buffer, (int)src_fbox.width, (int)src_fbox.height);
@@ -801,6 +864,7 @@ static void update_snapshot_entry(animation_entry_t *entry, struct timespec now)
         if (dw <= 0) dw = 1;
         if (dh <= 0) dh = 1;
 
+        full_src = clamp_buffer_source_box(copy->buffer, full_src);
         wlr_scene_buffer_set_source_box(copy->buffer, &full_src);
         wlr_scene_node_set_position(&copy->buffer->node, dx, dy);
         wlr_scene_buffer_set_dest_size(copy->buffer, dw, dh);
@@ -837,6 +901,7 @@ static void update_snapshot_entry(animation_entry_t *entry, struct timespec now)
         .height = (float)(vis_y2 - vis_y1),
       };
 
+      src_fbox = clamp_buffer_source_box(copy->buffer, src_fbox);
       wlr_scene_buffer_set_source_box(copy->buffer, &src_fbox);
       wlr_scene_node_set_position(&copy->buffer->node, vis_x1, vis_y1);
       wlr_scene_buffer_set_dest_size(copy->buffer, (int)src_fbox.width, (int)src_fbox.height);
