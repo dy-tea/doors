@@ -16,6 +16,7 @@
 #include "config.h"
 #include "animation.h"
 #include "bezier.h"
+#include "spring.h"
 #include "scroller.h"
 #include "text.h"
 #include <stdio.h>
@@ -3602,7 +3603,16 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
     }
   } else if (streq("animation", *args)) {
     if (num < 2) {
-      send_failure(client_fd, "config animation: expected <type> [bezier|duration] [value]\n");
+      send_failure(client_fd, "config animation: expected <type> [bezier|duration|spring] [value]\n");
+    } else if (num >= 3 && streq("spring", args[2])) {
+      const char *sname = num >= 4 ? args[3] : "";
+      if (sname[0] != '\0' && !spring_exists(sname)) {
+        send_failure(client_fd, "config animation: no such spring curve\n");
+      } else if (animation_set_type_spring(args[1], sname)) {
+        send_success(client_fd, "animation type spring set\n");
+      } else {
+        send_failure(client_fd, "config animation: unknown type\n");
+      }
     } else if (num >= 3 && streq("bezier", args[2])) {
       const char *bname = num >= 4 ? args[3] : "";
       if (bname[0] != '\0' && !bezier_exists(bname)) {
@@ -3633,9 +3643,15 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
       } else {
         const char *bname = animation_type_get_bezier(args[1]);
         uint32_t dur = animation_type_get_duration(args[1]);
-        char buf[192];
-        snprintf(buf, sizeof(buf), "bezier: %s\nduration: %u\n",
-          bname ? bname : "(global default)",
+        const char *sname = animation_type_get_spring(args[1]);
+        char buf[256];
+        int off = 0;
+        if (sname) {
+          off = snprintf(buf, sizeof(buf), "spring: %s\n", sname);
+        } else {
+          off = snprintf(buf, sizeof(buf), "bezier: %s\n", bname ? bname : "(global default)");
+        }
+        snprintf(buf + off, sizeof(buf) - off, "duration: %u\n",
           dur > 0 ? dur : animation_get_duration());
         send_success(client_fd, buf);
       }
@@ -4271,6 +4287,21 @@ static void process_ipc_message(char *msg, int msg_len, int client_fd) {
          send_success(client_fd, "bezier curve added\n");
        else
          send_failure(client_fd, "failed to add bezier curve\n");
+     }
+   } else if (streq("spring", *args)) {
+     ++args; --num;
+     if (num < 3) {
+       send_failure(client_fd, "usage: spring <name> <stiffness> <damping> [mass] [value_eps] [velocity_eps]\n");
+     } else {
+       double stiffness = atof(args[1]);
+       double damping = atof(args[2]);
+       double mass = num >= 4 ? atof(args[3]) : 1.0;
+       double value_eps = num >= 5 ? atof(args[4]) : SPRING_EPSILON_DEFAULT;
+       double velocity_eps = num >= 6 ? atof(args[5]) : SPRING_EPSILON_DEFAULT;
+       if (spring_add(args[0], stiffness, damping, mass, value_eps, velocity_eps))
+         send_success(client_fd, "spring curve added\n");
+       else
+         send_failure(client_fd, "failed to add spring curve\n");
      }
    } else {
      send_failure(client_fd, "unknown command\n");

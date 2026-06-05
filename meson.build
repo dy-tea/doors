@@ -104,6 +104,7 @@ executable(
 		'src' / 'scroller.c',
 		'src' / 'animation.c',
 		'src' / 'bezier.c',
+		'src' / 'spring.c',
 		'src' / 'xwayland.c',
 		'src' / 'input_method.c',
 		'src' / 'blur.c',

@@ -23,6 +23,8 @@ int animation_type_from_name(const char *name);
 bool animation_set_type_config(const char *type_name, const char *bezier_name, uint32_t duration_ms);
 const char *animation_type_get_bezier(const char *type_name);
 uint32_t animation_type_get_duration(const char *type_name);
+bool animation_set_type_spring(const char *type_name, const char *spring_name);
+const char *animation_type_get_spring(const char *type_name);
 
 bool animation_apply_geometry(node_t *node, struct wlr_scene_tree *scene_tree,
   struct wlr_box target, bool animate);

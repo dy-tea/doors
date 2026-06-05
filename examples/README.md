@@ -714,7 +714,7 @@ doorsctl config scroller_default_proportion [<value>]
 doorsctl config scroller_proportion_preset [<values>]
 doorsctl config animation_bezier [<name>]
 doorsctl config animation_duration [<ms>]
-doorsctl config animation <type> [bezier|duration] [<value>]
+doorsctl config animation <type> [bezier|duration|spring] [<value>]
 ```
 
 ### Animation Settings
@@ -801,6 +801,54 @@ doorsctl config animation <type> bezier ""
 ```
 
 Clear a per-type override (revert to global default).
+
+#### Custom Spring Curves
+
+Spring curves use a damped harmonic oscillator model for physics-based
+animations. Unlike bezier curves (which have a fixed duration), springs
+naturally settle based on their parameters — they can overshoot, bounce,
+and feel more organic.
+
+```
+doorsctl spring <name> <stiffness> <damping> [mass] [value_eps] [velocity_eps]
+```
+
+- `<name>` — Name to reference this spring by
+- `<stiffness>` — Pull-back force (higher = snappier)
+- `<damping>` — Energy dissipation (higher = less bounce)
+- `[mass]` — Inertia (higher = slower/heavier, default: 1.0)
+- `[value_eps]` — Position settle threshold (default: 0.001)
+- `[velocity_eps]` — Velocity settle threshold (default: 0.001)
+
+Built-in springs:
+
+| Name       | Stiffness | Damping | Mass | Character              |
+|------------|-----------|---------|------|------------------------|
+| `default`  | 300       | 20      | 1    | Snappy, no overshoot   |
+| `bouncy`   | 400       | 10      | 1    | Fast with bounce       |
+| `gentle`   | 100       | 15      | 1    | Soft and smooth        |
+| `slow`     | 50        | 10      | 2    | Heavy                  |
+
+Example:
+
+```
+doorsctl spring snappy 500 15 1          # Very fast, slight overshoot
+doorsctl spring floaty 80 5 3            # Heavy, bouncy
+```
+
+#### Per-Type Spring Configuration
+
+When a spring is assigned to an animation type, it takes priority over any
+bezier curve — the animation runs until the spring settles, ignoring the
+duration entirely.
+
+```
+doorsctl config animation <type> spring <name>
+```
+
+```
+doorsctl config animation <type> spring ""     # Clear spring, revert to bezier
+```
 
 ### Blur Settings
 

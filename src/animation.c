@@ -1,5 +1,6 @@
 #include "animation.h"
 #include "bezier.h"
+#include "spring.h"
 #include "layer.h"
 #include "output.h"
 #include "toplevel.h"
@@ -43,7 +44,14 @@ typedef struct {
   output_t *output;
   float from_opacity;
   float to_opacity;
-  char bezier_name[64];
+  bool use_spring;
+  double spring_position;
+  double spring_velocity;
+  struct timespec spring_last_tick;
+  bool spring_done;
+  char curve_name[64];
+  double eased;
+  double progress;
 } animation_entry_t;
 
 static struct wl_list animations;
@@ -58,6 +66,7 @@ static const char *anim_type_names[ANIM_TYPE_COUNT] = {
 typedef struct {
   char bezier_name[64];
   uint32_t duration_ms;
+  char spring_name[64];
 } animation_type_config_t;
 
 static animation_type_config_t anim_type_configs[ANIM_TYPE_COUNT];
@@ -66,8 +75,19 @@ static void apply_config_to_entry(animation_entry_t *entry, int type_index) {
   if (type_index >= 0 && type_index < ANIM_TYPE_COUNT) {
     animation_type_config_t *cfg = &anim_type_configs[type_index];
 
+    // spring takes priority over bezier
+    if (cfg->spring_name[0] != '\0' && spring_exists(cfg->spring_name)) {
+      entry->use_spring = true;
+      entry->spring_position = 0.0;
+      entry->spring_velocity = 0.0;
+      entry->spring_done = false;
+      clock_gettime(CLOCK_MONOTONIC, &entry->spring_last_tick);
+      snprintf(entry->curve_name, sizeof(entry->curve_name), "%s", cfg->spring_name);
+      return;
+    }
+
     if (cfg->bezier_name[0] != '\0' && bezier_exists(cfg->bezier_name))
-      snprintf(entry->bezier_name, sizeof(entry->bezier_name), "%s", cfg->bezier_name);
+      snprintf(entry->curve_name, sizeof(entry->curve_name), "%s", cfg->bezier_name);
 
     if (cfg->duration_ms > 0)
       entry->duration_ms = cfg->duration_ms;
@@ -291,6 +311,55 @@ static void destroy_snapshot_buffers(animation_entry_t *entry) {
     }
     entry->updated_buffers_initialized = false;
   }
+}
+
+static void tick_entry(animation_entry_t *entry, struct timespec now) {
+  if (entry->use_spring) {
+    double dt = elapsed_ms(entry->spring_last_tick, now) / 1000.0;
+    entry->spring_last_tick = now;
+    spring_curve_t *curve = spring_find(entry->curve_name);
+
+    if (curve) {
+      entry->eased = spring_evaluate(curve, dt, &entry->spring_position, &entry->spring_velocity, &entry->spring_done);
+    } else {
+      entry->eased = 1.0;
+      entry->spring_done = true;
+    }
+  } else {
+    entry->progress = elapsed_ms(entry->start, now) / (double)entry->duration_ms;
+    if (entry->progress < 0.0) entry->progress = 0.0;
+    if (entry->progress > 1.0) entry->progress = 1.0;
+
+    const char *bname = entry->curve_name[0] ? entry->curve_name : default_bezier_name;
+    entry->eased = bezier_evaluate(bname, entry->progress);
+  }
+}
+
+static bool is_entry_done(animation_entry_t *entry) {
+  if (entry->use_spring) return entry->spring_done;
+
+  return entry->progress >= 1.0;
+}
+
+bool animation_set_type_spring(const char *type_name, const char *spring_name) {
+  int idx = animation_type_from_name(type_name);
+
+  if (idx < 0) return false;
+  if (!spring_name) return false;
+
+  if (spring_name[0] == '\0' || spring_exists(spring_name)) {
+    snprintf(anim_type_configs[idx].spring_name, sizeof(anim_type_configs[idx].spring_name), "%s", spring_name);
+    return true;
+  }
+
+  return false;
+}
+
+const char *animation_type_get_spring(const char *type_name) {
+  int idx = animation_type_from_name(type_name);
+  if (idx < 0) return NULL;
+
+  return anim_type_configs[idx].spring_name[0] ? anim_type_configs[idx].spring_name : NULL;
 }
 
 void animation_init(void) {
@@ -606,16 +675,10 @@ bool animation_apply_geometry_from(node_t *node, struct wlr_scene_tree *scene_tr
 }
 
 static void update_snapshot_entry(animation_entry_t *entry, struct timespec now) {
+  (void)now;
   if (!entry->toplevel || !entry->toplevel->saved_surface_tree) return;
 
-  double progress = elapsed_ms(entry->start, now) / (double)entry->duration_ms;
-  if (progress < 0.0)
-    progress = 0.0;
-  if (progress > 1.0)
-    progress = 1.0;
-
-  const char *bname = entry->bezier_name[0] ? entry->bezier_name : default_bezier_name;
-  double eased = bezier_evaluate(bname, progress);
+  double eased = entry->eased;
   int x = (int)(entry->from.x + (entry->to.x - entry->from.x) * eased);
   int y = (int)(entry->from.y + (entry->to.y - entry->from.y) * eased);
   int width = (int)(entry->from.width + (entry->to.width - entry->from.width) * eased);
@@ -827,16 +890,11 @@ bool animation_update_output(output_t *output, struct timespec now) {
         continue;
       }
 
-      double progress = elapsed_ms(entry->start, now) / (double)entry->duration_ms;
-      if (progress < 0.0) progress = 0.0;
-      if (progress > 1.0) progress = 1.0;
-
-      const char *bname = entry->bezier_name[0] ? entry->bezier_name : default_bezier_name;
-      double eased = bezier_evaluate(bname, progress);
-      float opacity = (float)(entry->from_opacity + (entry->to_opacity - entry->from_opacity) * eased);
+      tick_entry(entry, now);
+      float opacity = (float)(entry->from_opacity + (entry->to_opacity - entry->from_opacity) * entry->eased);
       wlr_scene_node_for_each_buffer(&entry->scene_tree->node, set_opacity_iterator, &opacity);
 
-      if (progress >= 1.0) {
+      if (is_entry_done(entry)) {
         float full = 1.0f;
         wlr_scene_node_for_each_buffer(&entry->scene_tree->node, set_opacity_iterator, &full);
 
@@ -863,9 +921,9 @@ bool animation_update_output(output_t *output, struct timespec now) {
     if (entry->node->output != output) continue;
 
     if (entry->snapshot_resize) {
+      tick_entry(entry, now);
       update_snapshot_entry(entry, now);
-      double progress = elapsed_ms(entry->start, now) / (double)entry->duration_ms;
-      if (progress >= 1.0) {
+      if (is_entry_done(entry)) {
         if (entry->toplevel) {
           toplevel_remove_saved_buffer(entry->toplevel);
           if (entry->toplevel->scene_tree)
@@ -887,22 +945,17 @@ bool animation_update_output(output_t *output, struct timespec now) {
       continue;
     }
 
-    double progress = elapsed_ms(entry->start, now) / (double)entry->duration_ms;
-    if (progress < 0.0) progress = 0.0;
-    if (progress > 1.0) progress = 1.0;
+    tick_entry(entry, now);
 
-    const char *bname = entry->bezier_name[0] ? entry->bezier_name : default_bezier_name;
-    double eased = bezier_evaluate(bname, progress);
-
-    int x = (int)(entry->from.x + (entry->to.x - entry->from.x) * eased);
-    int y = (int)(entry->from.y + (entry->to.y - entry->from.y) * eased);
+    int x = (int)(entry->from.x + (entry->to.x - entry->from.x) * entry->eased);
+    int y = (int)(entry->from.y + (entry->to.y - entry->from.y) * entry->eased);
     wlr_scene_node_set_position(&entry->scene_tree->node, x, y);
 
-    float cur_opacity = (float)(entry->from_opacity + (entry->to_opacity - entry->from_opacity) * eased);
+    float cur_opacity = (float)(entry->from_opacity + (entry->to_opacity - entry->from_opacity) * entry->eased);
     if (entry->from_opacity != entry->to_opacity)
       wlr_scene_node_for_each_buffer(&entry->scene_tree->node, set_opacity_iterator, &cur_opacity);
 
-    if (progress >= 1.0) {
+    if (is_entry_done(entry)) {
       if (entry->from_opacity != entry->to_opacity) {
         float full = 1.0f;
         wlr_scene_node_for_each_buffer(&entry->scene_tree->node, set_opacity_iterator, &full);
