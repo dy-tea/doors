@@ -58,8 +58,7 @@ static const char *get_config_home(void) {
 
 static uint32_t parse_modifiers(const char *mod_str) {
   uint32_t mods = 0;
-  if (!mod_str || mod_str[0] == '\0')
-    return 0;
+  if (!mod_str || mod_str[0] == '\0') return 0;
 
   char *tmp = strdup(mod_str);
   char *saveptr;
@@ -102,8 +101,7 @@ static xkb_keysym_t parse_keysym(const char *name) {
 }
 
 static uint32_t parse_keycode(const char *name) {
-  if (!name || name[0] == '\0')
-    return 0;
+  if (!name || name[0] == '\0') return 0;
 
   static const char *mouse_buttons[] = {
     "mouse_left", "mouse_right", "mouse_middle", "mouse_back", "mouse_forward"
@@ -851,17 +849,15 @@ static void setup_inotify_watch(const char *config_path) {
     return;
   }
 
-  char dir_path[PATH_MAX];
-  snprintf(dir_path, sizeof(dir_path), "%s", config_path);
-  char *last_slash = strrchr(dir_path, '/');
+  char *last_slash = strrchr(config_path, '/');
   if (last_slash) {
     *last_slash = '\0';
-    inotify_add_watch(hotkey_watch_fd, dir_path, IN_MODIFY);
+    inotify_add_watch(hotkey_watch_fd, config_path, IN_MODIFY);
   } else {
     inotify_add_watch(hotkey_watch_fd, ".", IN_MODIFY);
   }
 
-  snprintf(hotkey_config_path, sizeof(hotkey_config_path), "%s", config_path);
+  strcpy(hotkey_config_path, config_path);
 }
 
 void config_init(void) {
@@ -877,9 +873,7 @@ void config_init_with_config_dir(const char *config_dir) {
   snprintf(doorsrc_path, sizeof(doorsrc_path), "%s/%s", config_home, DOORSRC_NAME);
   run_config(doorsrc_path);
 
-  char hotkey_path[PATH_MAX];
-  snprintf(hotkey_path, sizeof(hotkey_path), "%s/%s", config_home, DOORSHKRC_NAME);
-  snprintf(hotkey_init_path, sizeof(hotkey_init_path), "%s", hotkey_path);
+  snprintf(hotkey_init_path, sizeof(hotkey_init_path), "%s/%s", config_home, DOORSHKRC_NAME);
 }
 
 void config_fini(void) {
