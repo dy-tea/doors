@@ -929,7 +929,6 @@ bool keybind_matches(keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysym, uin
     return (kb->modifiers == modifiers) && (kb->keycode == keycode);
   else {
     if (kb->modifiers == modifiers && kb->keysym == keysym) return true;
-    if (kb->modifiers == (modifiers | WLR_MODIFIER_SHIFT) && kb->keysym == keysym) return true;
     if (kb->modifiers == modifiers) {
       xkb_keysym_t lower = xkb_keysym_to_lower(keysym);
       if (kb->keysym == lower) return true;
