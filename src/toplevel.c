@@ -1244,7 +1244,7 @@ void handle_new_xdg_toplevel(struct wl_listener *listener, void *data) {
   }
 
   toplevel->scene_tree->node.data = toplevel;
-  xdg_toplevel->base->data = toplevel->scene_tree;
+  xdg_toplevel->base->data = toplevel;
 
   wlr_scene_node_set_enabled(&toplevel->scene_tree->node, false);
 

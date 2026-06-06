@@ -64,7 +64,8 @@ typedef struct xwayland_toplevel_t {
 	struct wl_listener set_title;
 	struct wl_listener set_class;
 	struct wl_listener set_hints;
-	struct wl_listener set_window_type;
+  struct wl_listener set_window_type;
+  struct wl_listener set_startup_id;
 	struct wl_listener associate;
 	struct wl_listener dissociate;
 	struct wl_listener override_redirect;

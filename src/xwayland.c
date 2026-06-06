@@ -1,4 +1,5 @@
 #include "xwayland.h"
+#include "launcher.h"
 #include "server.h"
 #include "toplevel.h"
 #include "types.h"
@@ -760,13 +761,14 @@ static void handle_destroy(struct wl_listener *listener, void *data) {
 	wl_list_remove(&xwayland_view->set_title.link);
 	wl_list_remove(&xwayland_view->set_class.link);
 	wl_list_remove(&xwayland_view->set_hints.link);
-	wl_list_remove(&xwayland_view->set_window_type.link);
-	wl_list_remove(&xwayland_view->associate.link);
-	wl_list_remove(&xwayland_view->dissociate.link);
-	wl_list_remove(&xwayland_view->override_redirect.link);
-	wl_list_remove(&xwayland_view->link);
+  wl_list_remove(&xwayland_view->set_window_type.link);
+  wl_list_remove(&xwayland_view->set_startup_id.link);
+  wl_list_remove(&xwayland_view->associate.link);
+  wl_list_remove(&xwayland_view->dissociate.link);
+  wl_list_remove(&xwayland_view->override_redirect.link);
+  wl_list_remove(&xwayland_view->link);
 
-	if (xwayland_view->image_capture != NULL) {
+  if (xwayland_view->image_capture != NULL) {
 		wlr_scene_node_destroy(&xwayland_view->image_capture->tree.node);
 		xwayland_view->image_capture = NULL;
 		xwayland_view->image_capture_source = NULL;
@@ -948,6 +950,23 @@ static void handle_set_hints(struct wl_listener *listener, void *data) {
 	}
 }
 
+static void handle_set_startup_id(struct wl_listener *listener, void *data) {
+  (void)data;
+  xwayland_toplevel_t *xwayland_view = wl_container_of(listener, xwayland_view, set_startup_id);
+  struct wlr_xwayland_surface *xsurface = xwayland_view->xwayland_surface;
+
+  if (xsurface->startup_id == NULL) return;
+
+  struct wlr_xdg_activation_token_v1 *token = wlr_xdg_activation_v1_find_token(server.xdg_activation_v1, xsurface->startup_id);
+  if (token) {
+    launcher_ctx_t *ctx = token->data;
+    if (ctx) {
+      wlr_log(WLR_DEBUG, "xwayland: startup_id '%s' matches launcher ctx", xsurface->startup_id);
+      launcher_ctx_consume(ctx);
+    }
+  }
+}
+
 static void handle_set_window_type(struct wl_listener *listener, void *data) {
 	(void)data;
 	xwayland_toplevel_t *xwayland_view = wl_container_of(listener, xwayland_view, set_window_type);
@@ -1076,6 +1095,9 @@ static xwayland_toplevel_t *create_xwayland_view(struct wlr_xwayland_surface *xs
 	wl_signal_add(&xsurface->events.set_window_type, &xwayland_view->set_window_type);
 	xwayland_view->set_window_type.notify = handle_set_window_type;
 
+	wl_signal_add(&xsurface->events.set_startup_id, &xwayland_view->set_startup_id);
+	xwayland_view->set_startup_id.notify = handle_set_startup_id;
+
 	wl_signal_add(&xsurface->events.associate, &xwayland_view->associate);
 	xwayland_view->associate.notify = handle_associate;
 
@@ -1109,6 +1131,7 @@ static void xwayland_view_destroy(xwayland_toplevel_t *xwayland_view) {
 	wl_list_remove(&xwayland_view->set_class.link);
 	wl_list_remove(&xwayland_view->set_hints.link);
 	wl_list_remove(&xwayland_view->set_window_type.link);
+	wl_list_remove(&xwayland_view->set_startup_id.link);
 	wl_list_remove(&xwayland_view->associate.link);
 	wl_list_remove(&xwayland_view->dissociate.link);
 	wl_list_remove(&xwayland_view->override_redirect.link);

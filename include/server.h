@@ -1,5 +1,6 @@
 #pragma once
 
+#include "launcher.h"
 #include "lock.h"
 #include "toplevel.h"
 #include "types.h"
@@ -52,6 +53,8 @@ typedef struct server_t {
   struct wlr_xdg_shell *xdg_shell;
   struct wlr_xdg_activation_v1 *xdg_activation_v1;
   struct wl_listener xdg_activation_request_activate;
+  struct wl_listener xdg_activation_new_token;
+  struct wl_list pending_launcher_ctxs;
   struct wlr_layer_shell_v1 *layer_shell;
   struct wl_listener new_layer_surface;
   struct wl_listener new_xdg_toplevel;

@@ -89,7 +89,7 @@ void handle_new_input(struct wl_listener *listener, void *data);
 void handle_output_power_set_mode(struct wl_listener *listener, void *data);
 void handle_output_manager_apply(struct wl_listener *listener, void *data);
 void handle_output_manager_test(struct wl_listener *listener, void *data);
-void handle_xdg_activation_request_activate(struct wl_listener *listener, void *data);
+
 void handle_drm_lease_request(struct wl_listener *listener, void *data);
 static void handle_ring_system_bell(struct wl_listener *listener, void *data);
 
@@ -192,9 +192,12 @@ void server_init(void) {
   wl_signal_add(&server.xdg_decoration_manager->events.new_toplevel_decoration, &server.new_xdg_decoration);
 
   // xdg activation
+  wl_list_init(&server.pending_launcher_ctxs);
   server.xdg_activation_v1 = wlr_xdg_activation_v1_create(server.wl_display);
   server.xdg_activation_request_activate.notify = handle_xdg_activation_request_activate;
   wl_signal_add(&server.xdg_activation_v1->events.request_activate, &server.xdg_activation_request_activate);
+  server.xdg_activation_new_token.notify = handle_xdg_activation_new_token;
+  wl_signal_add(&server.xdg_activation_v1->events.new_token, &server.xdg_activation_new_token);
 
   // layer shell
   server.layer_shell = wlr_layer_shell_v1_create(server.wl_display, 5);
@@ -673,6 +676,11 @@ void server_fini(void) {
   wl_list_remove(&server.new_session_lock.link);
 
   wl_list_remove(&server.xdg_activation_request_activate.link);
+  wl_list_remove(&server.xdg_activation_new_token.link);
+
+  launcher_ctx_t *ctx, *tmp;
+  wl_list_for_each_safe(ctx, tmp, &server.pending_launcher_ctxs, link)
+    launcher_ctx_destroy(ctx);
 
   wl_list_remove(&server.output_power_set_mode.link);
 
@@ -729,19 +737,6 @@ void handle_drag_icon_destroy(struct wl_listener *listener, void *data) {
   (void)data;
   wl_list_remove(&listener->link);
   free(listener);
-}
-
-void handle_xdg_activation_request_activate(struct wl_listener *listener, void *data) {
-  (void)listener;
-  struct wlr_xdg_activation_v1_request_activate_event *event = data;
-
-  if (event->surface == NULL) return;
-
-  toplevel_t *toplevel = event->surface->data;
-  if (toplevel == NULL) return;
-
-  wlr_scene_node_raise_to_top(&toplevel->scene_tree->node);
-  focus_toplevel(toplevel);
 }
 
 static int handle_system_bell_timer(void *data) {
