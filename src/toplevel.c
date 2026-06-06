@@ -723,6 +723,17 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
               toplevel->geometry.height);
             transaction_commit_dirty_client();
           }
+        } else if (IS_TILED(c)) {
+          struct wlr_box *last = &toplevel->last_configured_size;
+          if (last->width > 0 && last->height > 0 &&
+              (toplevel->geometry.width != last->width ||
+               toplevel->geometry.height != last->height) &&
+              c->tiled_rectangle.width > 0 && c->tiled_rectangle.height > 0) {
+            wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel,
+              c->tiled_rectangle.width, c->tiled_rectangle.height);
+            node_set_dirty(toplevel->node);
+            transaction_commit_dirty_client();
+          }
         }
       }
     }
