@@ -703,12 +703,6 @@ static submap_t *find_or_create_submap(const char *name) {
 }
 
 void load_hotkeys(const char *config_path) {
-  num_keybinds = 0;
-  num_submaps = 0;
-  num_hotcornerbinds = 0;
-  active_submap = NULL;
-  current_parsing_submap = NULL;
-
   wlr_log(WLR_DEBUG, "load_hotkeys called with path: %s", config_path);
 
   FILE *f = fopen(config_path, "r");
@@ -716,6 +710,13 @@ void load_hotkeys(const char *config_path) {
     wlr_log(WLR_INFO, "No hotkey config found at %s", config_path);
     return;
   }
+
+  num_keybinds = 0;
+  num_submaps = 0;
+  num_hotcornerbinds = 0;
+  num_gesturebinds = 0;
+  active_submap = NULL;
+  current_parsing_submap = NULL;
 
   char line[MAXLEN * 2];
   char hotkey[MAXLEN * 2];
@@ -849,15 +850,17 @@ static void setup_inotify_watch(const char *config_path) {
     return;
   }
 
-  char *last_slash = strrchr(config_path, '/');
+  strcpy(hotkey_config_path, config_path);
+
+  char dir_path[PATH_MAX];
+  strcpy(dir_path, config_path);
+  char *last_slash = strrchr(dir_path, '/');
   if (last_slash) {
     *last_slash = '\0';
-    inotify_add_watch(hotkey_watch_fd, config_path, IN_MODIFY);
+    inotify_add_watch(hotkey_watch_fd, dir_path, IN_MODIFY);
   } else {
     inotify_add_watch(hotkey_watch_fd, ".", IN_MODIFY);
   }
-
-  strcpy(hotkey_config_path, config_path);
 }
 
 void config_init(void) {
@@ -895,9 +898,21 @@ void reload_hotkeys(void) {
 static int hotkey_reload_handler(int fd, uint32_t mask, void *data) {
   (void)data;
   if (mask & WL_EVENT_READABLE) {
-    char buf[64];
-    read(fd, buf, sizeof(buf));
-    reload_hotkeys();
+    char buf[sizeof(struct inotify_event) + NAME_MAX + 1];
+    ssize_t len = read(fd, buf, sizeof(buf));
+    if (len > 0) {
+      struct inotify_event *event = (struct inotify_event *)buf;
+
+      if (event->len > 0 && event->name[0] != '\0') {
+        const char *config_file_name = strrchr(hotkey_config_path, '/');
+        config_file_name = config_file_name ? config_file_name + 1 : hotkey_config_path;
+
+        if (strcmp(event->name, config_file_name) == 0)
+          reload_hotkeys();
+      } else {
+        reload_hotkeys();
+      }
+    }
   }
   return 0;
 }
