@@ -204,6 +204,7 @@ static void ipc_cmd_output(char **args, int num, int client_fd) {
     }
   }
 
+  output_t *mon = find_output_by_name(output_name);
   char *subcmd = *args;
 
   if (streq("enable", subcmd)) {
@@ -504,6 +505,10 @@ static void ipc_cmd_output(char **args, int num, int client_fd) {
     output_config_apply(oc);
     send_success(client_fd, "output tearing set\n");
   } else if (streq("focus", subcmd) || streq("-f", subcmd) || streq("--focus", subcmd)) {
+    if (!mon) {
+      send_failure(client_fd, "output focus: no such output\n");
+      return;
+    }
     server.focused_output = mon;
     focus_node(mon, mon->desk, mon->desk ? mon->desk->focus : NULL);
     send_success(client_fd, "focused\n");
@@ -557,10 +562,14 @@ static void ipc_cmd_output(char **args, int num, int client_fd) {
     transaction_commit_dirty();
     send_success(client_fd, "desktops added\n");
   } else if (streq("desktops", subcmd) || streq("-d", subcmd) || streq("--desktops", subcmd)) {
+    if (!mon) {
+      send_failure(client_fd, "output desktops: no such output\n");
+      return;
+    }
     if (num < 2) {
       char buf[DOORS_BUFSIZ];
       size_t offset = 0;
-      for (desktop_t *d = mon->desk; d != NULL; d = d->next) {
+      for (desktop_t *d = mon->desk_head; d != NULL; d = d->next) {
         offset += snprintf(buf + offset, sizeof(buf) - offset, "%s\n", d->name);
       }
       send_success(client_fd, buf);
@@ -568,7 +577,7 @@ static void ipc_cmd_output(char **args, int num, int client_fd) {
       args++;
       num--;
 
-      desktop_t *d = mon->desk;
+      desktop_t *d = mon->desk_head;
       for (; num > 0 && d != NULL; d = d->next) {
         strncpy(d->name, *args, SMALEN - 1);
         d->name[SMALEN - 1] = '\0';
@@ -882,7 +891,7 @@ static void ipc_cmd_input(char **args, int num, int client_fd) {
 }
 
 desktop_t *find_desktop_by_name_in_monitor(output_t *mon, const char *name) {
-  desktop_t *d = mon->desk;
+  desktop_t *d = mon->desk_head;
   while (d) {
     if (strcmp(d->name, name) == 0)
       return d;

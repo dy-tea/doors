@@ -373,7 +373,16 @@ void workspace_switch_to_desktop(const char *name) {
     return;
   }
 
-  desktop_t *d = find_desktop_by_name(name);
+  desktop_t *d = NULL;
+  for (desktop_t *local = server.focused_output->desk_head; local;
+       local = local->next) {
+    if (strcmp(local->name, name) == 0) {
+      d = local;
+      break;
+    }
+  }
+  if (!d)
+    d = find_desktop_by_name(name);
   if (!d) {
     wlr_log(WLR_ERROR, "Desktop not found: %s", name);
     return;
