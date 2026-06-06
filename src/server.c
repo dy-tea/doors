@@ -187,7 +187,7 @@ void server_init(void) {
   wl_signal_add(&server.xdg_shell->events.new_toplevel, &server.new_xdg_toplevel);
 
   // xdg decoration
-  server.xdg_decoration_manager = wlr_xdg_decoration_manager_v1_create(server.wl_display, 1);
+  server.xdg_decoration_manager = wlr_xdg_decoration_manager_v1_create(server.wl_display, 2);
   server.new_xdg_decoration.notify = handle_new_xdg_decoration;
   wl_signal_add(&server.xdg_decoration_manager->events.new_toplevel_decoration, &server.new_xdg_decoration);
 
