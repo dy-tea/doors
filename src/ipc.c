@@ -1343,7 +1343,27 @@ static void ipc_cmd_node(char **args, int num, int client_fd) {
     args++;
     num--;
 
-    output_t *target = find_output_by_name(*args);
+    bool set_focus = false;
+    char *target_name = NULL;
+    while (num > 0) {
+      if (streq("--follow", *args)) {
+        set_focus = true;
+      } else if (target_name == NULL) {
+        target_name = *args;
+      } else {
+        send_failure(client_fd, "node -m: unexpected argument\n");
+        return;
+      }
+      args++;
+      num--;
+    }
+
+    if (target_name == NULL) {
+      send_failure(client_fd, "node -m: missing monitor name\n");
+      return;
+    }
+
+    output_t *target = find_output_by_name(target_name);
     if (!target) {
       send_failure(client_fd, "node -m: monitor not found\n");
       return;
@@ -1368,6 +1388,11 @@ static void ipc_cmd_node(char **args, int num, int client_fd) {
 
     desktop_t *src_desk = m->desk;
     desktop_t *target_desk = target->desk ? target->desk : target->desk_head;
+
+		if (!target_desk){
+			send_failure(client_fd, "node -m: target monitor has no desktops");
+			return;
+		}
 
     n->destroying = false;
     n->ntxnrefs = 0;
@@ -1412,6 +1437,8 @@ static void ipc_cmd_node(char **args, int num, int client_fd) {
 
     arrange(target, target_desk, true);
     arrange(m, src_desk, src_desk->root != NULL);
+    if (set_focus)
+      focus_node(target, target_desk, n);
 
     send_success(client_fd, "node sent to monitor\n");
   } else if (streq("-n", *args) || streq("--to-node", *args)) {
