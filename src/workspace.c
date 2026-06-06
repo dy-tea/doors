@@ -336,7 +336,7 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
       if (n->client) {
         struct wlr_scene_tree *tree = client_get_scene_tree(n->client);
         if (tree) {
-          struct wlr_box target = n->pending.rectangle;
+          struct wlr_box target = n->client->tiled_rectangle;
           struct wlr_box from = {target.x - dx, target.y - dy, 0, 0};
           wlr_scene_node_set_position(&tree->node, from.x, from.y);
           animation_start_workspace_slide(output, n, tree, from, target, false);
