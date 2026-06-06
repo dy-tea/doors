@@ -2417,13 +2417,14 @@ static void ipc_cmd_query(char **args, int num, int client_fd) {
 
     if (use_names) {
       offset += snprintf(buf + offset, sizeof(buf) - offset,
-        "{\"monitor\": \"%s\", \"desktop\": \"%s\", \"node\": \"%s\", \"type\": %d, "
+        "{\"monitor\": \"%s\", \"desktop\": \"%s\", \"node\": \"%s\", \"title\": \"%s\", \"type\": %d, "
         "\"rect\": {\"x\": %d, \"y\": %d, \"width\": %d, \"height\": %d}, "
         "\"client\": \"%s\", \"identifier\": \"%s\"}\n",
         m->name,
         m->desk->name,
         n->client && n->client->title[0] ? n->client->title :
         (n->client && n->client->app_id[0] ? n->client->app_id : "?"),
+        n->client && n->client->title[0] ? n->client->title : "",
         n->split_type,
         n->rectangle.x,
         n->rectangle.y,
@@ -2433,12 +2434,13 @@ static void ipc_cmd_query(char **args, int num, int client_fd) {
         foreign_id);
     } else {
       offset += snprintf(buf + offset, sizeof(buf) - offset,
-        "{\"monitor\": \"%s\", \"desktop\": \"%s\", \"id\": %u, \"type\": %d, "
+        "{\"monitor\": \"%s\", \"desktop\": \"%s\", \"id\": %u, \"title\": \"%s\", \"type\": %d, "
         "\"rect\": {\"x\": %d, \"y\": %d, \"width\": %d, \"height\": %d}, "
         "\"client\": \"%s\", \"identifier\": \"%s\"}\n",
         m->name,
         m->desk->name,
         n->id,
+        n->client && n->client->title[0] ? n->client->title : "",
         n->split_type,
         n->rectangle.x,
         n->rectangle.y,
