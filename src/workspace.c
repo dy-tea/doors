@@ -373,37 +373,40 @@ void workspace_switch_to_desktop(const char *name) {
     return;
   }
 
+  output_t *output = server.focused_output;
   desktop_t *d = NULL;
-  for (desktop_t *local = server.focused_output->desk_head; local;
+  for (desktop_t *local = output->desk_head; local;
        local = local->next) {
     if (strcmp(local->name, name) == 0) {
       d = local;
       break;
     }
   }
-  if (!d)
-    d = find_desktop_by_name(name);
   if (!d) {
-    wlr_log(WLR_ERROR, "Desktop not found: %s", name);
-    return;
+    d = find_desktop_by_name(name);
+    if (!d) {
+      wlr_log(WLR_ERROR, "Desktop not found: %s", name);
+      return;
+    }
+    if (d->output)
+      output = d->output;
   }
 
-  desktop_t *old_desktop = server.focused_output->desk;
+  desktop_t *old_desktop = output->desk;
   if (old_desktop && old_desktop != d)
-    server.focused_output->last_desk = old_desktop;
+    output->last_desk = old_desktop;
 
-  if (enable_animations && old_desktop && old_desktop != d &&
-      server.focused_output) {
-    workspace_switch_animate(server.focused_output, old_desktop, d);
+  if (enable_animations && old_desktop && old_desktop != d && output) {
+    workspace_switch_animate(output, old_desktop, d);
     return;
   }
 
-  server.focused_output->desk = d;
+  output->desk = d;
 
   wlr_log(WLR_DEBUG, "Switching from %s to %s",
     old_desktop ? old_desktop->name : "NULL", d->name);
 
-  update_all_toplevels_visibility(server.focused_output, d);
+  update_all_toplevels_visibility(output, d);
 
   struct wlr_ext_workspace_handle_v1 *old = workspace_get_active();
 
@@ -413,10 +416,10 @@ void workspace_switch_to_desktop(const char *name) {
     goto finish;
   }
 
-  arrange(server.focused_output, d, true);
+  arrange(output, d, true);
 
   if (d->focus != NULL)
-    focus_node(server.focused_output, d, d->focus);
+    focus_node(output, d, d->focus);
 
   wlr_log(WLR_INFO, "Switched to desktop: %s", name);
 
