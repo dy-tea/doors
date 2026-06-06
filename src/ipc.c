@@ -1926,6 +1926,10 @@ static void ipc_cmd_desktop(char **args, int num, int client_fd) {
     focus_next_desktop();
     send_success(client_fd, "focused\n");
     return;
+  } else if (streq("last", *args)) {
+    focus_last_desktop();
+    send_success(client_fd, "focused\n");
+    return;
   } else if (streq("prev", *args) || streq("previous", *args)) {
     focus_prev_desktop();
     send_success(client_fd, "focused\n");
@@ -1961,6 +1965,9 @@ static void ipc_cmd_desktop(char **args, int num, int client_fd) {
     num--;
     if (num >= 1 && (streq("next", *args) || streq("next.local", *args))) {
       focus_next_desktop();
+      send_success(client_fd, "focused\n");
+    } else if (num >= 1 && streq("last", *args)) {
+      focus_last_desktop();
       send_success(client_fd, "focused\n");
     } else if (num >= 1 && (streq("prev", *args) || streq("prev.local", *args) || streq("previous", *args))) {
       focus_prev_desktop();
@@ -2100,6 +2107,8 @@ static void ipc_cmd_desktop(char **args, int num, int client_fd) {
       if (mon->desk)
         focus_node(mon, mon->desk, mon->desk->focus);
     }
+    if (mon->last_desk == desk)
+      mon->last_desk = next ? next : prev;
 
     free(desk);
     transaction_commit_dirty();

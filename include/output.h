@@ -58,6 +58,7 @@ typedef struct output_t {
   unsigned int border_width;
   struct wlr_box rectangle;
   desktop_t *desk;
+  desktop_t *last_desk;
   desktop_t *desk_head;
   desktop_t *desk_tail;
   struct output_t *prev;

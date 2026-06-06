@@ -224,8 +224,13 @@ static bind_action_t parse_action(const char *cmd, int *desktop_index, char *sub
     }
 
     if (strcmp(args[0], "desktop") == 0 && argc >= 2) {
+      if (strcmp(args[1], "last") == 0)
+        return BIND_DESKTOP_LAST;
+
       if (strcmp(args[1], "-f") == 0 || strcmp(args[1], "--focus") == 0)
-        return BIND_DESKTOP_FOCUS;
+        return (argc >= 3 && strcmp(args[2], "last") == 0)
+          ? BIND_DESKTOP_LAST
+          : BIND_DESKTOP_FOCUS;
 
       if ((strcmp(args[1], "-l") == 0 || strcmp(args[1], "--layout") == 0) && argc >= 3) {
         if (strcmp(args[2], "tiled") == 0) return BIND_DESKTOP_LAYOUT_TILED;
@@ -1048,6 +1053,9 @@ void execute_bind(bind_t b) {
       break;
     case BIND_DESKTOP_PREV:
       focus_prev_desktop();
+      break;
+    case BIND_DESKTOP_LAST:
+      focus_last_desktop();
       break;
     case BIND_SEND_TO_DESKTOP_NEXT:
       send_to_next_desktop();

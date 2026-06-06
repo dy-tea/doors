@@ -380,6 +380,8 @@ void workspace_switch_to_desktop(const char *name) {
   }
 
   desktop_t *old_desktop = server.focused_output->desk;
+  if (old_desktop && old_desktop != d)
+    server.focused_output->last_desk = old_desktop;
 
   if (enable_animations && old_desktop && old_desktop != d &&
       server.focused_output) {
@@ -415,6 +417,26 @@ finish:
 
   wlr_ext_workspace_handle_v1_set_active(workspace, true);
   wlr_ext_workspace_handle_v1_set_hidden(workspace, false);
+}
+
+void workspace_switch_to_last_desktop(void) {
+  if (!server.focused_output || !server.focused_output->desk ||
+      !server.focused_output->last_desk)
+    return;
+
+  output_t *output = server.focused_output;
+  desktop_t *target = output->last_desk;
+  if (target == output->desk)
+    return;
+
+  for (desktop_t *d = output->desk_head; d != NULL; d = d->next) {
+    if (d == target) {
+      workspace_switch_to_desktop(target->name);
+      return;
+    }
+  }
+
+  output->last_desk = NULL;
 }
 
 void workspace_switch_to_desktop_by_index(int index) {

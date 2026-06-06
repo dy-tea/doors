@@ -637,6 +637,10 @@ void focus_prev_desktop(void) {
   }
 }
 
+void focus_last_desktop(void) {
+  workspace_switch_to_last_desktop();
+}
+
 void send_to_desktop(int desktop_index) {
   if (mon == NULL) return;
 
