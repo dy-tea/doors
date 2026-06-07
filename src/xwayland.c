@@ -852,8 +852,19 @@ static void handle_request_fullscreen(struct wl_listener *listener, void *data) 
 			wlr_xwayland_surface_set_fullscreen(xsurface, false);
 			return;
 		}
-		wlr_log(WLR_INFO, "handle_request_fullscreen: denying remove-fullscreen");
-		wlr_xwayland_surface_set_fullscreen(xsurface, true);
+		wlr_log(WLR_INFO, "handle_request_fullscreen: allowing remove-fullscreen");
+
+		client_state_t restore = client->last_state;
+		if (restore == STATE_FULLSCREEN) restore = STATE_TILED;
+		if (restore == STATE_FLOATING && node->parent != NULL) restore = STATE_TILED;
+
+		if (restore == STATE_FLOATING)
+			wlr_scene_node_reparent(&scene_tree->node, server.float_tree);
+		else
+			wlr_scene_node_reparent(&scene_tree->node, server.tile_tree);
+
+		wlr_xwayland_surface_set_fullscreen(xsurface, false);
+		set_state(m, d, node, restore);
 	}
 
 	xwayland_view_apply_disable_decorations(xwayland_view);
