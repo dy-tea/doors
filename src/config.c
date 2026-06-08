@@ -1226,3 +1226,103 @@ void execute_hotcornerbind(hotcornerbind_t *hc) {
 void reload_hotcornerbinds(void) {
   num_hotcornerbinds = 0;
 }
+
+const char *bind_action_name(bind_action_t action) {
+  static const char *names[] = {
+    "none", "quit", "enter_submap", "exit_submap", "node_focus", "node_close",
+    "node_state_tiled", "node_state_floating", "node_state_fullscreen", "node_to_desktop",
+    "desktop_focus", "desktop_layout_tiled", "desktop_layout_monocle", "focus_west",
+    "focus_south", "focus_north", "focus_east", "swap_west", "swap_south", "swap_north",
+    "swap_east", "presel_west", "presel_south", "presel_north", "presel_east",
+    "presel_cancel", "toggle_floating", "toggle_fullscreen", "toggle_pseudo_tiled",
+    "toggle_monocle", "rotate_cw", "rotate_ccw", "flip_horizontal", "flip_vertical",
+    "desktop_next", "desktop_prev", "desktop_last", "send_to_desktop_next",
+    "send_to_desktop_prev", "send_to_desktop_1", "send_to_desktop_2", "send_to_desktop_3",
+    "send_to_desktop_4", "send_to_desktop_5", "send_to_desktop_6", "send_to_desktop_7",
+    "send_to_desktop_8", "send_to_desktop_9", "send_to_desktop_10", "desktop_1",
+    "desktop_2", "desktop_3", "desktop_4", "desktop_5", "desktop_6", "desktop_7",
+    "desktop_8", "desktop_9", "desktop_10", "resize_left", "resize_right", "resize_up",
+    "resize_down", "interactive_move", "interactive_resize", "external"
+  };
+  if (action >= 0 && action < (int)(sizeof(names) / sizeof(names[0]))) return names[action];
+
+  return "unknown";
+}
+
+void execute_bind_action(bind_action_t action) {
+  bind_t b = {.action = action, .desktop_index = 0};
+  execute_bind(b);
+}
+
+bind_action_t bind_action_from_name(const char *name) {
+  if (!name) return BIND_NONE;
+
+  #define ACTION_IF_MATCH(n, val) if (strcmp(name, n) == 0) return val
+
+  ACTION_IF_MATCH("west", BIND_FOCUS_WEST);
+  ACTION_IF_MATCH("w", BIND_FOCUS_WEST);
+  ACTION_IF_MATCH("east", BIND_FOCUS_EAST);
+  ACTION_IF_MATCH("e", BIND_FOCUS_EAST);
+  ACTION_IF_MATCH("north", BIND_FOCUS_NORTH);
+  ACTION_IF_MATCH("n", BIND_FOCUS_NORTH);
+  ACTION_IF_MATCH("south", BIND_FOCUS_SOUTH);
+  ACTION_IF_MATCH("s", BIND_FOCUS_SOUTH);
+
+  ACTION_IF_MATCH("swap_west", BIND_SWAP_WEST);
+  ACTION_IF_MATCH("swap_east", BIND_SWAP_EAST);
+  ACTION_IF_MATCH("swap_north", BIND_SWAP_NORTH);
+  ACTION_IF_MATCH("swap_south", BIND_SWAP_SOUTH);
+
+  ACTION_IF_MATCH("presel_west", BIND_PRESEL_WEST);
+  ACTION_IF_MATCH("presel_east", BIND_PRESEL_EAST);
+  ACTION_IF_MATCH("presel_north", BIND_PRESEL_NORTH);
+  ACTION_IF_MATCH("presel_south", BIND_PRESEL_SOUTH);
+  ACTION_IF_MATCH("presel_cancel", BIND_PRESEL_CANCEL);
+
+  ACTION_IF_MATCH("resize_left", BIND_RESIZE_LEFT);
+  ACTION_IF_MATCH("left", BIND_RESIZE_LEFT);
+  ACTION_IF_MATCH("resize_right", BIND_RESIZE_RIGHT);
+  ACTION_IF_MATCH("right", BIND_RESIZE_RIGHT);
+  ACTION_IF_MATCH("resize_up", BIND_RESIZE_UP);
+  ACTION_IF_MATCH("up", BIND_RESIZE_UP);
+  ACTION_IF_MATCH("resize_down", BIND_RESIZE_DOWN);
+  ACTION_IF_MATCH("down", BIND_RESIZE_DOWN);
+
+  ACTION_IF_MATCH("toggle_floating", BIND_TOGGLE_FLOATING);
+  ACTION_IF_MATCH("toggle_fullscreen", BIND_TOGGLE_FULLSCREEN);
+  ACTION_IF_MATCH("toggle_pseudo_tiled", BIND_TOGGLE_PSEUDO_TILED);
+  ACTION_IF_MATCH("toggle_monocle", BIND_TOGGLE_MONOCLE);
+
+  ACTION_IF_MATCH("rotate_cw", BIND_ROTATE_CW);
+  ACTION_IF_MATCH("rotate_ccw", BIND_ROTATE_CCW);
+
+  ACTION_IF_MATCH("flip_horizontal", BIND_FLIP_HORIZONTAL);
+  ACTION_IF_MATCH("flip_vertical", BIND_FLIP_VERTICAL);
+
+  ACTION_IF_MATCH("desktop_next", BIND_DESKTOP_NEXT);
+  ACTION_IF_MATCH("next", BIND_DESKTOP_NEXT);
+  ACTION_IF_MATCH("desktop_prev", BIND_DESKTOP_PREV);
+  ACTION_IF_MATCH("desktop_last", BIND_DESKTOP_LAST);
+
+  ACTION_IF_MATCH("quit", BIND_QUIT);
+
+  ACTION_IF_MATCH("send_to_desktop_next", BIND_SEND_TO_DESKTOP_NEXT);
+  ACTION_IF_MATCH("send_to_desktop_prev", BIND_SEND_TO_DESKTOP_PREV);
+
+  ACTION_IF_MATCH("send_next", BIND_SEND_TO_DESKTOP_NEXT);
+  ACTION_IF_MATCH("send_prev", BIND_SEND_TO_DESKTOP_PREV);
+  ACTION_IF_MATCH("send", BIND_SEND_TO_DESKTOP_NEXT);
+
+  ACTION_IF_MATCH("clockwise", BIND_ROTATE_CW);
+  ACTION_IF_MATCH("cw", BIND_ROTATE_CW);
+  ACTION_IF_MATCH("counterclockwise", BIND_ROTATE_CCW);
+  ACTION_IF_MATCH("ccw", BIND_ROTATE_CCW);
+  ACTION_IF_MATCH("horizontal", BIND_FLIP_HORIZONTAL);
+  ACTION_IF_MATCH("h", BIND_FLIP_HORIZONTAL);
+  ACTION_IF_MATCH("vertical", BIND_FLIP_VERTICAL);
+  ACTION_IF_MATCH("v", BIND_FLIP_VERTICAL);
+
+  #undef ACTION_IF_MATCH
+
+  return BIND_NONE;
+}

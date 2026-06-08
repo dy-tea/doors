@@ -167,3 +167,10 @@ bool hotcornerbind_matches(hotcornerbind_t *hc, int corner_x, int corner_y);
 hotcornerbind_t *hotcorner_bind_match(int corner_x, int corner_y);
 void execute_hotcornerbind(hotcornerbind_t *hc);
 void reload_hotcornerbinds(void);
+
+void execute_bind(bind_t b);
+void execute_bind_action(bind_action_t action);
+
+bind_action_t bind_action_from_name(const char *name);
+const char *bind_action_name(bind_action_t action);
+

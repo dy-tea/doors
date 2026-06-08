@@ -3714,17 +3714,9 @@ static void ipc_cmd_focus(char **args, int num, int client_fd) {
     return;
   }
 
-  if (streq("west", *args) || streq("w", *args)) {
-    focus_west();
-    send_success(client_fd, "focused\n");
-  } else if (streq("east", *args) || streq("e", *args)) {
-    focus_east();
-    send_success(client_fd, "focused\n");
-  } else if (streq("north", *args) || streq("n", *args)) {
-    focus_north();
-    send_success(client_fd, "focused\n");
-  } else if (streq("south", *args) || streq("s", *args)) {
-    focus_south();
+  bind_action_t action = bind_action_from_name(*args);
+  if (action != BIND_NONE) {
+    execute_bind_action(action);
     send_success(client_fd, "focused\n");
   } else {
     send_failure(client_fd, "focus: unknown direction\n");
@@ -3737,17 +3729,9 @@ static void ipc_cmd_swap(char **args, int num, int client_fd) {
     return;
   }
 
-  if (streq("west", *args) || streq("w", *args)) {
-    swap_west();
-    send_success(client_fd, "swapped\n");
-  } else if (streq("east", *args) || streq("e", *args)) {
-    swap_east();
-    send_success(client_fd, "swapped\n");
-  } else if (streq("north", *args) || streq("n", *args)) {
-    swap_north();
-    send_success(client_fd, "swapped\n");
-  } else if (streq("south", *args) || streq("s", *args)) {
-    swap_south();
+  bind_action_t action = bind_action_from_name(*args);
+  if (action != BIND_NONE) {
+    execute_bind_action(action);
     send_success(client_fd, "swapped\n");
   } else {
     send_failure(client_fd, "swap: unknown direction\n");
@@ -3760,21 +3744,15 @@ static void ipc_cmd_presel(char **args, int num, int client_fd) {
     return;
   }
 
-  if (streq("west", *args) || streq("w", *args)) {
-    presel_west();
-    send_success(client_fd, "presel set\n");
-  } else if (streq("east", *args) || streq("e", *args)) {
-    presel_east();
-    send_success(client_fd, "presel set\n");
-  } else if (streq("north", *args) || streq("n", *args)) {
-    presel_north();
-    send_success(client_fd, "presel set\n");
-  } else if (streq("south", *args) || streq("s", *args)) {
-    presel_south();
-    send_success(client_fd, "presel set\n");
-  } else if (streq("cancel", *args)) {
-    cancel_presel();
-    send_success(client_fd, "presel cancelled\n");
+  bind_action_t action = bind_action_from_name(*args);
+  if (action != BIND_NONE) {
+    execute_bind_action(action);
+    const char *name = *args;
+    if (strcmp(name, "cancel") == 0) {
+      send_success(client_fd, "presel cancelled\n");
+    } else {
+      send_success(client_fd, "presel set\n");
+    }
   } else {
     send_failure(client_fd, "presel: unknown direction\n");
   }
@@ -3786,17 +3764,9 @@ static void ipc_cmd_resize(char **args, int num, int client_fd) {
     return;
   }
 
-  if (streq("left", *args) || streq("west", *args) || streq("w", *args)) {
-    resize_left();
-    send_success(client_fd, "resized\n");
-  } else if (streq("right", *args) || streq("east", *args) || streq("e", *args)) {
-    resize_right();
-    send_success(client_fd, "resized\n");
-  } else if (streq("up", *args) || streq("north", *args) || streq("n", *args)) {
-    resize_up();
-    send_success(client_fd, "resized\n");
-  } else if (streq("down", *args) || streq("south", *args) || streq("s", *args)) {
-    resize_down();
+  bind_action_t action = bind_action_from_name(*args);
+  if (action != BIND_NONE) {
+    execute_bind_action(action);
     send_success(client_fd, "resized\n");
   } else {
     send_failure(client_fd, "resize: unknown direction\n");
@@ -3835,11 +3805,9 @@ static void ipc_cmd_rotate(char **args, int num, int client_fd) {
     return;
   }
 
-  if (streq("clockwise", *args) || streq("cw", *args)) {
-    rotate_clockwise();
-    send_success(client_fd, "rotated\n");
-  } else if (streq("counterclockwise", *args) || streq("ccw", *args)) {
-    rotate_counterclockwise();
+  bind_action_t action = bind_action_from_name(*args);
+  if (action == BIND_ROTATE_CW || action == BIND_ROTATE_CCW) {
+    execute_bind_action(action);
     send_success(client_fd, "rotated\n");
   } else {
     send_failure(client_fd, "rotate: unknown direction\n");
@@ -3852,11 +3820,9 @@ static void ipc_cmd_flip(char **args, int num, int client_fd) {
     return;
   }
 
-  if (streq("horizontal", *args) || streq("h", *args)) {
-    flip_horizontal();
-    send_success(client_fd, "flipped\n");
-  } else if (streq("vertical", *args) || streq("v", *args)) {
-    flip_vertical();
+  bind_action_t action = bind_action_from_name(*args);
+  if (action == BIND_FLIP_HORIZONTAL || action == BIND_FLIP_VERTICAL) {
+    execute_bind_action(action);
     send_success(client_fd, "flipped\n");
   } else {
     send_failure(client_fd, "flip: unknown direction\n");
@@ -3909,10 +3875,11 @@ static void ipc_cmd_send(char **args, int num, int client_fd) {
     return;
   }
 
-  if (streq("next", *args)) {
+  const char *arg = *args;
+  if (strcmp(arg, "next") == 0) {
     send_to_next_desktop();
     send_success(client_fd, "sent\n");
-  } else if (streq("prev", *args) || streq("previous", *args)) {
+  } else if (strcmp(arg, "prev") == 0 || strcmp(arg, "previous") == 0) {
     send_to_prev_desktop();
     send_success(client_fd, "sent\n");
   } else {
