@@ -1098,14 +1098,11 @@ static void ipc_cmd_node(char **args, int num, int client_fd) {
     if (val == NULL) {
       has_value = false;
     } else {
-      has_value = true;
+   		has_value = true;
       if (strcmp(val, "true") == 0 || strcmp(val, "on") == 0 || strcmp(val, "1") == 0) {
         set_value = true;
       } else if (strcmp(val, "false") == 0 || strcmp(val, "off") == 0 || strcmp(val, "0") == 0) {
         set_value = false;
-      } else {
-        send_failure(client_fd, "node -g: invalid value\n");
-        return;
       }
     }
 
@@ -1159,7 +1156,7 @@ static void ipc_cmd_node(char **args, int num, int client_fd) {
       if (n->client->toplevel)
         toplevel_set_acrylic(n->client->toplevel, new_val);
       send_success(client_fd, "flag changed\n");
-    } else if (strncmp(key, "border_radius=", 14) == 0) {
+    } else if (strncmp(key, "border_radius", 13) == 0) {
       if (!n->client) {
         send_failure(client_fd, "node -g: no client\n");
         return;
