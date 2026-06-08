@@ -1568,8 +1568,9 @@ static bool rebuild_corner_masks(output_t *output, struct wlr_scene_output *scen
     struct wlr_box content_r = get_client_rect(tl);
     if (content_r.width <= 0 || content_r.height <= 0) continue;
 
+    bool hide_flag = false;
     GLuint src = capture_bg_to_tex1(output, ctx, scene_output, false,
-      &tl->scene_tree->node, &tl->blur->blur_scene_hidden);
+      &tl->scene_tree->node, tl->blur ? &tl->blur->blur_scene_hidden : &hide_flag);
     if (!src) continue;
 
     egl_make_current();
