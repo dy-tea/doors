@@ -1,4 +1,5 @@
 #include "blur.h"
+#include "animation.h"
 #include "server.h"
 #include "output.h"
 #include "toplevel.h"
@@ -1853,6 +1854,9 @@ void blur_output_frame(output_t *output, struct wlr_scene_output *scene_output) 
   if (!blur_ctx.available) return;
   blur_output_ctx_t *ctx = output->blur_ctx;
   if (!ctx) return;
+
+  // skip expensive blur rebuilds during workspace slide animation
+  if (animation_workspace_switch_active()) return;
 
   if (ctx->width != output->width || ctx->height != output->height)
     blur_output_resize(ctx, output->width, output->height, output);

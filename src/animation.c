@@ -643,6 +643,15 @@ bool animation_fade_out_layer(layer_surface_t *layer) {
   return true;
 }
 
+bool animation_workspace_switch_active(void) {
+  animation_entry_t *entry;
+  wl_list_for_each(entry, &animations, link)
+    if (entry->workspace_switch)
+      return true;
+
+  return false;
+}
+
 bool animation_start_workspace_slide(output_t *output, node_t *node,
 		struct wlr_scene_tree *scene_tree, struct wlr_box from, struct wlr_box to, bool slide_out) {
   if (!node || !scene_tree || !output || !enable_animations) return false;
