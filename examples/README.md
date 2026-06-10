@@ -1103,6 +1103,36 @@ doorsctl scroller cycle_preset                # Cycle to next proportion preset
 doorsctl scroller center                      # Center focused scroller window in viewport
 ```
 
+### Hotkey Commands
+
+Add or list keybinds on the fly without editing `doorshkrc`. Keybinds added this way are active immediately and use the same parsing as the config file.
+
+```
+doorsctl hotkey list
+```
+
+List all currently registered keybinds. Tab-separated columns: index, modifier combination, key name, and action (built-in name or external shell command).
+Submap membership is shown in brackets (e.g. `focus_west [submap: focus]`).
+
+```
+doorsctl hotkey <modifiers+key> <command> [args...]
+```
+
+Register a new keybind at runtime. The `<modifiers+key>` syntax matches
+`doorshkrc` (e.g. `alt+d`, `super+shift+Return`). The command and its
+arguments are joined and parsed the same way as the config file - commands
+prefixed with `doorsctl` are mapped to built-in actions; anything else is
+executed as a shell command.
+
+Examples:
+
+```
+doorsctl hotkey "alt+d" doorsctl desktop --focus next
+doorsctl hotkey "super+Return" foot
+doorsctl hotkey "alt+shift+l" doorsctl toggle floating
+doorsctl hotkey "ctrl+alt+t" doorsctl node --state tiled
+```
+
 ### Equalize/Balance Commands
 
 ```

@@ -56,7 +56,7 @@ static const char *get_config_home(void) {
   return buf;
 }
 
-static uint32_t parse_modifiers(const char *mod_str) {
+uint32_t parse_modifiers(const char *mod_str) {
   uint32_t mods = 0;
   if (!mod_str || mod_str[0] == '\0') return 0;
 
@@ -90,7 +90,7 @@ static uint32_t parse_modifiers(const char *mod_str) {
   return mods;
 }
 
-static xkb_keysym_t parse_keysym(const char *name) {
+xkb_keysym_t parse_keysym(const char *name) {
   if (!name || name[0] == '\0')
     return XKB_KEY_NoSymbol;
 
@@ -100,7 +100,7 @@ static xkb_keysym_t parse_keysym(const char *name) {
   return xkb_keysym_from_name(name, XKB_KEYSYM_CASE_INSENSITIVE);
 }
 
-static uint32_t parse_keycode(const char *name) {
+uint32_t parse_keycode(const char *name) {
   if (!name || name[0] == '\0') return 0;
 
   static const char *mouse_buttons[] = {
@@ -120,7 +120,7 @@ static uint32_t parse_keycode(const char *name) {
   return 0;
 }
 
-static bind_action_t parse_action(const char *cmd, int *desktop_index, char *submap_name) {
+bind_action_t parse_action(const char *cmd, int *desktop_index, char *submap_name) {
   *desktop_index = 0;
   if (submap_name)
     submap_name[0] = '\0';
@@ -394,7 +394,7 @@ static char *expand_sequence(const char *input, char *output, size_t out_size) {
   return output;
 }
 
-static void add_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode, bool use_keycode, bind_action_t action,
+void add_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode, bool use_keycode, bind_action_t action,
 		int desktop_index, const char *external_cmd, const char *submap_name) {
   size_t *num_ptr;
   keybind_t *kb_array;

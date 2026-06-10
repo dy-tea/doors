@@ -174,3 +174,10 @@ void execute_bind_action(bind_action_t action);
 bind_action_t bind_action_from_name(const char *name);
 const char *bind_action_name(bind_action_t action);
 
+uint32_t parse_modifiers(const char *mod_str);
+xkb_keysym_t parse_keysym(const char *name);
+uint32_t parse_keycode(const char *name);
+bind_action_t parse_action(const char *cmd, int *desktop_index, char *submap_name);
+void add_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode, bool use_keycode, bind_action_t action,
+    int desktop_index, const char *external_cmd, const char *submap_name);
+
