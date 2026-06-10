@@ -1090,7 +1090,7 @@ static bool rebuild_live_blur(output_t *output, struct wlr_scene_output *scene_o
       struct wlr_box content_r = get_client_rect(tl);
       float ow = (float)w, oh = (float)h;
       float win_u  = (float)(content_r.x - output->lx) / ow;
-      float win_v  = (float)(content_r.y - output->ly) / oh;
+      float win_v  = 1.0f - (float)(content_r.y - output->ly + content_r.height) / oh;
       float win_sw = (float)content_r.width  / ow;
       float win_sh = (float)content_r.height / oh;
       int bw_i = (c->state == STATE_FULLSCREEN) ? 0 : (int)c->border_width;
@@ -1565,7 +1565,19 @@ static bool rebuild_corner_masks(output_t *output, struct wlr_scene_output *scen
     client_t *c = tl->node->client;
     if (c->border_radius <= 0.0f) continue;
 
-    struct wlr_box content_r = get_client_rect(tl);
+    struct wlr_box container_r = get_client_rect(tl);
+    int cx = tl->content_tree->node.x;
+    int cy = tl->content_tree->node.y;
+    int surf_w = (tl->geometry.width > 0 && tl->geometry.width < container_r.width)
+      ? (int)tl->geometry.width : container_r.width;
+    int surf_h = (tl->geometry.height > 0 && tl->geometry.height < container_r.height)
+      ? (int)tl->geometry.height : container_r.height;
+    struct wlr_box content_r = {
+      .x = container_r.x + cx,
+      .y = container_r.y + cy,
+      .width  = surf_w,
+      .height = surf_h,
+    };
     if (content_r.width <= 0 || content_r.height <= 0) continue;
 
     bool hide_flag = false;
@@ -1583,12 +1595,17 @@ static bool rebuild_corner_masks(output_t *output, struct wlr_scene_output *scen
     }
 
     float ow = (float)w, oh = (float)h;
-    float win_u  = (float)(content_r.x - output->lx) / ow;
-    float win_v  = (float)(content_r.y - output->ly) / oh;
-    float win_sw = (float)content_r.width  / ow;
-    float win_sh = (float)content_r.height / oh;
     int bw_i = (c->state == STATE_FULLSCREEN) ? 0 : (int)c->border_width;
-    float inner_r = (c->border_radius > (float)bw_i) ? c->border_radius - (float)bw_i : 0.0f;
+
+    float outer_x = (float)(content_r.x - output->lx - bw_i);
+    float outer_y = (float)(content_r.y - output->ly - bw_i);
+    float outer_w = (float)(content_r.width  + 2 * bw_i);
+    float outer_h = (float)(content_r.height + 2 * bw_i);
+
+    float win_u = outer_x / ow;
+    float win_v = outer_y / oh;
+    float win_sw = outer_w / ow;
+    float win_sh = outer_h / oh;
 
     glDisable(GL_BLEND);
     glDisable(GL_SCISSOR_TEST);
@@ -1600,11 +1617,10 @@ static bool rebuild_corner_masks(output_t *output, struct wlr_scene_output *scen
     glBindTexture(GL_TEXTURE_2D, src);
     glUseProgram(blur_ctx.prog_corner_mask);
     glUniform1i(blur_ctx.u_corner_mask.tex, 0);
-    glUniform2f(blur_ctx.u_corner_mask.win_pos_uv, win_u, win_v);
+    glUniform2f(blur_ctx.u_corner_mask.win_pos_uv,  win_u,  win_v);
     glUniform2f(blur_ctx.u_corner_mask.win_size_uv, win_sw, win_sh);
-    glUniform2f(blur_ctx.u_corner_mask.win_size_px,
-      (float)content_r.width, (float)content_r.height);
-    glUniform1f(blur_ctx.u_corner_mask.border_radius_px, inner_r);
+    glUniform2f(blur_ctx.u_corner_mask.win_size_px, outer_w, outer_h);
+    glUniform1f(blur_ctx.u_corner_mask.border_radius_px, c->border_radius);
     draw_quad();
     glBindTexture(GL_TEXTURE_2D, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1633,15 +1649,26 @@ static void push_corner_masks_to_toplevels(output_t *output) {
     }
 
     struct wlr_box content_r = get_client_rect(tl);
+    int bw_i = (c->state == STATE_FULLSCREEN) ? 0 : (int)c->border_width;
+
+    struct wlr_box outer_r = {
+      .x = content_r.x - bw_i,
+      .y = content_r.y - bw_i,
+      .width = content_r.width  + 2 * bw_i,
+      .height = content_r.height + 2 * bw_i,
+    };
+
     struct wlr_fbox src; int dw, dh;
-    if (!compute_src_box(output, &content_r, &src, &dw, &dh)) {
+    if (!compute_src_box(output, &outer_r, &src, &dw, &dh)) {
       wlr_scene_node_set_enabled(&tl->rounded->corner_mask_node->node, false);
       continue;
     }
+
+    int node_ox = (outer_r.x < output->lx) ? (output->lx - outer_r.x) : -bw_i;
+    int node_oy = (outer_r.y < output->ly) ? (output->ly - outer_r.y) : -bw_i;
+
     wlr_scene_node_set_enabled(&tl->rounded->corner_mask_node->node, true);
     wlr_scene_buffer_set_buffer(tl->rounded->corner_mask_node, tl->rounded->corner_mask_buf);
-    int node_ox = (content_r.x < output->lx) ? (output->lx - content_r.x) : 0;
-    int node_oy = (content_r.y < output->ly) ? (output->ly - content_r.y) : 0;
     wlr_scene_node_set_position(&tl->rounded->corner_mask_node->node, node_ox, node_oy);
     wlr_scene_buffer_set_source_box(tl->rounded->corner_mask_node, &src);
     wlr_scene_buffer_set_dest_size(tl->rounded->corner_mask_node, dw, dh);

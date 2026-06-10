@@ -20,13 +20,16 @@ void main() {
   }
   vec2 p_px = (win_local - 0.5) * win_size_px;
   vec2 half_px = win_size_px * 0.5;
-  float d = sdRoundedBox(p_px, half_px, border_radius_px);
-  float fw = max(length(vec2(dFdx(d), dFdy(d))), 0.5);
-  float alpha = smoothstep(-fw * 0.15, fw * 0.85, d);
-  if (alpha < 0.001) {
+
+  vec2 dist_to_edge = half_px - abs(p_px);
+  if (dist_to_edge.x > border_radius_px || dist_to_edge.y > border_radius_px) {
     gl_FragColor = vec4(0.0);
     return;
   }
+
+  float d = sdRoundedBox(p_px, half_px, border_radius_px);
+  float fw = max(length(vec2(dFdx(d), dFdy(d))), 0.5);
+  float alpha = smoothstep(-fw * 0.15, fw * 0.85, d);
   vec4 bg = texture2D(tex, v_uv);
-  gl_FragColor = vec4(bg.rgb * alpha, bg.a * alpha);
+  gl_FragColor = vec4(bg.rgb * alpha, alpha);
 }
