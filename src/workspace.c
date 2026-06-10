@@ -249,6 +249,7 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
   // skip if animations are disabled
   if (old_desk == new_desk || !enable_animations) return;
 
+  int num_steps = 0;
   desktop_t *walk = old_desk;
   while (walk) {
     if (walk == new_desk) {
@@ -256,6 +257,17 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
       break;
     }
     walk = walk->next;
+    num_steps++;
+  }
+
+  if (forward) {
+    num_steps = 0;
+    walk = old_desk;
+    while (walk) {
+      if (walk == new_desk) break;
+      walk = walk->prev;
+      num_steps++;
+    }
   }
 
   if (workspace_anim_direction == WORKSPACE_ANIM_VERTICAL) {
@@ -279,7 +291,7 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
         struct wlr_scene_tree *tree = client_get_scene_tree(n->client);
         if (tree && tree->node.enabled) {
           struct wlr_box from = {tree->node.x, tree->node.y, 0, 0};
-          struct wlr_box to = {from.x + dx, from.y + dy, 0, 0};
+          struct wlr_box to = {from.x + num_steps * dx, from.y + num_steps * dy, 0, 0};
           animation_start_workspace_slide(output, n, tree, from, to, true);
         }
       }
@@ -307,6 +319,33 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
     }
   }
 
+  // enable and animate intermediate desktop windows (between old and new)
+  int k = 1;
+  desktop_t *intermediate = forward ? old_desk->prev : old_desk->next;
+  while (intermediate && intermediate != new_desk) {
+    if (intermediate->root) {
+      arrange(output, intermediate, true);
+      node_t *n = first_extrema(intermediate->root);
+      while (n) {
+        if (n->client) {
+          struct wlr_scene_tree *tree = client_get_scene_tree(n->client);
+          if (tree) {
+            n->client->shown = true;
+            wlr_scene_node_set_enabled(&tree->node, true);
+            struct wlr_box target = n->client->tiled_rectangle;
+            struct wlr_box from = {target.x - k * dx, target.y - k * dy, 0, 0};
+            struct wlr_box to = {target.x + (num_steps - k) * dx, target.y + (num_steps - k) * dy, 0, 0};
+            wlr_scene_node_set_position(&tree->node, from.x, from.y);
+            animation_start_workspace_slide(output, n, tree, from, to, true);
+          }
+        }
+        n = next_leaf(n, intermediate->root);
+      }
+    }
+    k++;
+    intermediate = forward ? intermediate->prev : intermediate->next;
+  }
+
   if (new_desk && new_desk->root) {
     node_t *n = first_extrema(new_desk->root);
     while (n) {
@@ -314,7 +353,7 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
         struct wlr_scene_tree *tree = client_get_scene_tree(n->client);
         if (tree) {
           wlr_scene_node_set_enabled(&tree->node, true);
-          wlr_scene_node_set_position(&tree->node, tree->node.x - dx, tree->node.y - dy);
+          wlr_scene_node_set_position(&tree->node, tree->node.x - num_steps * dx, tree->node.y - num_steps * dy);
           n->client->committed_tiled_rectangle = (struct wlr_box){0, 0, 0, 0};
         }
       }
@@ -337,7 +376,7 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
         struct wlr_scene_tree *tree = client_get_scene_tree(n->client);
         if (tree) {
           struct wlr_box target = n->client->tiled_rectangle;
-          struct wlr_box from = {target.x - dx, target.y - dy, 0, 0};
+          struct wlr_box from = {target.x - num_steps * dx, target.y - num_steps * dy, 0, 0};
           wlr_scene_node_set_position(&tree->node, from.x, from.y);
           animation_start_workspace_slide(output, n, tree, from, target, false);
         }
