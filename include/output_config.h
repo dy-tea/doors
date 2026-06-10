@@ -80,4 +80,5 @@ void output_config_update_from_wlr_output(struct output_t *output);
 struct output_t *output_from_wlr_output(struct wlr_output *wlr_output);
 void output_set_power(struct wlr_output *wlr_output, uint32_t mode);
 void output_config_init(void);
+void output_config_fini(void);
 void output_update_manager_config(void);

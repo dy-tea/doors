@@ -41,6 +41,7 @@ static keyboard_grouping_t keyboard_grouping = KEYBOARD_GROUP_DEFAULT;
 static int hotkey_watch_fd = -1;
 static char hotkey_config_path[PATH_MAX];
 static struct wl_event_loop *hotkey_event_loop = NULL;
+static struct wl_event_source *hotkey_event_source = NULL;
 static void setup_inotify_watch(const char *config_path);
 static void add_hotkey_listener_to_event_loop(void);
 
@@ -885,6 +886,10 @@ void config_init_with_config_dir(const char *config_dir) {
 }
 
 void config_fini(void) {
+  if (hotkey_event_source) {
+    wl_event_source_remove(hotkey_event_source);
+    hotkey_event_source = NULL;
+  }
   if (hotkey_watch_fd >= 0) {
     close(hotkey_watch_fd);
     hotkey_watch_fd = -1;
@@ -1134,7 +1139,7 @@ void setup_hotkey_event_listener(struct wl_event_loop *event_loop) {
 
 static void add_hotkey_listener_to_event_loop(void) {
   if (hotkey_event_loop && hotkey_watch_fd >= 0)
-    wl_event_loop_add_fd(hotkey_event_loop, hotkey_watch_fd, WL_EVENT_READABLE, hotkey_reload_handler, NULL);
+    hotkey_event_source = wl_event_loop_add_fd(hotkey_event_loop, hotkey_watch_fd, WL_EVENT_READABLE, hotkey_reload_handler, NULL);
 }
 
 static submap_t *find_submap(const char *name) {

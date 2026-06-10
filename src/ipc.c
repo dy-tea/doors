@@ -196,13 +196,18 @@ static void ipc_cmd_output(char **args, int num, int client_fd) {
   }
 
   struct output_config *oc = output_config_find(output_name);
+  bool oc_new = false;
   if (!oc) {
     oc = output_config_create(output_name);
     if (!oc) {
       send_failure(client_fd, "output: failed to create config\n");
       return;
     }
+    oc_new = true;
   }
+
+  if (oc_new)
+    output_config_add(oc);
 
   output_t *mon = find_output_by_name(output_name);
   char *subcmd = *args;
@@ -635,8 +640,8 @@ static void ipc_cmd_output(char **args, int num, int client_fd) {
             mon->desk_tail = d->prev;
         }
         desktop_t *next = d->next;
-        d = next;
         free(d);
+        d = next;
       }
 
       transaction_commit_dirty();

@@ -591,7 +591,7 @@ int server_run(void) {
   struct wl_event_loop *event_loop = wl_display_get_event_loop(server.wl_display);
   int ipc_fd = ipc_get_socket_fd();
   if (ipc_fd >= 0)
-    wl_event_loop_add_fd(event_loop, ipc_fd, WL_EVENT_READABLE, ipc_socket_handler, NULL);
+    server.ipc_event_source = wl_event_loop_add_fd(event_loop, ipc_fd, WL_EVENT_READABLE, ipc_socket_handler, NULL);
 
   // setup hotkey event listener
   setup_hotkey_event_listener(event_loop);
@@ -628,10 +628,14 @@ void server_fini(void) {
   animation_fini();
   transaction_fini();
   workspace_fini();
+  if (server.ipc_event_source) {
+    wl_event_source_remove(server.ipc_event_source);
+    server.ipc_event_source = NULL;
+  }
   ipc_cleanup();
   rule_fini();
+  output_config_fini();
   input_fini();
-  input_method_relay_finish(server.input_method_relay);
   config_fini();
   wl_display_destroy_clients(server.wl_display);
 
@@ -699,6 +703,10 @@ void server_fini(void) {
 #endif
 
   wlr_backend_destroy(server.backend);
+
+  wl_event_loop_dispatch_idle(wl_display_get_event_loop(server.wl_display));
+
+  input_method_relay_finish(server.input_method_relay);
 
   blur_fini();
 

@@ -184,6 +184,14 @@ static void handle_output_destroy(struct wl_listener *listener, void *data) {
 
   wlr_color_transform_unref(output->color_transform);
   blur_output_fini(output->blur_ctx);
+
+  desktop_t *d = output->desk_head;
+  while (d) {
+    desktop_t *next = d->next;
+    free(d);
+    d = next;
+  }
+
   free(output);
 }
 

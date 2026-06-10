@@ -41,6 +41,14 @@ struct output_config *output_config_create(const char *name) {
   return oc;
 }
 
+void output_config_fini(void) {
+  struct output_config *oc, *tmp;
+  wl_list_for_each_safe(oc, tmp, &output_configs, link) {
+    wl_list_remove(&oc->link);
+    output_config_destroy(oc);
+  }
+}
+
 void output_config_destroy(struct output_config *oc) {
   if (!oc)
     return;

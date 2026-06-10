@@ -156,6 +156,8 @@ typedef struct server_t {
   struct wlr_text_input_manager_v3 *text_input_manager;
   struct ime_relay_t *input_method_relay;
 
+  struct wl_event_source *ipc_event_source;
+
   // cursor state
   enum cursor_mode cursor_mode;
   toplevel_t *grabbed_toplevel;
