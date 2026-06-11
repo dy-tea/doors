@@ -510,8 +510,17 @@ static void capture_output(struct wl_client *wl_client, screencopy_mgr_t *manage
 	frame->box = buffer_box;
 	frame->shm_stride = buffer_box.width * 4;
 
+	uint32_t shm_format;
+	switch (frame->shm_format) {
+	case DRM_FORMAT_ARGB8888: shm_format = WL_SHM_FORMAT_ARGB8888; break;
+	case DRM_FORMAT_XRGB8888: shm_format = WL_SHM_FORMAT_XRGB8888; break;
+	case DRM_FORMAT_ABGR8888: shm_format = WL_SHM_FORMAT_ABGR8888; break;
+	case DRM_FORMAT_XBGR8888: shm_format = WL_SHM_FORMAT_XBGR8888; break;
+	default: shm_format = WL_SHM_FORMAT_XRGB8888; break;
+	}
+
 	zwlr_screencopy_frame_v1_send_buffer(frame->resource,
-		WL_SHM_FORMAT_ARGB8888,
+		shm_format,
 		buffer_box.width, buffer_box.height, frame->shm_stride);
 
 	if (version >= 3) {
