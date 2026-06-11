@@ -28,6 +28,14 @@ typedef struct toplevel_rounded_t {
   bool border_dirty;
   float border_color[4];
 
+  float gradient_colors[BORDER_GRADIENT_MAX_STOPS * 4];
+  int gradient_count;
+  float gradient_angle;
+  float gradient2_colors[BORDER_GRADIENT_MAX_STOPS * 4];
+  int gradient2_count;
+  float gradient2_angle;
+  float gradient_lerp;
+
   struct wlr_scene_buffer *corner_mask_node;
   struct wlr_buffer *corner_mask_buf;
   GLuint corner_mask_buf_fbo;

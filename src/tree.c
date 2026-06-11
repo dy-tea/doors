@@ -52,6 +52,31 @@ bool debug_txn_wait = false;
 char normal_border_color[16] = "444444ff";
 char active_border_color[16] = "555555ff";
 char focused_border_color[16] = "1793dfff";
+
+// Gradient border globals – count==0 means "no gradient, use solid border_color"
+float normal_border_gradient[BORDER_GRADIENT_MAX_STOPS * 4] = {0};
+int   normal_border_gradient_count = 0;
+float normal_border_gradient_angle = 0.0f;
+float normal_border_gradient2[BORDER_GRADIENT_MAX_STOPS * 4] = {0};
+int   normal_border_gradient2_count = 0;
+float normal_border_gradient2_angle = 0.0f;
+float normal_border_gradient_lerp = 0.0f;
+
+float active_border_gradient[BORDER_GRADIENT_MAX_STOPS * 4] = {0};
+int   active_border_gradient_count = 0;
+float active_border_gradient_angle = 0.0f;
+float active_border_gradient2[BORDER_GRADIENT_MAX_STOPS * 4] = {0};
+int   active_border_gradient2_count = 0;
+float active_border_gradient2_angle = 0.0f;
+float active_border_gradient_lerp = 0.0f;
+
+float focused_border_gradient[BORDER_GRADIENT_MAX_STOPS * 4] = {0};
+int   focused_border_gradient_count = 0;
+float focused_border_gradient_angle = 0.0f;
+float focused_border_gradient2[BORDER_GRADIENT_MAX_STOPS * 4] = {0};
+int   focused_border_gradient2_count = 0;
+float focused_border_gradient2_angle = 0.0f;
+float focused_border_gradient_lerp = 0.0f;
 char presel_feedback_color[16] = "ff5555ff";
 
 // global state
@@ -1618,13 +1643,67 @@ void update_border_colors(struct wlr_scene_tree *border_tree, struct wlr_scene_r
   float color[4];
   get_border_color(client, color);
 
-  if (client->border_radius > 0.0f && client->toplevel && client->toplevel->rounded) {
-    struct toplevel_t *tl = client->toplevel;
-    tl->rounded->border_color[0] = color[0];
-    tl->rounded->border_color[1] = color[1];
-    tl->rounded->border_color[2] = color[2];
-    tl->rounded->border_color[3] = color[3];
-    tl->rounded->border_dirty = true;
+  // determine which gradient set applies to this client
+  output_t *m = client->toplevel ? client->toplevel->node->output :
+    client->xwayland_view ? client->xwayland_view->node->output : NULL;
+  desktop_t *d = m ? m->desk : NULL;
+  bool is_focused = (d && d->focus && d->focus->client == client);
+  bool is_active  = (d && d->focus && d->focus->client != NULL);
+
+  float *grad, *grad2;
+  int gcount, g2count;
+  float gangle, g2angle, glerp;
+  if (is_focused) {
+    grad = focused_border_gradient;
+    gcount = focused_border_gradient_count;
+    gangle = focused_border_gradient_angle;
+    grad2 = focused_border_gradient2;
+    g2count = focused_border_gradient2_count;
+    g2angle = focused_border_gradient2_angle;
+    glerp = focused_border_gradient_lerp;
+  } else if (is_active) {
+    grad = active_border_gradient;
+    gcount = active_border_gradient_count;
+    gangle = active_border_gradient_angle;
+    grad2 = active_border_gradient2;
+    g2count = active_border_gradient2_count;
+    g2angle = active_border_gradient2_angle;
+    glerp = active_border_gradient_lerp;
+  } else {
+    grad = normal_border_gradient;
+    gcount = normal_border_gradient_count;
+    gangle = normal_border_gradient_angle;
+    grad2 = normal_border_gradient2;
+    g2count = normal_border_gradient2_count;
+    g2angle = normal_border_gradient2_angle;
+    glerp = normal_border_gradient_lerp;
+  }
+
+  bool has_gradient = (gcount >= 2);
+  bool use_shader = (has_gradient || (client->border_radius > 0.0f));
+
+  if (use_shader && client->toplevel) {
+    toplevel_t *tl = client->toplevel;
+
+    if (!tl->rounded) {
+      tl->rounded = calloc(1, sizeof(*tl->rounded));
+      if (!tl->rounded) goto fallback_rects;
+    }
+
+    toplevel_rounded_t *r = tl->rounded;
+    r->border_color[0] = color[0];
+    r->border_color[1] = color[1];
+    r->border_color[2] = color[2];
+    r->border_color[3] = color[3];
+
+    memcpy(r->gradient_colors, grad, gcount * 4 * sizeof(float));
+    r->gradient_count = gcount;
+    r->gradient_angle = gangle;
+    memcpy(r->gradient2_colors, grad2, g2count * 4 * sizeof(float));
+    r->gradient2_count = g2count;
+    r->gradient2_angle = g2angle;
+    r->gradient_lerp = glerp;
+    r->border_dirty = true;
 
     static const float transparent[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     for (int i = 0; i < 4; i++)
@@ -1634,6 +1713,11 @@ void update_border_colors(struct wlr_scene_tree *border_tree, struct wlr_scene_r
     return;
   }
 
+  if (client->toplevel && client->toplevel->rounded &&
+      client->toplevel->rounded->border_shader_node)
+    wlr_scene_node_set_enabled(&client->toplevel->rounded->border_shader_node->node, false);
+
+fallback_rects:
   for (int i = 0; i < 4; i++)
     if (rects[i])
       wlr_scene_rect_set_color(rects[i], color);

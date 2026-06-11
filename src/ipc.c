@@ -50,6 +50,84 @@ static bool streq(const char *a, const char *b) {
   return strcmp(a, b) == 0;
 }
 
+// ---------------------------------------------------------------------------
+// Gradient border helpers
+// ---------------------------------------------------------------------------
+
+// Parse a hex-digit character (case-insensitive)
+static int ipc_hex_digit(char c) {
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return 10 + (c - 'a');
+  if (c >= 'A' && c <= 'F') return 10 + (c - 'A');
+  return 0;
+}
+
+// Parse a single RRGGBBAA (8 chars) or RRGGBB (6 chars) color into a float[4].
+static bool ipc_parse_color(const char *hex, float *rgba) {
+  if (!hex) return false;
+  if (*hex == '#') hex++;
+  size_t len = strlen(hex);
+  if (len != 6 && len != 8) return false;
+  rgba[0] = (float)(ipc_hex_digit(hex[0]) * 16 + ipc_hex_digit(hex[1])) / 255.0f;
+  rgba[1] = (float)(ipc_hex_digit(hex[2]) * 16 + ipc_hex_digit(hex[3])) / 255.0f;
+  rgba[2] = (float)(ipc_hex_digit(hex[4]) * 16 + ipc_hex_digit(hex[5])) / 255.0f;
+  rgba[3] = (len == 8) ? (float)(ipc_hex_digit(hex[6]) * 16 + ipc_hex_digit(hex[7])) / 255.0f : 1.0f;
+  return true;
+}
+
+// Parse a gradient string: "RRGGBBAA RRGGBBAA ... [ANGLEdeg]"
+// Fills out, count (number of stops), and angle_out (radians).
+// Returns true on success with at least 1 stop.
+static bool ipc_parse_gradient(const char *str,
+    float out[BORDER_GRADIENT_MAX_STOPS * 4], int *count, float *angle_out) {
+  if (!str) return false;
+  char buf[512];
+  strncpy(buf, str, sizeof(buf) - 1);
+  buf[sizeof(buf) - 1] = '\0';
+
+  *count = 0;
+  *angle_out = 0.0f;
+
+  char *tok = strtok(buf, " \t");
+  while (tok) {
+    // Check for "NNNdeg" angle token
+    size_t tlen = strlen(tok);
+    if (tlen > 3 && strcmp(tok + tlen - 3, "deg") == 0) {
+      char tmp[16];
+      strncpy(tmp, tok, sizeof(tmp) - 1);
+      tmp[tlen - 3] = '\0';
+      *angle_out = (float)atof(tmp) * 3.14159265f / 180.0f;
+    } else if (tlen >= 6) {
+      if (*count >= BORDER_GRADIENT_MAX_STOPS) break;
+      float rgba[4];
+      if (ipc_parse_color(tok, rgba)) {
+        memcpy(out + (*count) * 4, rgba, 4 * sizeof(float));
+        (*count)++;
+      }
+    }
+    tok = strtok(NULL, " \t");
+  }
+  return (*count >= 1);
+}
+
+// Serialise a gradient back to a string for IPC get queries.
+static void ipc_format_gradient(char *buf, size_t bufsz,
+    const float *colors, int count, float angle) {
+  buf[0] = '\0';
+  for (int i = 0; i < count; i++) {
+    char tmp[20];
+    unsigned r = (unsigned)(colors[i*4+0] * 255.0f + 0.5f);
+    unsigned g = (unsigned)(colors[i*4+1] * 255.0f + 0.5f);
+    unsigned b = (unsigned)(colors[i*4+2] * 255.0f + 0.5f);
+    unsigned a = (unsigned)(colors[i*4+3] * 255.0f + 0.5f);
+    snprintf(tmp, sizeof(tmp), "%02x%02x%02x%02x ", r, g, b, a);
+    strncat(buf, tmp, bufsz - strlen(buf) - 1);
+  }
+  char tmp[20];
+  snprintf(tmp, sizeof(tmp), "%ddeg", (int)(angle * 180.0f / 3.14159265f));
+  strncat(buf, tmp, bufsz - strlen(buf) - 1);
+}
+
 void ipc_init(void) {
   struct sockaddr_un addr;
   socklen_t len;
@@ -3143,6 +3221,109 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
     } else {
       send_success(client_fd, presel_feedback_color);
       send_success(client_fd, "\n");
+    }
+  } else if (streq("normal_border_gradient", *args) || streq("active_border_gradient", *args) ||
+      streq("focused_border_gradient", *args)) {
+    float *grad;
+    int *gcount;
+    float *gangle;
+    if (args[0][0] == 'n') {
+      grad = normal_border_gradient;
+      gcount = &normal_border_gradient_count;
+      gangle = &normal_border_gradient_angle;
+    } else if (args[0][0] == 'a') {
+      grad = active_border_gradient;
+      gcount = &active_border_gradient_count;
+      gangle = &active_border_gradient_angle;
+    } else {
+      grad = focused_border_gradient;
+      gcount = &focused_border_gradient_count;
+      gangle = &focused_border_gradient_angle;
+    }
+
+    if (num >= 2) {
+      char joined[512] = "";
+      for (int i = 1; i < num; i++) {
+        if (i > 1) strncat(joined, " ", sizeof(joined) - strlen(joined) - 1);
+        strncat(joined, args[i], sizeof(joined) - strlen(joined) - 1);
+      }
+
+      if (streq(joined, "clear")) {
+        *gcount = 0;
+        *gangle = 0.0f;
+      } else {
+        ipc_parse_gradient(joined, grad, gcount, gangle);
+      }
+
+      refresh_border_colors();
+      transaction_commit_dirty();
+      send_success(client_fd, "border gradient set\n");
+    } else {
+      char buf[512];
+      ipc_format_gradient(buf, sizeof(buf), grad, *gcount, *gangle);
+      send_success(client_fd, buf);
+      send_success(client_fd, "\n");
+    }
+  } else if (streq("normal_border_gradient2", *args) || streq("active_border_gradient2", *args) ||
+      streq("focused_border_gradient2", *args)) {
+    float *grad;
+    int *gcount;
+    float *gangle;
+    if (args[0][0] == 'n') {
+      grad = normal_border_gradient2;
+      gcount = &normal_border_gradient2_count;
+      gangle = &normal_border_gradient2_angle;
+    } else if (args[0][0] == 'a') {
+      grad = active_border_gradient2;
+      gcount = &active_border_gradient2_count;
+      gangle = &active_border_gradient2_angle;
+    } else {
+      grad = focused_border_gradient2;
+      gcount = &focused_border_gradient2_count;
+      gangle = &focused_border_gradient2_angle;
+    }
+
+    if (num >= 2) {
+      char joined[512] = "";
+      for (int i = 1; i < num; i++) {
+        if (i > 1) strncat(joined, " ", sizeof(joined) - strlen(joined) - 1);
+        strncat(joined, args[i], sizeof(joined) - strlen(joined) - 1);
+      }
+
+      if (streq(joined, "clear")) {
+        *gcount = 0;
+        *gangle = 0.0f;
+      } else {
+        ipc_parse_gradient(joined, grad, gcount, gangle);
+      }
+
+      refresh_border_colors();
+      transaction_commit_dirty();
+      send_success(client_fd, "border gradient2 set\n");
+    } else {
+      char buf[512];
+      ipc_format_gradient(buf, sizeof(buf), grad, *gcount, *gangle);
+      send_success(client_fd, buf);
+      send_success(client_fd, "\n");
+    }
+  } else if (streq("normal_border_gradient_lerp", *args) || streq("active_border_gradient_lerp", *args) ||
+      streq("focused_border_gradient_lerp", *args)) {
+    float *lerp;
+    if (args[0][0] == 'n') lerp = &normal_border_gradient_lerp;
+    else if (args[0][0] == 'a') lerp = &active_border_gradient_lerp;
+    else lerp = &focused_border_gradient_lerp;
+
+    if (num >= 2) {
+      *lerp = (float)atof(args[1]);
+      if (*lerp < 0.0f) *lerp = 0.0f;
+      if (*lerp > 1.0f) *lerp = 1.0f;
+      refresh_border_colors();
+      transaction_commit_dirty();
+      send_success(client_fd, "border gradient lerp set\n");
+    } else {
+      char buf[32];
+      snprintf(buf, sizeof(buf), "%f\n", *lerp);
+      send_success(client_fd, buf);
     }
   } else if (streq("automatic_scheme", *args)) {
     if (num >= 2) {

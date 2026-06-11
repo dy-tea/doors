@@ -300,7 +300,7 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
       update_borders(tl->border_tree, tl->border_rects, geo, bw);
       wlr_scene_node_set_position(&tl->border_tree->node, border_x, border_y);
       update_border_colors(tl->border_tree, tl->border_rects, node->client);
-      if (node->client->border_radius > 0.0f && tl->rounded) {
+      if (tl->rounded && (node->client->border_radius > 0.0f || tl->rounded->gradient_count >= 2)) {
         tl->rounded->border_dirty = true;
         if (tl->rounded->border_shader_node) {
           int new_fw = geo.width + 2 * (int)bw;

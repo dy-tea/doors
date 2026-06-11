@@ -126,6 +126,9 @@ typedef struct blur_ctx_t {
   } u_ext_blit;
   struct {
     GLint resolution, border_radius, border_width_px, border_color;
+    GLint gradient_colors, gradient_count, gradient_angle;
+    GLint gradient2_colors, gradient2_count, gradient2_angle;
+    GLint gradient_lerp;
   } u_border;
   struct {
     GLint tex, win_pos_uv, win_size_uv, win_size_px, border_radius_px;

@@ -585,6 +585,13 @@ bool blur_init(void) {
     blur_ctx.u_border.border_radius = glGetUniformLocation(blur_ctx.prog_border, "border_radius");
     blur_ctx.u_border.border_width_px = glGetUniformLocation(blur_ctx.prog_border, "border_width_px");
     blur_ctx.u_border.border_color = glGetUniformLocation(blur_ctx.prog_border, "border_color");
+    blur_ctx.u_border.gradient_colors  = glGetUniformLocation(blur_ctx.prog_border, "gradient_colors");
+    blur_ctx.u_border.gradient_count = glGetUniformLocation(blur_ctx.prog_border, "gradient_count");
+    blur_ctx.u_border.gradient_angle = glGetUniformLocation(blur_ctx.prog_border, "gradient_angle");
+    blur_ctx.u_border.gradient2_colors = glGetUniformLocation(blur_ctx.prog_border, "gradient2_colors");
+    blur_ctx.u_border.gradient2_count = glGetUniformLocation(blur_ctx.prog_border, "gradient2_count");
+    blur_ctx.u_border.gradient2_angle = glGetUniformLocation(blur_ctx.prog_border, "gradient2_angle");
+    blur_ctx.u_border.gradient_lerp = glGetUniformLocation(blur_ctx.prog_border, "gradient_lerp");
   }
   if (blur_ctx.prog_corner_mask) {
     blur_ctx.u_corner_mask.tex = glGetUniformLocation(blur_ctx.prog_corner_mask, "tex");
@@ -1528,10 +1535,28 @@ static bool blur_render_border(toplevel_t *tl, int content_w, int content_h) {
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
   glClear(GL_COLOR_BUFFER_BIT);
   glUseProgram(blur_ctx.prog_border);
+
   glUniform2f(blur_ctx.u_border.resolution, (float)fw, (float)fh);
   glUniform1f(blur_ctx.u_border.border_radius, c->border_radius);
   glUniform1f(blur_ctx.u_border.border_width_px, (float)bw_i);
   glUniform4fv(blur_ctx.u_border.border_color, 1, tl->rounded->border_color);
+
+  // gradient uniforms
+  if (blur_ctx.u_border.gradient_colors >= 0)
+    glUniform4fv(blur_ctx.u_border.gradient_colors, BORDER_GRADIENT_MAX_STOPS, tl->rounded->gradient_colors);
+  if (blur_ctx.u_border.gradient_count >= 0)
+    glUniform1i(blur_ctx.u_border.gradient_count, tl->rounded->gradient_count);
+  if (blur_ctx.u_border.gradient_angle >= 0)
+    glUniform1f(blur_ctx.u_border.gradient_angle, tl->rounded->gradient_angle);
+  if (blur_ctx.u_border.gradient2_colors >= 0)
+    glUniform4fv(blur_ctx.u_border.gradient2_colors, BORDER_GRADIENT_MAX_STOPS, tl->rounded->gradient2_colors);
+  if (blur_ctx.u_border.gradient2_count >= 0)
+    glUniform1i(blur_ctx.u_border.gradient2_count, tl->rounded->gradient2_count);
+  if (blur_ctx.u_border.gradient2_angle >= 0)
+    glUniform1f(blur_ctx.u_border.gradient2_angle, tl->rounded->gradient2_angle);
+  if (blur_ctx.u_border.gradient_lerp >= 0)
+    glUniform1f(blur_ctx.u_border.gradient_lerp, tl->rounded->gradient_lerp);
+
   draw_quad();
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glDisable(GL_BLEND);
@@ -1920,7 +1945,13 @@ void blur_output_frame(output_t *output, struct wlr_scene_output *scene_output) 
       if (!tl->node || !tl->node->client || !tl->node->client->shown) continue;
       if (!tl->node->output || tl->node->output != output) continue;
       client_t *c = tl->node->client;
-      if (c->border_radius <= 0.0f) { tl->rounded->border_dirty = false; continue; }
+
+      // use shader if rounded corners or a gradient is set
+      bool has_gradient = (tl->rounded->gradient_count >= 2);
+      if (c->border_radius <= 0.0f && !has_gradient) {
+        tl->rounded->border_dirty = false;
+        continue;
+      }
 
       struct wlr_box content_r = get_client_rect(tl);
       if (c->state == STATE_TILED && tl->geometry.width > 0 && tl->geometry.height > 0) {

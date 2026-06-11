@@ -250,7 +250,8 @@ void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
       update_borders(toplevel->border_tree, toplevel->border_rects, content_geo, bw);
       wlr_scene_node_set_position(&toplevel->border_tree->node, (int)x - (int)bw, (int)y - (int)bw);
       update_border_colors(toplevel->border_tree, toplevel->border_rects, c);
-      if (c->border_radius > 0.0f && toplevel->rounded && toplevel->rounded->border_shader_node) {
+      if (toplevel->rounded && toplevel->rounded->border_shader_node &&
+          (c->border_radius > 0.0f || toplevel->rounded->gradient_count >= 2)) {
         toplevel->rounded->border_dirty = true;
         int new_fw = border_w + 2 * (int)bw;
         int new_fh = border_h + 2 * (int)bw;
@@ -261,7 +262,8 @@ void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
       struct wlr_box full_geo = {0, 0, container_rect->width, container_rect->height};
       update_borders(toplevel->border_tree, toplevel->border_rects, full_geo, bw);
       update_border_colors(toplevel->border_tree, toplevel->border_rects, c);
-      if (c->border_radius > 0.0f && toplevel->rounded && toplevel->rounded->border_shader_node) {
+      if (toplevel->rounded && toplevel->rounded->border_shader_node &&
+          (c->border_radius > 0.0f || toplevel->rounded->gradient_count >= 2)) {
         toplevel->rounded->border_dirty = true;
         int new_fw = container_rect->width + 2 * (int)bw;
         int new_fh = container_rect->height + 2 * (int)bw;
@@ -883,19 +885,25 @@ void toplevel_set_border_radius(toplevel_t *tl, float radius) {
         tl->rounded->corner_mask_buf_fbo = 0;
       }
     }
-    if (tl->rounded->border_shader_node) {
-      wlr_scene_node_destroy(&tl->rounded->border_shader_node->node);
-      tl->rounded->border_shader_node = NULL;
 
-      if (tl->rounded->border_shader_buf) {
-        wlr_buffer_unlock(tl->rounded->border_shader_buf);
-        tl->rounded->border_shader_buf = NULL;
-        tl->rounded->border_shader_buf_fbo = 0;
-        tl->rounded->border_shader_buf_w = 0;
-        tl->rounded->border_shader_buf_h = 0;
+    bool has_gradient = (tl->rounded->gradient_count >= 2);
+    if (!has_gradient) {
+      if (tl->rounded->border_shader_node) {
+        wlr_scene_node_destroy(&tl->rounded->border_shader_node->node);
+        tl->rounded->border_shader_node = NULL;
+
+        if (tl->rounded->border_shader_buf) {
+          wlr_buffer_unlock(tl->rounded->border_shader_buf);
+          tl->rounded->border_shader_buf = NULL;
+          tl->rounded->border_shader_buf_fbo = 0;
+          tl->rounded->border_shader_buf_w = 0;
+          tl->rounded->border_shader_buf_h = 0;
+        }
       }
+      tl->rounded->border_dirty = false;
+    } else {
+      tl->rounded->border_dirty = true;
     }
-    tl->rounded->border_dirty = false;
   }
 }
 

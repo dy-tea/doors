@@ -277,6 +277,47 @@ doorsctl config presel_feedback_color <color>
 
 Sets the color of the preselection feedback indicator.
 
+```
+doorsctl config normal_border_gradient <colors...> [angledeg]
+doorsctl config active_border_gradient <colors...> [angledeg]
+doorsctl config focused_border_gradient <colors...> [angledeg]
+```
+
+Sets a linear gradient border that replaces the solid border color for the respective state. The value is a space-separated list of hex `RRGGBB` or
+`RRGGBBAA` color stops, optionally followed by a rotation angle (e.g. `90deg`). A gradient with at least 2 stops is required; use `clear` to
+reset back to the solid border color.
+
+Examples:
+```
+# Red -> Blue gradient at 45° angle
+doorsctl config focused_border_gradient ff0000 0000ff 45deg
+
+# Red -> Blue -> Green gradient at 0° angle
+doorsctl config focused_border_gradient ff0000 0000ff 00ff00
+
+# Reset to solid color
+doorsctl config focused_border_gradient clear
+```
+
+```
+doorsctl config normal_border_gradient2 <colors...> [angledeg]
+doorsctl config active_border_gradient2 <colors...> [angledeg]
+doorsctl config focused_border_gradient2 <colors...> [angledeg]
+```
+
+Sets a secondary gradient that blends with the primary gradient via the
+corresponding `_lerp` setting. Same format as the primary gradient.
+
+```
+doorsctl config normal_border_gradient_lerp <0.0-1.0>
+doorsctl config active_border_gradient_lerp <0.0-1.0>
+doorsctl config focused_border_gradient_lerp <0.0-1.0>
+```
+
+Controls the blend between the primary and secondary gradient. `0.0` shows
+only the primary gradient, `1.0` shows only the secondary. Linear
+interpolation is applied between the two.
+
 ### Output/Desktop Setup
 
 ```

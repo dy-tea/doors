@@ -207,6 +207,32 @@ extern char active_border_color[16];
 extern char focused_border_color[16];
 extern char presel_feedback_color[16];
 
+// broder gradients
+#define BORDER_GRADIENT_MAX_STOPS 10
+extern float normal_border_gradient[BORDER_GRADIENT_MAX_STOPS * 4];
+extern int normal_border_gradient_count;
+extern float normal_border_gradient_angle;
+extern float normal_border_gradient2[BORDER_GRADIENT_MAX_STOPS * 4];
+extern int normal_border_gradient2_count;
+extern float normal_border_gradient2_angle;
+extern float normal_border_gradient_lerp;
+
+extern float active_border_gradient[BORDER_GRADIENT_MAX_STOPS * 4];
+extern int active_border_gradient_count;
+extern float active_border_gradient_angle;
+extern float active_border_gradient2[BORDER_GRADIENT_MAX_STOPS * 4];
+extern int active_border_gradient2_count;
+extern float active_border_gradient2_angle;
+extern float active_border_gradient_lerp;
+
+extern float focused_border_gradient[BORDER_GRADIENT_MAX_STOPS * 4];
+extern int focused_border_gradient_count;
+extern float focused_border_gradient_angle;
+extern float focused_border_gradient2[BORDER_GRADIENT_MAX_STOPS * 4];
+extern int focused_border_gradient2_count;
+extern float focused_border_gradient2_angle;
+extern float focused_border_gradient_lerp;
+
 // global state
 extern struct output_t *mon;
 extern struct output_t *mon_head;
