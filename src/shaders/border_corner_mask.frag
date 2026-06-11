@@ -29,7 +29,7 @@ void main() {
 
   float d = sdRoundedBox(p_px, half_px, border_radius_px);
   float fw = max(length(vec2(dFdx(d), dFdy(d))), 0.5);
-  float alpha = smoothstep(-fw * 0.15, fw * 0.85, d);
+  float alpha = smoothstep(-fw * 0.5, fw * 0.5, d);
   vec4 bg = texture2D(tex, v_uv);
   gl_FragColor = vec4(bg.rgb * alpha, alpha);
 }

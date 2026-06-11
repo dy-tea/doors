@@ -1509,12 +1509,17 @@ static bool blur_render_border(toplevel_t *tl, int content_w, int content_h) {
   if (!tl->border_tree) return false;
   if (!tl->rounded) return false;
 
+  float scale = tl->node->output ? tl->node->output->wlr_output->scale : 1.0f;
   client_t *c = tl->node->client;
   int bw_i = (int)c->border_width;
-  int fw = content_w + 2 * bw_i;
-  int fh = content_h + 2 * bw_i;
   if (bw_i <= 0) return false;
-  if (fw <= 0 || fh <= 0) return false;
+
+  double log_fw = (double)content_w + 2 * bw_i;
+  double log_fh = (double)content_h + 2 * bw_i;
+  if (log_fw <= 0 || log_fh <= 0) return false;
+
+  double phys_fw = log_fw * scale;
+  double phys_fh = log_fh * scale;
 
   if (!tl->rounded->border_shader_node) {
     tl->rounded->border_shader_node = wlr_scene_buffer_create(tl->border_tree, NULL);
@@ -1524,21 +1529,21 @@ static bool blur_render_border(toplevel_t *tl, int content_w, int content_h) {
   }
 
   GLuint dest_fbo = ensure_sized_buf(&tl->rounded->border_shader_buf, &tl->rounded->border_shader_buf_fbo,
-    &tl->rounded->border_shader_buf_w, &tl->rounded->border_shader_buf_h, fw, fh);
+    &tl->rounded->border_shader_buf_w, &tl->rounded->border_shader_buf_h, phys_fw, phys_fh);
   if (!dest_fbo) return false;
 
   glEnable(GL_BLEND);
   glBlendFunc(GL_ONE, GL_ZERO);
   glDisable(GL_SCISSOR_TEST);
   glBindFramebuffer(GL_FRAMEBUFFER, dest_fbo);
-  glViewport(0, 0, fw, fh);
+  glViewport(0, 0, phys_fw, phys_fh);
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
   glClear(GL_COLOR_BUFFER_BIT);
   glUseProgram(blur_ctx.prog_border);
 
-  glUniform2f(blur_ctx.u_border.resolution, (float)fw, (float)fh);
-  glUniform1f(blur_ctx.u_border.border_radius, c->border_radius);
-  glUniform1f(blur_ctx.u_border.border_width_px, (float)bw_i);
+  glUniform2f(blur_ctx.u_border.resolution, (float)phys_fw, (float)phys_fh);
+  glUniform1f(blur_ctx.u_border.border_radius, (float)c->border_radius * scale);
+  glUniform1f(blur_ctx.u_border.border_width_px, (float)bw_i * scale);
   glUniform4fv(blur_ctx.u_border.border_color, 1, tl->rounded->border_color);
 
   // gradient uniforms
@@ -1563,9 +1568,9 @@ static bool blur_render_border(toplevel_t *tl, int content_w, int content_h) {
   glFlush();
 
   wlr_scene_buffer_set_buffer(tl->rounded->border_shader_node, tl->rounded->border_shader_buf);
-  struct wlr_fbox src_box = {0, 0, (double)fw, (double)fh};
+  struct wlr_fbox src_box = {0, 0, phys_fw, phys_fh};
   wlr_scene_buffer_set_source_box(tl->rounded->border_shader_node, &src_box);
-  wlr_scene_buffer_set_dest_size(tl->rounded->border_shader_node, fw, fh);
+  wlr_scene_buffer_set_dest_size(tl->rounded->border_shader_node, log_fw, log_fh);
   wlr_scene_node_set_enabled(&tl->rounded->border_shader_node->node, true);
 
   static const float transparent[4] = {0.0f, 0.0f, 0.0f, 0.0f};

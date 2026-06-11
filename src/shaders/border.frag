@@ -53,8 +53,9 @@ void main() {
   float inner_r = max(border_radius - border_width_px, 0.0);
   vec2 inner_half = center - vec2(border_width_px);
   float d_inner = sdRoundedBox(p, inner_half, inner_r);
-  float aa = 0.5875;
+  float aa = fwidth(d_outer) * 0.5;
   float a_outer = 1.0 - smoothstep(-aa, aa, d_outer);
+  aa = fwidth(d_inner) * 0.5;
   float a_inner = smoothstep(-aa, aa, d_inner);
   vec4 col;
   if (gradient_count >= 2) {
