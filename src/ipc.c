@@ -19,6 +19,7 @@
 #include "spring.h"
 #include "scroller.h"
 #include "text.h"
+#include "scratchpad.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,11 +51,7 @@ static bool streq(const char *a, const char *b) {
   return strcmp(a, b) == 0;
 }
 
-// ---------------------------------------------------------------------------
-// Gradient border helpers
-// ---------------------------------------------------------------------------
-
-// Parse a hex-digit character (case-insensitive)
+// parse a hex-digit character
 static int ipc_hex_digit(char c) {
   if (c >= '0' && c <= '9') return c - '0';
   if (c >= 'a' && c <= 'f') return 10 + (c - 'a');
@@ -62,7 +59,7 @@ static int ipc_hex_digit(char c) {
   return 0;
 }
 
-// Parse a single RRGGBBAA (8 chars) or RRGGBB (6 chars) color into a float[4].
+// parse a single RRGGBBAA or RRGGBB color into a float[4]
 static bool ipc_parse_color(const char *hex, float *rgba) {
   if (!hex) return false;
   if (*hex == '#') hex++;
@@ -75,11 +72,7 @@ static bool ipc_parse_color(const char *hex, float *rgba) {
   return true;
 }
 
-// Parse a gradient string: "RRGGBBAA RRGGBBAA ... [ANGLEdeg]"
-// Fills out, count (number of stops), and angle_out (radians).
-// Returns true on success with at least 1 stop.
-static bool ipc_parse_gradient(const char *str,
-    float out[BORDER_GRADIENT_MAX_STOPS * 4], int *count, float *angle_out) {
+static bool ipc_parse_gradient(const char *str, float out[BORDER_GRADIENT_MAX_STOPS * 4], int *count, float *angle_out) {
   if (!str) return false;
   char buf[512];
   strncpy(buf, str, sizeof(buf) - 1);
@@ -90,7 +83,6 @@ static bool ipc_parse_gradient(const char *str,
 
   char *tok = strtok(buf, " \t");
   while (tok) {
-    // Check for "NNNdeg" angle token
     size_t tlen = strlen(tok);
     if (tlen > 3 && strcmp(tok + tlen - 3, "deg") == 0) {
       char tmp[16];
@@ -110,9 +102,8 @@ static bool ipc_parse_gradient(const char *str,
   return (*count >= 1);
 }
 
-// Serialise a gradient back to a string for IPC get queries.
-static void ipc_format_gradient(char *buf, size_t bufsz,
-    const float *colors, int count, float angle) {
+// serialise a gradient back to a string for IPC get queries.
+static void ipc_format_gradient(char *buf, size_t bufsz, const float *colors, int count, float angle) {
   buf[0] = '\0';
   for (int i = 0; i < count; i++) {
     char tmp[20];
@@ -1254,6 +1245,19 @@ static void ipc_cmd_node(char **args, int num, int client_fd) {
       send_failure(client_fd, "node -g: unknown flag\n");
       return;
     }
+  } else if (streq("-S", *args) || streq("--scratchpad", *args)) {
+    output_t *m = server.focused_output;
+    if (!m || !m->desk) {
+      send_failure(client_fd, "node -S: no focused desktop\n");
+      return;
+    }
+    node_t *n = m->desk->focus;
+    if (!n || !n->client) {
+      send_failure(client_fd, "node -S: no focused client\n");
+      return;
+    }
+    scratchpad_add(n);
+    send_success(client_fd, "sent to scratchpad\n");
   } else if (streq("-v", *args) || streq("--move", *args)) {
     if (num < 3) {
       send_failure(client_fd, "node -v: missing delta arguments\n");
@@ -2426,7 +2430,7 @@ static void ipc_cmd_query(char **args, int num, int client_fd) {
     offset += snprintf(buf + offset, sizeof(buf) - offset, "{\n");
 
     output_t *m_start = filter_mon ? filter_mon : mon_head;
-     output_t *m_end = filter_mon ? filter_mon->next : NULL;
+    output_t *m_end = filter_mon ? filter_mon->next : NULL;
 
     for (output_t *m = m_start; m != m_end; ) {
       offset += snprintf(buf + offset, sizeof(buf) - offset,
@@ -2448,7 +2452,7 @@ static void ipc_cmd_query(char **args, int num, int client_fd) {
       m = m->next;
     }
 
-    struct toplevel_t *toplevel;
+    toplevel_t *toplevel;
     wl_list_for_each(toplevel, &server.toplevels, link) {
       bool include = true;
       if (filter_node && toplevel->node != filter_node)
@@ -2494,7 +2498,7 @@ static void ipc_cmd_query(char **args, int num, int client_fd) {
     }
     send_success(client_fd, buf);
   } else if (streq("-N", *args) || streq("--nodes", *args)) {
-    struct toplevel_t *toplevel;
+    toplevel_t *toplevel;
     wl_list_for_each(toplevel, &server.toplevels, link) {
       bool include = true;
       if (filter_node && toplevel->node != filter_node)
@@ -2522,7 +2526,7 @@ static void ipc_cmd_query(char **args, int num, int client_fd) {
     }
     send_success(client_fd, buf);
   } else if (streq("-f", *args) || streq("--focused", *args)) {
-    struct output_t *m = server.focused_output;
+    output_t *m = server.focused_output;
     if (!m || !m->desk) {
       send_failure(client_fd, "no focused desktop\n");
       return;
@@ -2533,7 +2537,7 @@ static void ipc_cmd_query(char **args, int num, int client_fd) {
       return;
     }
     char *foreign_id = "?";
-    struct toplevel_t *toplevel;
+    toplevel_t *toplevel;
     wl_list_for_each(toplevel, &server.toplevels, link)
       if (toplevel->node == n) {
         foreign_id = toplevel->foreign_identifier ? toplevel->foreign_identifier : "?";
@@ -3391,6 +3395,13 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
       snprintf(buf, sizeof(buf), "%d\n", mapping_events_count);
       send_success(client_fd, buf);
     }
+  } else if (streq("minimize_to_scratchpad", *args)) {
+	  if (num >= 2) {
+	    minimize_to_scratchpad = (strcmp(args[1], "true") == 0);
+	    send_success(client_fd, "minimize_to_scratchpad set\n");
+	  } else {
+	    send_success(client_fd, minimize_to_scratchpad ? "true\n" : "false\n");
+	  }
   } else if (streq("ignore_ewmh_fullscreen", *args)) {
     if (num >= 2) {
       int val = atoi(args[1]);
@@ -4493,6 +4504,39 @@ static void ipc_cmd_hotkey(char **args, int num, int client_fd) {
   send_success(client_fd, "hotkey added\n");
 }
 
+static void ipc_cmd_scratchpad(char **args, int num, int client_fd) {
+  if (num < 1) {
+    send_failure(client_fd, "scratchpad: missing arguments\n");
+    return;
+  }
+
+  if (streq("show", *args)) {
+    if (num >= 2) {
+      node_t *n = NULL;
+      if (strncmp(args[1], "app_id:", 7) == 0)
+        n = scratchpad_find_by_app_id(args[1] + 7);
+      else if (strncmp(args[1], "title:", 6) == 0)
+        n = scratchpad_find_by_title(args[1] + 6);
+
+      if (n) {
+        scratchpad_show(n);
+        transaction_commit_dirty();
+        send_success(client_fd, "scratchpad shown\n");
+        return;
+      }
+      send_failure(client_fd, "scratchpad show: matching entry not found\n");
+      return;
+    }
+
+    scratchpad_toggle_auto();
+    transaction_commit_dirty();
+    send_success(client_fd, "scratchpad toggled\n");
+    return;
+  } else {
+    send_failure(client_fd, "scratchpad: unknown subcommand (use show)\n");
+  }
+}
+
 static void process_ipc_message(char *msg, int msg_len, int client_fd) {
   wlr_log(WLR_DEBUG, "IPC: processing message: %.*s", msg_len, msg);
   int cap = 16;
@@ -4565,8 +4609,10 @@ static void process_ipc_message(char *msg, int msg_len, int client_fd) {
     ipc_cmd_equalize(++args, --num, client_fd);
   } else if (streq("balance", *args)) {
     ipc_cmd_balance(++args, --num, client_fd);
-  } else if (streq("send", *args)) {
-    ipc_cmd_send(++args, --num, client_fd);
+   } else if (streq("scratchpad", *args)) {
+     ipc_cmd_scratchpad(++args, --num, client_fd);
+   } else if (streq("send", *args)) {
+     ipc_cmd_send(++args, --num, client_fd);
    } else if (streq("rule", *args)) {
      ipc_cmd_rule(++args, --num, client_fd);
    } else if (streq("keyboard_grouping", *args)) {
@@ -4758,9 +4804,7 @@ void ipc_print_report(int fd) {
       }
     }
 
-    if (m->next) {
-      offset += snprintf(buf + offset, sizeof(buf) - offset, "%s", ":");
-    }
+    if (m->next) offset += snprintf(buf + offset, sizeof(buf) - offset, "%s", ":");
   }
 
   offset += snprintf(buf + offset, sizeof(buf) - offset, "%s", "\n");

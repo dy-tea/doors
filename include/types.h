@@ -116,6 +116,7 @@ typedef struct node_t {
   bool vacant;
   bool hidden;
   bool sticky;
+  bool scratchpad;
   bool private_node;
   bool locked;
   bool marked;

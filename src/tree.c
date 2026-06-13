@@ -8,6 +8,7 @@
 #include "output.h"
 #include "scroller.h"
 #include "xwayland.h"
+#include "scratchpad.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -151,6 +152,9 @@ void free_node(node_t *n) {
   if (n == NULL) return;
 
   animation_cancel_node(n);
+
+  if (n->scratchpad)
+    scratchpad_remove(n);
 
   // deadbeef my beloved
   static uintptr_t sentinel = 0xDEADBEEF;

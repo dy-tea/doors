@@ -188,6 +188,12 @@ doorsctl config click_to_focus true|false
 When true, clicking a window focuses it.
 
 ```
+doorsctl config minimize_to_scratchpad true|false
+```
+
+When true, clicking the minimize button in the toplevel's decorations sends it to the scratchpad.
+
+```
 doorsctl config directional_focus_tightness <0-100>
 ```
 
@@ -413,6 +419,7 @@ doorsctl node --layer below|normal|above  				# Set window layer
 doorsctl node --type horizontal|vertical|tabbed  	# Set split type for container
 doorsctl node --type next_tab|prev_tab            # Navigate tabs in current tabbed container
 doorsctl node --ratio <value>          						# Set split ratio for container
+doorsctl node --scratchpad             						# Send focused window to scratchpad
 doorsctl node --circulate forward|backward  			# Circulate focus in tree
 doorsctl node --insert-receptacle      						# Insert receptacle at focused node
 doorsctl node --presel-dir west|east|north|south  # Preselect direction for next window
@@ -477,6 +484,17 @@ doorsctl toggle floating                # Toggle focused window floating/tiled
 doorsctl toggle fullscreen              # Toggle focused window fullscreen
 doorsctl toggle pseudo_tiled            # Toggle focused window pseudo-tiled
 doorsctl toggle monocle                 # Toggle monocle layout on desktop
+```
+
+#### Scratchpad Commands
+
+The scratchpad provides a way to temporarily hide windows and bring them back when needed.
+
+```
+doorsctl scratchpad show                # Toggle scratchpad (auto): hide focused if scratchpad, or show oldest hidden entry
+doorsctl scratchpad show app_id:kitty   # Show a specific scratchpad entry by app_id
+doorsctl scratchpad show title:terminal # Show a specific scratchpad entry by title
+doorsctl node --scratchpad              # Send focused window to scratchpad
 ```
 
 #### Rotate/Flip Commands

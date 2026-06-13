@@ -1,9 +1,11 @@
 #include "toplevel.h"
 #include "blur.h"
+#include "config.h"
 #include "ipc.h"
 #include "keyboard.h"
 #include "output.h"
 #include "popup.h"
+#include "scratchpad.h"
 #include "server.h"
 #include "tabs.h"
 #include "tree.h"
@@ -699,7 +701,9 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
 
     wlr_xdg_toplevel_set_wm_capabilities(toplevel->xdg_toplevel,
       WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN |
-      WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE);
+      WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE |
+      WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE
+    );
     return;
   }
 
@@ -1009,6 +1013,7 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
   wl_list_remove(&toplevel->request_resize.link);
   wl_list_remove(&toplevel->request_maximize.link);
   wl_list_remove(&toplevel->request_fullscreen.link);
+  wl_list_remove(&toplevel->request_minimize.link);
   wl_list_remove(&toplevel->set_title.link);
   wl_list_remove(&toplevel->set_app_id.link);
   wl_list_remove(&toplevel->link);
@@ -1088,6 +1093,16 @@ void toplevel_request_fullscreen(struct wl_listener *listener, void *data) {
   update_foreign_toplevel_state(toplevel);
 
   toplevel_apply_disable_decorations(toplevel);
+}
+
+void toplevel_request_minimize(struct wl_listener *listener, void *data) {
+  (void)data;
+  toplevel_t *toplevel = wl_container_of(listener, toplevel, request_minimize);
+
+  if (!toplevel_is_ready(toplevel)) return;
+
+  if (minimize_to_scratchpad)
+    scratchpad_add(toplevel->node);
 }
 
 void toplevel_set_title(struct wl_listener *listener, void *data) {
@@ -1295,6 +1310,9 @@ void handle_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 
   toplevel->request_fullscreen.notify = toplevel_request_fullscreen;
   wl_signal_add(&xdg_toplevel->events.request_fullscreen, &toplevel->request_fullscreen);
+
+  toplevel->request_minimize.notify = toplevel_request_minimize;
+  wl_signal_add(&xdg_toplevel->events.request_minimize, &toplevel->request_minimize);
 
   toplevel->set_title.notify = toplevel_set_title;
   wl_signal_add(&xdg_toplevel->events.set_title, &toplevel->set_title);

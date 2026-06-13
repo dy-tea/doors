@@ -21,6 +21,7 @@
 #include "animation.h"
 #include "bezier.h"
 #include "spring.h"
+#include "scratchpad.h"
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -461,6 +462,7 @@ void server_init(void) {
   animation_init();
   bezier_init();
   spring_init();
+  scratchpad_init();
   workspace_init();
   ipc_init();
   rule_init();
@@ -627,6 +629,7 @@ void server_fini(void) {
   image_copy_capture_fini();
   animation_fini();
   transaction_fini();
+  scratchpad_fini();
   workspace_fini();
   if (server.ipc_event_source) {
     wl_event_source_remove(server.ipc_event_source);

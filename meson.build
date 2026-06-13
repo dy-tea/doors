@@ -91,6 +91,7 @@ executable(
 		'src' / 'popup.c',
 		'src' / 'keyboard.c',
 		'src' / 'transaction.c',
+		'src' / 'scratchpad.c',
 		'src' / 'workspace.c',
 		'src' / 'ipc.c',
 		'src' / 'layer.c',

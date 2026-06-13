@@ -182,7 +182,10 @@ static void update_window_visibility(node_t *node, output_t *m, desktop_t *curre
   }
 
   if (!found) {
-    if (node->client && node->client->state == STATE_FLOATING && node->desktop != NULL) {
+    if (node->scratchpad) {
+      should_show = (node->desktop == current_desktop);
+      found = true;
+    } else if (node->client && node->client->state == STATE_FLOATING && node->desktop != NULL) {
       should_show = (node->desktop == current_desktop);
       found = true;
     } else {

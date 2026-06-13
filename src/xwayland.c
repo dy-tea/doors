@@ -1,5 +1,7 @@
 #include "xwayland.h"
+#include "config.h"
 #include "launcher.h"
+#include "scratchpad.h"
 #include "server.h"
 #include "toplevel.h"
 #include "types.h"
@@ -874,6 +876,11 @@ static void handle_request_minimize(struct wl_listener *listener, void *data) {
 	xwayland_toplevel_t *xwayland_view = wl_container_of(listener, xwayland_view, request_minimize);
 	struct wlr_xwayland_surface *xsurface = xwayland_view->xwayland_surface;
 	struct wlr_xwayland_minimize_event *ev = data;
+
+	if (minimize_to_scratchpad && xwayland_view->node) {
+		if (ev->minimize) scratchpad_add(xwayland_view->node);
+		return;
+	}
 
 	if (xwayland_view->node)
 		xwayland_view->node->hidden = ev->minimize;
