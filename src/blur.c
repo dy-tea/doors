@@ -1959,7 +1959,7 @@ void blur_output_frame(output_t *output, struct wlr_scene_output *scene_output) 
       }
 
       struct wlr_box content_r = get_client_rect(tl);
-      if (c->state == STATE_TILED && tl->geometry.width > 0 && tl->geometry.height > 0) {
+      if ((c->state == STATE_TILED || c->state == STATE_PSEUDO_TILED) && tl->geometry.width > 0 && tl->geometry.height > 0) {
         if ((int)tl->geometry.width < content_r.width)
           content_r.width = tl->geometry.width;
         if ((int)tl->geometry.height < content_r.height)

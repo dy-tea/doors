@@ -207,7 +207,7 @@ void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
   client_t *c = toplevel->node->client;
   bool floating = (c->state == STATE_FLOATING);
   bool fullscreen = (c->state == STATE_FULLSCREEN);
-  bool tiled = (c->state == STATE_TILED);
+  bool tiled = IS_TILED(c);
   int x = 0, y = 0;
  	struct wlr_box *container_rect = NULL;
   bool clip_to_geometry = true;
@@ -275,11 +275,9 @@ void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
     }
   }
 
-  if (!wl_list_empty(&toplevel->content_tree->children)) {
+  if (!wl_list_empty(&toplevel->content_tree->children) && container_rect) {
     int clip_w = container_rect->width;
     int clip_h = container_rect->height;
-    // for tiled surfaces where surface is smaller than container in one dimension,
-    // clip to surface geometry to avoid showing empty container space
     if (tiled && toplevel->geometry.width > 0 && toplevel->geometry.height > 0) {
       if ((int)toplevel->geometry.width < container_rect->width)
         clip_w = toplevel->geometry.width;
@@ -291,8 +289,6 @@ void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
         clip_h = container_rect->height;
     }
 
-    // when surface is wider/taller than container, we still need to clip to container
-    // to prevent the surface from extending past the window borders
     struct wlr_box clip = {
       .x = toplevel->geometry.x,
       .y = toplevel->geometry.y,
