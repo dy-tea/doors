@@ -150,6 +150,7 @@ void blur_output_resize(blur_output_ctx_t *ctx, int width, int height, output_t 
 void blur_invalidate_mica(blur_output_ctx_t *ctx);
 
 void blur_output_frame(output_t *output, struct wlr_scene_output *scene_output);
+void blur_evict_buffers(void);
 
 enum blur_algorithm blur_algorithm_from_str(const char *str);
 const char *blur_algorithm_to_str(enum blur_algorithm algo);

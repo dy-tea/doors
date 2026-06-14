@@ -557,7 +557,7 @@ static void transaction_commit(transaction_t *txn) {
         // wait for all mapped toplevels to respond
         instruction->waiting = true;
         txn->num_waiting++;
-        if (has_stable_frame && node->client->shown &&
+        if (enable_animations && has_stable_frame && node->client->shown &&
             !node->client->toplevel->saved_surface_tree &&
             node->client->toplevel->configured) {
           toplevel_save_buffer(node->client->toplevel);

@@ -582,6 +582,7 @@ void toplevel_map(struct wl_listener *listener, void *data) {
 
 void toplevel_freeze_sibling_buffers(desktop_t *d, node_t *n) {
   if (!d || !d->root) return;
+  if (!enable_animations) return;
 
   node_t *root = d->root;
   node_t *leaf = first_extrema(root);
@@ -622,7 +623,7 @@ void toplevel_unmap(struct wl_listener *listener, void *data) {
   if (!animation_fade_out(toplevel))
     animation_cancel_node(toplevel->node);
 
-  if (toplevel->node->client && toplevel->node->client->shown)
+  if (enable_animations && toplevel->node->client && toplevel->node->client->shown)
     toplevel_save_buffer(toplevel);
 
   node_t *n = toplevel->node;

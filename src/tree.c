@@ -158,7 +158,7 @@ void free_node(node_t *n) {
   // deadbeef my beloved
   static uintptr_t sentinel = 0xDEADBEEF;
   if ((uintptr_t)n->client == sentinel || (uintptr_t)n->presel == sentinel) {
-    wlr_log(WLR_ERROR, "free_node: double-free detected!");
+    wlr_log(WLR_ERROR, "free_node: double-free detected on node %u!", n->id);
     return;
   }
 
@@ -167,12 +167,12 @@ void free_node(node_t *n) {
 
   if (n->client != NULL) {
     free(n->client);
-    n->client = NULL;
+    n->client = (void *)sentinel;
   }
 
   if (n->presel != NULL) {
     free(n->presel);
-    n->presel = NULL;
+    n->presel = (void *)sentinel;
   }
 
   free(n);

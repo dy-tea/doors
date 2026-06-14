@@ -1876,6 +1876,47 @@ static void do_screen_shader_frame(output_t *output, struct wlr_scene_output *sc
   wlr_scene_node_set_enabled(&ctx->screen_shader_node->node, true);
 }
 
+void blur_evict_buffers(void) {
+  if (!blur_ctx.available) return;
+
+  toplevel_t *tl;
+  wl_list_for_each(tl, &server.toplevels, link) {
+    bool visible = tl->node && tl->node->client && tl->node->client->shown;
+
+    if (tl->blur) {
+      if (tl->blur->blur_buf && !visible) {
+        wlr_scene_buffer_set_buffer(tl->blur->blur_node, NULL);
+        wlr_buffer_unlock(tl->blur->blur_buf);
+        tl->blur->blur_buf = NULL;
+        tl->blur->blur_buf_fbo = 0;
+      }
+      if (tl->blur->acrylic_buf && !visible) {
+        wlr_scene_buffer_set_buffer(tl->blur->acrylic_node, NULL);
+        wlr_buffer_unlock(tl->blur->acrylic_buf);
+        tl->blur->acrylic_buf = NULL;
+        tl->blur->acrylic_buf_fbo = 0;
+      }
+    }
+
+    if (tl->rounded) {
+      if (tl->rounded->corner_mask_buf && !visible) {
+        wlr_scene_buffer_set_buffer(tl->rounded->corner_mask_node, NULL);
+        wlr_buffer_unlock(tl->rounded->corner_mask_buf);
+        tl->rounded->corner_mask_buf = NULL;
+        tl->rounded->corner_mask_buf_fbo = 0;
+      }
+      if (tl->rounded->border_shader_buf && !visible) {
+        wlr_scene_buffer_set_buffer(tl->rounded->border_shader_node, NULL);
+        wlr_buffer_unlock(tl->rounded->border_shader_buf);
+        tl->rounded->border_shader_buf = NULL;
+        tl->rounded->border_shader_buf_fbo = 0;
+        tl->rounded->border_shader_buf_w = 0;
+        tl->rounded->border_shader_buf_h = 0;
+      }
+    }
+  }
+}
+
 void blur_output_frame(output_t *output, struct wlr_scene_output *scene_output) {
   if (!blur_ctx.available) return;
   blur_output_ctx_t *ctx = output->blur_ctx;
@@ -1883,6 +1924,8 @@ void blur_output_frame(output_t *output, struct wlr_scene_output *scene_output) 
 
   // skip expensive blur rebuilds during workspace slide animation
   if (animation_workspace_switch_active()) return;
+
+  blur_evict_buffers();
 
   if (ctx->width != output->width || ctx->height != output->height)
     blur_output_resize(ctx, output->width, output->height, output);
