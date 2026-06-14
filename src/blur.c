@@ -1884,29 +1884,39 @@ void blur_evict_buffers(void) {
     bool visible = tl->node && tl->node->client && tl->node->client->shown;
 
     if (tl->blur) {
-      if (tl->blur->blur_buf && !visible) {
+    	// visual eviction
+      if (tl->blur->blur_node && !blur_enabled)
         wlr_scene_buffer_set_buffer(tl->blur->blur_node, NULL);
+      if (tl->blur->acrylic_node && !blur_enabled)
+        wlr_scene_buffer_set_buffer(tl->blur->acrylic_node, NULL);
+      if (tl->blur->mica_node && !mica_enabled)
+        wlr_scene_buffer_set_buffer(tl->blur->mica_node, NULL);
+
+     	// memory eviction
+      if (tl->blur->blur_buf && !visible) {
         wlr_buffer_unlock(tl->blur->blur_buf);
         tl->blur->blur_buf = NULL;
         tl->blur->blur_buf_fbo = 0;
       }
       if (tl->blur->acrylic_buf && !visible) {
-        wlr_scene_buffer_set_buffer(tl->blur->acrylic_node, NULL);
         wlr_buffer_unlock(tl->blur->acrylic_buf);
         tl->blur->acrylic_buf = NULL;
         tl->blur->acrylic_buf_fbo = 0;
       }
     }
 
+    // only evict from hidden toplevels
     if (tl->rounded) {
       if (tl->rounded->corner_mask_buf && !visible) {
-        wlr_scene_buffer_set_buffer(tl->rounded->corner_mask_node, NULL);
+        if (tl->rounded->corner_mask_node)
+          wlr_scene_buffer_set_buffer(tl->rounded->corner_mask_node, NULL);
         wlr_buffer_unlock(tl->rounded->corner_mask_buf);
         tl->rounded->corner_mask_buf = NULL;
         tl->rounded->corner_mask_buf_fbo = 0;
       }
       if (tl->rounded->border_shader_buf && !visible) {
-        wlr_scene_buffer_set_buffer(tl->rounded->border_shader_node, NULL);
+        if (tl->rounded->border_shader_node)
+          wlr_scene_buffer_set_buffer(tl->rounded->border_shader_node, NULL);
         wlr_buffer_unlock(tl->rounded->border_shader_buf);
         tl->rounded->border_shader_buf = NULL;
         tl->rounded->border_shader_buf_fbo = 0;
