@@ -831,6 +831,80 @@ static bool compute_src_box(output_t *output, const struct wlr_box *r,
   *dh_out = (int)sh;
   return true;
 }
+
+// read back the capture output buffer into ctx->tex[1] and return its FBO attachment
+static GLuint capture_readback(blur_output_ctx_t *ctx, GLuint capture_fbo, int w, int h) {
+  GLuint result = 0;
+  if (!capture_fbo) return 0;
+
+  glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
+  GLint attach_type = 0, attach_name = 0;
+  glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+    GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE, &attach_type);
+  if (attach_type == GL_TEXTURE) {
+    glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+      GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &attach_name);
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+  if (attach_type == GL_TEXTURE && attach_name > 0 && blur_ctx.prog_ext_blit) {
+    glDisable(GL_BLEND);
+    glDisable(GL_SCISSOR_TEST);
+    glBindFramebuffer(GL_FRAMEBUFFER, ctx->fbo[1]);
+    glViewport(0, 0, ctx->blur_w, ctx->blur_h);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_EXTERNAL_OES, (GLuint)attach_name);
+    glUseProgram(blur_ctx.prog_ext_blit);
+    glUniform1i(blur_ctx.u_ext_blit.tex, 0);
+    draw_quad();
+    glBindTexture(GL_TEXTURE_EXTERNAL_OES, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    result = ctx->tex[1];
+  } else if (attach_type == GL_TEXTURE && attach_name > 0) {
+    glDisable(GL_BLEND);
+    glDisable(GL_SCISSOR_TEST);
+    glBindFramebuffer(GL_FRAMEBUFFER, ctx->fbo[1]);
+    glViewport(0, 0, ctx->blur_w, ctx->blur_h);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, (GLuint)attach_name);
+    glUseProgram(blur_ctx.prog_blit);
+    glUniform1i(blur_ctx.u_blit.tex, 0);
+    draw_quad();
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    result = ctx->tex[1];
+  } else if (attach_type == GL_RENDERBUFFER) {
+    unsigned char *pixels = malloc((size_t)w * h * 4);
+    if (pixels) {
+      glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
+      glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+      GLuint tmp_tex;
+      glGenTextures(1, &tmp_tex);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, tmp_tex);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      free(pixels);
+
+      glDisable(GL_BLEND);
+      glDisable(GL_SCISSOR_TEST);
+      glBindFramebuffer(GL_FRAMEBUFFER, ctx->fbo[1]);
+      glViewport(0, 0, ctx->blur_w, ctx->blur_h);
+      glUseProgram(blur_ctx.prog_blit);
+      glUniform1i(blur_ctx.u_blit.tex, 0);
+      draw_quad();
+      glBindTexture(GL_TEXTURE_2D, 0);
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      glDeleteTextures(1, &tmp_tex);
+      result = ctx->tex[1];
+    }
+  }
+  return result;
+}
+
 static GLuint capture_bg_to_tex1(output_t *output, blur_output_ctx_t *ctx,
     struct wlr_scene_output *real_scene_output, bool mica_only,
     struct wlr_scene_node *hide_node, bool *hide_flag) {
@@ -916,79 +990,82 @@ static GLuint capture_bg_to_tex1(output_t *output, blur_output_ctx_t *ctx,
   }
 
   GLuint capture_fbo = wlr_gles2_renderer_get_buffer_fbo(server.renderer, cap_state.buffer);
-  GLuint result = 0;
-
-  if (capture_fbo) {
-    glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
-    GLint attach_type = 0, attach_name = 0;
-    glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-    	GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE, &attach_type);
-    if (attach_type == GL_TEXTURE) {
-      glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-      	GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &attach_name);
-    }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    if (attach_type == GL_TEXTURE && attach_name > 0 && blur_ctx.prog_ext_blit) {
-      glDisable(GL_BLEND);
-      glDisable(GL_SCISSOR_TEST);
-      glBindFramebuffer(GL_FRAMEBUFFER, ctx->fbo[1]);
-      glViewport(0, 0, ctx->blur_w, ctx->blur_h);
-      glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_EXTERNAL_OES, (GLuint)attach_name);
-      glUseProgram(blur_ctx.prog_ext_blit);
-      glUniform1i(blur_ctx.u_ext_blit.tex, 0);
-      draw_quad();
-      glBindTexture(GL_TEXTURE_EXTERNAL_OES, 0);
-      glBindFramebuffer(GL_FRAMEBUFFER, 0);
-      result = ctx->tex[1];
-    } else if (attach_type == GL_TEXTURE && attach_name > 0) {
-      glDisable(GL_BLEND);
-      glDisable(GL_SCISSOR_TEST);
-      glBindFramebuffer(GL_FRAMEBUFFER, ctx->fbo[1]);
-      glViewport(0, 0, ctx->blur_w, ctx->blur_h);
-      glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, (GLuint)attach_name);
-      glUseProgram(blur_ctx.prog_blit);
-      glUniform1i(blur_ctx.u_blit.tex, 0);
-      draw_quad();
-      glBindTexture(GL_TEXTURE_2D, 0);
-      glBindFramebuffer(GL_FRAMEBUFFER, 0);
-      result = ctx->tex[1];
-    } else if (attach_type == GL_RENDERBUFFER) {
-      unsigned char *pixels = malloc((size_t)w * h * 4);
-      if (pixels) {
-        glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
-        glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-        GLuint tmp_tex;
-        glGenTextures(1, &tmp_tex);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, tmp_tex);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        free(pixels);
-
-        glDisable(GL_BLEND);
-        glDisable(GL_SCISSOR_TEST);
-        glBindFramebuffer(GL_FRAMEBUFFER, ctx->fbo[1]);
-        glViewport(0, 0, ctx->blur_w, ctx->blur_h);
-        glUseProgram(blur_ctx.prog_blit);
-        glUniform1i(blur_ctx.u_blit.tex, 0);
-        draw_quad();
-        glBindTexture(GL_TEXTURE_2D, 0);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glDeleteTextures(1, &tmp_tex);
-        result = ctx->tex[1];
-      }
-    }
-  }
+  GLuint result = capture_readback(ctx, capture_fbo, w, h);
 
   egl_unset_current();
   wlr_output_state_finish(&cap_state);
 
+  return result;
+}
+
+// capture background once with all blur-layer surfaces AND corner-mask toplevels hidden
+static GLuint capture_bg_combined(output_t *output, blur_output_ctx_t *ctx,
+    struct wlr_scene_output *real_scene_output) {
+  int w = output->width, h = output->height;
+  if (!ctx->capture_output || !ctx->capture_scene_output) return 0;
+  if (w <= 0 || h <= 0) return 0;
+
+  wlr_scene_output_set_position(ctx->capture_scene_output, output->lx, output->ly);
+
+  wlr_scene_node_set_enabled(&server.top_tree->node, false);
+  wlr_scene_node_set_enabled(&server.full_tree->node, false);
+  wlr_scene_node_set_enabled(&server.over_tree->node, false);
+  wlr_scene_node_set_enabled(&server.lock_tree->node, false);
+
+  // hide all blur-layer surfaces
+  for (int i = 0; i < 4; i++) {
+    layer_surface_t *ls;
+    wl_list_for_each(ls, &output->layers[i], link) {
+      if (ls->blur_node && ls->mapped) {
+        ls->blur_scene_hidden = false;
+        if (ls->scene_tree->node.enabled) {
+          wlr_scene_node_set_enabled(&ls->scene_tree->node, false);
+          ls->blur_scene_hidden = true;
+        }
+      }
+    }
+  }
+
+  wlr_damage_ring_add_whole(&ctx->capture_scene_output->damage_ring);
+
+  struct wlr_output_state cap_state;
+  wlr_output_state_init(&cap_state);
+  wlr_output_state_set_enabled(&cap_state, true);
+  wlr_output_state_set_custom_mode(&cap_state, w, h, 0);
+
+  bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
+  if (ok) wlr_output_commit_state(ctx->capture_output, &cap_state);
+
+  egl_make_current();
+  glFlush();
+
+  // restore blur-layer surfaces
+  for (int i = 0; i < 4; i++) {
+    layer_surface_t *ls;
+    wl_list_for_each(ls, &output->layers[i], link)
+      if (ls->blur_scene_hidden)
+        wlr_scene_node_set_enabled(&ls->scene_tree->node, true);
+  }
+
+  wlr_scene_node_set_enabled(&server.top_tree->node, true);
+  wlr_scene_node_set_enabled(&server.full_tree->node, true);
+  wlr_scene_node_set_enabled(&server.over_tree->node, true);
+  wlr_scene_node_set_enabled(&server.lock_tree->node, true);
+
+  wlr_scene_output_set_position(ctx->capture_scene_output, -0x7fff, -0x7fff);
+  wlr_damage_ring_add_whole(&real_scene_output->damage_ring);
+
+  if (!ok || !cap_state.buffer) {
+    egl_unset_current();
+    wlr_output_state_finish(&cap_state);
+    return 0;
+  }
+
+  GLuint capture_fbo = wlr_gles2_renderer_get_buffer_fbo(server.renderer, cap_state.buffer);
+  GLuint result = capture_readback(ctx, capture_fbo, w, h);
+
+  egl_unset_current();
+  wlr_output_state_finish(&cap_state);
   return result;
 }
 
@@ -1155,7 +1232,8 @@ static void push_blur_to_toplevels(output_t *output) {
   }
 }
 
-static bool rebuild_live_blur_layers(output_t *output, struct wlr_scene_output *scene_output) {
+static bool rebuild_live_blur_layers(output_t *output, struct wlr_scene_output *scene_output,
+    GLuint bg_tex) {
   blur_output_ctx_t *ctx = output->blur_ctx;
   int w = output->width, h = output->height;
   bool any = false;
@@ -1204,9 +1282,14 @@ static bool rebuild_live_blur_layers(output_t *output, struct wlr_scene_output *
       ls->blur_region_width = blur_width;
       ls->blur_region_height = blur_height;
 
-      GLuint src = capture_bg_to_tex1(output, ctx, scene_output, false,
-        &ls->scene_tree->node, &ls->blur_scene_hidden);
-      if (!src) continue;
+      GLuint src;
+      if (bg_tex) {
+        src = bg_tex;
+      } else {
+        src = capture_bg_to_tex1(output, ctx, scene_output, false,
+          &ls->scene_tree->node, &ls->blur_scene_hidden);
+        if (!src) continue;
+      }
 
       egl_make_current();
       GLuint blurred = apply_blur(ctx, src, ctx->blur_w, ctx->blur_h);
@@ -1577,7 +1660,8 @@ static bool blur_render_border(toplevel_t *tl, int content_w, int content_h) {
   return true;
 }
 
-static bool rebuild_corner_masks(output_t *output, struct wlr_scene_output *scene_output) {
+static bool rebuild_corner_masks(output_t *output, struct wlr_scene_output *scene_output,
+    GLuint bg_tex) {
   if (!blur_ctx.prog_corner_mask) return false;
   blur_output_ctx_t *ctx = output->blur_ctx;
   int w = output->width, h = output->height;
@@ -1607,10 +1691,15 @@ static bool rebuild_corner_masks(output_t *output, struct wlr_scene_output *scen
     };
     if (content_r.width <= 0 || content_r.height <= 0) continue;
 
-    bool hide_flag = false;
-    GLuint src = capture_bg_to_tex1(output, ctx, scene_output, false,
-      &tl->scene_tree->node, tl->blur ? &tl->blur->blur_scene_hidden : &hide_flag);
-    if (!src) continue;
+    GLuint src;
+    if (bg_tex) {
+      src = bg_tex;
+    } else {
+      bool hide_flag = false;
+      src = capture_bg_to_tex1(output, ctx, scene_output, false,
+        &tl->scene_tree->node, tl->blur ? &tl->blur->blur_scene_hidden : &hide_flag);
+      if (!src) continue;
+    }
 
     egl_make_current();
 
@@ -1927,12 +2016,39 @@ void blur_evict_buffers(void) {
   }
 }
 
+// probe each region in tree for damage
+static bool region_overlaps_tree(pixman_region32_t *damage, struct wlr_scene_tree *tree) {
+  int nrects;
+  pixman_box32_t *rects = pixman_region32_rectangles(damage, &nrects);
+  for (int i = 0; i < nrects; i++) {
+    double cx = (rects[i].x1 + rects[i].x2) / 2.0;
+    double cy = (rects[i].y1 + rects[i].y2) / 2.0;
+    double nx, ny;
+    if (wlr_scene_node_at(&tree->node, cx, cy, &nx, &ny))
+      return true;
+  }
+  return false;
+}
+
+static bool background_capture_needed(struct wlr_scene_output *scene_output) {
+  pixman_region32_t *damage = &scene_output->damage_ring.current;
+  if (!damage->data) return false;  // inlined pixman_region32_not_empty
+
+  struct wlr_scene_tree *relevant[] = {
+    server.bg_tree, server.bot_tree, server.tile_tree,
+    server.float_tree, server.shader_tree, server.drag_tree,
+  };
+  for (size_t i = 0; i < sizeof(relevant)/sizeof(relevant[0]); i++)
+    if (region_overlaps_tree(damage, relevant[i])) return true;
+
+  return false;
+}
+
 void blur_output_frame(output_t *output, struct wlr_scene_output *scene_output) {
   if (!blur_ctx.available) return;
   blur_output_ctx_t *ctx = output->blur_ctx;
   if (!ctx) return;
 
-  // skip expensive blur rebuilds during workspace slide animation
   if (animation_workspace_switch_active()) return;
 
   blur_evict_buffers();
@@ -1940,6 +2056,50 @@ void blur_output_frame(output_t *output, struct wlr_scene_output *scene_output) 
   if (ctx->width != output->width || ctx->height != output->height)
     blur_output_resize(ctx, output->width, output->height, output);
 
+  bool bg_damaged = background_capture_needed(scene_output);
+  bool mica_dirty = mica_enabled && ctx->mica_dirty;
+
+  // when no relevant damage and mica not dirty, skip all background captures
+  if (!bg_damaged && !mica_dirty) {
+    if (blur_enabled) {
+      push_blur_to_toplevels(output);
+      push_blur_to_layers(output);
+    }
+    push_corner_masks_to_toplevels(output);
+    push_acrylic_to_toplevels(output);
+    push_mica_to_toplevels(output);
+    goto after_capture;
+  }
+
+  // check if layer blur surfaces need rendering
+  bool has_layer_blur = false;
+  if (blur_enabled) {
+    for (int i = 0; i < 4 && !has_layer_blur; i++) {
+      layer_surface_t *ls;
+      wl_list_for_each(ls, &output->layers[i], link) {
+        if (ls->blur_node && ls->mapped) {
+          has_layer_blur = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // check if corner masks need rendering
+  bool any_cm = false;
+  {
+    toplevel_t *tl;
+    wl_list_for_each(tl, &server.toplevels, link) {
+      if (tl->rounded && tl->rounded->corner_mask_node && tl->node && tl->node->client &&
+          tl->node->client->border_radius > 0.0f &&
+          tl->node->output && tl->node->output == output) {
+        any_cm = true;
+        break;
+      }
+    }
+  }
+
+  // toplevel blur
   if (blur_enabled) {
     bool any_blur = false;
     toplevel_t *tl;
@@ -1950,23 +2110,31 @@ void blur_output_frame(output_t *output, struct wlr_scene_output *scene_output) 
         break;
       }
     }
-    if (!any_blur) {
-      for (int i = 0; i < 4 && !any_blur; i++) {
-        layer_surface_t *ls;
-        wl_list_for_each(ls, &output->layers[i], link) {
-          if (ls->blur_node && ls->mapped) {
-            any_blur = true;
-            break;
-          }
-        }
-      }
-    }
     if (any_blur) {
       rebuild_live_blur(output, scene_output);
       push_blur_to_toplevels(output);
-      rebuild_live_blur_layers(output, scene_output);
+    }
+  }
+
+  if (has_layer_blur && any_cm) {
+    GLuint bg_tex = capture_bg_combined(output, ctx, scene_output);
+    if (bg_tex && blur_enabled) {
+      rebuild_live_blur_layers(output, scene_output, bg_tex);
+      push_blur_to_layers(output);
+    } else if (blur_enabled) {
+      rebuild_live_blur_layers(output, scene_output, 0);
       push_blur_to_layers(output);
     }
+    if (blur_ctx.prog_corner_mask) {
+      rebuild_corner_masks(output, scene_output, 0);
+      push_corner_masks_to_toplevels(output);
+    }
+  } else if (has_layer_blur && blur_enabled) {
+    rebuild_live_blur_layers(output, scene_output, 0);
+    push_blur_to_layers(output);
+  } else if (any_cm && blur_ctx.prog_corner_mask) {
+    rebuild_corner_masks(output, scene_output, 0);
+    push_corner_masks_to_toplevels(output);
   }
 
   {
@@ -1985,11 +2153,13 @@ void blur_output_frame(output_t *output, struct wlr_scene_output *scene_output) 
     }
   }
 
-  if (mica_enabled && ctx->mica_dirty)
+  if (mica_dirty)
     rebuild_mica(output, scene_output);
 
   if (mica_enabled && ctx->mica_buf)
     push_mica_to_toplevels(output);
+
+after_capture:
 
   // shader border
   {
@@ -2018,24 +2188,6 @@ void blur_output_frame(output_t *output, struct wlr_scene_output *scene_output) 
       blur_render_border(tl, content_r.width, content_r.height);
       egl_unset_current();
       tl->rounded->border_dirty = false;
-    }
-  }
-
-  // corner mask render
-  {
-    bool any_cm = false;
-    toplevel_t *tl;
-    wl_list_for_each(tl, &server.toplevels, link) {
-      if (tl->rounded && tl->rounded->corner_mask_node && tl->node && tl->node->client &&
-          tl->node->client->border_radius > 0.0f &&
-          tl->node->output && tl->node->output == output) {
-        any_cm = true;
-        break;
-      }
-    }
-    if (any_cm) {
-      rebuild_corner_masks(output, scene_output);
-      push_corner_masks_to_toplevels(output);
     }
   }
 
