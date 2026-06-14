@@ -94,6 +94,7 @@ executable(
 		'src' / 'scratchpad.c',
 		'src' / 'workspace.c',
 		'src' / 'ipc.c',
+		'src' / 'ipc_helpers.c',
 		'src' / 'layer.c',
 		'src' / 'config.c',
 		'src' / 'lock.c',
