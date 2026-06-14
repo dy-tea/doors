@@ -27,6 +27,7 @@
 #include <stdarg.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <wlr/util/log.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/xwayland.h>
@@ -199,6 +200,77 @@ static void send_success(int client_fd, const char *msg) {
 
 static void send_failure(int client_fd, const char *msg) {
   send_response(client_fd, false, msg);
+}
+
+#define IPC_FLAG_NONE 0
+#define IPC_FLAG_COMMIT (1 << 0)
+
+static bool ipc_handle_bool(char **args, int num, int client_fd, bool *var, int flags) {
+  if (num >= 2) {
+    *var = streq(args[1], "true") || streq(args[1], "on") || streq(args[1], "1");
+    if (flags & IPC_FLAG_COMMIT)
+      transaction_commit_dirty();
+    char msg[128];
+    snprintf(msg, sizeof(msg), "%s set\n", args[0]);
+    send_success(client_fd, msg);
+    return true;
+  }
+  send_success(client_fd, *var ? "true\n" : "false\n");
+  return false;
+}
+
+static bool ipc_handle_int(char **args, int num, int client_fd, int *var, int flags, int min, int max, const char *errmsg) {
+  if (num >= 2) {
+    int val = atoi(args[1]);
+    if (val < min || val > max) {
+      if (errmsg) {
+        char buf[128];
+        snprintf(buf, sizeof(buf), "config %s: %s\n", args[0], errmsg);
+        send_failure(client_fd, buf);
+        return false;
+      }
+      if (val < min) val = min;
+      if (val > max) val = max;
+    }
+    *var = val;
+    if (flags & IPC_FLAG_COMMIT)
+      transaction_commit_dirty();
+    char msg[128];
+    snprintf(msg, sizeof(msg), "%s set\n", args[0]);
+    send_success(client_fd, msg);
+    return true;
+  }
+  char buf[64];
+  snprintf(buf, sizeof(buf), "%d\n", *var);
+  send_success(client_fd, buf);
+  return false;
+}
+
+static bool ipc_handle_float(char **args, int num, int client_fd, float *var, int flags, float min, float max, const char *fmt, const char *errmsg) {
+  if (num >= 2) {
+    float val = (float)atof(args[1]);
+    if (val < min || val > max) {
+      if (errmsg) {
+        char buf[128];
+        snprintf(buf, sizeof(buf), "config %s: %s\n", args[0], errmsg);
+        send_failure(client_fd, buf);
+        return false;
+      }
+      if (val < min) val = min;
+      if (val > max) val = max;
+    }
+    *var = val;
+    if (flags & IPC_FLAG_COMMIT)
+      transaction_commit_dirty();
+    char msg[128];
+    snprintf(msg, sizeof(msg), "%s set\n", args[0]);
+    send_success(client_fd, msg);
+    return true;
+  }
+  char buf[64];
+  snprintf(buf, sizeof(buf), fmt, *var);
+  send_success(client_fd, buf);
+  return false;
 }
 
 static void ipc_cmd_quit(char **args, int num, int client_fd) {
@@ -1089,10 +1161,6 @@ static void ipc_cmd_node(char **args, int num, int client_fd) {
       for (node_t *n_iter = first_extrema(target->root); n_iter != NULL; n_iter = next_leaf(n_iter, target->root)) {
         if (n_iter->client) {
           n_iter->client->shown = true;
-          // Only directly enable windows that have already been configured
-          // (positioned by a prior transaction). New unconfigured tiled windows
-          // sit at (0,0); enabling them here causes a top-left flash before
-          // arrange()/apply_node_state() positions and enables them atomically.
           bool already_configured = true;
           if (n_iter->client->toplevel)
             already_configured = n_iter->client->toplevel->configured;
@@ -2749,37 +2817,13 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
       send_success(client_fd, buf);
     }
   } else if (streq("single_monocle", *args)) {
-    if (num >= 2) {
-      single_monocle = (strcmp(args[1], "true") == 0);
-      transaction_commit_dirty();
-      send_success(client_fd, "single_monocle set\n");
-    } else {
-      send_success(client_fd, single_monocle ? "true\n" : "false\n");
-    }
+    ipc_handle_bool(args, num, client_fd, &single_monocle, IPC_FLAG_COMMIT);
   } else if (streq("borderless_monocle", *args)) {
-    if (num >= 2) {
-      borderless_monocle = (strcmp(args[1], "true") == 0);
-      transaction_commit_dirty();
-      send_success(client_fd, "borderless_monocle set\n");
-    } else {
-      send_success(client_fd, borderless_monocle ? "true\n" : "false\n");
-    }
+    ipc_handle_bool(args, num, client_fd, &borderless_monocle, IPC_FLAG_COMMIT);
   } else if (streq("borderless_singleton", *args)) {
-    if (num >= 2) {
-      borderless_singleton = (strcmp(args[1], "true") == 0);
-      transaction_commit_dirty();
-      send_success(client_fd, "borderless_singleton set\n");
-    } else {
-      send_success(client_fd, borderless_singleton ? "true\n" : "false\n");
-    }
+    ipc_handle_bool(args, num, client_fd, &borderless_singleton, IPC_FLAG_COMMIT);
   } else if (streq("gapless_monocle", *args)) {
-    if (num >= 2) {
-      gapless_monocle = (strcmp(args[1], "true") == 0);
-      transaction_commit_dirty();
-      send_success(client_fd, "gapless_monocle set\n");
-    } else {
-      send_success(client_fd, gapless_monocle ? "true\n" : "false\n");
-    }
+    ipc_handle_bool(args, num, client_fd, &gapless_monocle, IPC_FLAG_COMMIT);
   } else if (streq("decoration_mode", *args)) {
     if (num >= 2) {
       if (strcmp(args[1], "none") == 0)
@@ -2819,12 +2863,7 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
       send_success(client_fd, mode_str);
     }
   } else if (streq("enable_animations", *args)) {
-    if (num >= 2) {
-      enable_animations = (strcmp(args[1], "true") == 0);
-      send_success(client_fd, "enable_animations set\n");
-    } else {
-      send_success(client_fd, enable_animations ? "true\n" : "false\n");
-    }
+    ipc_handle_bool(args, num, client_fd, &enable_animations, IPC_FLAG_NONE);
   } else if (streq("workspace_anim_direction", *args)) {
     if (num >= 2) {
       if (streq(args[1], "vertical")) {
@@ -2840,19 +2879,9 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
       send_success(client_fd, workspace_anim_direction == WORKSPACE_ANIM_VERTICAL ? "vertical\n" : "horizontal\n");
     }
   } else if (streq("workspace_anim_slide_up", *args)) {
-    if (num >= 2) {
-      workspace_anim_slide_up = (strcmp(args[1], "true") == 0);
-      send_success(client_fd, "workspace_anim_slide_up set\n");
-    } else {
-      send_success(client_fd, workspace_anim_slide_up ? "true\n" : "false\n");
-    }
+    ipc_handle_bool(args, num, client_fd, &workspace_anim_slide_up, IPC_FLAG_NONE);
   } else if (streq("edge_scroller_pointer_focus", *args)) {
-    if (num >= 2) {
-      edge_scroller_pointer_focus = (strcmp(args[1], "true") == 0);
-      send_success(client_fd, "edge_scroller_pointer_focus set\n");
-    } else {
-      send_success(client_fd, edge_scroller_pointer_focus ? "true\n" : "false\n");
-    }
+    ipc_handle_bool(args, num, client_fd, &edge_scroller_pointer_focus, IPC_FLAG_NONE);
   } else if (streq("tab_color_bar_bg", *args)) {
     if (num >= 2) {
       float r, g, b, a = 1.0f;
@@ -3011,16 +3040,7 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
       send_success(client_fd, buf);
     }
   } else if (streq("scroller_default_proportion", *args)) {
-    if (num >= 2) {
-      scroller_default_proportion = atof(args[1]);
-      if (scroller_default_proportion < 0.1f) scroller_default_proportion = 0.1f;
-      if (scroller_default_proportion > 1.0f) scroller_default_proportion = 1.0f;
-      send_success(client_fd, "scroller_default_proportion set\n");
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%.2f\n", scroller_default_proportion);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_float(args, num, client_fd, &scroller_default_proportion, IPC_FLAG_NONE, 0.1f, 1.0f, "%.2f\n", NULL);
   } else if (streq("scroller_proportion_preset", *args)) {
     if (num >= 2) {
       // Parse comma-separated list of proportions
@@ -3064,70 +3084,21 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
       send_success(client_fd, buf);
     }
   } else if (streq("scroller_default_proportion_single", *args)) {
-    if (num >= 2) {
-      scroller_default_proportion_single = atof(args[1]);
-      if (scroller_default_proportion_single < 0.1f) scroller_default_proportion_single = 0.1f;
-      if (scroller_default_proportion_single > 1.0f) scroller_default_proportion_single = 1.0f;
-      send_success(client_fd, "scroller_default_proportion_single set\n");
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%.2f\n", scroller_default_proportion_single);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_float(args, num, client_fd, &scroller_default_proportion_single, IPC_FLAG_NONE, 0.1f, 1.0f, "%.2f\n", NULL);
   } else if (streq("scroller_focus_center", *args)) {
-    if (num >= 2) {
-      scroller_focus_center = (strcmp(args[1], "true") == 0);
-      send_success(client_fd, "scroller_focus_center set\n");
-    } else {
-      send_success(client_fd, scroller_focus_center ? "true\n" : "false\n");
-    }
+    ipc_handle_bool(args, num, client_fd, &scroller_focus_center, IPC_FLAG_NONE);
   } else if (streq("scroller_prefer_center", *args)) {
-    if (num >= 2) {
-      scroller_prefer_center = (strcmp(args[1], "true") == 0);
-      send_success(client_fd, "scroller_prefer_center set\n");
-    } else {
-      send_success(client_fd, scroller_prefer_center ? "true\n" : "false\n");
-    }
+    ipc_handle_bool(args, num, client_fd, &scroller_prefer_center, IPC_FLAG_NONE);
   } else if (streq("scroller_prefer_overspread", *args)) {
-    if (num >= 2) {
-      scroller_prefer_overspread = (strcmp(args[1], "true") == 0);
-      send_success(client_fd, "scroller_prefer_overspread set\n");
-    } else {
-      send_success(client_fd, scroller_prefer_overspread ? "true\n" : "false\n");
-    }
+    ipc_handle_bool(args, num, client_fd, &scroller_prefer_overspread, IPC_FLAG_NONE);
   } else if (streq("scroller_ignore_proportion_single", *args)) {
-    if (num >= 2) {
-      scroller_ignore_proportion_single = (strcmp(args[1], "true") == 0);
-      send_success(client_fd, "scroller_ignore_proportion_single set\n");
-    } else {
-      send_success(client_fd, scroller_ignore_proportion_single ? "true\n" : "false\n");
-    }
+    ipc_handle_bool(args, num, client_fd, &scroller_ignore_proportion_single, IPC_FLAG_NONE);
   } else if (streq("scroller_structs", *args)) {
-    if (num >= 2) {
-      scroller_structs = atoi(args[1]);
-      if (scroller_structs < 0) scroller_structs = 0;
-      send_success(client_fd, "scroller_structs set\n");
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%d\n", scroller_structs);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_int(args, num, client_fd, &scroller_structs, IPC_FLAG_NONE, 0, 1000000, NULL);
   } else if (streq("focus_follows_pointer", *args)) {
-    if (num >= 2) {
-      focus_follows_pointer = (strcmp(args[1], "true") == 0);
-      transaction_commit_dirty();
-      send_success(client_fd, "focus_follows_pointer set\n");
-    } else {
-      send_success(client_fd, focus_follows_pointer ? "true\n" : "false\n");
-    }
+    ipc_handle_bool(args, num, client_fd, &focus_follows_pointer, IPC_FLAG_COMMIT);
   } else if (streq("pointer_follows_focus", *args)) {
-    if (num >= 2) {
-      pointer_follows_focus = (strcmp(args[1], "true") == 0);
-      transaction_commit_dirty();
-      send_success(client_fd, "pointer_follows_focus set\n");
-    } else {
-      send_success(client_fd, pointer_follows_focus ? "true\n" : "false\n");
-    }
+    ipc_handle_bool(args, num, client_fd, &pointer_follows_focus, IPC_FLAG_COMMIT);
   } else if (streq("split_ratio", *args)) {
     if (num >= 2) {
       double val = atof(args[1]);
@@ -3144,45 +3115,13 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
       send_success(client_fd, buf);
     }
   } else if (streq("top_padding", *args)) {
-    if (num >= 2) {
-      padding.top = atoi(args[1]);
-      transaction_commit_dirty();
-      send_success(client_fd, "top_padding set\n");
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%d\n", padding.top);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_int(args, num, client_fd, &padding.top, IPC_FLAG_COMMIT, INT_MIN, INT_MAX, NULL);
   } else if (streq("right_padding", *args)) {
-    if (num >= 2) {
-      padding.right = atoi(args[1]);
-      transaction_commit_dirty();
-      send_success(client_fd, "right_padding set\n");
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%d\n", padding.right);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_int(args, num, client_fd, &padding.right, IPC_FLAG_COMMIT, INT_MIN, INT_MAX, NULL);
   } else if (streq("bottom_padding", *args)) {
-    if (num >= 2) {
-      padding.bottom = atoi(args[1]);
-      transaction_commit_dirty();
-      send_success(client_fd, "bottom_padding set\n");
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%d\n", padding.bottom);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_int(args, num, client_fd, &padding.bottom, IPC_FLAG_COMMIT, INT_MIN, INT_MAX, NULL);
   } else if (streq("left_padding", *args)) {
-    if (num >= 2) {
-      padding.left = atoi(args[1]);
-      transaction_commit_dirty();
-      send_success(client_fd, "left_padding set\n");
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%d\n", padding.left);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_int(args, num, client_fd, &padding.left, IPC_FLAG_COMMIT, INT_MIN, INT_MAX, NULL);
   } else if (streq("normal_border_color", *args)) {
     if (num >= 2) {
       strncpy(normal_border_color, args[1], sizeof(normal_border_color) - 1);
@@ -3366,78 +3305,19 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
       send_success(client_fd, initial_polarity == FIRST_CHILD ? "first_child\n" : "second_child\n");
     }
   } else if (streq("directional_focus_tightness", *args)) {
-    if (num >= 2) {
-      int val = atoi(args[1]);
-      if (val >= 0 && val <= 100) {
-        directional_focus_tightness = val;
-        send_success(client_fd, "directional_focus_tightness set\n");
-      } else {
-        send_failure(client_fd, "config directional_focus_tightness: invalid value\n");
-        return;
-      }
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%d\n", directional_focus_tightness);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_int(args, num, client_fd, &directional_focus_tightness, IPC_FLAG_NONE, 0, 100, "invalid value");
   } else if (streq("mapping_events_count", *args)) {
-    if (num >= 2) {
-      int val = atoi(args[1]);
-      if (val >= 0) {
-        mapping_events_count = val;
-        send_success(client_fd, "mapping_events_count set\n");
-      } else {
-        send_failure(client_fd, "config mapping_events_count: invalid value\n");
-        return;
-      }
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%d\n", mapping_events_count);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_int(args, num, client_fd, &mapping_events_count, IPC_FLAG_NONE, 0, 1000000, "invalid value");
   } else if (streq("minimize_to_scratchpad", *args)) {
-	  if (num >= 2) {
-	    minimize_to_scratchpad = (strcmp(args[1], "true") == 0);
-	    send_success(client_fd, "minimize_to_scratchpad set\n");
-	  } else {
-	    send_success(client_fd, minimize_to_scratchpad ? "true\n" : "false\n");
-	  }
+    ipc_handle_bool(args, num, client_fd, &minimize_to_scratchpad, IPC_FLAG_NONE);
   } else if (streq("ignore_ewmh_fullscreen", *args)) {
-    if (num >= 2) {
-      int val = atoi(args[1]);
-      if (val >= 0 && val <= 2) {
-        ignore_ewmh_fullscreen = val;
-        send_success(client_fd, "ignore_ewmh_fullscreen set\n");
-      } else {
-        send_failure(client_fd, "config ignore_ewmh_fullscreen: invalid value (0-2)\n");
-        return;
-      }
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%d\n", ignore_ewmh_fullscreen);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_int(args, num, client_fd, &ignore_ewmh_fullscreen, IPC_FLAG_NONE, 0, 2, "invalid value (0-2)");
   } else if (streq("click_to_focus", *args)) {
-    if (num >= 2) {
-      click_to_focus = (strcmp(args[1], "true") == 0);
-      send_success(client_fd, "click_to_focus set\n");
-    } else {
-      send_success(client_fd, click_to_focus ? "true\n" : "false\n");
-    }
+    ipc_handle_bool(args, num, client_fd, &click_to_focus, IPC_FLAG_NONE);
   } else if (streq("record_history", *args)) {
-    if (num >= 2) {
-      record_history = (strcmp(args[1], "true") == 0);
-      send_success(client_fd, "record_history set\n");
-    } else {
-      send_success(client_fd, record_history ? "true\n" : "false\n");
-    }
+    ipc_handle_bool(args, num, client_fd, &record_history, IPC_FLAG_NONE);
   } else if (streq("blur_enabled", *args)) {
-    if (num >= 2) {
-      blur_enabled = (strcmp(args[1], "true") == 0);
-      send_success(client_fd, "blur_enabled set\n");
-    } else {
-      send_success(client_fd, blur_enabled ? "true\n" : "false\n");
-    }
+    ipc_handle_bool(args, num, client_fd, &blur_enabled, IPC_FLAG_NONE);
   } else if (streq("blur_algorithm", *args)) {
     if (num >= 2) {
       enum blur_algorithm algo = blur_algorithm_from_str(args[1]);
@@ -3453,19 +3333,7 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
       send_success(client_fd, buf);
     }
   } else if (streq("blur_passes", *args)) {
-    if (num >= 2) {
-      int val = atoi(args[1]);
-      if (val >= 1 && val <= 10) {
-        blur_passes = val;
-        send_success(client_fd, "blur_passes set\n");
-      } else {
-        send_failure(client_fd, "config blur_passes: value must be 1-10\n");
-      }
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%d\n", blur_passes);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_int(args, num, client_fd, &blur_passes, IPC_FLAG_NONE, 1, 10, "value must be 1-10");
   } else if (streq("blur_radius", *args)) {
     if (num >= 2) {
       float val = atof(args[1]);
@@ -3481,75 +3349,15 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
       send_success(client_fd, buf);
     }
   } else if (streq("refraction_strength", *args)) {
-    if (num >= 2) {
-      float val = atof(args[1]);
-      if (val >= 0.0f && val <= 30.0f) {
-        refraction_strength = val;
-        send_success(client_fd, "refraction_strength set\n");
-      } else {
-        send_failure(client_fd, "config refraction_strength: value must be 0.0-30.0\n");
-      }
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%.3f\n", refraction_strength);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_float(args, num, client_fd, &refraction_strength, IPC_FLAG_NONE, 0.0f, 30.0f, "%.3f\n", "value must be 0.0-30.0");
   } else if (streq("refraction_edge_size_px", *args)) {
-    if (num >= 2) {
-      float val = atof(args[1]);
-      if (val >= 0.0f && val <= 400.0f) {
-        refraction_edge_size_px = val;
-        send_success(client_fd, "refraction_edge_size_px set\n");
-      } else {
-        send_failure(client_fd, "config refraction_edge_size_px: value must be 0.0-400.0\n");
-      }
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%.3f\n", refraction_edge_size_px);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_float(args, num, client_fd, &refraction_edge_size_px, IPC_FLAG_NONE, 0.0f, 400.0f, "%.3f\n", "value must be 0.0-400.0");
   } else if (streq("refraction_corner_radius_px", *args)) {
-    if (num >= 2) {
-      float val = atof(args[1]);
-      if (val >= 0.0f && val <= 400.0f) {
-        refraction_corner_radius_px = val;
-        send_success(client_fd, "refraction_corner_radius_px set\n");
-      } else {
-        send_failure(client_fd, "config refraction_corner_radius_px: value must be 0.0-400.0\n");
-      }
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%.3f\n", refraction_corner_radius_px);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_float(args, num, client_fd, &refraction_corner_radius_px, IPC_FLAG_NONE, 0.0f, 400.0f, "%.3f\n", "value must be 0.0-400.0");
   } else if (streq("refraction_normal_pow", *args)) {
-    if (num >= 2) {
-      float val = atof(args[1]);
-      if (val >= 0.0f && val <= 8.0f) {
-        refraction_normal_pow = val;
-        send_success(client_fd, "refraction_normal_pow set\n");
-      } else {
-        send_failure(client_fd, "config refraction_normal_pow: value must be 0.0-8.0\n");
-      }
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%.3f\n", refraction_normal_pow);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_float(args, num, client_fd, &refraction_normal_pow, IPC_FLAG_NONE, 0.0f, 8.0f, "%.3f\n", "value must be 0.0-8.0");
   } else if (streq("refraction_rgb_fringing", *args)) {
-    if (num >= 2) {
-      float val = atof(args[1]);
-      if (val >= 0.0f && val <= 1.0f) {
-        refraction_rgb_fringing = val;
-        send_success(client_fd, "refraction_rgb_fringing set\n");
-      } else {
-        send_failure(client_fd, "config refraction_rgb_fringing: value must be 0.0-1.0\n");
-      }
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%.6f\n", refraction_rgb_fringing);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_float(args, num, client_fd, &refraction_rgb_fringing, IPC_FLAG_NONE, 0.0f, 1.0f, "%.6f\n", "value must be 0.0-1.0");
   } else if (streq("refraction_texture_repeat_mode", *args)) {
     if (num >= 2) {
       int val = atoi(args[1]);
@@ -3565,19 +3373,7 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
       send_success(client_fd, buf);
     }
   } else if (streq("refraction_offset", *args)) {
-    if (num >= 2) {
-      float val = atof(args[1]);
-      if (val >= 0.0f && val <= 8.0f) {
-        refraction_offset = val;
-        send_success(client_fd, "refraction_offset set\n");
-      } else {
-        send_failure(client_fd, "config refraction_offset: value must be 0.0-8.0\n");
-      }
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%.3f\n", refraction_offset);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_float(args, num, client_fd, &refraction_offset, IPC_FLAG_NONE, 0.0f, 8.0f, "%.3f\n", "value must be 0.0-8.0");
   } else if (streq("blur_downsample", *args)) {
     if (num >= 2) {
       int val = atoi(args[1]);
@@ -3597,75 +3393,15 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
       send_success(client_fd, buf);
     }
   } else if (streq("blur_vibrancy", *args)) {
-    if (num >= 2) {
-      float val = atof(args[1]);
-      if (val >= 0.0f && val <= 1.0f) {
-        blur_vibrancy = val;
-        send_success(client_fd, "blur_vibrancy set\n");
-      } else {
-        send_failure(client_fd, "config blur_vibrancy: value must be 0.0-1.0\n");
-      }
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%.3f\n", blur_vibrancy);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_float(args, num, client_fd, &blur_vibrancy, IPC_FLAG_NONE, 0.0f, 1.0f, "%.3f\n", "value must be 0.0-1.0");
   } else if (streq("blur_vibrancy_darkness", *args)) {
-    if (num >= 2) {
-      float val = atof(args[1]);
-      if (val >= 0.0f && val <= 1.0f) {
-        blur_vibrancy_darkness = val;
-        send_success(client_fd, "blur_vibrancy_darkness set\n");
-      } else {
-        send_failure(client_fd, "config blur_vibrancy_darkness: value must be 0.0-1.0\n");
-      }
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%.3f\n", blur_vibrancy_darkness);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_float(args, num, client_fd, &blur_vibrancy_darkness, IPC_FLAG_NONE, 0.0f, 1.0f, "%.3f\n", "value must be 0.0-1.0");
   } else if (streq("blur_noise_strength", *args)) {
-    if (num >= 2) {
-      float val = atof(args[1]);
-      if (val >= 0.0f && val <= 1.0f) {
-        blur_noise_strength = val;
-        send_success(client_fd, "blur_noise_strength set\n");
-      } else {
-        send_failure(client_fd, "config blur_noise_strength: value must be 0.0-1.0\n");
-      }
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%.3f\n", blur_noise_strength);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_float(args, num, client_fd, &blur_noise_strength, IPC_FLAG_NONE, 0.0f, 1.0f, "%.3f\n", "value must be 0.0-1.0");
   } else if (streq("blur_brightness", *args)) {
-    if (num >= 2) {
-      float val = atof(args[1]);
-      if (val >= 0.5f && val <= 2.0f) {
-        blur_brightness = val;
-        send_success(client_fd, "blur_brightness set\n");
-      } else {
-        send_failure(client_fd, "config blur_brightness: value must be 0.5-2.0\n");
-      }
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%.3f\n", blur_brightness);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_float(args, num, client_fd, &blur_brightness, IPC_FLAG_NONE, 0.5f, 2.0f, "%.3f\n", "value must be 0.5-2.0");
   } else if (streq("blur_contrast", *args)) {
-    if (num >= 2) {
-      float val = atof(args[1]);
-      if (val >= 0.5f && val <= 2.0f) {
-        blur_contrast = val;
-        send_success(client_fd, "blur_contrast set\n");
-      } else {
-        send_failure(client_fd, "config blur_contrast: value must be 0.5-2.0\n");
-      }
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%.3f\n", blur_contrast);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_float(args, num, client_fd, &blur_contrast, IPC_FLAG_NONE, 0.5f, 2.0f, "%.3f\n", "value must be 0.5-2.0");
   } else if (streq("mica_enabled", *args)) {
     if (num >= 2) {
       mica_enabled = (strcmp(args[1], "true") == 0);
@@ -3677,7 +3413,7 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
     }
   } else if (streq("mica_tint_strength", *args)) {
     if (num >= 2) {
-      float val = atof(args[1]);
+      float val = (float)atof(args[1]);
       if (val >= 0.0f && val <= 1.0f) {
         mica_tint_strength = val;
         for (output_t *output = mon_head; output; output = output->next)
@@ -3728,33 +3464,9 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
       send_success(client_fd, buf);
     }
   } else if (streq("acrylic_tint_strength", *args)) {
-    if (num >= 2) {
-      float val = atof(args[1]);
-      if (val >= 0.0f && val <= 1.0f) {
-        acrylic_tint_strength = val;
-        send_success(client_fd, "acrylic_tint_strength set\n");
-      } else {
-        send_failure(client_fd, "config acrylic_tint_strength: value must be 0.0-1.0\n");
-      }
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%.3f\n", acrylic_tint_strength);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_float(args, num, client_fd, &acrylic_tint_strength, IPC_FLAG_NONE, 0.0f, 1.0f, "%.3f\n", "value must be 0.0-1.0");
   } else if (streq("acrylic_noise_strength", *args)) {
-    if (num >= 2) {
-      float val = atof(args[1]);
-      if (val >= 0.0f && val <= 1.0f) {
-        acrylic_noise_strength = val;
-        send_success(client_fd, "acrylic_noise_strength set\n");
-      } else {
-        send_failure(client_fd, "config acrylic_noise_strength: value must be 0.0-1.0\n");
-      }
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%.3f\n", acrylic_noise_strength);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_float(args, num, client_fd, &acrylic_noise_strength, IPC_FLAG_NONE, 0.0f, 1.0f, "%.3f\n", "value must be 0.0-1.0");
   } else if (streq("acrylic_light_anchor", *args)) {
     if (num >= 2) {
     	float a, b;
@@ -3772,19 +3484,7 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
       send_success(client_fd, buf);
     }
   } else if (streq("acrylic_blur_passes", *args)) {
-    if (num >= 2) {
-      int val = atoi(args[1]);
-      if (val >= 0 && val <= 10) {
-        acrylic_blur_passes = val;
-        send_success(client_fd, "acrylic_blur_passes set\n");
-      } else {
-        send_failure(client_fd, "config acrylic_blur_passes: value must be 0-10\n");
-      }
-    } else {
-      char buf[32];
-      snprintf(buf, sizeof(buf), "%d\n", acrylic_blur_passes);
-      send_success(client_fd, buf);
-    }
+    ipc_handle_int(args, num, client_fd, &acrylic_blur_passes, IPC_FLAG_NONE, 0, 10, "value must be 0-10");
   } else if (streq("screen_shader", *args)) {
     if (num >= 2) {
       if (!screen_shader_set(args[1])) {
@@ -3809,12 +3509,7 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
       send_failure(client_fd, "config screen_shader_file: missing path argument\n");
     }
   } else if (streq("screen_shader_enabled", *args)) {
-    if (num >= 2) {
-      screen_shader_enabled = (strcmp(args[1], "true") == 0);
-      send_success(client_fd, "screen_shader_enabled set\n");
-    } else {
-      send_success(client_fd, screen_shader_enabled ? "true\n" : "false\n");
-    }
+    ipc_handle_bool(args, num, client_fd, &screen_shader_enabled, IPC_FLAG_NONE);
   } else if (streq("animation_bezier", *args)) {
     if (num >= 2) {
       if (bezier_exists(args[1])) {
