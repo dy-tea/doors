@@ -54,28 +54,27 @@ char normal_border_color[16] = "444444ff";
 char active_border_color[16] = "555555ff";
 char focused_border_color[16] = "1793dfff";
 
-// Gradient border globals – count==0 means "no gradient, use solid border_color"
 float normal_border_gradient[BORDER_GRADIENT_MAX_STOPS * 4] = {0};
-int   normal_border_gradient_count = 0;
+int normal_border_gradient_count = 0;
 float normal_border_gradient_angle = 0.0f;
 float normal_border_gradient2[BORDER_GRADIENT_MAX_STOPS * 4] = {0};
-int   normal_border_gradient2_count = 0;
+int normal_border_gradient2_count = 0;
 float normal_border_gradient2_angle = 0.0f;
 float normal_border_gradient_lerp = 0.0f;
 
 float active_border_gradient[BORDER_GRADIENT_MAX_STOPS * 4] = {0};
-int   active_border_gradient_count = 0;
+int active_border_gradient_count = 0;
 float active_border_gradient_angle = 0.0f;
 float active_border_gradient2[BORDER_GRADIENT_MAX_STOPS * 4] = {0};
-int   active_border_gradient2_count = 0;
+int active_border_gradient2_count = 0;
 float active_border_gradient2_angle = 0.0f;
 float active_border_gradient_lerp = 0.0f;
 
 float focused_border_gradient[BORDER_GRADIENT_MAX_STOPS * 4] = {0};
-int   focused_border_gradient_count = 0;
+int focused_border_gradient_count = 0;
 float focused_border_gradient_angle = 0.0f;
 float focused_border_gradient2[BORDER_GRADIENT_MAX_STOPS * 4] = {0};
-int   focused_border_gradient2_count = 0;
+int focused_border_gradient2_count = 0;
 float focused_border_gradient2_angle = 0.0f;
 float focused_border_gradient_lerp = 0.0f;
 char presel_feedback_color[16] = "ff5555ff";
@@ -1752,5 +1751,22 @@ output_t *output_at(double x, double y) {
     if (wlr_box_contains_point(&m->rectangle, (int)x, (int)y))
       return m;
 
+  return NULL;
+}
+
+desktop_t *find_desktop_by_name_in_monitor(output_t *mon, const char *name) {
+  desktop_t *d = mon->desk_head;
+  while (d) {
+    if (strcmp(d->name, name) == 0)
+      return d;
+    d = d->next;
+  }
+  return NULL;
+}
+
+output_t *find_output_by_name(const char *name) {
+  for (output_t *m = mon_head; m != NULL; m = m->next)
+    if (strcmp(m->name, name) == 0)
+      return m;
   return NULL;
 }

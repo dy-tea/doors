@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.h"
+#include "output.h"
 #include <wlr/types/wlr_scene.h>
 
 #define MIN_WIDTH 1
@@ -84,6 +85,10 @@ void update_borders(struct wlr_scene_tree *border_tree, struct wlr_scene_rect *r
 void update_border_colors(struct wlr_scene_tree *border_tree, struct wlr_scene_rect *rects[4],
   client_t *client);
 void refresh_border_colors(void);
+
+// Misc helpers
+desktop_t *find_desktop_by_name_in_monitor(output_t *mon, const char *name);
+output_t *find_output_by_name(const char *name);
 
 // macros for state checking
 #define IS_TILED(c) (is_tiled(c))

@@ -44,6 +44,9 @@ typedef struct subscriber_t {
   struct subscriber_t *next;
 } subscriber_t;
 
+extern subscriber_t *subscriber_head;
+extern subscriber_t *subscriber_tail;
+
 void ipc_init(void);
 int ipc_get_socket_fd(void);
 void ipc_handle_incoming(int client_fd);
@@ -53,5 +56,4 @@ const char *ipc_get_socket_path(void);
 void ipc_put_status(subscriber_mask_t mask, const char *fmt, ...);
 void ipc_print_report(int fd);
 
-desktop_t *find_desktop_by_name_in_monitor(output_t *mon, const char *name);
-output_t *find_output_by_name(const char *name);
+void process_ipc_message(char *msg, int msg_len, int client_fd);
