@@ -1,8 +1,8 @@
 #pragma once
 
+#include <wayland-server.h>
 #include <wlr/types/wlr_input_method_v2.h>
 #include <wlr/types/wlr_text_input_v3.h>
-#include <wayland-server.h>
 
 struct ime_text_t;
 

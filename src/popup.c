@@ -1,14 +1,14 @@
-#include <stdlib.h>
-#include <wlr/types/wlr_xdg_shell.h>
-#include <wlr/types/wlr_scene.h>
-#include <wlr/types/wlr_layer_shell_v1.h>
-#include <wlr/types/wlr_output_layout.h>
-#include <wlr/util/log.h>
-#include "popup.h"
-#include "server.h"
 #include "layer.h"
 #include "output.h"
+#include "popup.h"
+#include "server.h"
 #include "toplevel.h"
+#include <stdlib.h>
+#include <wlr/types/wlr_layer_shell_v1.h>
+#include <wlr/types/wlr_output_layout.h>
+#include <wlr/types/wlr_scene.h>
+#include <wlr/types/wlr_xdg_shell.h>
+#include <wlr/util/log.h>
 
 static void create_xdg_popup(struct wlr_xdg_popup *xdg_popup,
 	struct wlr_scene_tree *parent_tree, struct wlr_scene_tree *image_capture_parent_tree);

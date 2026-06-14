@@ -1,20 +1,20 @@
 #include "config.h"
-#include "server.h"
 #include "keyboard.h"
+#include "server.h"
 #include "types.h"
 #include "workspace.h"
+#include <ctype.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <unistd.h>
-#include <sys/wait.h>
-#include <wlr/util/log.h>
-#include <wlr/types/wlr_keyboard.h>
-#include <xkbcommon/xkbcommon.h>
-#include <limits.h>
-#include <ctype.h>
 #include <sys/inotify.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #include <wayland-server-core.h>
+#include <wlr/types/wlr_keyboard.h>
+#include <wlr/util/log.h>
+#include <xkbcommon/xkbcommon.h>
 
 #define DOORS_CONFIG_DIR "/.config/doors"
 #define DOORSRC_NAME "doorsrc"

@@ -1,21 +1,21 @@
-#include "layer.h"
 #include "animation.h"
+#include "blur.h"
+#include "input_method.h"
+#include "layer.h"
+#include "output.h"
 #include "popup.h"
 #include "server.h"
-#include "output.h"
 #include "tree.h"
-#include "input_method.h"
-#include "blur.h"
 #include <stdlib.h>
 #include <wayland-server-core.h>
 #include <wlr/util/log.h>
+#include <wlr/types/wlr_buffer.h>
+#include <wlr/types/wlr_ext_background_effect_v1.h>
+#include <wlr/types/wlr_fractional_scale_v1.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
-#include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_seat.h>
-#include <wlr/types/wlr_fractional_scale_v1.h>
-#include <wlr/types/wlr_ext_background_effect_v1.h>
-#include <wlr/types/wlr_buffer.h>
+#include <wlr/types/wlr_scene.h>
 
 extern struct server_t server;
 

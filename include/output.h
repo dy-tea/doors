@@ -1,12 +1,12 @@
 #pragma once
 
+#include "types.h"
 #include <wayland-server.h>
-#include <wlr/util/box.h>
-#include <wlr/render/color.h>
-#include <time.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include "types.h"
+#include <time.h>
+#include <wlr/render/color.h>
+#include <wlr/util/box.h>
 
 typedef struct blur_output_ctx_t blur_output_ctx_t;
 typedef struct desktop_t desktop_t;

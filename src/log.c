@@ -1,14 +1,14 @@
 #include "log.h"
-#include <wlr/util/log.h>
+#include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
-#include <time.h>
-#include <signal.h>
-#include <unistd.h>
 #include <sys/stat.h>
-#include <errno.h>
+#include <time.h>
+#include <unistd.h>
+#include <wlr/util/log.h>
 
 #if defined(__linux__) && (defined(__GLIBC__) || defined(__GNU_LIBRARY__))
 	#include <execinfo.h>

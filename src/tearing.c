@@ -1,9 +1,9 @@
-#include <wayland-server-core.h>
-#include <wlr/types/wlr_xdg_shell.h>
-#include <wlr/types/wlr_tearing_control_v1.h>
-#include <wlr/util/log.h>
 #include "server.h"
 #include "toplevel.h"
+#include <wayland-server-core.h>
+#include <wlr/types/wlr_tearing_control_v1.h>
+#include <wlr/types/wlr_xdg_shell.h>
+#include <wlr/util/log.h>
 
 typedef struct {
 	struct wlr_tearing_control_v1 *tearing_control;

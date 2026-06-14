@@ -1,8 +1,8 @@
 #pragma once
 
-#include <stdbool.h>
-#include <stddef.h>
 #include "types.h"
+#include <stddef.h>
+#include <stdbool.h>
 
 #define MAX_RULES 128
 

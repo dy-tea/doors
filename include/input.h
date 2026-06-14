@@ -2,8 +2,8 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <xkbcommon/xkbcommon.h>
 #include <wayland-server.h>
+#include <xkbcommon/xkbcommon.h>
 
 struct wlr_input_device;
 

@@ -1,10 +1,10 @@
 #pragma once
 
+#include "types.h"
 #include <stdbool.h>
-#include <wayland-server-core.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include "types.h"
+#include <wayland-server-core.h>
 
 #define DOORS_SOCKET_ENV "DOORS_SOCKET"
 #define DOORS_SOCKET_PATH_TEMPLATE "/run/user/%d/doors-%d.sock"

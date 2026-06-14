@@ -1,40 +1,37 @@
-#include "blur.h"
 #include "animation.h"
-#include "server.h"
-#include "output.h"
-#include "toplevel.h"
+#include "blur.h"
 #include "layer.h"
+#include "output.h"
+#include "server.h"
+#include "toplevel.h"
 
+#include <drm_fourcc.h>
+#include <EGL/egl.h>
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <GLES2/gl2.h>
-#include <GLES2/gl2ext.h>
-#include <EGL/egl.h>
-#include <wlr/util/log.h>
-#include <wlr/render/gles2.h>
-#include <wlr/render/egl.h>
-#include <wlr/render/allocator.h>
-#include <wlr/render/drm_format_set.h>
-#include <wlr/render/wlr_texture.h>
-#include <wlr/render/wlr_renderer.h>
 #include <wlr/backend/interface.h>
 #include <wlr/interfaces/wlr_output.h>
+#include <wlr/render/gles2.h>
+#include <wlr/render/allocator.h>
+#include <wlr/render/drm_format_set.h>
+#include <wlr/render/egl.h>
+#include <wlr/render/wlr_texture.h>
+#include <wlr/render/wlr_renderer.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_buffer.h>
 #include <wlr/types/wlr_damage_ring.h>
-#include <drm_fourcc.h>
+#include <wlr/util/log.h>
 
 #include "effect_tex_vert_src.h"
-
 #include "blit_frag_src.h"
 #include "ext_blit_frag_src.h"
-
 #include "border_frag_src.h"
 #include "border_corner_mask_frag_src.h"
-
 #include "blur_kawase_frag_src.h"
 #include "blur_box_h_frag_src.h"
 #include "blur_box_v_frag_src.h"
@@ -43,7 +40,6 @@
 #include "blur_mica_frag_src.h"
 #include "blur_acrylic_frag_src.h"
 #include "blur_refraction_frag_src.h"
-
 #include "grayscale_frag_src.h"
 #include "invert_frag_src.h"
 #include "nightlight_frag_src.h"

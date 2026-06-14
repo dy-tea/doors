@@ -1,10 +1,10 @@
 #pragma once
 
+#include <GLES2/gl2.h>
+#include <pixman.h>
 #include <wayland-server.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_scene.h>
-#include <GLES2/gl2.h>
-#include <pixman.h>
 
 typedef struct output_t output_t;
 

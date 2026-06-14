@@ -1,15 +1,15 @@
-#include "input.h"
-#include "keyboard.h"
 #include "cursor.h"
+#include "keyboard.h"
 #include "server.h"
+#include "input.h"
+#include <float.h>
 #include <stdlib.h>
 #include <string.h>
-#include <float.h>
-#include <wlr/util/log.h>
+#include <libinput.h>
+#include <wlr/backend/libinput.h>
 #include <wlr/types/wlr_keyboard.h>
 #include <wlr/types/wlr_xcursor_manager.h>
-#include <wlr/backend/libinput.h>
-#include <libinput.h>
+#include <wlr/util/log.h>
 
 extern struct server_t server;
 

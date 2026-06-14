@@ -1,6 +1,7 @@
 #include "copy_capture.h"
+#include "ext-image-capture-source-v1-protocol.h"
+#include "ext-image-copy-capture-v1-protocol.h"
 #include "server.h"
-#include "output.h"
 #include "toplevel.h"
 #include "types.h"
 #include "xwayland.h"
@@ -18,10 +19,8 @@
 #include <wlr/types/wlr_scene.h>
 #include <wlr/render/allocator.h>
 #include <wlr/util/log.h>
-#include "ext-image-capture-source-v1-protocol.h"
 
 const struct wlr_drm_format_set *wlr_renderer_get_render_formats(struct wlr_renderer *renderer);
-#include "ext-image-copy-capture-v1-protocol.h"
 
 typedef struct image_copy_source_t {
 	struct wlr_ext_image_capture_source_v1 base;

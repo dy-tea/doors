@@ -1,22 +1,22 @@
-#include "tree.h"
+#include "animation.h"
+#include "output.h"
+#include "scroller.h"
+#include "scratchpad.h"
 #include "server.h"
 #include "tabs.h"
 #include "toplevel.h"
-#include "animation.h"
-#include "types.h"
 #include "transaction.h"
-#include "output.h"
-#include "scroller.h"
+#include "tree.h"
+#include "types.h"
 #include "xwayland.h"
-#include "scratchpad.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <wlr/util/log.h>
-#include <wlr/types/wlr_xdg_shell.h>
-#include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_cursor.h>
+#include <wlr/types/wlr_scene.h>
+#include <wlr/types/wlr_xdg_shell.h>
+#include <wlr/util/log.h>
 
 // global settings
 automatic_scheme_t automatic_scheme = SCHEME_SPIRAL;

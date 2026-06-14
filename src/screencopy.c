@@ -1,17 +1,18 @@
-#include "screencopy.h"
-#include "server.h"
 #include "output.h"
+#include "server.h"
+#include "screencopy.h"
 #include "toplevel.h"
 #include "types.h"
+#include "wlr-screencopy-unstable-v1-protocol.h"
 #include "xwayland.h"
-#include <stdlib.h>
 #include <assert.h>
 #include <drm_fourcc.h>
+#include <stdlib.h>
 #include <wlr/interfaces/wlr_output.h>
 #include <wlr/render/allocator.h>
+#include <wlr/render/pass.h>
 #include <wlr/render/swapchain.h>
 #include <wlr/render/wlr_renderer.h>
-#include <wlr/render/pass.h>
 #include <wlr/types/wlr_buffer.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
@@ -19,7 +20,6 @@
 #include <wlr/util/box.h>
 #include <wlr/util/log.h>
 #include <wlr/util/transform.h>
-#include "wlr-screencopy-unstable-v1-protocol.h"
 
 #define SCREENCOPY_MANAGER_VERSION 3
 

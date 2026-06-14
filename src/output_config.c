@@ -1,11 +1,11 @@
-#include "output_config.h"
 #include "output.h"
+#include "output_config.h"
 #include "server.h"
+#include <drm_fourcc.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
-#include <limits.h>
 #include <wayland-server-core.h>
-#include <drm_fourcc.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_output_management_v1.h>

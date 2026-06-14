@@ -1,14 +1,14 @@
-#include "workspace.h"
 #include "animation.h"
 #include "server.h"
-#include "types.h"
 #include "output.h"
 #include "tree.h"
 #include "transaction.h"
+#include "types.h"
+#include "workspace.h"
 #include <stdint.h>
 #include <string.h>
-#include <wlr/util/log.h>
 #include <wlr/types/wlr_scene.h>
+#include <wlr/util/log.h>
 
 extern struct server_t server;
 

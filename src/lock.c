@@ -1,6 +1,6 @@
 #include "lock.h"
-#include "server.h"
 #include "output.h"
+#include "server.h"
 #include "tree.h"
 #include <stdlib.h>
 #include <wayland-util.h>

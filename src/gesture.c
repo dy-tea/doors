@@ -1,9 +1,8 @@
 #include "gesture.h"
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
-#include <math.h>
 #include <wlr/util/log.h>
 
 const char *gesture_type_string(enum gesture_type type) {

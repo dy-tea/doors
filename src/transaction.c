@@ -1,18 +1,18 @@
-#include "transaction.h"
-#include "server.h"
-#include "toplevel.h"
-#include "tree.h"
 #include "animation.h"
-#include "types.h"
-#include "output.h"
 #include "cursor.h"
 #include "idle.h"
+#include "output.h"
+#include "server.h"
+#include "toplevel.h"
+#include "transaction.h"
+#include "tree.h"
+#include "types.h"
 #include <stdlib.h>
 #include <string.h>
-#include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/types/wlr_scene.h>
-#include <wlr/util/log.h>
+#include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/box.h>
+#include <wlr/util/log.h>
 
 // transaction state
 static struct {

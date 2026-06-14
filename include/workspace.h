@@ -1,7 +1,7 @@
 #pragma once
 
-#include <wlr/types/wlr_ext_workspace_v1.h>
 #include <stdbool.h>
+#include <wlr/types/wlr_ext_workspace_v1.h>
 
 void workspace_init(void);
 void workspace_fini(void);

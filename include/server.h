@@ -1,23 +1,23 @@
 #pragma once
 
+#include "gesture.h"
+#include "input_method.h"
 #include "launcher.h"
 #include "lock.h"
 #include "toplevel.h"
 #include "types.h"
-#include "gesture.h"
 #include "xwayland.h"
-#include "input_method.h"
 #include <wayland-protocols/color-management-v1-enum.h>
 #include <wayland-server.h>
-#include <xkbcommon/xkbcommon.h>
+#include <wlr/types/wlr_ext_background_effect_v1.h>
 #include <wlr/types/wlr_ext_workspace_v1.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_output_power_management_v1.h>
 #include <wlr/types/wlr_output_management_v1.h>
-#include <wlr/types/wlr_xdg_activation_v1.h>
 #include <wlr/types/wlr_pointer_gestures_v1.h>
-#include <wlr/types/wlr_ext_background_effect_v1.h>
 #include <wlr/types/wlr_tearing_control_v1.h>
+#include <wlr/types/wlr_xdg_activation_v1.h>
+#include <xkbcommon/xkbcommon.h>
 
 enum cursor_mode {
   CURSOR_PASSTHROUGH,

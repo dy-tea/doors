@@ -1,9 +1,9 @@
 #pragma once
 
-#include <stdint.h>
-#include <xkbcommon/xkbcommon.h>
-#include <wayland-server.h>
 #include "gesture.h"
+#include <stdint.h>
+#include <wayland-server.h>
+#include <xkbcommon/xkbcommon.h>
 
 #define MAX_KEYBINDS 256
 #define MAX_GESTUREBINDS 64
@@ -181,4 +181,3 @@ uint32_t parse_keycode(const char *name);
 bind_action_t parse_action(const char *cmd, int *desktop_index, char *submap_name);
 void add_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode, bool use_keycode, bind_action_t action,
     int desktop_index, const char *external_cmd, const char *submap_name);
-

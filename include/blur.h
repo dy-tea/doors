@@ -1,7 +1,7 @@
 #pragma once
 
-#include <stdbool.h>
 #include <GLES2/gl2.h>
+#include <stdbool.h>
 #include <wlr/util/box.h>
 
 typedef struct output_t output_t;

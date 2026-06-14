@@ -1,34 +1,34 @@
-#include "toplevel.h"
+#include "animation.h"
 #include "blur.h"
 #include "config.h"
+#include "toplevel.h"
+#include "input_method.h"
 #include "ipc.h"
+#include "rule.h"
 #include "keyboard.h"
 #include "output.h"
 #include "popup.h"
+#include "scroller.h"
 #include "scratchpad.h"
 #include "server.h"
 #include "tabs.h"
-#include "tree.h"
 #include "transaction.h"
-#include "animation.h"
+#include "tree.h"
 #include "types.h"
-#include "rule.h"
-#include "scroller.h"
 #include "xwayland.h"
-#include "input_method.h"
+#include <math.h>
+#include <pixman.h>
 #include <string.h>
 #include <stdlib.h>
-#include <math.h>
 #include <wayland-server-core.h>
+#include <wlr/types/wlr_buffer.h>
+#include <wlr/types/wlr_ext_background_effect_v1.h>
+#include <wlr/types/wlr_ext_image_capture_source_v1.h>
+#include <wlr/types/wlr_fractional_scale_v1.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/types/wlr_xdg_decoration_v1.h>
-#include <wlr/types/wlr_fractional_scale_v1.h>
-#include <wlr/types/wlr_ext_image_capture_source_v1.h>
-#include <wlr/types/wlr_buffer.h>
-#include <wlr/types/wlr_ext_background_effect_v1.h>
 #include <wlr/util/log.h>
-#include <pixman.h>
 
 extern struct server_t server;
 

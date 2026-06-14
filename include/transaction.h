@@ -4,8 +4,8 @@
 #include <stdint.h>
 #include <time.h>
 #include <wayland-server-core.h>
-#include <wlr/util/box.h>
 #include <wlr/types/wlr_scene.h>
+#include <wlr/util/box.h>
 
 // forward declarations
 struct node_t;

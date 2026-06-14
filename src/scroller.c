@@ -1,9 +1,9 @@
 #include "scroller.h"
-#include "tree.h"
 #include "toplevel.h"
+#include "tree.h"
 #include "output.h"
-#include <stdlib.h>
 #include <math.h>
+#include <stdlib.h>
 #include <wlr/util/log.h>
 #include <wlr/types/wlr_xdg_shell.h>
 

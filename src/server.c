@@ -2,7 +2,6 @@
 #include "cursor.h"
 #include "output.h"
 #include "toplevel.h"
-#include "types.h"
 #include "transaction.h"
 #include "workspace.h"
 #include "ipc.h"

@@ -1,9 +1,9 @@
-#include "server.h"
 #include "config.h"
 #include "log.h"
-#include <wlr/util/log.h>
+#include "server.h"
 #include <stdio.h>
 #include <string.h>
+#include <wlr/util/log.h>
 
 struct server_t server = {0};
 

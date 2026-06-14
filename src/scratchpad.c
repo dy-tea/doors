@@ -1,13 +1,13 @@
+#include "output.h"
 #include "scratchpad.h"
 #include "server.h"
-#include "types.h"
-#include "tree.h"
 #include "transaction.h"
-#include "output.h"
 #include "toplevel.h"
+#include "tree.h"
+#include "types.h"
 #include <stdlib.h>
-#include <wlr/util/log.h>
 #include <wlr/types/wlr_scene.h>
+#include <wlr/util/log.h>
 
 extern struct server_t server;
 

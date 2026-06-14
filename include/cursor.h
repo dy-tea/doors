@@ -1,8 +1,8 @@
 #pragma once
 
+#include "gesture.h"
 #include "server.h"
 #include "toplevel.h"
-#include "gesture.h"
 #include <wlr/types/wlr_pointer.h>
 
 typedef struct pointer_t {

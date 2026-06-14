@@ -1,5 +1,4 @@
 #include "text.h"
-
 #include <cairo.h>
 #include <drm_fourcc.h>
 #include <math.h>

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <stdbool.h>
 #include "types.h"
+#include <stdbool.h>
 
 void scratchpad_init(void);
 void scratchpad_fini(void);

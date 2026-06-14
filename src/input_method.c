@@ -2,10 +2,10 @@
 #include "server.h"
 #include <assert.h>
 #include <stdlib.h>
+#include <wlr/types/wlr_layer_shell_v1.h>
+#include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_virtual_keyboard_v1.h>
 #include <wlr/types/wlr_xdg_shell.h>
-#include <wlr/types/wlr_scene.h>
-#include <wlr/types/wlr_layer_shell_v1.h>
 
 extern struct server_t server;
 
