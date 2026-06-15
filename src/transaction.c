@@ -442,11 +442,22 @@ static bool should_configure(node_t *node, transaction_inst_t *instruction) {
   bool size_changed = client_w != target_rect.width ||
     client_h != target_rect.height;
 
-  wlr_log(WLR_DEBUG, "should_configure node %u: client_geometry=(%dx%d) target=(%dx%d) changed=%d",
+  wlr_log(WLR_DEBUG, "should_configure node %u: client_geometry=(%dx%d) target=(%dx%d) last_requested=(%dx%d) changed=%d",
     node->id, client_w, client_h,
-    target_rect.width, target_rect.height, size_changed);
+    target_rect.width, target_rect.height,
+    node->client->toplevel->last_requested.width,
+    node->client->toplevel->last_requested.height, size_changed);
 
-  return size_changed;
+  if (!size_changed) return false;
+
+  if (node->client->toplevel->last_requested.width == target_rect.width &&
+      node->client->toplevel->last_requested.height == target_rect.height) {
+    wlr_log(WLR_DEBUG, "should_configure node %u: target unchanged since last configure, skipping",
+      node->id);
+    return false;
+  }
+
+  return true;
 }
 
 static int handle_timeout(void *data) {
@@ -454,9 +465,18 @@ static int handle_timeout(void *data) {
 
   if (!txn) return 0;
 
-  wlr_log(WLR_DEBUG, "Transaction timed out (%zu/%zu ready) - applying partial state",
+  wlr_log(WLR_DEBUG, "Transaction timed out (%zu/%zu ready) - retrying unresponsive",
     wl_list_length(&txn->instructions) - txn->num_waiting,
     (size_t)wl_list_length(&txn->instructions));
+
+  bool need_retry = false;
+  transaction_inst_t *inst;
+  wl_list_for_each(inst, &txn->instructions, link) {
+    if (!inst->waiting || !inst->node->client || !inst->node->client->toplevel)
+      continue;
+    transaction_add_dirty_node(inst->node);
+    need_retry = true;
+  }
 
   transaction_apply(txn);
   cursor_rebase();
@@ -466,6 +486,9 @@ static int handle_timeout(void *data) {
 
   transaction_destroy(txn);
   transaction_commit_pending();
+
+  if (need_retry)
+    _transaction_commit_dirty(true);
 
   return 0;
 }
@@ -521,6 +544,8 @@ static void transaction_commit(transaction_t *txn) {
         instruction->serial = wlr_xdg_toplevel_set_size(
           node->client->toplevel->xdg_toplevel,
           rect->width, rect->height);
+
+        node->client->toplevel->last_requested = *rect;
 
         bool has_stable_frame =
           node->client->toplevel->geometry.width > 0 ||
