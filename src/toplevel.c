@@ -688,10 +688,6 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
   struct wlr_xdg_surface *xdg_surface = toplevel->xdg_toplevel->base;
 
   if (xdg_surface->initial_commit) {
-    // initialize last_configured_size to 0,0 for initial configure
-    toplevel->last_configured_size.width = 0;
-    toplevel->last_configured_size.height = 0;
-
     // initial commit can happen before the xdg_surface is marked initialized
     if (xdg_surface->initialized)
       wlr_xdg_surface_schedule_configure(xdg_surface);
@@ -727,11 +723,9 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
             transaction_commit_dirty_client();
           }
         } else if (IS_TILED(c)) {
-          struct wlr_box *last = &toplevel->last_configured_size;
-          if (last->width > 0 && last->height > 0 &&
-              (toplevel->geometry.width != last->width ||
-               toplevel->geometry.height != last->height) &&
-              c->tiled_rectangle.width > 0 && c->tiled_rectangle.height > 0) {
+          if (c->tiled_rectangle.width > 0 && c->tiled_rectangle.height > 0 &&
+              (toplevel->geometry.width != c->tiled_rectangle.width ||
+               toplevel->geometry.height != c->tiled_rectangle.height)) {
             wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel,
               c->tiled_rectangle.width, c->tiled_rectangle.height);
             node_set_dirty(toplevel->node);

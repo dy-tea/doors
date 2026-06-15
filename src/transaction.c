@@ -104,6 +104,8 @@ static void transaction_add_node(transaction_t *txn, node_t *node, bool server_r
   wl_list_for_each(existing, &txn->instructions, link) {
     if (existing->node == node) {
       copy_node_state(node, existing);
+      if (server_request)
+        existing->server_request = true;
       return;
     }
   }
@@ -434,14 +436,15 @@ static bool should_configure(node_t *node, transaction_inst_t *instruction) {
   // don't configure windows that are too small to show
   if (target_rect.width < 1 || target_rect.height < 1) return false;
 
-  // compare target size against last configured size
-  struct wlr_box *last_configured = &node->client->toplevel->last_configured_size;
-  bool size_changed = last_configured->width != target_rect.width ||
-    last_configured->height != target_rect.height;
+  // compare target size against client's committed geometry
+  int client_w = node->client->toplevel->geometry.width;
+  int client_h = node->client->toplevel->geometry.height;
+  bool size_changed = client_w != target_rect.width ||
+    client_h != target_rect.height;
 
-  wlr_log(WLR_DEBUG, "should_configure node %u: last_configured=(%dx%d) target=(%dx%d) changed=%d",
-  	node->id, last_configured->width, last_configured->height,
-	  target_rect.width, target_rect.height, size_changed);
+  wlr_log(WLR_DEBUG, "should_configure node %u: client_geometry=(%dx%d) target=(%dx%d) changed=%d",
+    node->id, client_w, client_h,
+    target_rect.width, target_rect.height, size_changed);
 
   return size_changed;
 }
@@ -451,28 +454,9 @@ static int handle_timeout(void *data) {
 
   if (!txn) return 0;
 
-  wlr_log(WLR_DEBUG, "Transaction timed out (%zu/%zu ready)",
+  wlr_log(WLR_DEBUG, "Transaction timed out (%zu/%zu ready) - applying partial state",
     wl_list_length(&txn->instructions) - txn->num_waiting,
     (size_t)wl_list_length(&txn->instructions));
-
-  transaction_inst_t *inst;
-  bool need_dirty_commit = false;
-  wl_list_for_each(inst, &txn->instructions, link) {
-    if (!inst->waiting || !inst->node->client || !inst->node->client->toplevel)
-      continue;
-
-    wlr_log(WLR_DEBUG, "Unresponsive node %u — keeping last_configured_size (%dx%d)",
-      inst->node->id,
-      inst->node->client->toplevel->last_configured_size.width,
-      inst->node->client->toplevel->last_configured_size.height);
-
-    if (!node_in_transaction(txn_state.pending_transaction, inst->node)) {
-      transaction_add_dirty_node(inst->node);
-      need_dirty_commit = true;
-      wlr_log(WLR_DEBUG, "Re-dirtied unresponsive node %u for re-configure",
-        inst->node->id);
-    }
-  }
 
   transaction_apply(txn);
   cursor_rebase();
@@ -481,13 +465,7 @@ static int handle_timeout(void *data) {
     txn_state.queued_transaction = NULL;
 
   transaction_destroy(txn);
-
-  // promote pending transaction
   transaction_commit_pending();
-
-  // commit any re-dirtied timed-out nodes that weren't in pending
-  if (need_dirty_commit)
-    _transaction_commit_dirty(true);
 
   return 0;
 }
@@ -545,25 +523,21 @@ static void transaction_commit(transaction_t *txn) {
           rect->width, rect->height);
 
         bool has_stable_frame =
-          node->client->toplevel->last_configured_size.width > 0 ||
-          node->client->toplevel->last_configured_size.height > 0;
+          node->client->toplevel->geometry.width > 0 ||
+          node->client->toplevel->geometry.height > 0;
         instruction->require_geometry_match = has_stable_frame &&
           node->client->shown && node->client->toplevel->configured;
-
-        // update last configured size to prevent feedback loops
-        node->client->toplevel->last_configured_size.width = rect->width;
-        node->client->toplevel->last_configured_size.height = rect->height;
 
         // wait for all mapped toplevels to respond
         instruction->waiting = true;
         txn->num_waiting++;
-        if (enable_animations && has_stable_frame && node->client->shown &&
+        if (has_stable_frame && node->client->shown &&
             !node->client->toplevel->saved_surface_tree &&
             node->client->toplevel->configured) {
           toplevel_save_buffer(node->client->toplevel);
-          wlr_log(WLR_DEBUG, "Saved buffer for node %u (shown=true)", node->id);
+          wlr_log(WLR_DEBUG, "Saved buffer for node %u", node->id);
         } else if (!has_stable_frame) {
-          wlr_log(WLR_DEBUG, "Skipping buffer save for node %u — no stable prior frame", node->id);
+          wlr_log(WLR_DEBUG, "Skipping buffer save for node %u - no stable prior frame", node->id);
         }
 
         num_configures++;

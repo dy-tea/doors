@@ -67,7 +67,6 @@ typedef struct toplevel_t {
   node_t *node;
 
   struct wlr_box geometry;
-  struct wlr_box last_configured_size;
 
   bool mapped;
   bool configured;

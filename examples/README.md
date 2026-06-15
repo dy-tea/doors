@@ -686,20 +686,20 @@ doorsctl output <name> rectangle <WxH:X,Y>         # Set output rectangle geomet
 doorsctl output <name> reorder-desktops <names...> # Reorder desktops on output
 ```
 
-- `name` — connector name (e.g. `DP-1`, `HDMI-A-1`)
-- `description` — human-readable description string
-- `make` / `model` / `serial` — manufacturer, model, and serial number
-- `width` / `height` — current resolution in pixels
-- `refresh` — current refresh rate
-- `scale` — current scale factor
-- `phys_width` / `phys_height` — physical display size in millimeters
-- `enabled` — whether the output is currently active
+- `name` - connector name (e.g. `DP-1`, `HDMI-A-1`)
+- `description` - human-readable description string
+- `make` / `model` / `serial` - manufacturer, model, and serial number
+- `width` / `height` - current resolution in pixels
+- `refresh` - current refresh rate
+- `scale` - current scale factor
+- `phys_width` / `phys_height` - physical display size in millimeters
+- `enabled` - whether the output is currently active
 
 `color_profile` controls the color transform applied to the output:
 
-- `gamma22` — default gamma 2.2, no transform applied
-- `srgb` — apply an sRGB inverse EOTF transfer function (useful for HDR-capable displays running in SDR mode)
-- `icc <path>` — load a custom ICC color profile from a file and apply it as a linear-to-display transform
+- `gamma22` - default gamma 2.2, no transform applied
+- `srgb` - apply an sRGB inverse EOTF transfer function (useful for HDR-capable displays running in SDR mode)
+- `icc <path>` - load a custom ICC color profile from a file and apply it as a linear-to-display transform
 
 ### Input Commands
 
@@ -790,11 +790,11 @@ Globally enable or disable all animations (default: false).
 doorsctl bezier <name> <p1x> <p1y> <p2x> <p2y>
 ```
 
-Register named cubic bezier curves for use as animation easing functions. A cubic bezier is defined by two control points — P0=(0,0) and P3=(1,1) are implicit.
+Register named cubic bezier curves for use as animation easing functions. A cubic bezier is defined by two control points - P0=(0,0) and P3=(1,1) are implicit.
 
-- `<name>` — Name to reference this curve by
-- `<p1x> <p1y>` — First control point (x and y, 0.0—1.0)
-- `<p2x> <p2y>` — Second control point (x and y, 0.0—1.0)
+- `<name>` - Name to reference this curve by
+- `<p1x> <p1y>` - First control point (x and y, 0.0-1.0)
+- `<p2x> <p2y>` - Second control point (x and y, 0.0-1.0)
 
 Built-in curves:
 
@@ -872,12 +872,12 @@ and feel more organic.
 doorsctl spring <name> <stiffness> <damping> [mass] [value_eps] [velocity_eps]
 ```
 
-- `<name>` — Name to reference this spring by
-- `<stiffness>` — Pull-back force (higher = snappier)
-- `<damping>` — Energy dissipation (higher = less bounce)
-- `[mass]` — Inertia (higher = slower/heavier, default: 1.0)
-- `[value_eps]` — Position settle threshold (default: 0.001)
-- `[velocity_eps]` — Velocity settle threshold (default: 0.001)
+- `<name>` - Name to reference this spring by
+- `<stiffness>` - Pull-back force (higher = snappier)
+- `<damping>` - Energy dissipation (higher = less bounce)
+- `[mass]` - Inertia (higher = slower/heavier, default: 1.0)
+- `[value_eps]` - Position settle threshold (default: 0.001)
+- `[velocity_eps]` - Velocity settle threshold (default: 0.001)
 
 Built-in springs:
 
@@ -898,7 +898,7 @@ doorsctl spring floaty 80 5 3            # Heavy, bouncy
 #### Per-Type Spring Configuration
 
 When a spring is assigned to an animation type, it takes priority over any
-bezier curve — the animation runs until the spring settles, ignoring the
+bezier curve - the animation runs until the spring settles, ignoring the
 duration entirely.
 
 ```
