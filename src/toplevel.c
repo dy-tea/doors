@@ -663,9 +663,8 @@ void toplevel_unmap(struct wl_listener *listener, void *data) {
     remove_node(d, n);
 
     if (n) n->destroying = true;
-    arrange(m, d, true);
-
     if (n && n->client) n->client->toplevel = NULL;
+    arrange(m, d, true);
 
     toplevel->node = NULL;
 
@@ -679,7 +678,7 @@ void toplevel_unmap(struct wl_listener *listener, void *data) {
     }
   }
 
-  transaction_notify_view_unmapped(n);
+  transaction_notify_view_unmapped(toplevel->node);
 }
 
 void toplevel_commit(struct wl_listener *listener, void *data) {
