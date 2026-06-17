@@ -1495,19 +1495,11 @@ static void handle_decoration_request_mode(struct wl_listener *listener, void *d
   if (!tl || !tl->xdg_decoration || !tl->xdg_toplevel || !tl->xdg_toplevel->base ||
     !tl->xdg_toplevel->base->initialized || !tl->node) return;
 
-  enum wlr_xdg_toplevel_decoration_v1_mode mode;
-  switch (decoration_mode) {
-  case DECORATION_NONE:
-  case DECORATION_TABS:
-  case DECORATION_CSD:
-    mode = WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
-    break;
-  case DECORATION_ALWAYS:
+  enum wlr_xdg_toplevel_decoration_v1_mode mode = WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
+  if (decoration_mode == DECORATION_ALWAYS)
     mode = tabbed_ancestor(tl->node) != NULL
       ? WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
       : WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
-    break;
-  }
 
   wlr_xdg_toplevel_decoration_v1_set_mode(tl->xdg_decoration, mode);
 }
@@ -1529,19 +1521,12 @@ void handle_new_xdg_decoration(struct wl_listener *listener, void *data) {
   wl_signal_add(&deco->events.request_mode, &tl->decoration_request_mode);
 
   if (xdg_surface->initialized && tl->node) {
-    enum wlr_xdg_toplevel_decoration_v1_mode mode;
-    switch (decoration_mode) {
-    case DECORATION_NONE:
-    case DECORATION_TABS:
-    case DECORATION_CSD:
-      mode = WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
-      break;
-    case DECORATION_ALWAYS:
-      mode = tabbed_ancestor(tl->node) != NULL
-        ? WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
-        : WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
-      break;
-    }
+    enum wlr_xdg_toplevel_decoration_v1_mode mode = WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
+    if (decoration_mode == DECORATION_ALWAYS)
+	    mode = tabbed_ancestor(tl->node) != NULL
+	      ? WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
+	      : WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
+
     wlr_xdg_toplevel_decoration_v1_set_mode(deco, mode);
   }
 }
