@@ -1167,7 +1167,7 @@ static bool rebuild_live_blur(output_t *output, struct wlr_scene_output *scene_o
     draw_quad();
 
     client_t *c = tl->node->client;
-    if (c && c->border_radius > 0.0f && blur_ctx.prog_corner_mask) {
+    if (c && c->border_radius > 0.0f && c->state != STATE_FULLSCREEN && blur_ctx.prog_corner_mask) {
       struct wlr_box content_r = get_client_rect(tl);
       float ow = (float)w, oh = (float)h;
       float win_u  = (float)(content_r.x - output->lx) / ow;
@@ -1435,7 +1435,7 @@ static bool rebuild_live_acrylic(output_t *output, struct wlr_scene_output *scen
     draw_quad();
 
     client_t *c = tl->node->client;
-    if (c && c->border_radius > 0.0f && blur_ctx.prog_corner_mask) {
+    if (c && c->border_radius > 0.0f && c->state != STATE_FULLSCREEN && blur_ctx.prog_corner_mask) {
       struct wlr_box content_r = get_client_rect(tl);
       float ow = (float)w, oh = (float)h;
       float win_u  = (float)(content_r.x - output->lx) / ow;
@@ -1674,7 +1674,7 @@ static bool rebuild_corner_masks(output_t *output, struct wlr_scene_output *scen
     if (!tl->node->output || tl->node->output != output) continue;
 
     client_t *c = tl->node->client;
-    if (c->border_radius <= 0.0f) continue;
+    if (c->border_radius <= 0.0f || c->state == STATE_FULLSCREEN) continue;
 
     struct wlr_box container_r = get_client_rect(tl);
     int cx = tl->content_tree->node.x;
@@ -1755,7 +1755,7 @@ static void push_corner_masks_to_toplevels(output_t *output) {
     if (!m || m != output) continue;
 
     client_t *c = tl->node->client;
-    if (c->border_radius <= 0.0f) {
+    if (c->border_radius <= 0.0f || c->state == STATE_FULLSCREEN) {
       wlr_scene_buffer_set_buffer(tl->rounded->corner_mask_node, NULL);
       continue;
     }
@@ -2092,6 +2092,7 @@ void blur_output_frame(output_t *output, struct wlr_scene_output *scene_output) 
     wl_list_for_each(tl, &server.toplevels, link) {
       if (tl->rounded && tl->rounded->corner_mask_node && tl->node && tl->node->client &&
           tl->node->client->border_radius > 0.0f &&
+          tl->node->client->state != STATE_FULLSCREEN &&
           tl->node->output && tl->node->output == output) {
         any_cm = true;
         break;
