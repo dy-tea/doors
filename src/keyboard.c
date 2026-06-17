@@ -572,6 +572,7 @@ void toggle_fullscreen(void) {
       wlr_xwayland_surface_set_fullscreen(n->client->xwayland_view->xwayland_surface, false);
 
     set_state(mon, mon->desk, n, restore);
+    n->hidden = (restore == STATE_FLOATING);
     wlr_log(WLR_INFO, "Fullscreen disabled");
   } else {
     wlr_scene_node_reparent(&scene_tree->node, server.full_tree);

@@ -174,11 +174,13 @@ static void handle_foreign_fullscreen_request(struct wl_listener *listener, void
     wlr_scene_node_reparent(&toplevel->scene_tree->node, server.full_tree);
   } else {
     client_state_t last = toplevel->node->client->last_state;
-    if (last == STATE_FLOATING)
+    if (last == STATE_FLOATING) {
       set_state(m, d, toplevel->node, STATE_FLOATING);
-    else
+      wlr_scene_node_reparent(&toplevel->scene_tree->node, server.float_tree);
+    } else {
       set_state(m, d, toplevel->node, STATE_TILED);
-    wlr_scene_node_reparent(&toplevel->scene_tree->node, server.tile_tree);
+      wlr_scene_node_reparent(&toplevel->scene_tree->node, server.tile_tree);
+    }
   }
 
   wlr_xdg_toplevel_set_fullscreen(toplevel->xdg_toplevel, event->fullscreen);
@@ -1071,12 +1073,13 @@ void toplevel_request_fullscreen(struct wl_listener *listener, void *data) {
   } else {
     client_state_t last = toplevel->node->client->last_state;
 
-    if (last == STATE_FLOATING)
+    if (last == STATE_FLOATING) {
       set_state(m, d, toplevel->node, STATE_FLOATING);
-    else
+      wlr_scene_node_reparent(&toplevel->scene_tree->node, server.float_tree);
+    } else {
       set_state(m, d, toplevel->node, STATE_TILED);
-
-    wlr_scene_node_reparent(&toplevel->scene_tree->node, server.tile_tree);
+      wlr_scene_node_reparent(&toplevel->scene_tree->node, server.tile_tree);
+    }
   }
 
   wlr_xdg_toplevel_set_fullscreen(toplevel->xdg_toplevel, requested_fullscreen);

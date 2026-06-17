@@ -388,17 +388,8 @@ static void xwayland_view_configure(xwayland_toplevel_t *xwayland_view,
 	}
 }
 
-static void xwayland_view_set_fullscreen(xwayland_toplevel_t *xwayland_view, bool fullscreen) {
-	struct wlr_xwayland_surface *surface = xwayland_view->xwayland_surface;
-	wlr_xwayland_surface_set_fullscreen(surface, fullscreen);
-}
-
 static void xwayland_view_apply_disable_decorations(xwayland_toplevel_t *xwayland_view) {
-	if (!xwayland_view || !xwayland_view->xwayland_surface) return;
-
-	// if decorations are disabled or tabs-only, request fullscreen to hide client-side decorations
-	if (decoration_mode == DECORATION_NONE || decoration_mode == DECORATION_TABS)
-		xwayland_view_set_fullscreen(xwayland_view, true);
+	(void)xwayland_view;
 }
 
 void xwayland_view_set_activated(xwayland_toplevel_t *xwayland_view, bool activated) {
@@ -643,6 +634,8 @@ static void handle_map(struct wl_listener *listener, void *data) {
 
 	if (rule && rule->has_state && rule->state == STATE_FULLSCREEN)
 		toggle_fullscreen();
+	else if (xsurface->fullscreen)
+		toggle_fullscreen();
 
 	xwayland_view_apply_disable_decorations(xwayland_view);
 
@@ -868,8 +861,6 @@ static void handle_request_fullscreen(struct wl_listener *listener, void *data) 
 		wlr_xwayland_surface_set_fullscreen(xsurface, false);
 		set_state(m, d, node, restore);
 	}
-
-	xwayland_view_apply_disable_decorations(xwayland_view);
 }
 
 static void handle_request_minimize(struct wl_listener *listener, void *data) {
