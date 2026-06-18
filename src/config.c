@@ -690,7 +690,6 @@ void load_hotkeys_idle(void *data) {
 
   load_hotkeys(hotkey_init_path);
   setup_inotify_watch(hotkey_init_path);
-  add_hotkey_listener_to_event_loop();
 }
 
 static submap_t *find_or_create_submap(const char *name) {
@@ -725,6 +724,7 @@ void load_hotkeys(const char *config_path) {
   num_gesturebinds = 0;
   active_submap = NULL;
   current_parsing_submap = NULL;
+  bell_bind = (keybind_t){0};
 
   char line[MAXLEN * 2];
   char hotkey[MAXLEN * 2];
@@ -849,8 +849,15 @@ void load_hotkeys(const char *config_path) {
 }
 
 static void setup_inotify_watch(const char *config_path) {
-  if (hotkey_watch_fd >= 0)
+  if (hotkey_event_source) {
+    wl_event_source_remove(hotkey_event_source);
+    hotkey_event_source = NULL;
+  }
+
+  if (hotkey_watch_fd >= 0) {
     close(hotkey_watch_fd);
+    hotkey_watch_fd = -1;
+  }
 
   hotkey_watch_fd = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
   if (hotkey_watch_fd < 0) {
@@ -863,12 +870,15 @@ static void setup_inotify_watch(const char *config_path) {
   char dir_path[PATH_MAX];
   strcpy(dir_path, config_path);
   char *last_slash = strrchr(dir_path, '/');
+  uint32_t mask = IN_MODIFY | IN_CLOSE_WRITE | IN_MOVED_TO | IN_CREATE;
   if (last_slash) {
     *last_slash = '\0';
-    inotify_add_watch(hotkey_watch_fd, dir_path, IN_MODIFY);
+    inotify_add_watch(hotkey_watch_fd, dir_path, mask);
   } else {
-    inotify_add_watch(hotkey_watch_fd, ".", IN_MODIFY);
+    inotify_add_watch(hotkey_watch_fd, ".", mask);
   }
+
+  add_hotkey_listener_to_event_loop();
 }
 
 void config_init(void) {
@@ -1151,6 +1161,11 @@ void setup_hotkey_event_listener(struct wl_event_loop *event_loop) {
 }
 
 static void add_hotkey_listener_to_event_loop(void) {
+  if (hotkey_event_source) {
+    wl_event_source_remove(hotkey_event_source);
+    hotkey_event_source = NULL;
+  }
+
   if (hotkey_event_loop && hotkey_watch_fd >= 0)
     hotkey_event_source = wl_event_loop_add_fd(hotkey_event_loop, hotkey_watch_fd, WL_EVENT_READABLE, hotkey_reload_handler, NULL);
 }
