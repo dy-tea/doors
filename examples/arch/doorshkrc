@@ -1,0 +1,80 @@
+#
+# doors hotkey configuration
+#
+
+# terminal emulator
+super + Return
+	foot
+
+# launcher
+super + space
+	rofi -show drun
+
+# close window
+super + shift + q
+	doorsctl node --close
+
+# toggle fullscreen
+super + f
+	doorsctl node --state fullscreen
+
+# toggle floating
+super + shift + space
+	doorsctl node --state floating
+
+# toggle monocle
+super + m
+	doorsctl desktop --layout monocle
+
+# window navigation (using brace expansion)
+super + {h,j,k,l}
+	doorsctl focus {west,south,north,east}
+
+# window swapping (using brace expansion)
+super + shift + {h,j,k,l}
+	doorsctl swap {west,south,north,east}
+
+# cancel preselection
+super + ctrl + space
+	doorsctl presel cancel
+
+# rotate
+super + r
+	doorsctl rotate clockwise
+super + shift + r
+	doorsctl rotate counterclockwise
+
+# flip
+super + {comma,period}
+	doorsctl flip {horizontal,vertical}
+
+# resizing tiled windows (using brace expansion)
+super + ctrl + {h,j,k,l}
+	doorsctl resize {left,down,up,right}
+
+# floating window interactions (super + mouse on floating windows)
+super + mouse_left
+	doorsctl node interactive_move
+super + mouse_right
+	doorsctl node interactive_resize
+
+# desktop switching (1-based index)
+# Using brace expansion with range syntax
+super + {1-9}
+	doorsctl desktop {1-9}
+super + 0
+	doorsctl desktop 10
+
+# send to desktop (1-based index)
+super + shift + {1-9}
+	doorsctl node --to-desktop {1-9}
+super + shift + 0
+	doorsctl node --to-desktop 10
+
+# send to next/prev desktop
+super + shift + {Right,Left}
+	doorsctl send {next,prev}
+
+# quit
+super + shift + Escape
+	 systemctl --user stop doors-session.target && doorsctl exit
