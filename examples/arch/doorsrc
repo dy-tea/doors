@@ -25,8 +25,9 @@ doorsctl config gapless_monocle true
 doorsctl config enable_animations true
 
 # Commands for xdg-desktop-portal to work on systemd
-exec systemctl --user set-environment XDG_CURRENT_DESKTOP=doors && \
- systemctl --user import-environment DISPLAY WAYLAND_DISPLAY XDG_CURRENT_DESKTOP && \
- systemctl --user start doors-session.target
+systemctl --user set-environment XDG_CURRENT_DESKTOP=doors && \
+systemctl --user import-environment DISPLAY WAYLAND_DISPLAY XDG_CURRENT_DESKTOP && \
+systemctl --user start doors-session.target &
 
-dbus-update-activation-environment --systemd DISPLAY WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=doors
+hash dbus-update-activation-environment 2>/dev/null && \
+dbus-update-activation-environment --systemd DISPLAY XDG_CURRENT_DESKTOP=sway WAYLAND_DISPLAY &
