@@ -17,6 +17,7 @@
 #include <xkbcommon/xkbcommon.h>
 
 #define DOORS_CONFIG_DIR "/.config/doors"
+#define GLOBAL_CONFIG_DIR "/etc/doors"
 #define DOORSRC_NAME "doorsrc"
 #define DOORSHKRC_NAME "doorshkrc"
 
@@ -878,12 +879,23 @@ void config_init_with_config_dir(const char *config_dir) {
   custom_config_dir = config_dir;
 
   const char *config_home = get_config_home();
-
   char doorsrc_path[PATH_MAX];
-  snprintf(doorsrc_path, sizeof(doorsrc_path), "%s/%s", config_home, DOORSRC_NAME);
+  const char *config_source = config_home;
+
+  if (!custom_config_dir) {
+    char test_path[PATH_MAX];
+    snprintf(test_path, sizeof(test_path), "%s/%s", config_home, DOORSRC_NAME);
+    if (access(test_path, R_OK) != 0) {
+      snprintf(test_path, sizeof(test_path), "%s/%s", config_home, DOORSHKRC_NAME);
+      if (access(test_path, R_OK) != 0)
+        config_source = GLOBAL_CONFIG_DIR;
+    }
+  }
+
+  snprintf(doorsrc_path, sizeof(doorsrc_path), "%s/%s", config_source, DOORSRC_NAME);
   run_config(doorsrc_path);
 
-  snprintf(hotkey_init_path, sizeof(hotkey_init_path), "%s/%s", config_home, DOORSHKRC_NAME);
+  snprintf(hotkey_init_path, sizeof(hotkey_init_path), "%s/%s", config_source, DOORSHKRC_NAME);
 }
 
 void config_fini(void) {
