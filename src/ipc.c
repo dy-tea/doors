@@ -1,6 +1,7 @@
 #include "ipc.h"
 #include "output.h"
 #include "server.h"
+#include "tree.h"
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,6 +16,16 @@ subscriber_t *subscriber_head = NULL;
 subscriber_t *subscriber_tail = NULL;
 
 void remove_subscriber(subscriber_t *sb);
+
+static bool desktop_has_urgent(desktop_t *d) {
+  if (!d || !d->root) return false;
+
+  for (node_t *n = first_extrema(d->root); n != NULL; n = next_leaf(n, d->root))
+    if (n->client && n->client->urgent)
+      return true;
+
+  return false;
+}
 
 const char *ipc_get_socket_path(void) {
   return socket_path;
@@ -149,7 +160,7 @@ void ipc_print_report(int fd) {
     char mon_flag = (server.focused_output == m) ? 'M' : 'm';
     offset += snprintf(buf + offset, sizeof(buf) - offset, "%c%s", mon_flag, m->name);
 
-    for (desktop_t *d = m->desk; d != NULL; d = d->next) {
+    for (desktop_t *d = m->desk_head; d != NULL; d = d->next) {
       char desk_flag;
       if (m->desk == d) {
         if (d->focus) {
@@ -165,6 +176,8 @@ void ipc_print_report(int fd) {
         }
       }
       offset += snprintf(buf + offset, sizeof(buf) - offset, ":%c%s", desk_flag, d->name);
+      if (desktop_has_urgent(d))
+        offset += snprintf(buf + offset, sizeof(buf) - offset, ":U%s", d->name);
     }
 
     if (m->desk) {
