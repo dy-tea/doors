@@ -1,6 +1,6 @@
 pkgname='doors-git'
 _pkgname='doors'
-pkgver=0.r981b304
+pkgver=0.r12681a1
 pkgrel=1
 pkgdesc='Wayland compositor inspired by bspwm'
 arch=(x86_64)
