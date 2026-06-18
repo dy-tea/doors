@@ -1,0 +1,4 @@
+src/
+pkg/
+doors/
+*.pkg.tar.zst

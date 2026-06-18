@@ -135,7 +135,3 @@ executable(
 )
 
 install_data('doors.desktop', install_dir: '/usr/share/wayland-sessions')
-install_data(
-	'doors-portals.conf',
-	install_dir: get_option('datadir') / 'xdg-desktop-portal',
-)
