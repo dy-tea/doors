@@ -39,7 +39,6 @@ typedef struct toplevel_rounded_t {
   struct wlr_scene_buffer *corner_mask_node;
   struct wlr_buffer *corner_mask_buf;
   GLuint corner_mask_buf_fbo;
-  bool corner_mask_dirty;
 } toplevel_rounded_t;
 
 typedef struct toplevel_t {

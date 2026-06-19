@@ -774,7 +774,6 @@ void blur_output_resize(blur_output_ctx_t *ctx, int width, int height,
         tl->rounded->border_shader_buf_h = 0;
       }
       tl->rounded->border_dirty = true;
-      tl->rounded->corner_mask_dirty = true;
     }
   }
 
@@ -1675,8 +1674,6 @@ static bool rebuild_corner_masks(output_t *output, struct wlr_scene_output *scen
     if (!tl->node->client->shown) continue;
     if (!tl->node->output || tl->node->output != output) continue;
 
-    tl->rounded->corner_mask_dirty = false;
-
     client_t *c = tl->node->client;
     if (c->border_radius <= 0.0f || c->state == STATE_FULLSCREEN) continue;
 
@@ -2068,28 +2065,15 @@ void blur_output_frame(output_t *output, struct wlr_scene_output *scene_output) 
   bool mica_dirty = mica_enabled && ctx->mica_dirty;
 
   // when no relevant damage and mica not dirty, skip all background captures
-  // unless corner masks need re-rendering due to toplevel size changes
   if (!bg_damaged && !mica_dirty) {
-    bool has_dirty_cm = false;
-    toplevel_t *tltmp;
-    wl_list_for_each(tltmp, &server.toplevels, link) {
-      if (tltmp->rounded && tltmp->rounded->corner_mask_dirty &&
-          tltmp->rounded->corner_mask_node && tltmp->node &&
-          tltmp->node->client && tltmp->node->output == output) {
-        has_dirty_cm = true;
-        break;
-      }
-    }
-    if (!has_dirty_cm) {
-      if (blur_enabled) {
-        push_blur_to_toplevels(output);
-        push_blur_to_layers(output);
-      }
-      push_corner_masks_to_toplevels(output);
-      push_acrylic_to_toplevels(output);
-      push_mica_to_toplevels(output);
-      goto after_capture;
-    }
+  	if (blur_enabled) {
+      push_blur_to_toplevels(output);
+      push_blur_to_layers(output);
+   	}
+   	push_corner_masks_to_toplevels(output);
+    push_acrylic_to_toplevels(output);
+    push_mica_to_toplevels(output);
+    goto after_capture;
   }
 
   // check if layer blur surfaces need rendering

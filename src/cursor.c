@@ -186,7 +186,6 @@ static void update_scene_positions(node_t *n, struct wlr_box rect, desktop_t *d)
           update_border_colors(n->client->toplevel->border_tree, n->client->toplevel->border_rects, n->client);
           if (n->client->border_radius > 0.0f && n->client->toplevel->rounded) {
             n->client->toplevel->rounded->border_dirty = true;
-            n->client->toplevel->rounded->corner_mask_dirty = true;
           }
         }
       }
@@ -411,7 +410,6 @@ static void process_cursor_resize(void) {
     update_border_colors(toplevel->border_tree, toplevel->border_rects, client);
     if (client->border_radius > 0.0f && toplevel->rounded) {
       toplevel->rounded->border_dirty = true;
-      toplevel->rounded->corner_mask_dirty = true;
     }
   }
 }
