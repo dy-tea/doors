@@ -16,12 +16,11 @@ depends=(
 	'libxcb'
 	'libxkbcommon.so'
 	'pango'
-	'perl'
 	'wlroots-git'
 	'xcb-util-wm'
 	'xorg-xwayland'
 )
-makedepends=(git meson ninja wayland-protocols)
+makedepends=(git perl meson ninja wayland-protocols)
 provides=('wayland-compositor')
 source=("git+https://dawn.wine/CreeperFace/doors.git#branch=master"
 				"doors-portals.conf"
