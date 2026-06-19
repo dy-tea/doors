@@ -774,6 +774,7 @@ void blur_output_resize(blur_output_ctx_t *ctx, int width, int height,
         tl->rounded->border_shader_buf_h = 0;
       }
       tl->rounded->border_dirty = true;
+      tl->rounded->corner_mask_dirty = true;
     }
   }
 
@@ -998,7 +999,7 @@ static GLuint capture_bg_to_tex1(output_t *output, blur_output_ctx_t *ctx,
   return result;
 }
 
-// capture background once with all blur-layer surfaces AND corner-mask toplevels hidden
+// capture background once with all blur-layer surfaces and corner-mask toplevels hidden
 static GLuint capture_bg_combined(output_t *output, blur_output_ctx_t *ctx,
     struct wlr_scene_output *real_scene_output) {
   int w = output->width, h = output->height;
@@ -1072,8 +1073,7 @@ static GLuint capture_bg_combined(output_t *output, blur_output_ctx_t *ctx,
 // ensure buf/fbo are allocated; returns fbo or 0 on failure
 static GLuint ensure_output_buf(struct wlr_buffer **buf_out, GLuint *fbo_out,
     int w, int h) {
-  if (*buf_out)
-    return *fbo_out;
+  if (*buf_out) return *fbo_out;
 
   const struct wlr_drm_format_set *fmts = wlr_renderer_get_render_formats(server.renderer);
   const struct wlr_drm_format *fmt = fmts ? wlr_drm_format_set_get(fmts, DRM_FORMAT_ARGB8888) : NULL;
@@ -1365,11 +1365,11 @@ static void push_blur_to_layers(output_t *output) {
       int blur_r_w = ls->blur_region_width;
       int blur_r_h = ls->blur_region_height;
 
-      // Compute the source box in output-local coordinates
-      // r is the blur region in layout (absolute) coordinates
+      // compute the source box in output-local coordinates
       struct wlr_box r = { .x = lx + blur_r_x, .y = ly + blur_r_y, .width = blur_r_w, .height = blur_r_h };
 
-      struct wlr_fbox src; int dw, dh;
+      struct wlr_fbox src;
+      int dw, dh;
       if (!compute_src_box(output, &r, &src, &dw, &dh)) {
         wlr_scene_buffer_set_buffer(ls->blur_node, NULL);
         wlr_scene_node_set_position(&ls->blur_node->node, 0, 0);
@@ -1379,7 +1379,7 @@ static void push_blur_to_layers(output_t *output) {
       int offset_x = (r.x < output->lx) ? (output->lx - r.x) : 0;
       int offset_y = (r.y < output->ly) ? (output->ly - r.y) : 0;
 
-      // Position at blur region offset within surface
+      // position at blur region offset within surface
       wlr_scene_node_set_position(&ls->blur_node->node, blur_r_x + offset_x, blur_r_y + offset_y);
       wlr_scene_buffer_set_source_box(ls->blur_node, &src);
       wlr_scene_buffer_set_dest_size(ls->blur_node, dw, dh);
@@ -1438,8 +1438,8 @@ static bool rebuild_live_acrylic(output_t *output, struct wlr_scene_output *scen
     if (c && c->border_radius > 0.0f && c->state != STATE_FULLSCREEN && blur_ctx.prog_corner_mask) {
       struct wlr_box content_r = get_client_rect(tl);
       float ow = (float)w, oh = (float)h;
-      float win_u  = (float)(content_r.x - output->lx) / ow;
-      float win_v  = (float)(content_r.y - output->ly) / oh;
+      float win_u = (float)(content_r.x - output->lx) / ow;
+      float win_v = (float)(content_r.y - output->ly) / oh;
       float win_sw = (float)content_r.width  / ow;
       float win_sh = (float)content_r.height / oh;
       int bw_i = (c->state == STATE_FULLSCREEN) ? 0 : (int)c->border_width;
@@ -1492,6 +1492,7 @@ static void push_acrylic_to_toplevels(output_t *output) {
       wlr_scene_node_set_position(&tl->blur->acrylic_node->node, 0, 0);
       continue;
     }
+
     int node_ox = (r.x < output->lx) ? (output->lx - r.x) : 0;
     int node_oy = (r.y < output->ly) ? (output->ly - r.y) : 0;
     wlr_scene_node_set_position(&tl->blur->acrylic_node->node, node_ox, node_oy);
@@ -1561,6 +1562,7 @@ static void push_mica_to_toplevels(output_t *output) {
       wlr_scene_node_set_position(&tl->blur->mica_node->node, 0, 0);
       continue;
     }
+
     int node_ox = (r.x < output->lx) ? (output->lx - r.x) : 0;
     int node_oy = (r.y < output->ly) ? (output->ly - r.y) : 0;
     wlr_scene_node_set_position(&tl->blur->mica_node->node, node_ox, node_oy);
@@ -1673,6 +1675,8 @@ static bool rebuild_corner_masks(output_t *output, struct wlr_scene_output *scen
     if (!tl->node->client->shown) continue;
     if (!tl->node->output || tl->node->output != output) continue;
 
+    tl->rounded->corner_mask_dirty = false;
+
     client_t *c = tl->node->client;
     if (c->border_radius <= 0.0f || c->state == STATE_FULLSCREEN) continue;
 
@@ -1742,6 +1746,7 @@ static bool rebuild_corner_masks(output_t *output, struct wlr_scene_output *scen
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glFlush();
     egl_unset_current();
+
     any = true;
   }
   return any;
@@ -1905,7 +1910,7 @@ static GLuint capture_full_scene_to_tex(output_t *output, blur_output_ctx_t *ctx
   return result;
 }
 
-static void do_screen_shader_frame(output_t *output, struct wlr_scene_output *scene_output) {
+static void handle_screen_shader_frame(output_t *output, struct wlr_scene_output *scene_output) {
   blur_output_ctx_t *ctx = output->blur_ctx;
   if (!ctx || !ctx->screen_shader_node) return;
 
@@ -1939,10 +1944,12 @@ static void do_screen_shader_frame(output_t *output, struct wlr_scene_output *sc
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, src);
   glUseProgram(screen_shader_prog);
+
   if (screen_shader_u_tex >= 0)
     glUniform1i(screen_shader_u_tex, 0);
   if (screen_shader_u_resolution >= 0)
     glUniform2f(screen_shader_u_resolution, (float)w, (float)h);
+
   if (screen_shader_u_time >= 0) {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
@@ -2032,12 +2039,13 @@ static bool region_overlaps_tree(pixman_region32_t *damage, struct wlr_scene_tre
 
 static bool background_capture_needed(struct wlr_scene_output *scene_output) {
   pixman_region32_t *damage = &scene_output->damage_ring.current;
-  if (!damage->data) return false;  // inlined pixman_region32_not_empty
+  if (!damage->data) return false; // inlined pixman_region32_not_empty
 
   struct wlr_scene_tree *relevant[] = {
     server.bg_tree, server.bot_tree, server.tile_tree,
     server.float_tree, server.shader_tree, server.drag_tree,
   };
+
   for (size_t i = 0; i < sizeof(relevant)/sizeof(relevant[0]); i++)
     if (region_overlaps_tree(damage, relevant[i])) return true;
 
@@ -2060,15 +2068,28 @@ void blur_output_frame(output_t *output, struct wlr_scene_output *scene_output) 
   bool mica_dirty = mica_enabled && ctx->mica_dirty;
 
   // when no relevant damage and mica not dirty, skip all background captures
+  // unless corner masks need re-rendering due to toplevel size changes
   if (!bg_damaged && !mica_dirty) {
-    if (blur_enabled) {
-      push_blur_to_toplevels(output);
-      push_blur_to_layers(output);
+    bool has_dirty_cm = false;
+    toplevel_t *tltmp;
+    wl_list_for_each(tltmp, &server.toplevels, link) {
+      if (tltmp->rounded && tltmp->rounded->corner_mask_dirty &&
+          tltmp->rounded->corner_mask_node && tltmp->node &&
+          tltmp->node->client && tltmp->node->output == output) {
+        has_dirty_cm = true;
+        break;
+      }
     }
-    push_corner_masks_to_toplevels(output);
-    push_acrylic_to_toplevels(output);
-    push_mica_to_toplevels(output);
-    goto after_capture;
+    if (!has_dirty_cm) {
+      if (blur_enabled) {
+        push_blur_to_toplevels(output);
+        push_blur_to_layers(output);
+      }
+      push_corner_masks_to_toplevels(output);
+      push_acrylic_to_toplevels(output);
+      push_mica_to_toplevels(output);
+      goto after_capture;
+    }
   }
 
   // check if layer blur surfaces need rendering
@@ -2117,6 +2138,7 @@ void blur_output_frame(output_t *output, struct wlr_scene_output *scene_output) 
     }
   }
 
+  // apply corner masks and blur if needed
   if (has_layer_blur && any_cm) {
     GLuint bg_tex = capture_bg_combined(output, ctx, scene_output);
     if (bg_tex && blur_enabled) {
@@ -2185,6 +2207,7 @@ after_capture:
         if ((int)tl->geometry.height < content_r.height)
           content_r.height = tl->geometry.height;
       }
+
       egl_make_current();
       blur_render_border(tl, content_r.width, content_r.height);
       egl_unset_current();
@@ -2192,7 +2215,7 @@ after_capture:
     }
   }
 
-  do_screen_shader_frame(output, scene_output);
+  handle_screen_shader_frame(output, scene_output);
 }
 
 enum blur_algorithm blur_algorithm_from_str(const char *str) {
@@ -2221,7 +2244,9 @@ const char *blur_algorithm_to_str(enum blur_algorithm algo) {
 static void screen_shader_set_prog(GLuint prog, const char *name) {
   if (screen_shader_prog)
     glDeleteProgram(screen_shader_prog);
+
   screen_shader_prog = prog;
+
   if (prog) {
     screen_shader_u_tex = glGetUniformLocation(prog, "tex");
     screen_shader_u_resolution = glGetUniformLocation(prog, "resolution");
@@ -2307,6 +2332,7 @@ void screen_shader_clear(void) {
     glDeleteProgram(screen_shader_prog);
     egl_unset_current();
   }
+
   screen_shader_prog = 0;
   screen_shader_enabled = false;
   screen_shader_u_tex = screen_shader_u_resolution = screen_shader_u_time = -1;

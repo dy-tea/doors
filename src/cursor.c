@@ -184,8 +184,10 @@ static void update_scene_positions(node_t *n, struct wlr_box rect, desktop_t *d)
           const struct wlr_box geo = {0, 0, r.width, r.height};
           update_borders(n->client->toplevel->border_tree, n->client->toplevel->border_rects, geo, bw);
           update_border_colors(n->client->toplevel->border_tree, n->client->toplevel->border_rects, n->client);
-          if (n->client->border_radius > 0.0f && n->client->toplevel->rounded)
+          if (n->client->border_radius > 0.0f && n->client->toplevel->rounded) {
             n->client->toplevel->rounded->border_dirty = true;
+            n->client->toplevel->rounded->corner_mask_dirty = true;
+          }
         }
       }
       if (n->client->xwayland_view && n->client->xwayland_view->scene_tree) {
@@ -407,8 +409,10 @@ static void process_cursor_resize(void) {
     const struct wlr_box geo = {0, 0, new_width, new_height};
     update_borders(toplevel->border_tree, toplevel->border_rects, geo, bw);
     update_border_colors(toplevel->border_tree, toplevel->border_rects, client);
-    if (client->border_radius > 0.0f && toplevel->rounded)
+    if (client->border_radius > 0.0f && toplevel->rounded) {
       toplevel->rounded->border_dirty = true;
+      toplevel->rounded->corner_mask_dirty = true;
+    }
   }
 }
 
