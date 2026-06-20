@@ -1,4 +1,5 @@
 #include "animation.h"
+#include "ipc.h"
 #include "server.h"
 #include "output.h"
 #include "tree.h"
@@ -303,6 +304,7 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
   }
 
   output->desk = new_desk;
+  ipc_put_status(SUB_MASK_REPORT, NULL);
 
   // update visibility
   update_all_toplevels_visibility(output, new_desk);
@@ -444,6 +446,7 @@ void workspace_switch_to_desktop(const char *name) {
   }
 
   output->desk = d;
+  ipc_put_status(SUB_MASK_REPORT, NULL);
 
   wlr_log(WLR_DEBUG, "Switching from %s to %s",
     old_desktop ? old_desktop->name : "NULL", d->name);

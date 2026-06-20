@@ -1,5 +1,6 @@
 #include "animation.h"
 #include "config.h"
+#include "ipc.h"
 #include "input_method.h"
 #include "launcher.h"
 #include "keyboard.h"
@@ -956,6 +957,7 @@ static void handle_set_hints(struct wl_listener *listener, void *data) {
 	if (xwayland_view->node && xwayland_view->node->client) {
 		xwayland_view->node->client->urgent =
 			xsurface->hints && (xsurface->hints->flags & XCB_ICCCM_WM_HINT_X_URGENCY);
+		ipc_put_status(SUB_MASK_REPORT, NULL);
 	}
 }
 

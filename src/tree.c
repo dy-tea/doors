@@ -1,4 +1,5 @@
 #include "animation.h"
+#include "ipc.h"
 #include "output.h"
 #include "scroller.h"
 #include "scratchpad.h"
@@ -1088,6 +1089,7 @@ bool focus_node(output_t *m, desktop_t *d, node_t *n) {
   }
 
   server.focus_from_click = false;
+  ipc_put_status(SUB_MASK_REPORT, NULL);
 
   return true;
 }
