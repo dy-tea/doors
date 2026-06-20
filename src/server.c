@@ -145,9 +145,15 @@ void server_init(void) {
 			wlr_renderer_get_drm_fd(server.renderer));
 	}
 
+  // data device
   wlr_data_device_manager_create(server.wl_display);
-  wlr_primary_selection_v1_device_manager_create(server.wl_display);
 
+  // primary selection
+  const char *disable_primary_selection = getenv("DOORS_DISABLE_PRIMARY_SELECTION");
+  if (disable_primary_selection == NULL)
+  	wlr_primary_selection_v1_device_manager_create(server.wl_display);
+
+  // output management
   server.output_layout = wlr_output_layout_create(server.wl_display);
   wlr_xdg_output_manager_v1_create(server.wl_display, server.output_layout);
 

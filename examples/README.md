@@ -1198,3 +1198,7 @@ doorsctl hotkey "ctrl+alt+t" doorsctl node --state tiled
 doorsctl equalize # Equalize window sizes in tree
 doorsctl balance  # Balance window sizes in tree
 ```
+
+### Primary selection
+
+Primary selection (middle mouse paste) is enabled by default. To disable it, add the enviroment variable `DOORS_DISABLE_PRIMARY_SELECTION=1` to your environment before doors launches. Do not put this in the `doorsrc` as those commands run after primary selection is set up.
