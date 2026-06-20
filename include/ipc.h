@@ -54,6 +54,7 @@ void ipc_cleanup(void);
 const char *ipc_get_socket_path(void);
 
 void ipc_put_status(subscriber_mask_t mask, const char *fmt, ...);
-void ipc_print_report(int fd);
+bool ipc_print_report(int fd);
 
-void process_ipc_message(char *msg, int msg_len, int client_fd);
+/* Returns true when the command takes ownership of client_fd. */
+bool process_ipc_message(char *msg, int msg_len, int client_fd);

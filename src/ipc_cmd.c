@@ -3981,17 +3981,18 @@ static void ipc_cmd_scratchpad(char **args, int num, int client_fd) {
   }
 }
 
-void ipc_cmd_subscribe(char **args, int num, int client_fd);
+bool ipc_cmd_subscribe(char **args, int num, int client_fd);
 
-void process_ipc_message(char *msg, int msg_len, int client_fd) {
+bool process_ipc_message(char *msg, int msg_len, int client_fd) {
   wlr_log(WLR_DEBUG, "IPC: processing message: %.*s", msg_len, msg);
+  bool owns_client_fd = false;
   int cap = 16;
   int num = 0;
   char **args = calloc(cap, sizeof(char *));
 
   if (!args) {
     send_failure(client_fd, "memory error\n");
-    return;
+    return false;
   }
 
   for (int i = 0, j = 0; i < msg_len; i++) {
@@ -4001,7 +4002,7 @@ void process_ipc_message(char *msg, int msg_len, int client_fd) {
       if (!new) {
         free(args);
         send_failure(client_fd, "memory error\n");
-        return;
+        return false;
       }
       args = new;
     }
@@ -4014,7 +4015,7 @@ void process_ipc_message(char *msg, int msg_len, int client_fd) {
   if (num < 1) {
     free(args);
     send_failure(client_fd, "no arguments\n");
-    return;
+    return false;
   }
 
   char **args_orig = args;
@@ -4032,7 +4033,7 @@ void process_ipc_message(char *msg, int msg_len, int client_fd) {
   } else if (streq("quit", *args)) {
     ipc_cmd_quit(++args, --num, client_fd);
   } else if (streq("subscribe", *args)) {
-    ipc_cmd_subscribe(++args, --num, client_fd);
+    owns_client_fd = ipc_cmd_subscribe(++args, --num, client_fd);
   } else if (streq("output", *args)) {
     ipc_cmd_output(++args, --num, client_fd);
   } else if (streq("input", *args)) {
@@ -4099,4 +4100,5 @@ void process_ipc_message(char *msg, int msg_len, int client_fd) {
    }
 
   free(args_orig);
+  return owns_client_fd;
 }

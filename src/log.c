@@ -233,6 +233,7 @@ int log_setup_signals(void) {
   sigaction(SIGABRT, &sa, NULL);
   sigaction(SIGFPE, &sa, NULL);
   sigaction(SIGILL, &sa, NULL);
+  signal(SIGPIPE, SIG_IGN); // TO PREVENT LOG CRASHES
 
   return 0;
 }

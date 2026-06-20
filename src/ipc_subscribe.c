@@ -59,12 +59,17 @@ void add_subscriber(subscriber_t *sb) {
   fcntl(sb->client_fd, F_SETFD, flags & ~FD_CLOEXEC);
 
   if (sb->mask & SUB_MASK_REPORT) {
-    ipc_print_report(sb->client_fd);
-    if (sb->count-- == 1) remove_subscriber(sb);
+    if (!ipc_print_report(sb->client_fd)) {
+      // Remove dead subscriber
+      remove_subscriber(sb);
+    } else if (sb->count > 0 && --sb->count == 0) {
+      // remove subscriber if event count hits 0
+      remove_subscriber(sb);
+    }
   }
 }
 
-void ipc_cmd_subscribe(char **args, int num, int client_fd) {
+bool ipc_cmd_subscribe(char **args, int num, int client_fd) {
   subscriber_mask_t mask = 0;
   int count = -1;
   char *fifo_path = NULL;
@@ -74,13 +79,13 @@ void ipc_cmd_subscribe(char **args, int num, int client_fd) {
     if (streq("-c", *args) || streq("--count", *args)) {
       if (num < 2) {
         send_failure(client_fd, "subscribe -c: missing count\n");
-        return;
+        return false;
       }
       args++;
       num--;
       if (sscanf(*args, "%d", &count) != 1 || count < 1) {
         send_failure(client_fd, "subscribe -c: invalid count\n");
-        return;
+        return false;
       }
     } else if (streq("-f", *args) || streq("--fifo", *args)) {
       explicit_fifo = true;
@@ -126,7 +131,7 @@ void ipc_cmd_subscribe(char **args, int num, int client_fd) {
       mask = SUB_MASK_ALL;
     } else {
       send_failure(client_fd, "subscribe: unknown argument\n");
-      return;
+      return false;
     }
     args++;
     num--;
@@ -141,14 +146,14 @@ void ipc_cmd_subscribe(char **args, int num, int client_fd) {
     int fd = mkstemp(template);
     if (fd < 0) {
       send_failure(client_fd, "subscribe: failed to create fifo path\n");
-      return;
+      return false;
     }
     close(fd);
     unlink(template);
     fifo_path = strdup(template);
     if (!fifo_path) {
       send_failure(client_fd, "subscribe: memory error\n");
-      return;
+      return false;
     }
     if (mkfifo(fifo_path, 0666) == -1) {
       free(fifo_path);
@@ -161,7 +166,7 @@ void ipc_cmd_subscribe(char **args, int num, int client_fd) {
     if (fifo_fd < 0) {
       free(fifo_path);
       send_failure(client_fd, "subscribe: failed to open fifo\n");
-      return;
+      return false;
     }
     char response[DOORS_BUFSIZ];
     snprintf(response, sizeof(response), "%s\n", fifo_path);
@@ -174,8 +179,9 @@ void ipc_cmd_subscribe(char **args, int num, int client_fd) {
   if (!sb) {
     if (fifo_path) free(fifo_path);
     send_failure(client_fd, "subscribe: failed to create subscriber\n");
-    return;
+    return false;
   }
 
   add_subscriber(sb);
+  return true;
 }

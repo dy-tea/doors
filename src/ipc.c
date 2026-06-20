@@ -2,6 +2,7 @@
 #include "output.h"
 #include "server.h"
 #include "tree.h"
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,6 +17,25 @@ subscriber_t *subscriber_head = NULL;
 subscriber_t *subscriber_tail = NULL;
 
 void remove_subscriber(subscriber_t *sb);
+
+static bool ipc_write_all(int fd, const void *data, size_t len) {
+  const char *buf = data;
+  size_t written = 0;
+
+  while (written < len) {
+    ssize_t n = write(fd, buf + written, len - written);
+    if (n < 0) {
+      if (errno == EINTR)
+        continue;
+      return false;
+    }
+    if (n == 0)
+      return false;
+    written += (size_t)n;
+  }
+
+  return true;
+}
 
 static bool desktop_has_urgent(desktop_t *d) {
   if (!d || !d->root) return false;
@@ -102,7 +122,7 @@ static void send_response(int client_fd, bool success, const char *msg) {
   }
 
   wlr_log(WLR_DEBUG, "IPC: sending response: %.*s", (int)(offset-1), buf+1);
-  write(client_fd, buf, offset);
+  ipc_write_all(client_fd, buf, offset);
 }
 
 void send_success(int client_fd, const char *msg) {
@@ -126,8 +146,9 @@ void ipc_handle_incoming(int client_fd) {
   }
 
   msg[n] = '\0';
-  process_ipc_message(msg, (int)n, client_fd);
-  close(client_fd);
+  /* Long-lived commands such as subscribe keep client_fd open. */
+  if (!process_ipc_message(msg, (int)n, client_fd))
+    close(client_fd);
 }
 
 void ipc_cleanup(void) {
@@ -152,7 +173,7 @@ void ipc_cleanup(void) {
   subscriber_head = subscriber_tail = NULL;
 }
 
-void ipc_print_report(int fd) {
+bool ipc_print_report(int fd) {
   char buf[DOORS_BUFSIZ];
   size_t offset = 0;
 
@@ -212,18 +233,13 @@ void ipc_print_report(int fd) {
   }
 
   offset += snprintf(buf + offset, sizeof(buf) - offset, "%s", "\n");
-  write(fd, buf, offset);
+  return ipc_write_all(fd, buf, offset);
 }
 
 void ipc_put_status(subscriber_mask_t mask, const char *fmt, ...) {
   subscriber_t *sb = subscriber_head;
   char buf[DOORS_BUFSIZ];
   size_t len = 0;
-
-  if (mask == SUB_MASK_REPORT) {
-    ipc_print_report(-1);
-    return;
-  }
 
   if (fmt) {
     va_list args;
@@ -238,13 +254,14 @@ void ipc_put_status(subscriber_mask_t mask, const char *fmt, ...) {
     if (sb->mask & mask) {
       if (sb->count > 0) sb->count--;
 
+      bool ok = true;
       if (mask == SUB_MASK_REPORT) {
-        ipc_print_report(sb->client_fd);
+        ok = ipc_print_report(sb->client_fd);
       } else if (len > 0) {
-        write(sb->client_fd, buf, len);
+        ok = ipc_write_all(sb->client_fd, buf, len);
       }
 
-      if (sb->count == 0) remove_subscriber(sb);
+      if (!ok || sb->count == 0) remove_subscriber(sb);
     }
     sb = next;
   }
