@@ -3,6 +3,7 @@
 #include "config.h"
 #include "toplevel.h"
 #include "input_method.h"
+#include "workspace.h"
 #include "ipc.h"
 #include "rule.h"
 #include "keyboard.h"
@@ -133,28 +134,32 @@ void update_foreign_toplevel_state(toplevel_t *toplevel) {
 }
 
 static void handle_foreign_activate_request(struct wl_listener *listener, void *data) {
-  struct wlr_foreign_toplevel_handle_v1_activated_event *event = data;
-  (void)event;
+  (void)data;
   toplevel_t *toplevel = wl_container_of(listener, toplevel, foreign_activate_request);
 
   if (!toplevel->node || !toplevel->node->client)
     return;
 
   output_t *m = toplevel->node->output;
-  desktop_t *d = m ? m->desk : NULL;
+  if (!m) return;
 
-  if (!d) return;
+  desktop_t *toplevel_desk = toplevel->node->desktop;
+  if (!toplevel_desk) return;
 
-  if (d->focus != NULL && d->focus != toplevel->node) {
-    node_t *prev = d->focus;
-    d->focus = NULL;
+  if (m->desk != toplevel_desk)
+    workspace_switch_to_desktop(toplevel_desk->name);
 
-    if (prev->client && prev->client->toplevel) {
-      struct toplevel_t *prev_toplevel = prev->client->toplevel;
-      wlr_xdg_toplevel_set_activated(prev_toplevel->xdg_toplevel, false);
-      if (prev_toplevel->foreign_toplevel)
-        wlr_foreign_toplevel_handle_v1_set_activated(prev_toplevel->foreign_toplevel, false);
-    }
+  if (toplevel_desk->focus == toplevel->node)
+    return;
+
+  node_t *prev = toplevel_desk->focus;
+  toplevel_desk->focus = NULL;
+
+  if (prev && prev->client && prev->client->toplevel) {
+    struct toplevel_t *prev_toplevel = prev->client->toplevel;
+    wlr_xdg_toplevel_set_activated(prev_toplevel->xdg_toplevel, false);
+    if (prev_toplevel->foreign_toplevel)
+      wlr_foreign_toplevel_handle_v1_set_activated(prev_toplevel->foreign_toplevel, false);
   }
 
   focus_toplevel(toplevel);
@@ -530,6 +535,10 @@ void toplevel_map(struct wl_listener *listener, void *data) {
     };
     n->client->state = STATE_PSEUDO_TILED;
   }
+
+  // notify wlr_foreign_toplevel clients about the output association
+  if (toplevel->foreign_toplevel && target_output && target_output->wlr_output)
+    wlr_foreign_toplevel_handle_v1_output_enter(toplevel->foreign_toplevel, target_output->wlr_output);
 
   // create borders if applicable
   create_borders(toplevel->scene_tree, &toplevel->border_tree, toplevel->border_rects);
