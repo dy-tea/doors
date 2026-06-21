@@ -990,7 +990,7 @@ static void ipc_cmd_node(char **args, int num, int client_fd) {
     char *key = strtok(*args, "=");
     char *val = strtok(NULL, "=");
 
-    bool set_value;
+    bool set_value = false;
     bool has_value = false;
 
     if (val == NULL) {
@@ -2594,7 +2594,7 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
       transaction_commit_dirty();
       send_success(client_fd, "decoration_mode set\n");
     } else {
-      const char *mode_str;
+      const char *mode_str = "";
       switch (decoration_mode) {
       case DECORATION_NONE:
         mode_str = "none\n";

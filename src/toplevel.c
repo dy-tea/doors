@@ -70,6 +70,7 @@ static void handle_foreign_activate_request(struct wl_listener *listener, void *
 static void handle_foreign_fullscreen_request(struct wl_listener *listener, void *data);
 static void handle_foreign_close_request(struct wl_listener *listener, void *data);
 static void handle_foreign_destroy(struct wl_listener *listener, void *data);
+static void handle_outputs_update(struct wl_listener *listener, void *data);
 
 static void toplevel_apply_disable_decorations(toplevel_t *toplevel) {
   if (!toplevel || !toplevel->xdg_toplevel) return;
@@ -205,6 +206,44 @@ static void handle_foreign_destroy(struct wl_listener *listener, void *data) {
   wl_list_remove(&toplevel->foreign_fullscreen_request.link);
   wl_list_remove(&toplevel->foreign_close_request.link);
   wl_list_remove(&toplevel->foreign_destroy.link);
+}
+
+static void handle_outputs_update(struct wl_listener *listener, void *data) {
+  toplevel_t *toplevel = wl_container_of(listener, toplevel, outputs_update);
+  struct wlr_scene_outputs_update_event *event = data;
+
+  if (toplevel->foreign_toplevel) {
+    struct wlr_foreign_toplevel_handle_v1_output *toplevel_output, *tmp;
+    wl_list_for_each_safe(toplevel_output, tmp, &toplevel->foreign_toplevel->outputs, link) {
+      bool active = false;
+      for (size_t i = 0; i < event->size; i++) {
+        struct wlr_scene_output *scene_output = event->active[i];
+        if (scene_output->output == toplevel_output->output) {
+          active = true;
+          break;
+        }
+      }
+
+      if (!active) {
+        wlr_log(WLR_DEBUG, "Toplevel output leave: %s", toplevel_output->output->name);
+        wlr_foreign_toplevel_handle_v1_output_leave(toplevel->foreign_toplevel, toplevel_output->output);
+      }
+    }
+
+    for (size_t i = 0; i < event->size; i++) {
+      struct wlr_scene_output *scene_output = event->active[i];
+      wlr_log(WLR_DEBUG, "Toplevel output enter: %s", scene_output->output->name);
+      wlr_foreign_toplevel_handle_v1_output_enter(toplevel->foreign_toplevel, scene_output->output);
+    }
+  }
+}
+
+static bool toplevel_output_handler_point_accepts_input(
+		struct wlr_scene_buffer *buffer, double *x, double *y) {
+	(void)buffer;
+	(void)x;
+	(void)y;
+	return false;
 }
 
 void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
@@ -1017,6 +1056,13 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
   wl_list_remove(&toplevel->request_minimize.link);
   wl_list_remove(&toplevel->set_title.link);
   wl_list_remove(&toplevel->set_app_id.link);
+  wl_list_remove(&toplevel->outputs_update.link);
+
+  if (toplevel->output_handler) {
+    wlr_scene_node_destroy(&toplevel->output_handler->node);
+    toplevel->output_handler = NULL;
+  }
+
   wl_list_remove(&toplevel->link);
 
   free(toplevel);
@@ -1288,6 +1334,13 @@ void handle_new_xdg_toplevel(struct wl_listener *listener, void *data) {
   toplevel->image_capture = wlr_scene_create();
   toplevel->image_capture_tree = wlr_scene_tree_create(&toplevel->image_capture->tree);
 
+  toplevel->output_handler = wlr_scene_buffer_create(toplevel->scene_tree, NULL);
+  if (!toplevel->output_handler) {
+    wlr_log(WLR_ERROR, "Failed to create output handler for toplevel");
+  } else {
+    toplevel->output_handler->point_accepts_input = toplevel_output_handler_point_accepts_input;
+  }
+
   // register event listeners
   toplevel->map.notify = toplevel_map;
   wl_signal_add(&xdg_toplevel->base->surface->events.map, &toplevel->map);
@@ -1321,6 +1374,11 @@ void handle_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 
   toplevel->set_app_id.notify = toplevel_set_app_id;
   wl_signal_add(&xdg_toplevel->events.set_app_id, &toplevel->set_app_id);
+
+  if (toplevel->output_handler) {
+    toplevel->outputs_update.notify = handle_outputs_update;
+    wl_signal_add(&toplevel->output_handler->events.outputs_update, &toplevel->outputs_update);
+  }
 
   // add to toplevels list
   wl_list_insert(&server.toplevels, &toplevel->link);

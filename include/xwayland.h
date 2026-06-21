@@ -35,6 +35,7 @@ typedef struct xwayland_toplevel_t {
 	struct wlr_xwayland_surface *xwayland_surface;
 	struct wlr_scene_tree *scene_tree;
 	struct wlr_scene_tree *content_tree;
+	struct wlr_scene_buffer *output_handler;
 
 	struct wlr_scene_tree *border_tree;
 	struct wlr_scene_rect *border_rects[4];
@@ -69,6 +70,7 @@ typedef struct xwayland_toplevel_t {
 	struct wl_listener associate;
 	struct wl_listener dissociate;
 	struct wl_listener override_redirect;
+	struct wl_listener outputs_update;
 
 	struct wl_list link;
 } xwayland_toplevel_t;

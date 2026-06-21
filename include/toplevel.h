@@ -47,6 +47,7 @@ typedef struct toplevel_t {
   struct wlr_scene_tree *scene_tree;      // Parent container
   struct wlr_scene_tree *content_tree;    // XDG surface content
   struct wlr_scene_tree *saved_surface_tree;  // Saved buffer snapshot
+  struct wlr_scene_buffer *output_handler;  // For tracking output enter/leave events
 
   toplevel_blur_t *blur;
   toplevel_rounded_t *rounded;
@@ -95,6 +96,7 @@ typedef struct toplevel_t {
   struct wl_listener set_title;
   struct wl_listener set_app_id;
   struct wl_listener new_xdg_popup;
+  struct wl_listener outputs_update;
 
   // foreign toplevel listeners
   struct wl_listener foreign_activate_request;

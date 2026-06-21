@@ -47,6 +47,7 @@ static void xwayland_view_destroy(xwayland_toplevel_t *xwayland_view);
 static xwayland_toplevel_t *create_xwayland_view(struct wlr_xwayland_surface *xsurface);
 static xwayland_unmanaged_t *create_unmanaged(struct wlr_xwayland_surface *xsurface);
 static void begin_xwayland_interactive(struct xwayland_toplevel_t *xwayland_view, enum cursor_mode mode, uint32_t edges);
+static void handle_xwayland_outputs_update(struct wl_listener *listener, void *data);
 
 static void unmanaged_handle_request_configure(struct wl_listener *listener, void *data) {
 	xwayland_unmanaged_t *surface = wl_container_of(listener, surface, request_configure);
@@ -348,6 +349,43 @@ static struct xwayland_unmanaged_t *create_unmanaged(struct wlr_xwayland_surface
 	surface->override_redirect.notify = unmanaged_handle_override_redirect;
 
 	return surface;
+}
+
+static bool xwayland_output_handler_point_accepts_input(struct wlr_scene_buffer *buffer, double *x, double *y) {
+	(void)buffer;
+	(void)x;
+	(void)y;
+	return false;
+}
+
+static void handle_xwayland_outputs_update(struct wl_listener *listener, void *data) {
+	xwayland_toplevel_t *xwayland_view = wl_container_of(listener, xwayland_view, outputs_update);
+	struct wlr_scene_outputs_update_event *event = data;
+
+	if (xwayland_view->foreign_toplevel) {
+		struct wlr_foreign_toplevel_handle_v1_output *toplevel_output, *tmp;
+		wl_list_for_each_safe(toplevel_output, tmp, &xwayland_view->foreign_toplevel->outputs, link) {
+			bool active = false;
+			for (size_t i = 0; i < event->size; i++) {
+				struct wlr_scene_output *scene_output = event->active[i];
+				if (scene_output->output == toplevel_output->output) {
+					active = true;
+					break;
+				}
+			}
+
+			if (!active) {
+				wlr_log(WLR_DEBUG, "XWayland toplevel output leave: %s", toplevel_output->output->name);
+				wlr_foreign_toplevel_handle_v1_output_leave(xwayland_view->foreign_toplevel, toplevel_output->output);
+			}
+		}
+
+		for (size_t i = 0; i < event->size; i++) {
+			struct wlr_scene_output *scene_output = event->active[i];
+			wlr_log(WLR_DEBUG, "XWayland toplevel output enter: %s", scene_output->output->name);
+			wlr_foreign_toplevel_handle_v1_output_enter(xwayland_view->foreign_toplevel, scene_output->output);
+		}
+	}
 }
 
 static bool xwayland_view_wants_floating(struct xwayland_toplevel_t *xwayland_view) {
@@ -1118,6 +1156,13 @@ static xwayland_toplevel_t *create_xwayland_view(struct wlr_xwayland_surface *xs
 	wl_signal_add(&xsurface->events.set_override_redirect, &xwayland_view->override_redirect);
 	xwayland_view->override_redirect.notify = handle_override_redirect;
 
+	xwayland_view->output_handler = wlr_scene_buffer_create(xwayland_view->scene_tree, NULL);
+	if (xwayland_view->output_handler) {
+		xwayland_view->outputs_update.notify = handle_xwayland_outputs_update;
+		wl_signal_add(&xwayland_view->output_handler->events.outputs_update, &xwayland_view->outputs_update);
+		xwayland_view->output_handler->point_accepts_input = xwayland_output_handler_point_accepts_input;
+	}
+
 	xsurface->data = xwayland_view;
 
 	wl_list_insert(&server.xwayland.views, &xwayland_view->link);
@@ -1146,6 +1191,13 @@ static void xwayland_view_destroy(xwayland_toplevel_t *xwayland_view) {
 	wl_list_remove(&xwayland_view->associate.link);
 	wl_list_remove(&xwayland_view->dissociate.link);
 	wl_list_remove(&xwayland_view->override_redirect.link);
+	wl_list_remove(&xwayland_view->outputs_update.link);
+
+	if (xwayland_view->output_handler) {
+		wlr_scene_node_destroy(&xwayland_view->output_handler->node);
+		xwayland_view->output_handler = NULL;
+	}
+
 	wl_list_remove(&xwayland_view->link);
 
 	free(xwayland_view);
