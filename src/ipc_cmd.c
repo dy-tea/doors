@@ -3288,7 +3288,7 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
     }
   } else if (streq("animation", *args)) {
     if (num < 2) {
-      send_failure(client_fd, "config animation: expected <type> [bezier|duration|spring] [value]\n");
+      send_failure(client_fd, "config animation: expected <type> [bezier|duration|spring|enabled] [value]\n");
     } else if (num >= 3 && streq("spring", args[2])) {
       const char *sname = num >= 4 ? args[3] : "";
       if (sname[0] != '\0' && !spring_exists(sname)) {
@@ -3320,6 +3320,17 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
           send_failure(client_fd, "config animation: unknown type\n");
         }
       }
+    } else if (num >= 3 && streq("enabled", args[2])) {
+      if (num < 4) {
+        bool enabled = animation_type_get_enabled(args[1]);
+        send_success(client_fd, enabled ? "enabled\n" : "disabled\n");
+      } else {
+        bool val = streq(args[3], "true") || streq(args[3], "1");
+        if (animation_type_set_enabled(args[1], val))
+          send_success(client_fd, val ? "enabled\n" : "disabled\n");
+        else
+          send_failure(client_fd, "config animation: unknown type\n");
+      }
     } else {
       // query type config
       int idx = animation_type_from_name(args[1]);
@@ -3329,6 +3340,7 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
         const char *bname = animation_type_get_bezier(args[1]);
         uint32_t dur = animation_type_get_duration(args[1]);
         const char *sname = animation_type_get_spring(args[1]);
+        bool enabled = animation_type_get_enabled(args[1]);
         char buf[256];
         int off = 0;
         if (sname) {
@@ -3336,8 +3348,9 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
         } else {
           off = snprintf(buf, sizeof(buf), "bezier: %s\n", bname ? bname : "(global default)");
         }
-        snprintf(buf + off, sizeof(buf) - off, "duration: %u\n",
+        off += snprintf(buf + off, sizeof(buf) - off, "duration: %u\n",
           dur > 0 ? dur : animation_get_duration());
+        snprintf(buf + off, sizeof(buf) - off, "enabled: %s\n", enabled ? "true" : "false");
         send_success(client_fd, buf);
       }
     }

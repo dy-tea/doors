@@ -26,6 +26,9 @@ uint32_t animation_type_get_duration(const char *type_name);
 bool animation_set_type_spring(const char *type_name, const char *spring_name);
 const char *animation_type_get_spring(const char *type_name);
 
+bool animation_type_set_enabled(const char *type_name, bool enabled);
+bool animation_type_get_enabled(const char *type_name);
+
 bool animation_apply_geometry(node_t *node, struct wlr_scene_tree *scene_tree,
   struct wlr_box target, bool animate);
 

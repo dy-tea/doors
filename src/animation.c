@@ -67,6 +67,7 @@ typedef struct {
   char bezier_name[64];
   uint32_t duration_ms;
   char spring_name[64];
+  bool enabled;
 } animation_type_config_t;
 
 static animation_type_config_t anim_type_configs[ANIM_TYPE_COUNT];
@@ -397,8 +398,24 @@ const char *animation_type_get_spring(const char *type_name) {
   return anim_type_configs[idx].spring_name[0] ? anim_type_configs[idx].spring_name : NULL;
 }
 
+bool animation_type_set_enabled(const char *type_name, bool enabled) {
+  int idx = animation_type_from_name(type_name);
+  if (idx < 0) return false;
+  anim_type_configs[idx].enabled = enabled;
+  return true;
+}
+
+bool animation_type_get_enabled(const char *type_name) {
+  int idx = animation_type_from_name(type_name);
+  if (idx < 0) return true;
+  return anim_type_configs[idx].enabled;
+}
+
 void animation_init(void) {
   wl_list_init(&animations);
+
+  for (int i = 0; i < ANIM_TYPE_COUNT; i++)
+    anim_type_configs[i].enabled = true;
 }
 
 void animation_fini(void) {
@@ -480,6 +497,8 @@ bool animation_start_snapshot_resize(toplevel_t *toplevel, struct wlr_box from, 
   if (!toplevel || !toplevel->saved_surface_tree || !toplevel->node || !enable_animations)
     return false;
 
+  if (!anim_type_configs[1].enabled) return false;
+
   animation_cancel_node(toplevel->node);
 
   animation_entry_t *entry = find_animation(toplevel->node);
@@ -541,6 +560,8 @@ bool animation_fade_in(struct toplevel_t *toplevel) {
   if (!toplevel || !toplevel->node || !toplevel->scene_tree || !enable_animations)
     return false;
 
+  if (!anim_type_configs[2].enabled) return false;
+
   animation_entry_t *entry = find_animation(toplevel->node);
   if (entry) {
     entry->from_opacity = 0.0f;
@@ -575,6 +596,8 @@ bool animation_fade_in_layer(layer_surface_t *layer) {
   if (!layer || !layer->scene_tree || !layer->output || !enable_animations)
     return false;
 
+  if (!anim_type_configs[4].enabled) return false;
+
   animation_entry_t *entry = create_animation_entry();
   if (!entry) return false;
 
@@ -601,6 +624,8 @@ bool animation_fade_out(toplevel_t *toplevel) {
       !toplevel->node->output || !enable_animations)
     return false;
 
+  if (!anim_type_configs[3].enabled) return false;
+
   animation_entry_t *entry = create_animation_entry();
   if (!entry) return false;
 
@@ -622,6 +647,8 @@ bool animation_fade_out(toplevel_t *toplevel) {
 bool animation_fade_out_layer(layer_surface_t *layer) {
   if (!layer || !layer->saved_tree || !layer->output || !enable_animations)
     return false;
+
+  if (!anim_type_configs[5].enabled) return false;
 
   animation_entry_t *entry = create_animation_entry();
   if (!entry) return false;
@@ -655,6 +682,8 @@ bool animation_workspace_switch_active(void) {
 bool animation_start_workspace_slide(output_t *output, node_t *node,
 		struct wlr_scene_tree *scene_tree, struct wlr_box from, struct wlr_box to, bool slide_out) {
   if (!node || !scene_tree || !output || !enable_animations) return false;
+
+  if (!anim_type_configs[6].enabled) return false;
 
   animation_cancel_node(node);
 
@@ -709,6 +738,12 @@ bool animation_apply_geometry_from(node_t *node, struct wlr_scene_tree *scene_tr
 
   output_t *output = node->output;
   if (!animate || !enable_animations || !output || !output->enabled || !node->client || !node->client->shown) {
+    animation_cancel_node(node);
+    wlr_scene_node_set_position(&scene_tree->node, target.x, target.y);
+    return false;
+  }
+
+  if (!anim_type_configs[0].enabled) {
     animation_cancel_node(node);
     wlr_scene_node_set_position(&scene_tree->node, target.x, target.y);
     return false;

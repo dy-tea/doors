@@ -773,7 +773,7 @@ doorsctl config scroller_default_proportion [<value>]
 doorsctl config scroller_proportion_preset [<values>]
 doorsctl config animation_bezier [<name>]
 doorsctl config animation_duration [<ms>]
-doorsctl config animation <type> [bezier|duration|spring] [<value>]
+doorsctl config animation <type> [bezier|duration|spring|enabled] [<value>]
 ```
 
 ### Animation Settings
@@ -860,6 +860,12 @@ doorsctl config animation <type> bezier ""
 ```
 
 Clear a per-type override (revert to global default).
+
+```
+doorsctl config animation <type> enabled [true|false]
+```
+
+Enable or disable a specific animation type independently. When disabled, the animation is skipped entirely.
 
 #### Custom Spring Curves
 
