@@ -1,3 +1,4 @@
+#include "copy_capture.h"
 #include "animation.h"
 #include "config.h"
 #include "ipc.h"
@@ -15,6 +16,7 @@
 #include "types.h"
 #include "workspace.h"
 #include "xwayland.h"
+#include <wlr/types/wlr_buffer.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wayland-server-core.h>
@@ -802,6 +804,11 @@ static void handle_destroy(struct wl_listener *listener, void *data) {
   wl_list_remove(&xwayland_view->override_redirect.link);
   wl_list_remove(&xwayland_view->outputs_update.link);
   wl_list_remove(&xwayland_view->link);
+
+	if (xwayland_view->capture_renderer) {
+		capture_renderer_destroy(xwayland_view->capture_renderer);
+		xwayland_view->capture_renderer = NULL;
+	}
 
   if (xwayland_view->image_capture != NULL) {
 		wlr_scene_node_destroy(&xwayland_view->image_capture->tree.node);

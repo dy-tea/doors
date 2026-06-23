@@ -1,3 +1,4 @@
+#include "copy_capture.h"
 #include "animation.h"
 #include "blur.h"
 #include "config.h"
@@ -973,6 +974,11 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
     animation_cancel_node(toplevel->node);
     toplevel->node->client->toplevel = NULL;
     toplevel->node = NULL;
+  }
+
+  if (toplevel->capture_renderer) {
+		capture_renderer_destroy(toplevel->capture_renderer);
+		toplevel->capture_renderer = NULL;
   }
 
   if (toplevel->image_capture != NULL) {

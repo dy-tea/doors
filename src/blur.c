@@ -835,7 +835,10 @@ static bool compute_src_box(output_t *output, const struct wlr_box *r,
 // read back the capture output buffer into ctx->tex[1] and return its FBO attachment
 static GLuint capture_readback(blur_output_ctx_t *ctx, GLuint capture_fbo, int w, int h) {
   GLuint result = 0;
-  if (!capture_fbo) return 0;
+  if (!capture_fbo) {
+    wlr_log(WLR_INFO, "blur: capture_readback: no FBO");
+    return 0;
+  }
 
   glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
   GLint attach_type = 0, attach_name = 0;
@@ -984,6 +987,7 @@ static GLuint capture_bg_to_tex1(output_t *output, blur_output_ctx_t *ctx,
   wlr_damage_ring_add_whole(&real_scene_output->damage_ring);
 
   if (!ok || !cap_state.buffer) {
+    wlr_log(WLR_INFO, "capture_bg_to_tex1: no buffer from build_state");
     egl_unset_current();
     wlr_output_state_finish(&cap_state);
     return 0;
@@ -1056,6 +1060,7 @@ static GLuint capture_bg_combined(output_t *output, blur_output_ctx_t *ctx,
   wlr_damage_ring_add_whole(&real_scene_output->damage_ring);
 
   if (!ok || !cap_state.buffer) {
+    wlr_log(WLR_INFO, "capture_bg_combined: no buffer from build_state");
     egl_unset_current();
     wlr_output_state_finish(&cap_state);
     return 0;

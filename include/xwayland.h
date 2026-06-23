@@ -51,6 +51,7 @@ typedef struct xwayland_toplevel_t {
 	struct wlr_scene_surface *image_capture_surface;
 	struct wlr_scene *image_capture;
 	struct wlr_scene_tree *image_capture_tree;
+	void *capture_renderer;
 
 	struct wl_listener map;
 	struct wl_listener unmap;

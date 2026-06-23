@@ -61,6 +61,7 @@ typedef struct toplevel_t {
   struct wlr_scene_surface *image_capture_surface;
   struct wlr_scene *image_capture;
   struct wlr_scene_tree *image_capture_tree;
+  void *capture_renderer;
 
   struct wlr_scene_tree *border_tree;
   struct wlr_scene_rect *border_rects[4];
