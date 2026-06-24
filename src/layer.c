@@ -15,6 +15,7 @@
 #include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_seat.h>
+#include <wlr/types/wlr_damage_ring.h>
 #include <wlr/types/wlr_scene.h>
 
 extern struct server_t server;
@@ -32,8 +33,16 @@ void layer_surface_set_blur(layer_surface_t *ls, bool enabled) {
 
   if (enabled && !ls->blur_node) {
     ls->blur_node = wlr_scene_buffer_create(ls->scene_tree, NULL);
-    if (ls->blur_node)
+    if (ls->blur_node) {
       wlr_scene_node_lower_to_bottom(&ls->blur_node->node);
+      // ensure next frame recaptures the background for this new blur node
+      struct wlr_scene_output *so = wlr_scene_get_scene_output(server.scene, ls->output->wlr_output);
+      if (so) {
+        pixman_region32_union_rect(&so->damage_ring.current, &so->damage_ring.current,
+          0, 0, (unsigned int)ls->output->width, (unsigned int)ls->output->height);
+        wlr_output_schedule_frame(ls->output->wlr_output);
+      }
+    }
   } else if (!enabled && ls->blur_node) {
     wlr_scene_node_destroy(&ls->blur_node->node);
     ls->blur_node = NULL;
@@ -186,8 +195,7 @@ void handle_new_layer_surface(struct wl_listener *listener, void *data) {
   layer_surface_t *layer;
   output_t *output;
 
-  wlr_log(WLR_INFO, "New layer surface on layer %d",
-      layer_surface->pending.layer);
+  wlr_log(WLR_INFO, "New layer surface on layer %d", layer_surface->pending.layer);
 
   if (!layer_surface->output) {
     wlr_log(WLR_INFO, "Layer surface has no output, using focused_monitor");

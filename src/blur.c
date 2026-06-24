@@ -2025,31 +2025,40 @@ void blur_evict_buffers(void) {
   }
 }
 
-// probe each region in tree for damage
-static bool region_overlaps_tree(pixman_region32_t *damage, struct wlr_scene_tree *tree) {
+// check if any damage rectangle overlaps a node in the given tree
+static bool damage_in_tree(pixman_region32_t *damage, struct wlr_scene_tree *tree) {
   int nrects;
   pixman_box32_t *rects = pixman_region32_rectangles(damage, &nrects);
   for (int i = 0; i < nrects; i++) {
-    double cx = (rects[i].x1 + rects[i].x2) / 2.0;
-    double cy = (rects[i].y1 + rects[i].y2) / 2.0;
-    double nx, ny;
-    if (wlr_scene_node_at(&tree->node, cx, cy, &nx, &ny))
-      return true;
+    double x1 = rects[i].x1, y1 = rects[i].y1;
+    double x2 = rects[i].x2, y2 = rects[i].y2;
+    double w = x2 - x1, h = y2 - y1;
+    // sample a 3x3 grid across the rect to catch overlaps reliably
+    for (int row = 0; row < 3; row++) {
+      for (int col = 0; col < 3; col++) {
+        double px = x1 + (col + 0.5) * w / 3.0;
+        double py = y1 + (row + 0.5) * h / 3.0;
+        double nx, ny;
+        if (wlr_scene_node_at(&tree->node, px, py, &nx, &ny))
+          return true;
+      }
+    }
   }
   return false;
 }
 
 static bool background_capture_needed(struct wlr_scene_output *scene_output) {
   pixman_region32_t *damage = &scene_output->damage_ring.current;
-  if (!damage->data) return false; // inlined pixman_region32_not_empty
+  if (pixman_region32_empty(damage)) return false;
 
   struct wlr_scene_tree *relevant[] = {
     server.bg_tree, server.bot_tree, server.tile_tree,
     server.float_tree, server.shader_tree, server.drag_tree,
+    server.top_tree, server.over_tree,
   };
 
   for (size_t i = 0; i < sizeof(relevant)/sizeof(relevant[0]); i++)
-    if (region_overlaps_tree(damage, relevant[i])) return true;
+    if (damage_in_tree(damage, relevant[i])) return true;
 
   return false;
 }

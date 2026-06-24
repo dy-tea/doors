@@ -27,6 +27,8 @@
 #include <wlr/types/wlr_ext_background_effect_v1.h>
 #include <wlr/types/wlr_ext_image_capture_source_v1.h>
 #include <wlr/types/wlr_fractional_scale_v1.h>
+#include <wlr/types/wlr_damage_ring.h>
+#include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/types/wlr_xdg_decoration_v1.h>
@@ -827,8 +829,17 @@ void toplevel_set_blur(toplevel_t *tl, bool enabled) {
     }
     if (!tl->blur->blur_node) {
       tl->blur->blur_node = wlr_scene_buffer_create(tl->scene_tree, NULL);
-      if (tl->blur->blur_node)
+      if (tl->blur->blur_node) {
         wlr_scene_node_lower_to_bottom(&tl->blur->blur_node->node);
+        if (tl->node && tl->node->output) {
+          struct wlr_scene_output *so = wlr_scene_get_scene_output(server.scene, tl->node->output->wlr_output);
+          if (so) {
+            pixman_region32_union_rect(&so->damage_ring.current, &so->damage_ring.current,
+              0, 0, (unsigned int)tl->node->output->width, (unsigned int)tl->node->output->height);
+            wlr_output_schedule_frame(tl->node->output->wlr_output);
+          }
+        }
+      }
     }
   } else if (tl->blur && tl->blur->blur_node) {
     wlr_scene_node_destroy(&tl->blur->blur_node->node);
@@ -852,8 +863,17 @@ void toplevel_set_mica(toplevel_t *tl, bool enabled) {
 
     if (!tl->blur->mica_node) {
       tl->blur->mica_node = wlr_scene_buffer_create(tl->scene_tree, NULL);
-      if (tl->blur->mica_node)
+      if (tl->blur->mica_node) {
         wlr_scene_node_lower_to_bottom(&tl->blur->mica_node->node);
+        if (tl->node && tl->node->output) {
+          struct wlr_scene_output *so = wlr_scene_get_scene_output(server.scene, tl->node->output->wlr_output);
+          if (so) {
+            pixman_region32_union_rect(&so->damage_ring.current, &so->damage_ring.current,
+              0, 0, (unsigned int)tl->node->output->width, (unsigned int)tl->node->output->height);
+            wlr_output_schedule_frame(tl->node->output->wlr_output);
+          }
+        }
+      }
     }
   } else if (tl->blur && tl->blur->mica_node) {
     wlr_scene_node_destroy(&tl->blur->mica_node->node);
@@ -872,8 +892,17 @@ void toplevel_set_acrylic(toplevel_t *tl, bool enabled) {
 
     if (!tl->blur->acrylic_node) {
       tl->blur->acrylic_node = wlr_scene_buffer_create(tl->scene_tree, NULL);
-      if (tl->blur->acrylic_node)
+      if (tl->blur->acrylic_node) {
         wlr_scene_node_lower_to_bottom(&tl->blur->acrylic_node->node);
+        if (tl->node && tl->node->output) {
+          struct wlr_scene_output *so = wlr_scene_get_scene_output(server.scene, tl->node->output->wlr_output);
+          if (so) {
+            pixman_region32_union_rect(&so->damage_ring.current, &so->damage_ring.current,
+              0, 0, (unsigned int)tl->node->output->width, (unsigned int)tl->node->output->height);
+            wlr_output_schedule_frame(tl->node->output->wlr_output);
+          }
+        }
+      }
     }
   } else if (tl->blur && tl->blur->acrylic_node) {
     wlr_scene_node_destroy(&tl->blur->acrylic_node->node);
