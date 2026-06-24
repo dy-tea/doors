@@ -58,6 +58,8 @@ typedef struct blur_output_ctx_t {
   GLuint fbo[2];
   GLuint tex[2];
 
+  GLuint staging_tex;  // full-res staging texture for renderbuffer→texture copy
+
   GLuint screen_fbo;  /* full-res intermediate for screen shader */
   GLuint screen_tex;
 

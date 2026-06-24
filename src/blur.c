@@ -656,6 +656,15 @@ blur_output_ctx_t *blur_output_init(int width, int height) {
     create_fbo(ctx->blur_w, ctx->blur_h, &ctx->fbo[1], &ctx->tex[1]);
   if (!create_fbo(width, height, &ctx->screen_fbo, &ctx->screen_tex))
     wlr_log(WLR_ERROR, "blur: screen shader FBO creation failed (non-fatal)");
+
+  glGenTextures(1, &ctx->staging_tex);
+  glBindTexture(GL_TEXTURE_2D, ctx->staging_tex);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glBindTexture(GL_TEXTURE_2D, 0);
   egl_unset_current();
 
   if (!ok) {
@@ -669,6 +678,8 @@ blur_output_ctx_t *blur_output_init(int width, int height) {
     destroy_fbo(&ctx->fbo[0], &ctx->tex[0]);
     destroy_fbo(&ctx->fbo[1], &ctx->tex[1]);
     destroy_fbo(&ctx->screen_fbo, &ctx->screen_tex);
+    glDeleteTextures(1, &ctx->staging_tex);
+    ctx->staging_tex = 0;
     egl_unset_current();
     free(ctx);
     return NULL;
@@ -691,6 +702,10 @@ void blur_output_fini(blur_output_ctx_t *ctx) {
     destroy_fbo(&ctx->fbo[0], &ctx->tex[0]);
     destroy_fbo(&ctx->fbo[1], &ctx->tex[1]);
     destroy_fbo(&ctx->screen_fbo, &ctx->screen_tex);
+    if (ctx->staging_tex) {
+      glDeleteTextures(1, &ctx->staging_tex);
+      ctx->staging_tex = 0;
+    }
     egl_unset_current();
   }
   if (ctx->mica_buf) {
@@ -724,6 +739,10 @@ void blur_output_resize(blur_output_ctx_t *ctx, int width, int height,
   destroy_fbo(&ctx->fbo[0], &ctx->tex[0]);
   destroy_fbo(&ctx->fbo[1], &ctx->tex[1]);
   destroy_fbo(&ctx->screen_fbo, &ctx->screen_tex);
+  if (ctx->staging_tex) {
+    glDeleteTextures(1, &ctx->staging_tex);
+    ctx->staging_tex = 0;
+  }
   ctx->width  = width;
   ctx->height = height;
   ctx->blur_w = new_bw;
@@ -732,6 +751,14 @@ void blur_output_resize(blur_output_ctx_t *ctx, int width, int height,
   create_fbo(ctx->blur_w, ctx->blur_h, &ctx->fbo[1], &ctx->tex[1]);
   if (!create_fbo(width, height, &ctx->screen_fbo, &ctx->screen_tex))
     wlr_log(WLR_ERROR, "blur: screen shader FBO resize failed (non-fatal)");
+  glGenTextures(1, &ctx->staging_tex);
+  glBindTexture(GL_TEXTURE_2D, ctx->staging_tex);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glBindTexture(GL_TEXTURE_2D, 0);
   egl_unset_current();
 
   if (ctx->mica_buf) {
@@ -877,33 +904,22 @@ static GLuint capture_readback(blur_output_ctx_t *ctx, GLuint capture_fbo, int w
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     result = ctx->tex[1];
   } else if (attach_type == GL_RENDERBUFFER) {
-    unsigned char *pixels = malloc((size_t)w * h * 4);
-    if (pixels) {
-      glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
-      glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-      glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-      GLuint tmp_tex;
-      glGenTextures(1, &tmp_tex);
-      glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, tmp_tex);
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-      free(pixels);
-
-      glDisable(GL_BLEND);
-      glDisable(GL_SCISSOR_TEST);
-      glBindFramebuffer(GL_FRAMEBUFFER, ctx->fbo[1]);
-      glViewport(0, 0, ctx->blur_w, ctx->blur_h);
-      glUseProgram(blur_ctx.prog_blit);
-      glUniform1i(blur_ctx.u_blit.tex, 0);
-      draw_quad();
-      glBindTexture(GL_TEXTURE_2D, 0);
-      glBindFramebuffer(GL_FRAMEBUFFER, 0);
-      glDeleteTextures(1, &tmp_tex);
-      result = ctx->tex[1];
-    }
+    glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
+    glBindTexture(GL_TEXTURE_2D, ctx->staging_tex);
+    glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, w, h);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glDisable(GL_BLEND);
+    glDisable(GL_SCISSOR_TEST);
+    glBindFramebuffer(GL_FRAMEBUFFER, ctx->fbo[1]);
+    glViewport(0, 0, ctx->blur_w, ctx->blur_h);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, ctx->staging_tex);
+    glUseProgram(blur_ctx.prog_blit);
+    glUniform1i(blur_ctx.u_blit.tex, 0);
+    draw_quad();
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    result = ctx->tex[1];
   }
   return result;
 }
@@ -1136,7 +1152,8 @@ static GLuint ensure_sized_buf(struct wlr_buffer **buf_out, GLuint *fbo_out,
 
 static struct wlr_box get_client_rect(toplevel_t *tl);
 
-static bool rebuild_live_blur(output_t *output, struct wlr_scene_output *scene_output) {
+static bool rebuild_live_blur(output_t *output, struct wlr_scene_output *scene_output,
+    pixman_region32_t *damage) {
   blur_output_ctx_t *ctx = output->blur_ctx;
   int w = output->width, h = output->height;
   bool any = false;
@@ -1146,6 +1163,19 @@ static bool rebuild_live_blur(output_t *output, struct wlr_scene_output *scene_o
     if (!tl->blur || !tl->blur->blur_node || !tl->node || !tl->node->client) continue;
     if (!tl->node->client->shown) continue;
     if (!tl->node->output || tl->node->output != output) continue;
+
+    // skip if toplevel already has a valid blur and the damage doesn't overlap it
+    if (tl->blur->blur_buf && damage && !pixman_region32_empty(damage)) {
+      struct wlr_box r = get_client_rect(tl);
+      pixman_region32_t tl_rgn, intersection;
+      pixman_region32_init_rect(&tl_rgn, r.x - output->lx, r.y - output->ly, r.width, r.height);
+      pixman_region32_init(&intersection);
+      pixman_region32_intersect(&intersection, damage, &tl_rgn);
+      bool overlaps = !pixman_region32_empty(&intersection);
+      pixman_region32_fini(&intersection);
+      pixman_region32_fini(&tl_rgn);
+      if (!overlaps) continue;
+    }
 
     GLuint src = capture_bg_to_tex1(output, ctx, scene_output, false,
       &tl->scene_tree->node, &tl->blur->blur_scene_hidden);
@@ -1391,7 +1421,8 @@ static void push_blur_to_layers(output_t *output) {
   }
 }
 
-static bool rebuild_live_acrylic(output_t *output, struct wlr_scene_output *scene_output) {
+static bool rebuild_live_acrylic(output_t *output, struct wlr_scene_output *scene_output,
+    pixman_region32_t *damage) {
   blur_output_ctx_t *ctx = output->blur_ctx;
   int w = output->width, h = output->height;
   bool any = false;
@@ -1401,6 +1432,19 @@ static bool rebuild_live_acrylic(output_t *output, struct wlr_scene_output *scen
     if (!tl->blur || !tl->blur->acrylic_node || !tl->node || !tl->node->client) continue;
     if (!tl->node->client->shown) continue;
     if (!tl->node->output || tl->node->output != output) continue;
+
+    // skip if toplevel already has a valid acrylic buffer and the damage doesn't overlap it
+    if (tl->blur->acrylic_buf && damage && !pixman_region32_empty(damage)) {
+      struct wlr_box r = get_client_rect(tl);
+      pixman_region32_t tl_rgn, intersection;
+      pixman_region32_init_rect(&tl_rgn, r.x - output->lx, r.y - output->ly, r.width, r.height);
+      pixman_region32_init(&intersection);
+      pixman_region32_intersect(&intersection, damage, &tl_rgn);
+      bool overlaps = !pixman_region32_empty(&intersection);
+      pixman_region32_fini(&intersection);
+      pixman_region32_fini(&tl_rgn);
+      if (!overlaps) continue;
+    }
 
     GLuint src = capture_bg_to_tex1(output, ctx, scene_output, false,
       &tl->scene_tree->node, &tl->blur->blur_scene_hidden);
@@ -1877,33 +1921,22 @@ static GLuint capture_full_scene_to_tex(output_t *output, blur_output_ctx_t *ctx
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
       result = ctx->screen_tex;
     } else if (attach_type == GL_RENDERBUFFER) {
-      unsigned char *pixels = malloc((size_t)w * h * 4);
-      if (pixels) {
-        glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
-        glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-        GLuint tmp_tex;
-        glGenTextures(1, &tmp_tex);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, tmp_tex);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        free(pixels);
-
-        glDisable(GL_BLEND);
-        glDisable(GL_SCISSOR_TEST);
-        glBindFramebuffer(GL_FRAMEBUFFER, ctx->screen_fbo);
-        glViewport(0, 0, w, h);
-        glUseProgram(blur_ctx.prog_blit);
-        glUniform1i(blur_ctx.u_blit.tex, 0);
-        draw_quad();
-        glBindTexture(GL_TEXTURE_2D, 0);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glDeleteTextures(1, &tmp_tex);
-        result = ctx->screen_tex;
-      }
+      glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
+      glBindTexture(GL_TEXTURE_2D, ctx->staging_tex);
+      glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, w, h);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      glDisable(GL_BLEND);
+      glDisable(GL_SCISSOR_TEST);
+      glBindFramebuffer(GL_FRAMEBUFFER, ctx->screen_fbo);
+      glViewport(0, 0, w, h);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, ctx->staging_tex);
+      glUseProgram(blur_ctx.prog_blit);
+      glUniform1i(blur_ctx.u_blit.tex, 0);
+      draw_quad();
+      glBindTexture(GL_TEXTURE_2D, 0);
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      result = ctx->screen_tex;
     }
   }
 
@@ -2131,7 +2164,7 @@ void blur_output_frame(output_t *output, struct wlr_scene_output *scene_output) 
       }
     }
     if (any_blur) {
-      rebuild_live_blur(output, scene_output);
+      rebuild_live_blur(output, scene_output, &scene_output->damage_ring.current);
       push_blur_to_toplevels(output);
     }
   }
@@ -2169,7 +2202,7 @@ void blur_output_frame(output_t *output, struct wlr_scene_output *scene_output) 
       }
     }
     if (any_acrylic) {
-      rebuild_live_acrylic(output, scene_output);
+      rebuild_live_acrylic(output, scene_output, &scene_output->damage_ring.current);
       push_acrylic_to_toplevels(output);
     }
   }
