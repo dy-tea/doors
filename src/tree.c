@@ -151,6 +151,12 @@ client_t *make_client(void) {
 void free_node(node_t *n) {
   if (n == NULL) return;
 
+  // clear any desktop focus pointer that still points to this node
+  for (output_t *o = mon_head; o; o = o->next)
+    for (desktop_t *d = o->desk_head; d; d = d->next)
+      if (d->focus == n)
+        d->focus = NULL;
+
   animation_cancel_node(n);
 
   if (n->scratchpad)

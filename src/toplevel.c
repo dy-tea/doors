@@ -701,9 +701,16 @@ void toplevel_unmap(struct wl_listener *listener, void *data) {
     }
 
     if (d == NULL) {
-      wlr_log(WLR_ERROR, "Could not find desktop for node %u root %p, using current desktop %s",
-	      n->id, (void*)root, m->desk->name);
-      d = m->desk;
+      // for floating/orphaned nodes, use the node's desktop field directly
+      if (n && n->desktop != NULL) {
+        d = n->desktop;
+        m = d->output;
+        wlr_log(WLR_DEBUG, "Found node %u belongs to desktop %s (via n->desktop)", n->id, d->name);
+      } else {
+        wlr_log(WLR_ERROR, "Could not find desktop for node %u root %p, using current desktop %s",
+          n->id, (void*)root, m->desk->name);
+        d = m->desk;
+      }
     }
   }
 
