@@ -5,6 +5,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <poll.h>
+#include <fcntl.h>
 
 #define DOORS_SOCKET_ENV "DOORS_SOCKET"
 #define DOORS_BUFSIZ 4096
@@ -79,6 +80,24 @@ int main(int argc, char *argv[]) {
         } else {
           fprintf(stdout, "%s", rsp + 1);
           fflush(stdout);
+          if (rsp[1] == '/') {
+            size_t len = strlen(rsp + 1);
+            if (len > 0 && rsp[1 + len - 1] == '\n')
+              rsp[1 + len - 1] = '\0';
+            int fifo_fd = open(rsp + 1, O_RDONLY);
+            if (fifo_fd < 0) {
+              close(sock_fd);
+              err("subscribe: failed to open fifo for reading\n");
+            }
+            close(sock_fd);
+            char buf[DOORS_BUFSIZ];
+            while ((nb = read(fifo_fd, buf, sizeof(buf))) > 0) {
+              fwrite(buf, 1, nb, stdout);
+              fflush(stdout);
+            }
+            close(fifo_fd);
+            return ret;
+          }
         }
       }
       break;

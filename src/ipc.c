@@ -183,19 +183,11 @@ bool ipc_print_report(int fd) {
 
     for (desktop_t *d = m->desk_head; d != NULL; d = d->next) {
       char desk_flag;
-      if (m->desk == d) {
-        if (d->focus) {
-          desk_flag = 'O';
-        } else {
-          desk_flag = 'F';
-        }
-      } else {
-        if (d->focus) {
-          desk_flag = 'o';
-        } else {
-          desk_flag = 'f';
-        }
-      }
+      if (m->desk == d)
+      	desk_flag = d->focus ? 'O' : 'F';
+      else
+      	desk_flag = d->focus ? 'o' : 'f';
+
       offset += snprintf(buf + offset, sizeof(buf) - offset, ":%c%s", desk_flag, d->name);
       if (desktop_has_urgent(d))
         offset += snprintf(buf + offset, sizeof(buf) - offset, ":U%s", d->name);

@@ -60,7 +60,7 @@ void add_subscriber(subscriber_t *sb) {
 
   if (sb->mask & SUB_MASK_REPORT) {
     if (!ipc_print_report(sb->client_fd)) {
-      // Remove dead subscriber
+      // remove dead subscriber
       remove_subscriber(sb);
     } else if (sb->count > 0 && --sb->count == 0) {
       // remove subscriber if event count hits 0
@@ -162,15 +162,20 @@ bool ipc_cmd_subscribe(char **args, int num, int client_fd) {
   }
 
   if (fifo_path) {
-    int fifo_fd = open(fifo_path, O_WRONLY);
+    int fifo_fd = open(fifo_path, O_RDWR);
     if (fifo_fd < 0) {
       free(fifo_path);
       send_failure(client_fd, "subscribe: failed to open fifo\n");
       return false;
     }
     char response[DOORS_BUFSIZ];
-    snprintf(response, sizeof(response), "%s\n", fifo_path);
-    write(client_fd, response, strlen(response));
+    size_t offset = 0;
+    response[offset++] = '\0';
+    size_t len = strlen(fifo_path);
+    memcpy(response + offset, fifo_path, len);
+    offset += len;
+    response[offset++] = '\n';
+    write(client_fd, response, offset);
     close(client_fd);
     client_fd = fifo_fd;
   }
