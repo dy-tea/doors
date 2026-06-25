@@ -90,7 +90,6 @@ static struct timespec screen_shader_start_time;
 
 static EGLDisplay s_egl_display = EGL_NO_DISPLAY;
 static EGLContext s_egl_context = EGL_NO_CONTEXT;
-
 static bool egl_make_current(void) {
   return eglMakeCurrent(s_egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, s_egl_context) == EGL_TRUE;
 }
@@ -291,7 +290,7 @@ static void blur_pass(GLuint src_tex, GLuint dst_fbo, int w, int h, int pass_ind
   glUseProgram(blur_ctx.prog_kawase);
   glUniform1i(blur_ctx.u_kawase.tex, 0);
   glUniform2f(blur_ctx.u_kawase.halfpixel, 0.5f / (float)w, 0.5f / (float)h);
-  glUniform1f(blur_ctx.u_kawase.offset, (float)(pass_index + 1));
+  glUniform1f(blur_ctx.u_kawase.offset, blur_radius * (float)(pass_index + 1));
   if (blur_ctx.u_kawase.noise_strength >= 0)
     glUniform1f(blur_ctx.u_kawase.noise_strength, blur_noise_strength);
   if (blur_ctx.u_kawase.vibrancy >= 0)
@@ -974,8 +973,6 @@ static GLuint capture_bg_to_tex1(output_t *output, blur_output_ctx_t *ctx,
 
   bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
 
-  if (ok) wlr_output_commit_state(ctx->capture_output, &cap_state);
-
   egl_make_current();
   glFlush();
 
@@ -1054,7 +1051,6 @@ static GLuint capture_bg_combined(output_t *output, blur_output_ctx_t *ctx,
   wlr_output_state_set_custom_mode(&cap_state, w, h, 0);
 
   bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
-  if (ok) wlr_output_commit_state(ctx->capture_output, &cap_state);
 
   egl_make_current();
   glFlush();
@@ -1863,7 +1859,6 @@ static GLuint capture_full_scene_to_tex(output_t *output, blur_output_ctx_t *ctx
   wlr_output_state_set_custom_mode(&cap_state, w, h, 0);
 
   bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
-  if (ok) wlr_output_commit_state(ctx->capture_output, &cap_state);
 
   egl_make_current();
   glFlush();
