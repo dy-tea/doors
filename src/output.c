@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wlr/types/wlr_buffer.h>
+#include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_fractional_scale_v1.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
@@ -86,6 +87,98 @@ static bool output_can_tear(output_t *output) {
 	return output->allow_tearing;
 }
 
+static bool output_has_fullscreen_cover(output_t *output) {
+	if (!output || !output->desk || !output->desk->focus) return false;
+
+	node_t *node = output->desk->focus;
+	client_t *client = node->client;
+	if (!client || client->state != STATE_FULLSCREEN) return false;
+	if (client->toplevel && client->toplevel->mapped) return true;
+
+	return (client->xwayland_view && client->xwayland_view->mapped);
+}
+
+static bool fullscreen_has_effects(output_t *output) {
+	node_t *node = output->desk->focus;
+	client_t *client = node->client;
+	return client->blur || client->mica || client->acrylic;
+}
+
+static struct wlr_surface *fullscreen_surface(output_t *output) {
+	if (!output || !output->desk || !output->desk->focus) return NULL;
+
+	node_t *node = output->desk->focus;
+	client_t *client = node->client;
+	if (!client || client->state != STATE_FULLSCREEN) return NULL;
+
+	if (client->toplevel && client->toplevel->mapped)
+		return client->toplevel->xdg_toplevel->base->surface;
+	if (client->xwayland_view && client->xwayland_view->mapped)
+		return client->xwayland_view->xwayland_surface->surface;
+
+	return NULL;
+}
+
+static void output_configure_scene_visible(output_t *output) {
+	if (!output) return;
+
+	wlr_scene_node_for_each_buffer(&server.full_tree->node,
+		output_configure_scene_iterator, output);
+	wlr_scene_node_for_each_buffer(&server.over_tree->node,
+		output_configure_scene_iterator, output);
+	wlr_scene_node_for_each_buffer(&server.shader_tree->node,
+		output_configure_scene_iterator, output);
+	wlr_scene_node_for_each_buffer(&server.drag_tree->node,
+		output_configure_scene_iterator, output);
+	wlr_scene_node_for_each_buffer(&server.lock_tree->node,
+		output_configure_scene_iterator, output);
+
+	wlr_scene_node_for_each_buffer(&output->layer_overlay->node,
+		output_configure_scene_iterator, output);
+}
+
+static bool output_try_direct_scanout(output_t *output) {
+	if (!output_has_fullscreen_cover(output)) return false;
+	if (fullscreen_has_effects(output)) return false;
+	if (server.locked || screen_shader_enabled) return false;
+
+	struct wlr_surface *surface = fullscreen_surface(output);
+	if (!surface || !wlr_surface_has_buffer(surface) || !surface->buffer)
+		return false;
+
+	struct wlr_buffer *buf = &surface->buffer->base;
+
+	struct wlr_output_state state;
+	wlr_output_state_init(&state);
+
+	wlr_buffer_lock(buf);
+	wlr_output_state_set_buffer(&state, buf);
+
+	pixman_region32_t damage;
+	pixman_region32_init_rect(&damage, 0, 0,
+		(unsigned int)output->width, (unsigned int)output->height);
+	wlr_output_state_set_damage(&state, &damage);
+	pixman_region32_fini(&damage);
+
+	state.tearing_page_flip = output_can_tear(output);
+
+	bool ok = wlr_output_test_state(output->wlr_output, &state);
+	if (!ok) {
+		wlr_log(WLR_DEBUG, "Direct scanout test failed for %s", output->name);
+		wlr_buffer_unlock(buf);
+		wlr_output_state_finish(&state);
+		return false;
+	}
+
+	ok = wlr_output_commit_state(output->wlr_output, &state);
+	if (!ok)
+		wlr_log(WLR_ERROR, "Direct scanout commit failed for %s", output->name);
+
+	wlr_buffer_unlock(buf);
+	wlr_output_state_finish(&state);
+	return ok;
+}
+
 void output_frame(struct wl_listener *listener, void *data) {
 	(void)data;
 	output_t *output = wl_container_of(listener, output, frame);
@@ -95,12 +188,24 @@ void output_frame(struct wl_listener *listener, void *data) {
 
 	if (!scene_output) return;
 
-	output_configure_scene(output);
+	bool has_fs = output_has_fullscreen_cover(output);
+	bool fs_effects = has_fs && fullscreen_has_effects(output);
+
+	if (has_fs) output_configure_scene_visible(output);
+	else output_configure_scene(output);
+
   clock_gettime(CLOCK_MONOTONIC, &now);
   animating = animation_update_output(output, now);
 
-	if (blur_ctx.available)
+	if (blur_ctx.available && (fs_effects || !has_fs))
 		blur_output_frame(output, scene_output);
+
+	if (has_fs && !fs_effects && output_try_direct_scanout(output)) {
+		wlr_scene_output_send_frame_done(scene_output, &now);
+		if (animating)
+			wlr_output_schedule_frame(output->wlr_output);
+		return;
+	}
 
 	struct wlr_scene_output_state_options opts = {
 		.color_transform = output->color_transform,
