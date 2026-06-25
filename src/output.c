@@ -8,6 +8,7 @@
 #include "server.h"
 #include "tree.h"
 #include "toplevel.h"
+#include "ipc.h"
 #include "types.h"
 #include <time.h>
 #include <stdlib.h>
@@ -192,6 +193,7 @@ static void handle_output_destroy(struct wl_listener *listener, void *data) {
     d = next;
   }
 
+  ipc_put_status(SUB_MASK_MONITOR_REMOVE, "monitor_remove[%s]\n", output->name);
   free(output);
 }
 
@@ -299,6 +301,7 @@ void handle_new_output(struct wl_listener *listener, void *data) {
   output->blur_ctx = blur_output_init(output->rectangle.width, output->rectangle.height);
 
   output_enable(output);
+  ipc_put_status(SUB_MASK_MONITOR_ADD, "monitor_add[%s]\n", output->name);
   output_update_manager_config();
 }
 

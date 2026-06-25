@@ -467,6 +467,7 @@ static void ipc_cmd_output(char **args, int num, int client_fd) {
       d->output = mon;
 
       workspace_create_desktop(d->name);
+      ipc_put_status(SUB_MASK_DESKTOP_ADD, "desktop_add[%s]\n", d->name);
 
       args++;
       num--;
@@ -645,6 +646,7 @@ static void ipc_cmd_output(char **args, int num, int client_fd) {
       }
     }
 
+    ipc_put_status(SUB_MASK_MONITOR_REMOVE, "monitor_remove[%s]\n", mon->name);
     free(mon);
     transaction_commit_dirty();
     send_success(client_fd, "removed\n");
@@ -671,6 +673,7 @@ static void ipc_cmd_output(char **args, int num, int client_fd) {
     mon->rectangle.width = width;
     mon->rectangle.height = height;
 
+    ipc_put_status(SUB_MASK_MONITOR_CHANGE, "monitor_change[%s]\n", mon->name);
     transaction_commit_dirty();
     send_success(client_fd, "rectangle set\n");
   } else if (streq("reorder-desktops", subcmd) || streq("-o", subcmd) || streq("--reorder-desktops", subcmd)) {
@@ -1943,6 +1946,8 @@ static void ipc_cmd_desktop(char **args, int num, int client_fd) {
     } else {
       transaction_commit_dirty();
     }
+    ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", desk->name,
+      desk->layout == LAYOUT_TILED ? 'T' : desk->layout == LAYOUT_MONOCLE ? 'M' : 'S');
     send_success(client_fd, "layout changed\n");
   } else if (streq("-n", *args) || streq("--rename", *args)) {
     if (num < 2) {
@@ -1952,6 +1957,7 @@ static void ipc_cmd_desktop(char **args, int num, int client_fd) {
     args++;
     strncpy(desk->name, *args, SMALEN - 1);
     desk->name[SMALEN - 1] = '\0';
+    ipc_put_status(SUB_MASK_DESKTOP_CHANGE, "desktop_change[%s]\n", desk->name);
     transaction_commit_dirty();
     send_success(client_fd, "renamed\n");
   } else if (streq("-s", *args) || streq("--swap", *args)) {
@@ -2054,6 +2060,7 @@ static void ipc_cmd_desktop(char **args, int num, int client_fd) {
     if (mon->last_desk == desk)
       mon->last_desk = next ? next : prev;
 
+    ipc_put_status(SUB_MASK_DESKTOP_REMOVE, "desktop_remove[%s]\n", desk->name);
     free(desk);
     transaction_commit_dirty();
     send_success(client_fd, "removed\n");

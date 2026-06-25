@@ -682,6 +682,11 @@ static void handle_map(struct wl_listener *listener, void *data) {
 
 	arrange(target_monitor, target_desktop, true);
 
+	ipc_put_status(SUB_MASK_NODE_ADD, "node_add[%s,%s,%u]\n",
+		client && client->app_id[0] ? client->app_id : "?",
+		client && client->title[0] ? client->title : "?",
+		node->id);
+
 	if (!wants_float && xwayland_view->node && xwayland_view->node->client) {
 		client_t *client = xwayland_view->node->client;
 		struct wlr_box *rect = &client->tiled_rectangle;
@@ -748,6 +753,10 @@ static void handle_unmap(struct wl_listener *listener, void *data) {
 			xwayland_view->node->client->xwayland_view = NULL;
 
 		if (desk) {
+			ipc_put_status(SUB_MASK_NODE_REMOVE, "node_remove[%s,%s,%u]\n",
+				xwayland_view->node->client && xwayland_view->node->client->app_id[0] ? xwayland_view->node->client->app_id : "?",
+				xwayland_view->node->client && xwayland_view->node->client->title[0] ? xwayland_view->node->client->title : "?",
+				xwayland_view->node->id);
 			remove_node(desk, xwayland_view->node);
 			if (mon && desk) {
 				arrange(mon, desk, true);
@@ -1004,6 +1013,11 @@ static void handle_set_hints(struct wl_listener *listener, void *data) {
 		xwayland_view->node->client->urgent =
 			xsurface->hints && (xsurface->hints->flags & XCB_ICCCM_WM_HINT_X_URGENCY);
 		ipc_put_status(SUB_MASK_REPORT, NULL);
+		ipc_put_status(SUB_MASK_NODE_FLAG, "node_flag[%s,%s,%u,%c]\n",
+			xwayland_view->node->client->app_id[0] ? xwayland_view->node->client->app_id : "?",
+			xwayland_view->node->client->title[0] ? xwayland_view->node->client->title : "?",
+			xwayland_view->node->id,
+			xwayland_view->node->client->urgent ? 'U' : 'u');
 	}
 }
 

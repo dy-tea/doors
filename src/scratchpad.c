@@ -1,3 +1,4 @@
+#include "ipc.h"
 #include "output.h"
 #include "scratchpad.h"
 #include "server.h"
@@ -185,6 +186,11 @@ void scratchpad_show(node_t *n) {
     d->focus = n;
     focus_node(out, d, n);
     arrange(out, d, true);
+
+    ipc_put_status(SUB_MASK_NODE_ADD, "node_add[%s,%s,%u]\n",
+      n->client && n->client->app_id[0] ? n->client->app_id : "?",
+      n->client && n->client->title[0] ? n->client->title : "?",
+      n->id);
   } else {
     // restore as floating
     n->client->state = STATE_FLOATING;
@@ -203,6 +209,11 @@ void scratchpad_show(node_t *n) {
 
     d->focus = n;
     focus_node(out, d, n);
+
+    ipc_put_status(SUB_MASK_NODE_ADD, "node_add[%s,%s,%u]\n",
+      n->client && n->client->app_id[0] ? n->client->app_id : "?",
+      n->client && n->client->title[0] ? n->client->title : "?",
+      n->id);
   }
 
   transaction_commit_dirty();

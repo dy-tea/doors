@@ -619,6 +619,11 @@ void toplevel_map(struct wl_listener *listener, void *data) {
   toplevel->wants_fade = true;
   arrange(target_output, target_desktop, true);
 
+  ipc_put_status(SUB_MASK_NODE_ADD, "node_add[%s,%s,%u]\n",
+    n->client && n->client->app_id[0] ? n->client->app_id : "?",
+    n->client && n->client->title[0] ? n->client->title : "?",
+    n->id);
+
   // tabbed ancestors force SSD, otherwise allow CSD
   toplevel_apply_decoration_mode(toplevel);
 
@@ -719,7 +724,13 @@ void toplevel_unmap(struct wl_listener *listener, void *data) {
   toplevel_freeze_sibling_buffers(d, n);
 
   if (m && d) {
-    if (n) node_set_dirty(n);
+    if (n) {
+    	node_set_dirty(n);
+      ipc_put_status(SUB_MASK_NODE_REMOVE, "node_remove[%s,%s,%u]\n",
+        n->client && n->client->app_id[0] ? n->client->app_id : "?",
+        n->client && n->client->title[0] ? n->client->title : "?",
+        n->id);
+    }
     remove_node(d, n);
 
     if (n) n->destroying = true;
@@ -1214,6 +1225,11 @@ void toplevel_set_title(struct wl_listener *listener, void *data) {
       update_ext_foreign_toplevel(toplevel);
 
     tabs_update_label_for_leaf(toplevel->node);
+
+    ipc_put_status(SUB_MASK_NODE_CHANGE, "node_change[%s,%s,%u,title]\n",
+      toplevel->node->client->app_id[0] ? toplevel->node->client->app_id : "?",
+      title ? title : "?",
+      toplevel->node->id);
   }
 }
 
@@ -1236,6 +1252,11 @@ void toplevel_set_app_id(struct wl_listener *listener, void *data) {
       update_ext_foreign_toplevel(toplevel);
 
     tabs_update_label_for_leaf(toplevel->node);
+
+    ipc_put_status(SUB_MASK_NODE_CHANGE, "node_change[%s,%s,%u,app_id]\n",
+      app_id ? app_id : "?",
+      toplevel->node->client->title[0] ? toplevel->node->client->title : "?",
+      toplevel->node->id);
   }
 }
 

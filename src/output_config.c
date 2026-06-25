@@ -1,3 +1,4 @@
+#include "ipc.h"
 #include "output.h"
 #include "output_config.h"
 #include "server.h"
@@ -228,6 +229,7 @@ void output_config_apply(struct output_config *oc) {
     strncpy(output->name, wlr_output->name, SMALEN - 1);
     output->name[SMALEN - 1] = '\0';
     output_enable(output);
+    ipc_put_status(SUB_MASK_MONITOR_CHANGE, "monitor_change[%s]\n", output->name);
   }
 }
 

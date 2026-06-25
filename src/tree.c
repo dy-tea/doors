@@ -1096,6 +1096,11 @@ bool focus_node(output_t *m, desktop_t *d, node_t *n) {
 
   server.focus_from_click = false;
   ipc_put_status(SUB_MASK_REPORT, NULL);
+  ipc_put_status(SUB_MASK_MONITOR_FOCUS, "monitor_focus[%s]\n", m->name);
+  ipc_put_status(SUB_MASK_NODE_FOCUS, "node_focus[%s,%s,%u]\n",
+    n->client && n->client->app_id[0] ? n->client->app_id : "?",
+    n->client && n->client->title[0] ? n->client->title : "?",
+    n->id);
 
   return true;
 }
@@ -1207,6 +1212,11 @@ bool set_state(output_t *m, desktop_t *d, node_t *n, client_state_t s) {
   n->client->state = s;
 
   arrange(m, d, true);
+  ipc_put_status(SUB_MASK_NODE_STATE, "node_state[%s,%s,%u,%c]\n",
+    n->client->app_id[0] ? n->client->app_id : "?",
+    n->client->title[0] ? n->client->title : "?",
+    n->id,
+    s == STATE_TILED ? 'T' : s == STATE_FLOATING ? 'F' : s == STATE_FULLSCREEN ? 'U' : s == STATE_PSEUDO_TILED ? 'P' : '?');
   return true;
 }
 

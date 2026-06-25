@@ -1,4 +1,5 @@
 #include "config.h"
+#include "ipc.h"
 #include "input.h"
 #include "input_method.h"
 #include "keyboard.h"
@@ -468,6 +469,12 @@ void toggle_floating(void) {
 
     arrange(mon, mon->desk, true);
 
+    ipc_put_status(SUB_MASK_NODE_STATE, "node_state[%s,%s,%u,%c]\n",
+      n->client->app_id[0] ? n->client->app_id : "?",
+      n->client->title[0] ? n->client->title : "?",
+      n->id,
+      n->client->state == STATE_TILED ? 'T' : n->client->state == STATE_FLOATING ? 'F' : n->client->state == STATE_FULLSCREEN ? 'U' : '?');
+
     wlr_log(WLR_INFO, "toggle_floating: now tiled, node=%u parent=%u root=%u",
       n->id, n->parent ? n->parent->id : 0,
       mon->desk->root ? mon->desk->root->id : 0);
@@ -841,6 +848,8 @@ void toggle_monocle(void) {
   }
 
   arrange(mon, d, true);
+  ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name,
+    d->layout == LAYOUT_TILED ? 'T' : d->layout == LAYOUT_MONOCLE ? 'M' : 'S');
 
   if (d->focus != NULL)
   	focus_node(mon, d, d->focus);
@@ -863,6 +872,8 @@ void set_tiled_layout(void) {
   }
 
   arrange(mon, d, true);
+  ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name,
+    d->layout == LAYOUT_TILED ? 'T' : d->layout == LAYOUT_MONOCLE ? 'M' : 'S');
 
   if (d->focus != NULL)
     focus_node(mon, d, d->focus);
