@@ -11,6 +11,7 @@
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/util/log.h>
+#include <limits.h>
 
 #define MIN(a, b) a < b ? a : b
 
@@ -52,6 +53,7 @@ typedef struct {
   char curve_name[64];
   double eased;
   double progress;
+  int min_buf_y;
 } animation_entry_t;
 
 static struct wl_list animations;
@@ -528,13 +530,30 @@ bool animation_start_snapshot_resize(toplevel_t *toplevel, struct wlr_box from, 
   if (toplevel->content_tree)
     wlr_scene_node_for_each_buffer(&toplevel->content_tree->node, updated_buffer_iterator, entry);
 
-  if (toplevel->content_tree) {
+  bool growing = to.width >= from.width && to.height >= from.height;
+  if (toplevel->content_tree && growing) {
     entry->use_content_tree = true;
     wlr_log(WLR_DEBUG, "animation: using content_tree for snapshot resize entry=%p node=%u", (void*)entry, entry->node ? entry->node->id : 0);
     wlr_scene_node_set_enabled(&toplevel->content_tree->node, true);
     if (toplevel->saved_surface_tree)
       wlr_scene_node_set_enabled(&toplevel->saved_surface_tree->node, false);
     entry->scene_tree = toplevel->content_tree;
+
+    int init_clip_w = from.width;
+    int init_clip_h = from.height;
+    if (toplevel->geometry.width > 0 && toplevel->geometry.height > 0) {
+      if ((int)toplevel->geometry.width < init_clip_w)
+        init_clip_w = toplevel->geometry.width;
+      if ((int)toplevel->geometry.height < init_clip_h)
+        init_clip_h = toplevel->geometry.height;
+    }
+    struct wlr_box init_clip = {
+      .x = toplevel->geometry.x,
+      .y = toplevel->geometry.y,
+      .width = init_clip_w,
+      .height = init_clip_h,
+    };
+    wlr_scene_subsurface_tree_set_clip(&toplevel->content_tree->node, &init_clip);
   }
 
   if (wl_list_empty(&entry->snapshot_buffers)) {
@@ -543,6 +562,14 @@ bool animation_start_snapshot_resize(toplevel_t *toplevel, struct wlr_box from, 
     free(entry);
     return false;
   }
+
+  int min_buf_y = INT_MAX;
+  snapshot_buffer_t *sb;
+  wl_list_for_each(sb, &entry->snapshot_buffers, link)
+    if (sb->y < min_buf_y)
+    	min_buf_y = sb->y;
+
+  entry->min_buf_y = (min_buf_y == INT_MAX) ? 0 : min_buf_y;
 
   wlr_scene_node_set_position(&toplevel->scene_tree->node, from.x, from.y);
   wlr_scene_node_set_position(&toplevel->saved_surface_tree->node, 0, 0);
@@ -924,14 +951,6 @@ static void update_snapshot_entry(animation_entry_t *entry, struct timespec now)
       int vis_y2 = copy->y + copy->height;
       if (vis_y2 > height) vis_y2 = height;
 
-      // clip to surface geometry when saved buffer is larger
-      if (entry->toplevel && entry->toplevel->geometry.width > 0 && entry->toplevel->geometry.height > 0) {
-        int max_w = MIN(width, entry->toplevel->geometry.width);
-        int max_h = MIN(height, entry->toplevel->geometry.height);
-        if (vis_x2 > max_w) vis_x2 = max_w;
-        if (vis_y2 > max_h) vis_y2 = max_h;
-      }
-
       if (vis_x2 <= vis_x1 || vis_y2 <= vis_y1) {
         wlr_scene_node_set_position(&copy->buffer->node, vis_x1, vis_y1);
         wlr_scene_buffer_set_dest_size(copy->buffer, 1, 1);
@@ -973,6 +992,9 @@ borders_update:
       if (cx > 0 || cy > 0)
         wlr_scene_node_set_position(&entry->toplevel->border_tree->node,
           cx - (int)bw, cy - (int)bw);
+    } else {
+      wlr_scene_node_set_position(&entry->toplevel->border_tree->node,
+        -(int)bw, entry->min_buf_y - (int)bw);
     }
 
     if (entry->toplevel->rounded && entry->toplevel->rounded->border_shader_node && bw > 0) {

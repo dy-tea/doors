@@ -360,7 +360,6 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
         if (tree) {
           wlr_scene_node_set_enabled(&tree->node, true);
           wlr_scene_node_set_position(&tree->node, tree->node.x - num_steps * dx, tree->node.y - num_steps * dy);
-          n->client->committed_tiled_rectangle = (struct wlr_box){0, 0, 0, 0};
         }
       }
       n = next_leaf(n, new_desk->root);

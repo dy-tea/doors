@@ -261,8 +261,6 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
       animation_apply_geometry(node, scene_tree, *rect, true);
     }
   }
-  else
-    wlr_scene_node_set_position(&scene_tree->node, rect->x, rect->y);
 
   if (node->client->border_width != 0) {
     if (node->client->toplevel) {

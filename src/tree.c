@@ -365,9 +365,6 @@ static void render_leaf(output_t *m, desktop_t *d, node_t *n,
   }
 
   n->client->tiled_rectangle = r;
-  if (n->client->committed_tiled_rectangle.width == 0 &&
-      n->client->committed_tiled_rectangle.height == 0)
-    n->client->committed_tiled_rectangle = r;
 }
 
 static void apply_layout_tabbed_subtree(output_t *m, desktop_t *d, node_t *n,
