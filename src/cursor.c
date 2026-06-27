@@ -9,6 +9,7 @@
 #include "tiling_drag.h"
 #include "server.h"
 #include "tabs.h"
+#include "tablet.h"
 #include "toplevel.h"
 #include "transaction.h"
 #include "tree.h"
@@ -884,6 +885,8 @@ void request_cursor(struct wl_listener *listener, void *data) {
 void handle_new_input(struct wl_listener *listener, void *data) {
 	(void)listener;
   struct wlr_input_device *device = data;
+  seat_t *def = seat_default();
+
   switch (device->type) {
   case WLR_INPUT_DEVICE_KEYBOARD:
     handle_new_keyboard(device);
@@ -894,8 +897,21 @@ void handle_new_input(struct wl_listener *listener, void *data) {
     struct wlr_pointer *pointer = wlr_pointer_from_input_device(device);
     pointer_t *ptr = calloc(1, sizeof(*ptr));
     ptr->wlr_pointer = pointer;
-    ptr->seat = seat_default();
+    ptr->seat = def;
     wl_list_insert(&server.pointers, &ptr->link);
+    input_apply_config(device);
+    break;
+  case WLR_INPUT_DEVICE_TABLET:
+    if (!def) break;
+    wlr_cursor_attach_input_device(server.cursor, device);
+    tablet_t *tablet = tablet_create(def, device);
+    if (tablet) tablet_configure(tablet);
+    input_apply_config(device);
+    break;
+  case WLR_INPUT_DEVICE_TABLET_PAD:
+    if (!def) break;
+    tablet_pad_t *pad = tablet_pad_create(def, device);
+    if (pad) tablet_pad_configure(pad);
     input_apply_config(device);
     break;
   default:
@@ -903,7 +919,6 @@ void handle_new_input(struct wl_listener *listener, void *data) {
     break;
   }
 
-  seat_t *def = seat_default();
   if (def) {
     uint32_t caps = WL_SEAT_CAPABILITY_POINTER;
     if (!wl_list_empty(&server.keyboards))
@@ -1323,4 +1338,87 @@ void handle_pointer_warp(struct wl_listener *listener, void *data) {
 	wlr_cursor_warp(server.cursor, NULL, lx, ly);
 	wlr_seat_pointer_warp(event->seat_client->seat, event->x, event->y);
 	cursor_rebase();
+}
+
+void handle_tablet_tool_axis(struct wl_listener *listener, void *data) {
+  (void)listener;
+  struct wlr_tablet_tool_axis_event *event = data;
+  tablet_t *tablet = event->tablet->data;
+  if (!tablet) return;
+
+  if (event->updated_axes & WLR_TABLET_TOOL_AXIS_X ||
+      event->updated_axes & WLR_TABLET_TOOL_AXIS_Y) {
+    wlr_cursor_warp(server.cursor, NULL, event->x, event->y);
+  }
+
+  // send other axis events via tablet
+  tablet_tool_t *tool = event->tool->data;
+  if (tool && tool->tablet_v2_tool) {
+    if (event->updated_axes & WLR_TABLET_TOOL_AXIS_PRESSURE)
+      wlr_tablet_v2_tablet_tool_notify_pressure(tool->tablet_v2_tool, event->pressure);
+
+    if (event->updated_axes & WLR_TABLET_TOOL_AXIS_DISTANCE)
+      wlr_tablet_v2_tablet_tool_notify_distance(tool->tablet_v2_tool, event->distance);
+
+    if (event->updated_axes & WLR_TABLET_TOOL_AXIS_TILT_X ||
+        event->updated_axes & WLR_TABLET_TOOL_AXIS_TILT_Y)
+      wlr_tablet_v2_tablet_tool_notify_tilt(tool->tablet_v2_tool, event->tilt_x, event->tilt_y);
+
+    if (event->updated_axes & WLR_TABLET_TOOL_AXIS_ROTATION)
+      wlr_tablet_v2_tablet_tool_notify_rotation(tool->tablet_v2_tool, event->rotation);
+
+    if (event->updated_axes & WLR_TABLET_TOOL_AXIS_SLIDER)
+      wlr_tablet_v2_tablet_tool_notify_slider(tool->tablet_v2_tool, event->slider);
+
+    if (event->updated_axes & WLR_TABLET_TOOL_AXIS_WHEEL)
+      wlr_tablet_v2_tablet_tool_notify_wheel(tool->tablet_v2_tool, event->wheel_delta, 0);
+  }
+}
+
+void handle_tablet_tool_proximity(struct wl_listener *listener, void *data) {
+  (void)listener;
+  struct wlr_tablet_tool_proximity_event *event = data;
+  tablet_t *tablet = event->tablet->data;
+  if (!tablet) return;
+
+  if (event->state == WLR_TABLET_TOOL_PROXIMITY_IN) {
+    tablet_tool_t *tool = event->tool->data;
+    if (!tool) {
+      tool = tablet_tool_configure(tablet, event->tool);
+      if (!tool) return;
+    }
+    handle_tablet_tool_position(event->tool, tablet, false, event->x, event->y,
+      event->time_msec);
+  } else {
+    tablet_tool_t *tool = event->tool->data;
+    if (tool && tool->tablet_v2_tool)
+      wlr_tablet_v2_tablet_tool_notify_proximity_out(tool->tablet_v2_tool);
+  }
+}
+
+void handle_tablet_tool_tip(struct wl_listener *listener, void *data) {
+  (void)listener;
+  struct wlr_tablet_tool_tip_event *event = data;
+  tablet_t *tablet = event->tablet->data;
+  if (!tablet) return;
+
+  tablet_tool_t *tool = event->tool->data;
+  if (!tool) return;
+
+  handle_tablet_tool_position(event->tool, tablet,
+  	event->state == WLR_TABLET_TOOL_TIP_DOWN, event->x, event->y,
+  	event->time_msec);
+}
+
+void handle_tablet_tool_button(struct wl_listener *listener, void *data) {
+  (void)listener;
+  struct wlr_tablet_tool_button_event *event = data;
+  tablet_t *tablet = event->tablet->data;
+  if (!tablet) return;
+
+  tablet_tool_t *tool = event->tool->data;
+  if (!tool || !tool->tablet_v2_tool) return;
+
+  wlr_tablet_v2_tablet_tool_notify_button(tool->tablet_v2_tool, event->button,
+    (enum zwp_tablet_pad_v2_button_state)event->state);
 }

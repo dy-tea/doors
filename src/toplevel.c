@@ -13,6 +13,7 @@
 #include "popup.h"
 #include "scroller.h"
 #include "scratchpad.h"
+#include "tablet.h"
 #include "server.h"
 #include "tabs.h"
 #include <wlr/types/wlr_content_type_v1.h>
@@ -1292,10 +1293,14 @@ void focus_toplevel(struct toplevel_t *toplevel) {
     wlr_seat_keyboard_notify_enter(seat, surface, seat->keyboard_state.keyboard->keycodes,
 	    seat->keyboard_state.keyboard->num_keycodes, &seat->keyboard_state.keyboard->modifiers);
 
-  // Update input method focus
+  // update input method focus
   seat_t *s = seat_default();
   if (s && s->input_method_relay)
     input_method_relay_set_focus(s->input_method_relay, surface);
+
+  // update tablet pad focus
+  if (s)
+    tablet_pads_set_focus(s, surface);
 
   if (toplevel->node && toplevel->node->output)
     server.focused_output = toplevel->node->output;

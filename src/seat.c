@@ -2,6 +2,7 @@
 #include "cursor.h"
 #include "input_method.h"
 #include "server.h"
+#include "tablet.h"
 #include <stdlib.h>
 #include <string.h>
 #include <wlr/types/wlr_cursor.h>
@@ -66,6 +67,8 @@ seat_t *seat_create(const char *name) {
   }
 
   seat->input_method_relay = input_method_relay_create(seat->wlr_seat);
+  wl_list_init(&seat->tablets);
+  wl_list_init(&seat->tablet_pads);
 
   seat->request_cursor.notify = request_cursor;
   wl_signal_add(&seat->wlr_seat->events.request_set_cursor, &seat->request_cursor);
@@ -99,6 +102,14 @@ void seat_destroy(seat_t *seat) {
 
   if (seat->input_method_relay)
     input_method_relay_finish(seat->input_method_relay);
+
+  tablet_t *tablet, *tmp_tablet;
+  wl_list_for_each_safe(tablet, tmp_tablet, &seat->tablets, link)
+    tablet_destroy(tablet);
+
+  tablet_pad_t *pad, *tmp_pad;
+  wl_list_for_each_safe(pad, tmp_pad, &seat->tablet_pads, link)
+    tablet_pad_destroy(pad);
 
   wl_list_remove(&seat->link);
 

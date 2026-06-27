@@ -51,3 +51,9 @@ void *desktop_type_at(double lx, double ly, struct wlr_surface **surface, double
 
 void handle_new_virtual_pointer(struct wl_listener *listener, void *data);
 void handle_pointer_warp(struct wl_listener *listener, void *data);
+
+// tablet cursor events
+void handle_tablet_tool_axis(struct wl_listener *listener, void *data);
+void handle_tablet_tool_proximity(struct wl_listener *listener, void *data);
+void handle_tablet_tool_tip(struct wl_listener *listener, void *data);
+void handle_tablet_tool_button(struct wl_listener *listener, void *data);

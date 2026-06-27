@@ -6,6 +6,7 @@
 #include "popup.h"
 #include "seat.h"
 #include "server.h"
+#include "tablet.h"
 #include "tree.h"
 #include <stdlib.h>
 #include <wayland-server-core.h>
@@ -330,6 +331,9 @@ void focus_layer_surface(layer_surface_t *layer_surface) {
 	seat_t *s = seat_default();
 	if (s && s->input_method_relay)
 		input_method_relay_set_focus(s->input_method_relay, surface);
+
+	if (s)
+		tablet_pads_set_focus(s, surface);
 }
 
 struct wlr_scene_tree *output_shell_layer(output_t *output, enum zwlr_layer_shell_v1_layer layer) {

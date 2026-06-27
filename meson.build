@@ -119,6 +119,7 @@ executable(
 		'src' / 'text.c',
 		'src' / 'tabs.c',
 		'src' / 'tearing.c',
+		'src' / 'tablet.c',
 		'src' / 'launcher.c',
 		wl_protos_src,
 		shader_headers,

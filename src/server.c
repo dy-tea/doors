@@ -270,6 +270,18 @@ void server_init(void) {
   server.cursor_frame.notify = cursor_frame;
   wl_signal_add(&server.cursor->events.frame, &server.cursor_frame);
 
+  server.cursor_tablet_tool_axis.notify = handle_tablet_tool_axis;
+  wl_signal_add(&server.cursor->events.tablet_tool_axis, &server.cursor_tablet_tool_axis);
+
+  server.cursor_tablet_tool_proximity.notify = handle_tablet_tool_proximity;
+  wl_signal_add(&server.cursor->events.tablet_tool_proximity, &server.cursor_tablet_tool_proximity);
+
+  server.cursor_tablet_tool_tip.notify = handle_tablet_tool_tip;
+  wl_signal_add(&server.cursor->events.tablet_tool_tip, &server.cursor_tablet_tool_tip);
+
+  server.cursor_tablet_tool_button.notify = handle_tablet_tool_button;
+  wl_signal_add(&server.cursor->events.tablet_tool_button, &server.cursor_tablet_tool_button);
+
   cursor_init_gestures();
 
   // relative pointer
@@ -482,6 +494,9 @@ void server_init(void) {
   server.tearing_control_new_object.notify = handle_new_tearing_hint;
   wl_list_init(&server.tearing_controllers);
   wl_signal_add(&server.tearing_control_v1->events.new_object, &server.tearing_control_new_object);
+
+  // tablet support
+  server.tablet_v2 = wlr_tablet_v2_create(server.wl_display);
 
   // input method support
   server.input_method_manager = wlr_input_method_manager_v2_create(server.wl_display);
@@ -724,8 +739,16 @@ void server_fini(void) {
   wl_list_remove(&server.cursor_button.link);
   wl_list_remove(&server.cursor_axis.link);
   wl_list_remove(&server.cursor_frame.link);
-  wl_list_remove(&server.new_pointer_constraint.link);
   wl_list_remove(&server.cursor_request_set_shape.link);
+
+  wl_list_remove(&server.cursor_tablet_tool_axis.link);
+  wl_list_remove(&server.cursor_tablet_tool_proximity.link);
+  wl_list_remove(&server.cursor_tablet_tool_tip.link);
+  wl_list_remove(&server.cursor_tablet_tool_button.link);
+
+  wl_list_remove(&server.new_pointer_constraint.link);
+  wl_list_remove(&server.pointer_warp.link);
+
   wl_list_remove(&server.swipe_begin.link);
   wl_list_remove(&server.swipe_update.link);
   wl_list_remove(&server.swipe_end.link);
@@ -735,12 +758,9 @@ void server_fini(void) {
   wl_list_remove(&server.hold_begin.link);
   wl_list_remove(&server.hold_end.link);
 
-  wl_list_remove(&server.pointer_warp.link);
-
   wl_list_remove(&server.tearing_control_new_object.link);
 
   wl_list_remove(&server.new_virtual_pointer.link);
-
   wl_list_remove(&server.new_virtual_keyboard.link);
 
   wl_list_remove(&server.new_session_lock.link);

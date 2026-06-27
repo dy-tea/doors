@@ -21,6 +21,7 @@
 #include <wlr/types/wlr_keyboard_shortcuts_inhibit_v1.h>
 #include <wlr/types/wlr_tearing_control_v1.h>
 #include <wlr/types/wlr_security_context_v1.h>
+#include <wlr/types/wlr_tablet_v2.h>
 #include <wlr/types/wlr_xdg_activation_v1.h>
 #include <xkbcommon/xkbcommon.h>
 
@@ -76,6 +77,11 @@ typedef struct server_t {
   struct wl_listener cursor_button;
   struct wl_listener cursor_axis;
   struct wl_listener cursor_frame;
+
+  struct wl_listener cursor_tablet_tool_axis;
+  struct wl_listener cursor_tablet_tool_proximity;
+  struct wl_listener cursor_tablet_tool_tip;
+  struct wl_listener cursor_tablet_tool_button;
 
   struct wlr_pointer_constraints_v1 *pointer_constraints;
   struct wlr_pointer_constraint_v1 *active_pointer_constraint;
@@ -170,6 +176,8 @@ typedef struct server_t {
   struct wlr_input_method_manager_v2 *input_method_manager;
   struct wlr_text_input_manager_v3 *text_input_manager;
   struct ime_relay_t *input_method_relay;
+
+  struct wlr_tablet_manager_v2 *tablet_v2;
 
   struct wl_event_source *ipc_event_source;
 
