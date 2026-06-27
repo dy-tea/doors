@@ -29,6 +29,8 @@
 #include <wayland-server-core.h>
 #include <wayland-util.h>
 #include <wlr/backend.h>
+#include <wlr/backend/headless.h>
+#include <wlr/backend/multi.h>
 #include <wlr/render/allocator.h>
 #include <wlr/util/log.h>
 #include <wlr/util/box.h>
@@ -135,6 +137,16 @@ void server_init(void) {
   if (server.backend == NULL) {
     wlr_log(WLR_ERROR, "Failed to create backend");
     exit(EXIT_FAILURE);
+  }
+
+  // headless backend for virtual outputs
+  server.headless_backend = wlr_headless_backend_create(wl_display_get_event_loop(server.wl_display));
+  if (server.headless_backend) {
+    wlr_log(WLR_INFO, "Created headless backend for virtual outputs");
+    if (wlr_backend_is_multi(server.backend)) {
+      wlr_multi_backend_add(server.backend, server.headless_backend);
+      server.headless_output_counter = 0;
+    }
   }
 
   server.new_output.notify = handle_new_output;

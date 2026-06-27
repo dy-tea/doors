@@ -13,6 +13,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wlr/backend/headless.h>
 #include <wlr/types/wlr_buffer.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_fractional_scale_v1.h>
@@ -318,6 +319,11 @@ void handle_new_output(struct wl_listener *listener, void *data) {
   output->allow_tearing = false;
   strncpy(output->name, wlr_output->name, SMALEN - 1);
   output->name[SMALEN - 1] = 0;
+  if (wlr_output_is_headless(wlr_output)) {
+    server.headless_output_counter++;
+    snprintf(output->name, SMALEN, "HEADLESS-%u", server.headless_output_counter);
+    wlr_output_set_name(wlr_output, output->name);
+  }
   output->id = next_monitor_id++;
   output->wired = true;
   output->padding = (padding_t){0};

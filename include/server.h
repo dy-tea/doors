@@ -156,6 +156,10 @@ typedef struct server_t {
 
   struct wlr_content_type_manager_v1 *content_type_manager;
 
+  // headless/virtual output backend
+  struct wlr_backend *headless_backend;
+  unsigned int headless_output_counter;
+
   struct wlr_security_context_manager_v1 *security_context_manager_v1;
 
   struct wlr_data_control_manager_v1 *data_control_manager;

@@ -30,6 +30,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
+#include <wlr/backend/headless.h>
+#include <wlr/backend/multi.h>
+#include <wlr/backend/wayland.h>
+#include <wlr/backend/x11.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/box.h>
 #include <wlr/util/log.h>
@@ -39,6 +43,27 @@ void send_success(int client_fd, const char *msg);
 void send_failure(int client_fd, const char *msg);
 
 void toplevel_map(struct wl_listener *listener, void *data);
+
+static void create_output(struct wlr_backend *backend, void *data) {
+	bool *done = data;
+	if (*done) return;
+
+	if (wlr_backend_is_wl(backend)) {
+		wlr_wl_output_create(backend);
+		goto set_done;
+	} else if (wlr_backend_is_headless(backend)) {
+		wlr_headless_add_output(backend, 1920, 1080);
+		goto set_done;
+	} else if (wlr_backend_is_x11(backend)) {
+		wlr_x11_output_create(backend);
+		goto set_done;
+	}
+
+	return;
+
+set_done:
+	*done = true;
+}
 
 static void ipc_cmd_quit(char **args, int num, int client_fd) {
   (void)args;
@@ -92,7 +117,17 @@ static void ipc_cmd_output(char **args, int num, int client_fd) {
     offset += snprintf(buf + offset, sizeof(buf) - offset, "\n]\n");
     send_success(client_fd, buf);
     return;
-  }
+  } else if (streq("create", *args)) {
+   	bool done = false;
+    wlr_multi_for_each_backend(server.backend, create_output, &done);
+
+     if (done)
+     	send_success(client_fd, "created output\n");
+     else
+     	send_failure(client_fd, "output create: can only create outputs for wayland, x11 or headless backends");
+
+     return;
+   }
 
   char *output_name = *args;
   args++;

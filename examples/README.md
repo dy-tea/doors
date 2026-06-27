@@ -714,30 +714,30 @@ hotcorner topleft|topright|bottomleft|bottomright
 ### Output Commands
 
 ```
-doorsctl output list
-doorsctl output <name> enable
-doorsctl output <name> disable
-doorsctl output <name> mode <width>x<height>[@<refresh>]
-doorsctl output <name> position <x> <y>
-doorsctl output <name> scale <factor>
-doorsctl output <name> transform <normal|90|180|270|flipped|flipped-90|flipped-270>
-doorsctl output <name> dpms on|off
-doorsctl output <name> adaptive_sync on|off
-doorsctl output <name> render_bit_depth 8|10
-doorsctl output <name> color_profile gamma22
-doorsctl output <name> color_profile srgb
-doorsctl output <name> color_profile icc /path/to/profile.icc
-doorsctl output <name> tearing on|off
-doorsctl output <name> focus                       # Focus output
-doorsctl output <name> rename <newname>            # Rename output
-doorsctl output <name> desktops                    # List desktop names on output
-doorsctl output <name> desktops <names...>         # Reset/replace desktops on output
-doorsctl output desktops <names...>                # Reset desktops on focused output
-doorsctl output <name> add-desktops <names...>     # Add desktops to output
-doorsctl output <name> swap-desktops <target>      # Swap desktops with another output
-doorsctl output <name> remove                      # Remove output (must have no desktops)
-doorsctl output <name> rectangle <WxH:X,Y>         # Set output rectangle geometry
-doorsctl output <name> reorder-desktops <names...> # Reorder desktops on output
+doorsctl output list                                         # List all outputs
+doorsctl output create                                        # Create a virtual output
+doorsctl output <name> enable                                 # Enable output
+doorsctl output <name> disable                                # Disable output
+doorsctl output <name> mode <width>x<height>[@<refresh>]      # Set display mode of output
+doorsctl output <name> position <x> <y>                       # Set output coordinates in layout space
+doorsctl output <name> scale <factor>                         # Set output scale
+doorsctl output <name> transform <normal|90|180|270|flipped|flipped-90|flipped-270> # Set rotation
+doorsctl output <name> dpms on|off                            # Set dpms state
+doorsctl output <name> adaptive_sync on|off                   # Set adaptive sync on/off
+doorsctl output <name> render_bit_depth 8|10                  # Set bits per pixel to be rendered on output (if supported by renderer)
+doorsctl output <name> color_profile gamma22|srgb             # Set color profile
+doorsctl output <name> color_profile icc /path/to/profile.icc # Set icc color profile
+doorsctl output <name> tearing on|off                         # Set output to tear (no buffering)
+doorsctl output <name> focus                                  # Focus output
+doorsctl output <name> rename <newname>                       # Rename output
+doorsctl output <name> desktops                               # List desktop names on output
+doorsctl output <name> desktops <names...>                    # Reset/replace desktops on output
+doorsctl output desktops <names...>                           # Reset desktops on focused output
+doorsctl output <name> add-desktops <names...>                # Add desktops to output
+doorsctl output <name> swap-desktops <target>                 # Swap desktops with another output
+doorsctl output <name> remove                                 # Remove output (must have no desktops)
+doorsctl output <name> rectangle <WxH:X,Y>                    # Set output rectangle geometry
+doorsctl output <name> reorder-desktops <names...>            # Reorder desktops on output
 ```
 
 - `name` - connector name (e.g. `DP-1`, `HDMI-A-1`)
