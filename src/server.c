@@ -80,6 +80,7 @@
 #include <wlr/types/wlr_xdg_system_bell_v1.h>
 #include <wlr/types/wlr_virtual_keyboard_v1.h>
 #include <wlr/types/wlr_keyboard_shortcuts_inhibit_v1.h>
+#include <wlr/xwayland.h>
 #include <wlr/types/wlr_pointer_warp_v1.h>
 #include <wlr/types/wlr_security_context_v1.h>
 
@@ -543,7 +544,29 @@ static int ipc_socket_handler(int fd, uint32_t mask, void *data) {
 void handle_keyboard_shortcuts_inhibit_new_inhibitor(struct wl_listener *listener, void *data) {
   (void)listener;
   struct wlr_keyboard_shortcuts_inhibitor_v1 *inhibitor = data;
-  wlr_keyboard_shortcuts_inhibitor_v1_activate(inhibitor);
+  const char *app_id = NULL;
+  const char *title = NULL;
+
+  struct wlr_xdg_surface *xdg_surface = wlr_xdg_surface_try_from_wlr_surface(inhibitor->surface);
+  if (xdg_surface && xdg_surface->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
+    app_id = xdg_surface->toplevel->app_id;
+    title = xdg_surface->toplevel->title;
+  } else {
+    struct wlr_xwayland_surface *xwayland_surface = wlr_xwayland_surface_try_from_wlr_surface(inhibitor->surface);
+    if (xwayland_surface) {
+      app_id = xwayland_surface->class;
+      title = xwayland_surface->title;
+    }
+  }
+
+  bool allow = true;
+  if (app_id || title) {
+    rule_consequence_t *rule = find_matching_rule(app_id, title);
+    if (rule && rule->has_shortcuts_inhibitor) allow = rule->shortcuts_inhibitor;
+  }
+
+  if (allow)
+    wlr_keyboard_shortcuts_inhibitor_v1_activate(inhibitor);
 }
 
 void handle_output_power_set_mode(struct wl_listener *listener, void *data) {

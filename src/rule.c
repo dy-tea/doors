@@ -146,6 +146,9 @@ void list_rules(char *buf, size_t buf_size) {
     if (r->consequence.has_allow_tearing)
       offset += snprintf(buf + offset, buf_size - offset, "allow_tearing=%s ",
         r->consequence.allow_tearing ? "on" : "off");
+    if (r->consequence.has_shortcuts_inhibitor)
+      offset += snprintf(buf + offset, buf_size - offset, "shortcuts_inhibitor=%s ",
+        r->consequence.shortcuts_inhibitor ? "on" : "off");
 
     offset += snprintf(buf + offset, buf_size - offset, "\n");
 

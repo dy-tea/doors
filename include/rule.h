@@ -47,6 +47,8 @@ typedef struct {
   bool has_block_out_from_screenshare;
   bool allow_tearing;
   bool has_allow_tearing;
+  bool shortcuts_inhibitor;
+  bool has_shortcuts_inhibitor;
 } rule_consequence_t;
 
 typedef struct rule_t {

@@ -607,6 +607,7 @@ doorsctl rule -a vesktop desktop=III
 - `scroller_proportion_single=<0.1-1.0>` - Set the single-window scroller proportion for matched windows
 - `block_out_from_screenshare=on|off` - Blocks out the window from screenshare and screenshot tools.
 - `allow_tearing=on|off` - Enables or disables tearing for the matched window(s), overriding the global `allow_tearing` config.
+- `shortcuts_inhibitor=on|off` - Controls whether the matched window(s) can use the keyboard shortcuts inhibitor protocol to suppress compositor keybindings (default: on).
 
 **Matching by Title:**
 

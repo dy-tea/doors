@@ -3739,6 +3739,12 @@ static void ipc_cmd_rule(char **args, int num, int client_fd) {
       } else if (streq("allow_tearing=off", arg)) {
         r->consequence.allow_tearing = false;
         r->consequence.has_allow_tearing = true;
+      } else if (streq("shortcuts_inhibitor=on", arg)) {
+        r->consequence.shortcuts_inhibitor = true;
+        r->consequence.has_shortcuts_inhibitor = true;
+      } else if (streq("shortcuts_inhibitor=off", arg)) {
+        r->consequence.shortcuts_inhibitor = false;
+        r->consequence.has_shortcuts_inhibitor = true;
       }
 
       args++;
