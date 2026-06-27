@@ -79,6 +79,7 @@
 #include <wlr/types/wlr_linux_drm_syncobj_v1.h>
 #include <wlr/types/wlr_xdg_system_bell_v1.h>
 #include <wlr/types/wlr_virtual_keyboard_v1.h>
+#include <wlr/types/wlr_keyboard_shortcuts_inhibit_v1.h>
 #include <wlr/types/wlr_pointer_warp_v1.h>
 
 void handle_request_start_drag(struct wl_listener *listener, void *data);
@@ -86,6 +87,7 @@ void handle_start_drag(struct wl_listener *listener, void *data);
 void handle_drag_icon_destroy(struct wl_listener *listener, void *data);
 void request_set_selection(struct wl_listener *listener, void *data);
 void handle_new_input(struct wl_listener *listener, void *data);
+void handle_keyboard_shortcuts_inhibit_new_inhibitor(struct wl_listener *listener, void *data);
 void handle_output_power_set_mode(struct wl_listener *listener, void *data);
 void handle_output_manager_apply(struct wl_listener *listener, void *data);
 void handle_output_manager_test(struct wl_listener *listener, void *data);
@@ -343,6 +345,11 @@ void server_init(void) {
   server.new_idle_inhibitor.notify = handle_new_idle_inhibitor;
   wl_signal_add(&server.idle_inhibit_manager->events.new_inhibitor, &server.new_idle_inhibitor);
 
+  // keyboard shortcuts inhibitor
+  server.keyboard_shortcuts_inhibit_manager = wlr_keyboard_shortcuts_inhibit_v1_create(server.wl_display);
+  server.keyboard_shortcuts_inhibit_new_inhibitor.notify = handle_keyboard_shortcuts_inhibit_new_inhibitor;
+  wl_signal_add(&server.keyboard_shortcuts_inhibit_manager->events.new_inhibitor, &server.keyboard_shortcuts_inhibit_new_inhibitor);
+
   // drm lease
 #if WLR_HAS_DRM_BACKEND
 	server.drm_lease_manager = wlr_drm_lease_manager_create(server.wl_display, server.backend);
@@ -484,6 +491,12 @@ static int ipc_socket_handler(int fd, uint32_t mask, void *data) {
       ipc_handle_incoming(client_fd);
   }
   return 0;
+}
+
+void handle_keyboard_shortcuts_inhibit_new_inhibitor(struct wl_listener *listener, void *data) {
+  (void)listener;
+  struct wlr_keyboard_shortcuts_inhibitor_v1 *inhibitor = data;
+  wlr_keyboard_shortcuts_inhibitor_v1_activate(inhibitor);
 }
 
 void handle_output_power_set_mode(struct wl_listener *listener, void *data) {
@@ -697,6 +710,8 @@ void server_fini(void) {
   wl_list_remove(&server.output_power_set_mode.link);
 
   wl_list_remove(&server.new_idle_inhibitor.link);
+
+  wl_list_remove(&server.keyboard_shortcuts_inhibit_new_inhibitor.link);
 
   wl_list_remove(&server.output_manager_apply.link);
   wl_list_remove(&server.output_manager_test.link);

@@ -15,6 +15,7 @@
 #include <wlr/types/wlr_output_power_management_v1.h>
 #include <wlr/types/wlr_output_management_v1.h>
 #include <wlr/types/wlr_pointer_gestures_v1.h>
+#include <wlr/types/wlr_keyboard_shortcuts_inhibit_v1.h>
 #include <wlr/types/wlr_tearing_control_v1.h>
 #include <wlr/types/wlr_xdg_activation_v1.h>
 #include <xkbcommon/xkbcommon.h>
@@ -129,6 +130,9 @@ typedef struct server_t {
   struct wlr_tearing_control_manager_v1 *tearing_control_v1;
   struct wl_listener tearing_control_new_object;
   struct wl_list tearing_controllers;
+
+  struct wlr_keyboard_shortcuts_inhibit_manager_v1 *keyboard_shortcuts_inhibit_manager;
+  struct wl_listener keyboard_shortcuts_inhibit_new_inhibitor;
 
   struct wlr_session_lock_manager_v1 *session_lock_manager;
   struct wl_listener new_session_lock;

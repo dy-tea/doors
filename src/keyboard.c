@@ -18,6 +18,7 @@
 #include <wlr/backend/session.h>
 #include <wlr/types/wlr_idle_notify_v1.h>
 #include <wlr/types/wlr_keyboard.h>
+#include <wlr/types/wlr_keyboard_shortcuts_inhibit_v1.h>
 #include <wlr/types/wlr_keyboard_group.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_seat.h>
@@ -114,7 +115,20 @@ void keyboard_key(struct wl_listener *listener, void *data) {
   bool handled = false;
   uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->wlr_keyboard);
 
-  if (event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
+  // check keyboard shortcuts inhibitor
+  bool shortcuts_inhibited = false;
+  if (server.keyboard_shortcuts_inhibit_manager) {
+    struct wlr_surface *focused = seat->keyboard_state.focused_surface;
+    struct wlr_keyboard_shortcuts_inhibitor_v1 *inhib;
+    wl_list_for_each(inhib, &server.keyboard_shortcuts_inhibit_manager->inhibitors, link) {
+      if (inhib->active && inhib->surface == focused && inhib->seat == seat) {
+        shortcuts_inhibited = true;
+        break;
+      }
+    }
+  }
+
+  if (!shortcuts_inhibited && event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
     // first try raw keycode for number keys
     if (handle_keybind_raw(modifiers, event->keycode, true)) {
       handled = true;
