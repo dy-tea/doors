@@ -672,10 +672,8 @@ static void handle_map(struct wl_listener *listener, void *data) {
 		wlr_scene_node_set_enabled(&xwayland_view->scene_tree->node, false);
 	}
 
-	if (should_focus && target_desktop_is_focused)
-		focus_node(target_monitor, target_desktop, node);
-	else if (should_focus && !target_desktop_is_focused)
-		target_desktop->focus = node;
+	if (should_focus)
+		activate_node(target_monitor, target_desktop, node);
 
 	if (rule && rule->has_state && rule->state == STATE_FULLSCREEN)
 		toggle_fullscreen();
@@ -952,7 +950,7 @@ static void handle_request_activate(struct wl_listener *listener, void *data) {
 				node_t *n = d->root;
 				if (n == xwayland_view->node ||
 				    (n && (n->first_child == xwayland_view->node || n->second_child == xwayland_view->node))) {
-					focus_node(mon, d, xwayland_view->node);
+					activate_node(mon, d, xwayland_view->node);
 					break;
 				}
 			}

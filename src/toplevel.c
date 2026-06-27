@@ -158,7 +158,6 @@ static void handle_foreign_activate_request(struct wl_listener *listener, void *
     return;
 
   node_t *prev = toplevel_desk->focus;
-  toplevel_desk->focus = NULL;
 
   if (prev && prev->client && prev->client->toplevel) {
     struct toplevel_t *prev_toplevel = prev->client->toplevel;
@@ -167,7 +166,7 @@ static void handle_foreign_activate_request(struct wl_listener *listener, void *
       wlr_foreign_toplevel_handle_v1_set_activated(prev_toplevel->foreign_toplevel, false);
   }
 
-  focus_toplevel(toplevel);
+  activate_node(m, toplevel_desk, toplevel->node);
 }
 
 static void handle_foreign_fullscreen_request(struct wl_listener *listener, void *data) {
@@ -612,10 +611,8 @@ void toplevel_map(struct wl_listener *listener, void *data) {
     wlr_scene_node_set_enabled(&toplevel->scene_tree->node, false);
   }
 
-  if (should_focus && target_desktop_is_focused && target_output)
-  	focus_node(target_output, target_desktop, n);
-  else if (should_focus && !target_desktop_is_focused)
-    target_desktop->focus = n;
+  if (should_focus && target_output)
+    activate_node(target_output, target_desktop, n);
 
   if (rule && rule->state == STATE_FULLSCREEN)
   	toggle_fullscreen();

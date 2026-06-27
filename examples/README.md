@@ -67,6 +67,17 @@ When true, directional focus wraps around when there is no window in the target
 direction (e.g., focusing west from the leftmost window wraps to the rightmost).
 
 ```
+doorsctl config focus_on_activate focus|none|smart|urgent
+```
+
+Controls what happens when a window requests activation (new window mapping, XDG activation, `_NET_ACTIVE_WINDOW`, foreign toplevel requests).
+
+- **focus** (default): The requesting window receives keyboard focus immediately.
+- **none**: Activation only updates visual state (borders, tab highlights) without stealing keyboard focus.
+- **smart**: The window receives keyboard focus only if it is on the currently focused desktop. Otherwise, only visual state is updated.
+- **urgent**: The window is marked as urgent (visual indicator) instead of receiving keyboard focus.
+
+```
 doorsctl config gapless_monocle true|false
 ```
 
@@ -807,6 +818,7 @@ doorsctl config borderless_singleton [true|false]
 doorsctl config smart_gaps [true|false]
 doorsctl config smart_borders [true|false]
 doorsctl config focus_wrapping [true|false]
+doorsctl config focus_on_activate focus|none|smart|urgent
 doorsctl config gapless_monocle [true|false]
 doorsctl config enable_animations [true|false]
 doorsctl config edge_scroller_pointer_focus [true|false]

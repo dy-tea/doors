@@ -2447,6 +2447,15 @@ static void ipc_cmd_wm(char **args, int num, int client_fd) {
       "    \"smart_borders\": %s,\n", smart_borders ? "true" : "false");
     offset += snprintf(buf + offset, sizeof(buf) - offset,
       "    \"focus_wrapping\": %s,\n", focus_wrapping ? "true" : "false");
+
+    // fowa
+   	const char *m = "focus";
+    if (focus_on_activate == FOCUS_ON_ACTIVATE_NONE) m = "none";
+    else if (focus_on_activate == FOCUS_ON_ACTIVATE_SMART) m = "smart";
+    else if (focus_on_activate == FOCUS_ON_ACTIVATE_URGENT) m = "urgent";
+    offset += snprintf(buf + offset, sizeof(buf) - offset,
+      "    \"focus_on_activate\": \"%s\",\n", m);
+
     offset += snprintf(buf + offset, sizeof(buf) - offset,
       "    \"record_history\": %s\n", record_history ? "true" : "false");
     offset += snprintf(buf + offset, sizeof(buf) - offset, "  }\n");
@@ -2581,6 +2590,34 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
     ipc_handle_bool(args, num, client_fd, &smart_borders, IPC_FLAG_COMMIT);
   } else if (streq("focus_wrapping", *args)) {
     ipc_handle_bool(args, num, client_fd, &focus_wrapping, IPC_FLAG_COMMIT);
+  } else if (streq("focus_on_activate", *args)) {
+    if (num >= 2) {
+      if (strcmp(args[1], "focus") == 0)
+        focus_on_activate = FOCUS_ON_ACTIVATE_FOCUS;
+      else if (strcmp(args[1], "none") == 0)
+        focus_on_activate = FOCUS_ON_ACTIVATE_NONE;
+      else if (strcmp(args[1], "smart") == 0)
+        focus_on_activate = FOCUS_ON_ACTIVATE_SMART;
+      else if (strcmp(args[1], "urgent") == 0)
+        focus_on_activate = FOCUS_ON_ACTIVATE_URGENT;
+      else {
+        send_failure(client_fd, "config focus_on_activate: expected \"focus\", \"none\", \"smart\", or \"urgent\"\n");
+        return;
+      }
+      transaction_commit_dirty();
+      send_success(client_fd, "focus_on_activate set\n");
+    } else {
+      const char *mode = "focus";
+      if (focus_on_activate == FOCUS_ON_ACTIVATE_NONE)
+        mode = "none";
+      else if (focus_on_activate == FOCUS_ON_ACTIVATE_SMART)
+        mode = "smart";
+      else if (focus_on_activate == FOCUS_ON_ACTIVATE_URGENT)
+        mode = "urgent";
+      char buf[64];
+      snprintf(buf, sizeof(buf), "%s\n", mode);
+      send_success(client_fd, buf);
+    }
   } else if (streq("gapless_monocle", *args)) {
     ipc_handle_bool(args, num, client_fd, &gapless_monocle, IPC_FLAG_COMMIT);
   } else if (streq("decoration_mode", *args)) {

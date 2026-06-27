@@ -36,6 +36,8 @@ typedef enum {
 
 typedef enum { DECORATION_NONE, DECORATION_TABS, DECORATION_ALWAYS, DECORATION_CSD } decoration_mode_t;
 
+typedef enum { FOCUS_ON_ACTIVATE_FOCUS, FOCUS_ON_ACTIVATE_NONE, FOCUS_ON_ACTIVATE_SMART, FOCUS_ON_ACTIVATE_URGENT } focus_on_activate_mode_t;
+
 typedef enum { LAYER_BELOW, LAYER_NORMAL, LAYER_ABOVE } stack_layer_t;
 
 typedef enum { LAYOUT_TILED, LAYOUT_MONOCLE, LAYOUT_SCROLLER } layout_t;
@@ -208,6 +210,7 @@ extern int window_gap;
 extern bool smart_gaps;
 extern bool smart_borders;
 extern bool focus_wrapping;
+extern int focus_on_activate; // focus_on_activate_mode_t
 extern double split_ratio;
 extern char normal_border_color[16];
 extern char active_border_color[16];

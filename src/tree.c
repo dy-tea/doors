@@ -46,6 +46,7 @@ int window_gap = 10;
 bool smart_gaps = false;
 bool smart_borders = false;
 bool focus_wrapping = true;
+int focus_on_activate = FOCUS_ON_ACTIVATE_FOCUS;
 double split_ratio = 0.5;
 
 // transaction settings
@@ -1017,7 +1018,7 @@ void kill_node(desktop_t *d, node_t *n) {
   close_node(n);
 }
 
-bool focus_node(output_t *m, desktop_t *d, node_t *n) {
+static bool focus_node_impl(output_t *m, desktop_t *d, node_t *n, bool give_keyboard_focus) {
   if (m == NULL || d == NULL || n == NULL) return false;
 
   d->focus = n;
@@ -1073,7 +1074,7 @@ bool focus_node(output_t *m, desktop_t *d, node_t *n) {
     }
   }
 
-  if (n != NULL && n->client != NULL) {
+  if (give_keyboard_focus && n != NULL && n->client != NULL) {
     if (n->client->toplevel)
       focus_toplevel(n->client->toplevel);
     else if (n->client->xwayland_view)
@@ -1095,26 +1096,53 @@ bool focus_node(output_t *m, desktop_t *d, node_t *n) {
     }
   }
 
-  // pointer follows focus
-  if (pointer_follows_focus && n != NULL && n->client != NULL && !server.focus_from_click) {
+  // pointer follows focus (only when giving keyboard focus)
+  if (give_keyboard_focus && pointer_follows_focus && n != NULL && n->client != NULL && !server.focus_from_click) {
     int center_x = n->rectangle.x + n->rectangle.width / 2;
     int center_y = n->rectangle.y + n->rectangle.height / 2;
     wlr_cursor_warp(server.cursor, NULL, center_x, center_y);
   }
 
   server.focus_from_click = false;
-  ipc_put_status(SUB_MASK_REPORT, NULL);
-  ipc_put_status(SUB_MASK_MONITOR_FOCUS, "monitor_focus[%s]\n", m->name);
-  ipc_put_status(SUB_MASK_NODE_FOCUS, "node_focus[%s,%s,%u]\n",
-    n->client && n->client->app_id[0] ? n->client->app_id : "?",
-    n->client && n->client->title[0] ? n->client->title : "?",
-    n->id);
+
+  if (give_keyboard_focus) {
+    ipc_put_status(SUB_MASK_REPORT, NULL);
+    ipc_put_status(SUB_MASK_MONITOR_FOCUS, "monitor_focus[%s]\n", m->name);
+    ipc_put_status(SUB_MASK_NODE_FOCUS, "node_focus[%s,%s,%u]\n",
+      n->client && n->client->app_id[0] ? n->client->app_id : "?",
+      n->client && n->client->title[0] ? n->client->title : "?",
+      n->id);
+  }
 
   return true;
 }
 
+bool focus_node(output_t *m, desktop_t *d, node_t *n) {
+  return focus_node_impl(m, d, n, true);
+}
+
 bool activate_node(output_t *m, desktop_t *d, node_t *n) {
-  return focus_node(m, d, n);
+  if (focus_on_activate == FOCUS_ON_ACTIVATE_FOCUS)
+    return focus_node_impl(m, d, n, true);
+
+  if (focus_on_activate == FOCUS_ON_ACTIVATE_NONE ||
+      (focus_on_activate == FOCUS_ON_ACTIVATE_URGENT)) {
+    bool result = focus_node_impl(m, d, n, false);
+    if (focus_on_activate == FOCUS_ON_ACTIVATE_URGENT && n && n->client) {
+      n->client->urgent = true;
+      if (n->client->toplevel)
+        update_border_colors(n->client->toplevel->border_tree,
+          n->client->toplevel->border_rects, n->client);
+      else if (n->client->xwayland_view)
+        update_border_colors(n->client->xwayland_view->border_tree,
+          n->client->xwayland_view->border_rects, n->client);
+    }
+    return result;
+  }
+
+  // smart: focus only if on currently focused desktop
+  bool on_current_desktop = (mon && mon->desk == d);
+  return focus_node_impl(m, d, n, on_current_desktop);
 }
 
 bool is_adjacent(node_t *a, node_t *b, direction_t dir) {

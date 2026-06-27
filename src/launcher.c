@@ -2,6 +2,7 @@
 #include "output.h"
 #include "server.h"
 #include "toplevel.h"
+#include "tree.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -144,7 +145,8 @@ void handle_xdg_activation_request_activate(struct wl_listener *listener, void *
   wlr_log(WLR_DEBUG, "xdg_activation: activating toplevel %p", (void*)toplevel);
 
   wlr_scene_node_raise_to_top(&toplevel->scene_tree->node);
-  focus_toplevel(toplevel);
+  if (toplevel->node && toplevel->node->output && toplevel->node->desktop)
+    activate_node(toplevel->node->output, toplevel->node->desktop, toplevel->node);
 }
 
 void handle_xdg_activation_new_token(struct wl_listener *listener, void *data) {
