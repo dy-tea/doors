@@ -69,7 +69,6 @@ typedef struct {
 typedef struct client_t {
   char app_id[MAXLEN];
   char title[MAXLEN];
-  unsigned int border_width;
   bool urgent;
   bool shown;
   client_state_t state;
@@ -167,7 +166,6 @@ typedef struct desktop_t {
   struct desktop_t *next;
   padding_t padding;
   int window_gap;
-  unsigned int border_width;
   struct output_t *output;
 } desktop_t;
 
@@ -207,6 +205,8 @@ extern padding_t monocle_padding;
 extern padding_t padding;
 extern int border_width;
 extern int window_gap;
+extern bool smart_gaps;
+extern bool smart_borders;
 extern double split_ratio;
 extern char normal_border_color[16];
 extern char active_border_color[16];

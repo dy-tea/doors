@@ -975,7 +975,7 @@ borders_update:
   if (entry->toplevel && entry->toplevel->border_tree) {
     unsigned int bw = 0;
     if (entry->node && entry->node->client)
-      bw = entry->node->client->border_width;
+      bw = effective_border_width(entry->node->desktop);
 
     int bwidth = width, bheight = height;
     if (entry->use_content_tree && entry->toplevel->geometry.width > 0) {

@@ -450,7 +450,6 @@ static void ipc_cmd_output(char **args, int num, int client_fd) {
       d->layout = LAYOUT_TILED;
       d->user_layout = LAYOUT_TILED;
       d->window_gap = window_gap;
-      d->border_width = border_width;
       d->padding = (padding_t){0};
       d->root = NULL;
       d->focus = NULL;
@@ -507,7 +506,6 @@ static void ipc_cmd_output(char **args, int num, int client_fd) {
         newd->layout = LAYOUT_TILED;
         newd->user_layout = LAYOUT_TILED;
         newd->window_gap = window_gap;
-        newd->border_width = border_width;
         newd->padding = (padding_t){0};
         newd->root = NULL;
         newd->focus = NULL;
@@ -2444,6 +2442,10 @@ static void ipc_cmd_wm(char **args, int num, int client_fd) {
     offset += snprintf(buf + offset, sizeof(buf) - offset,
       "    \"automatic_scheme\": %d,\n", automatic_scheme);
     offset += snprintf(buf + offset, sizeof(buf) - offset,
+      "    \"smart_gaps\": %s,\n", smart_gaps ? "true" : "false");
+    offset += snprintf(buf + offset, sizeof(buf) - offset,
+      "    \"smart_borders\": %s,\n", smart_borders ? "true" : "false");
+    offset += snprintf(buf + offset, sizeof(buf) - offset,
       "    \"record_history\": %s\n", record_history ? "true" : "false");
     offset += snprintf(buf + offset, sizeof(buf) - offset, "  }\n");
     offset += snprintf(buf + offset, sizeof(buf) - offset, "}\n");
@@ -2544,11 +2546,6 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
     if (num >= 2) {
       int val = atoi(args[1]);
       border_width = val;
-      for (output_t *m = mon_head; m != NULL; m = m->next) {
-        m->border_width = border_width;
-        for (desktop_t *d = m->desk; d != NULL; d = d->next)
-          d->border_width = border_width;
-      }
       transaction_commit_dirty();
       send_success(client_fd, "border_width set\n");
     } else {
@@ -2560,11 +2557,9 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
     if (num >= 2) {
       int val = atoi(args[1]);
       window_gap = val;
-      for (output_t *m = mon_head; m != NULL; m = m->next) {
-        m->window_gap = window_gap;
-        for (desktop_t *d = m->desk; d != NULL; d = d->next)
+      for (output_t *m = mon_head; m != NULL; m = m->next)
+        for (desktop_t *d = m->desk_head; d != NULL; d = d->next)
           d->window_gap = window_gap;
-      }
       transaction_commit_dirty();
       send_success(client_fd, "window_gap set\n");
     } else {
@@ -2578,6 +2573,10 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
     ipc_handle_bool(args, num, client_fd, &borderless_monocle, IPC_FLAG_COMMIT);
   } else if (streq("borderless_singleton", *args)) {
     ipc_handle_bool(args, num, client_fd, &borderless_singleton, IPC_FLAG_COMMIT);
+  } else if (streq("smart_gaps", *args)) {
+    ipc_handle_bool(args, num, client_fd, &smart_gaps, IPC_FLAG_COMMIT);
+  } else if (streq("smart_borders", *args)) {
+    ipc_handle_bool(args, num, client_fd, &smart_borders, IPC_FLAG_COMMIT);
   } else if (streq("gapless_monocle", *args)) {
     ipc_handle_bool(args, num, client_fd, &gapless_monocle, IPC_FLAG_COMMIT);
   } else if (streq("decoration_mode", *args)) {

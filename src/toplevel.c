@@ -293,8 +293,8 @@ void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
 
   // when tiled or floating surface is smaller than its container, update borders
   // to wrap the actual surface instead of the full allocated space
-  if ((tiled || floating) && toplevel->border_tree && c->border_width > 0) {
-    unsigned int bw = c->border_width;
+  if ((tiled || floating) && toplevel->border_tree && effective_border_width(toplevel->node->desktop) > 0) {
+    unsigned int bw = effective_border_width(toplevel->node->desktop);
     if (tiled && (x > 0 || y > 0)) {
       int border_w = (int)toplevel->geometry.width < container_rect->width ? (int)toplevel->geometry.width : container_rect->width;
       int border_h = (int)toplevel->geometry.height < container_rect->height ? (int)toplevel->geometry.height : container_rect->height;

@@ -1,5 +1,6 @@
 #include "animation.h"
 #include "blur.h"
+#include "tree.h"
 #include "layer.h"
 #include "output.h"
 #include "server.h"
@@ -1204,7 +1205,7 @@ static bool rebuild_live_blur(output_t *output, struct wlr_scene_output *scene_o
       float win_v  = 1.0f - (float)(content_r.y - output->ly + content_r.height) / oh;
       float win_sw = (float)content_r.width  / ow;
       float win_sh = (float)content_r.height / oh;
-      int bw_i = (c->state == STATE_FULLSCREEN) ? 0 : (int)c->border_width;
+      int bw_i = (c->state == STATE_FULLSCREEN) ? 0 : border_width;
       float inner_r = (c->border_radius > (float)bw_i) ? c->border_radius - (float)bw_i : 0.0f;
 
       glEnable(GL_BLEND);
@@ -1486,7 +1487,7 @@ static bool rebuild_live_acrylic(output_t *output, struct wlr_scene_output *scen
       float win_v = (float)(content_r.y - output->ly) / oh;
       float win_sw = (float)content_r.width  / ow;
       float win_sh = (float)content_r.height / oh;
-      int bw_i = (c->state == STATE_FULLSCREEN) ? 0 : (int)c->border_width;
+      int bw_i = (c->state == STATE_FULLSCREEN) ? 0 : border_width;
       float inner_r = (c->border_radius > (float)bw_i) ? c->border_radius - (float)bw_i : 0.0f;
 
       glEnable(GL_BLEND);
@@ -1636,7 +1637,7 @@ static bool blur_render_border(toplevel_t *tl, int content_w, int content_h) {
 
   float scale = tl->node->output ? tl->node->output->wlr_output->scale : 1.0f;
   client_t *c = tl->node->client;
-  int bw_i = (int)c->border_width;
+  int bw_i = border_width;
   if (bw_i <= 0) return false;
 
   double log_fw = (double)content_w + 2 * bw_i;
@@ -1757,7 +1758,7 @@ static bool rebuild_corner_masks(output_t *output, struct wlr_scene_output *scen
     }
 
     float ow = (float)w, oh = (float)h;
-    int bw_i = (c->state == STATE_FULLSCREEN) ? 0 : (int)c->border_width;
+    int bw_i = (c->state == STATE_FULLSCREEN) ? 0 : border_width;
 
     float outer_x = (float)(content_r.x - output->lx - bw_i);
     float outer_y = (float)(content_r.y - output->ly - bw_i);
@@ -1812,7 +1813,7 @@ static void push_corner_masks_to_toplevels(output_t *output) {
     }
 
     struct wlr_box content_r = get_client_rect(tl);
-    int bw_i = (c->state == STATE_FULLSCREEN) ? 0 : (int)c->border_width;
+    int bw_i = (c->state == STATE_FULLSCREEN) ? 0 : border_width;
 
     struct wlr_box outer_r = {
       .x = content_r.x - bw_i,

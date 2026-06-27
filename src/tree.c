@@ -43,6 +43,8 @@ padding_t monocle_padding = {0, 0, 0, 0};
 padding_t padding = {0, 0, 0, 0};
 int border_width = 2;
 int window_gap = 10;
+bool smart_gaps = false;
+bool smart_borders = false;
 double split_ratio = 0.5;
 
 // transaction settings
@@ -142,7 +144,6 @@ client_t *make_client(void) {
   c->last_layer = LAYER_NORMAL;
   c->urgent = false;
   c->shown = false;
-  c->border_width = border_width;
 
   // initialize scroller properties
   scroller_init_client(c);
@@ -229,6 +230,11 @@ int tiled_count(node_t *n, bool include_receptacles) {
     tiled_count(n->second_child, include_receptacles);
 }
 
+int visible_tiled_count(desktop_t *d) {
+  if (!d || !d->root) return 0;
+  return tiled_count(d->root, false);
+}
+
 node_t *brother_tree(node_t *n) {
   if (n == NULL || n->parent == NULL) return NULL;
 
@@ -310,10 +316,11 @@ void arrange(output_t *m, desktop_t *d, bool use_transaction) {
   }
 
   if (!gapless_monocle || d->layout != LAYOUT_MONOCLE) {
-    rect.x += d->window_gap;
-    rect.y += d->window_gap;
-    rect.width -= d->window_gap;
-    rect.height -= d->window_gap;
+    int wg = smart_gaps && visible_tiled_count(d) <= 1 ? 0 : d->window_gap;
+    rect.x += wg;
+    rect.y += wg;
+    rect.width -= wg;
+    rect.height -= wg;
   }
 
   apply_layout(m, d, d->root, rect, rect);
@@ -326,7 +333,7 @@ static void render_leaf(output_t *m, desktop_t *d, node_t *n,
   	struct wlr_box rect, struct wlr_box root_rect, bool omit_window_gap) {
   if (n == NULL || n->client == NULL) return;
 
-  unsigned int bw = n->client->border_width;
+  unsigned int bw = effective_border_width(d);
 
   struct wlr_box r;
   if (IS_FLOATING(n->client)) {
@@ -335,7 +342,7 @@ static void render_leaf(output_t *m, desktop_t *d, node_t *n,
     r = m->rectangle;
   } else if (d->layout == LAYOUT_MONOCLE && IS_TILED(n->client) && !omit_window_gap) {
     r = root_rect;
-    int wg = gapless_monocle ? 0 : d->window_gap;
+    int wg = gapless_monocle ? 0 : (smart_gaps && visible_tiled_count(d) <= 1 ? 0 : d->window_gap);
     int bleed = wg + 2 * bw;
 
     r.x += bw;
@@ -349,7 +356,8 @@ static void render_leaf(output_t *m, desktop_t *d, node_t *n,
     if (omit_window_gap)
       wg = 0;
     else
-      wg = (gapless_monocle && d->layout == LAYOUT_MONOCLE) ? 0 : d->window_gap;
+      wg = (gapless_monocle && d->layout == LAYOUT_MONOCLE) ? 0 :
+        (smart_gaps && visible_tiled_count(d) <= 1 ? 0 : d->window_gap);
 
     int bleed = wg + 2 * bw;
     r.x += bw;
@@ -421,7 +429,7 @@ void apply_layout(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect,
     if (show_deco) {
       int bar_h = tab_bar_height();
 
-      int wg = d->window_gap;
+      int wg = smart_gaps && visible_tiled_count(d) <= 1 ? 0 : d->window_gap;
       struct wlr_box bar_rect = {
         .x = rect.x,
         .y = rect.y,

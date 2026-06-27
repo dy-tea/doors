@@ -165,8 +165,9 @@ static void update_scene_positions(node_t *n, struct wlr_box rect, desktop_t *d)
     if (n->client) {
       // apply window gap and border width to leaf nodes
       struct wlr_box r = rect;
-      unsigned int bw = n->client->border_width;
-      int wg = (gapless_monocle && d->layout == LAYOUT_MONOCLE) ? 0 : d->window_gap;
+      unsigned int bw = effective_border_width(d);
+      int wg = (gapless_monocle && d->layout == LAYOUT_MONOCLE) ? 0 :
+        (smart_gaps && visible_tiled_count(d) <= 1 ? 0 : d->window_gap);
       int bleed = wg + 2 * bw;
       r.x += bw;
       r.y += bw;
@@ -381,7 +382,7 @@ static void process_cursor_resize(void) {
 
     // update borders
     client_t *client = xwayland_view->node->client;
-    unsigned int bw = client->border_width;
+    unsigned int bw = effective_border_width(xwayland_view->node->desktop);
     if (bw != 0) {
       const struct wlr_box geo = {0, 0, new_width, new_height};
       update_borders(xwayland_view->border_tree, xwayland_view->border_rects, geo, bw);
@@ -404,7 +405,7 @@ static void process_cursor_resize(void) {
   wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, new_width, new_height);
 
   // update borders
- 	unsigned int bw = client->border_width;
+ 	unsigned int bw = effective_border_width(toplevel->node->desktop);
   if (bw != 0) {
     const struct wlr_box geo = {0, 0, new_width, new_height};
     update_borders(toplevel->border_tree, toplevel->border_rects, geo, bw);

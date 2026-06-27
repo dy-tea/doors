@@ -54,8 +54,7 @@ typedef struct output_t {
   bool wired;
   padding_t padding;
   unsigned int sticky_count;
-  int window_gap;
-  unsigned int border_width;
+
   struct wlr_box rectangle;
   desktop_t *desk;
   desktop_t *last_desk;

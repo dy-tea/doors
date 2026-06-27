@@ -46,6 +46,20 @@ doorsctl config borderless_singleton true|false
 When true, removes borders for singleton windows.
 
 ```
+doorsctl config smart_gaps true|false
+```
+
+When true, window gaps are disabled when there is only one tiled window on the
+desktop.
+
+```
+doorsctl config smart_borders true|false
+```
+
+When true, window borders are hidden when there is only one tiled window on the
+desktop.
+
+```
 doorsctl config gapless_monocle true|false
 ```
 
@@ -783,6 +797,8 @@ doorsctl config window_gap [<n>]     	# Get or set window gap
 doorsctl config single_monocle [true|false]
 doorsctl config borderless_monocle [true|false]
 doorsctl config borderless_singleton [true|false]
+doorsctl config smart_gaps [true|false]
+doorsctl config smart_borders [true|false]
 doorsctl config gapless_monocle [true|false]
 doorsctl config enable_animations [true|false]
 doorsctl config edge_scroller_pointer_focus [true|false]

@@ -320,8 +320,6 @@ void handle_new_output(struct wl_listener *listener, void *data) {
   output->name[SMALEN - 1] = 0;
   output->id = next_monitor_id++;
   output->wired = true;
-  output->window_gap = window_gap;
-  output->border_width = border_width;
   output->padding = (padding_t){0};
   output->rectangle = (struct wlr_box){0, 0, 1920, 1080};
 
@@ -333,7 +331,6 @@ void handle_new_output(struct wl_listener *listener, void *data) {
     d->layout = LAYOUT_TILED;
     d->user_layout = LAYOUT_TILED;
     d->window_gap = window_gap;
-    d->border_width = border_width;
     d->padding = (padding_t){0};
     d->root = NULL;
     d->focus = NULL;

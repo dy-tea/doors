@@ -30,6 +30,7 @@ bool is_first_child(node_t *n);
 bool is_second_child(node_t *n);
 unsigned int clients_count_in(node_t *n);
 int tiled_count(node_t *n, bool include_receptacles);
+int visible_tiled_count(desktop_t *d);
 node_t *brother_tree(node_t *n);
 node_t *first_extrema(node_t *n);
 node_t *second_extrema(node_t *n);
@@ -97,3 +98,8 @@ output_t *find_output_by_name(const char *name);
 #define IS_TILED(c) (is_tiled(c))
 #define IS_FLOATING(c) (is_floating(c))
 #define IS_RECEPTACLE(n) ((n) != NULL && (n)->client == NULL && is_leaf(n))
+
+static inline int effective_border_width(desktop_t *d) {
+  if (smart_borders && d && visible_tiled_count(d) <= 1) return 0;
+  return border_width;
+}

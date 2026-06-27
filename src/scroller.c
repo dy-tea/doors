@@ -82,7 +82,7 @@ static void scroller_arrange_stack(node_t *head_node, struct wlr_box base_geom, 
 	}
 
   if (count == 1) {
-    unsigned int bw = head->border_width;
+    unsigned int bw = effective_border_width(head_node->desktop);
     struct wlr_box r = base_geom;
     r.x += bw;
     r.y += bw;
@@ -119,7 +119,7 @@ static void scroller_arrange_stack(node_t *head_node, struct wlr_box base_geom, 
       geom.height = remain_height;
     }
 
-    unsigned int bw = c->border_width;
+    unsigned int bw = effective_border_width(head_node->desktop);
     struct wlr_box r = geom;
     r.x += bw;
     r.y += bw;
@@ -157,10 +157,11 @@ void scroller_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
   wlr_log(WLR_DEBUG, "scroller_arrange: found %d tiled nodes", n);
   if (n == 0) return;
 
-  int gappih = d->window_gap;
-  int gappoh = d->window_gap;
-  int gappov = d->window_gap;
-  int gappiv = d->window_gap;
+  int wg = smart_gaps && visible_tiled_count(d) <= 1 ? 0 : d->window_gap;
+  int gappih = wg;
+  int gappoh = wg;
+  int gappov = wg;
+  int gappiv = wg;
 
   int max_width = available.width - 2 * scroller_structs - gappih;
   int max_height = available.height - 2 * gappov;

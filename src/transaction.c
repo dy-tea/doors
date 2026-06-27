@@ -262,9 +262,9 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
     }
   }
 
-  if (node->client->border_width != 0) {
+  if (effective_border_width(node->desktop) != 0) {
     if (node->client->toplevel) {
-      unsigned int bw = node->client->border_width;
+      unsigned int bw = effective_border_width(node->desktop);
       struct toplevel_t *tl = node->client->toplevel;
       // surface geometry differs from container in either dimension
       bool undersized = instruction->state != STATE_FLOATING && instruction->state != STATE_FULLSCREEN &&
@@ -310,7 +310,7 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
         }
       }
     } else if (node->client->xwayland_view) {
-      unsigned int bw = node->client->border_width;
+      unsigned int bw = effective_border_width(node->desktop);
       const struct wlr_box geo = {0, 0, rect->width, rect->height};
       update_borders(node->client->xwayland_view->border_tree,
         node->client->xwayland_view->border_rects, geo, bw);
