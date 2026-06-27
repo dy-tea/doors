@@ -631,3 +631,7 @@ void screencopy_fini(void) {
 	free(screencopy_manager);
 	screencopy_manager = NULL;
 }
+
+struct wl_global *screencopy_get_global(void) {
+	return screencopy_manager ? screencopy_manager->global : NULL;
+}

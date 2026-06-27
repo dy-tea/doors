@@ -18,6 +18,7 @@
 #include <wlr/types/wlr_pointer_gestures_v1.h>
 #include <wlr/types/wlr_keyboard_shortcuts_inhibit_v1.h>
 #include <wlr/types/wlr_tearing_control_v1.h>
+#include <wlr/types/wlr_security_context_v1.h>
 #include <wlr/types/wlr_xdg_activation_v1.h>
 #include <xkbcommon/xkbcommon.h>
 
@@ -149,6 +150,14 @@ typedef struct server_t {
   struct wl_listener new_idle_inhibitor;
 
   struct wlr_content_type_manager_v1 *content_type_manager;
+
+  struct wlr_security_context_manager_v1 *security_context_manager_v1;
+
+  struct wlr_data_control_manager_v1 *data_control_manager;
+  struct wlr_ext_data_control_manager_v1 *ext_data_control_manager;
+  struct wlr_export_dmabuf_manager_v1 *export_dmabuf_manager;
+  struct wlr_gamma_control_manager_v1 *gamma_control_manager;
+  struct wlr_xdg_output_manager_v1 *xdg_output_manager;
 
   struct wlr_ext_foreign_toplevel_list_v1 *foreign_toplevel_list;
   struct wlr_foreign_toplevel_manager_v1 *foreign_toplevel_manager;

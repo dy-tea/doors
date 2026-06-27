@@ -1142,3 +1142,11 @@ void image_copy_capture_fini(void) {
 		copy_mgr = NULL;
 	}
 }
+
+struct wl_global *image_copy_capture_get_global(void) {
+	return copy_mgr ? copy_mgr->global : NULL;
+}
+
+struct wl_global *image_capture_source_get_global(void) {
+	return output_mgr ? output_mgr->global : NULL;
+}

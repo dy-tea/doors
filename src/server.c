@@ -81,6 +81,7 @@
 #include <wlr/types/wlr_virtual_keyboard_v1.h>
 #include <wlr/types/wlr_keyboard_shortcuts_inhibit_v1.h>
 #include <wlr/types/wlr_pointer_warp_v1.h>
+#include <wlr/types/wlr_security_context_v1.h>
 
 void handle_request_start_drag(struct wl_listener *listener, void *data);
 void handle_start_drag(struct wl_listener *listener, void *data);
@@ -94,6 +95,40 @@ void handle_output_manager_test(struct wl_listener *listener, void *data);
 
 void handle_drm_lease_request(struct wl_listener *listener, void *data);
 static void handle_ring_system_bell(struct wl_listener *listener, void *data);
+
+static bool is_privileged(const struct wl_global *global) {
+	return
+		global == server.output_manager->global ||
+		global == server.output_power_manager->global ||
+		global == server.input_method_manager->global ||
+		global == server.foreign_toplevel_list->global ||
+		global == server.foreign_toplevel_manager->global ||
+		global == server.data_control_manager->global ||
+		global == server.ext_data_control_manager->global ||
+		global == server.export_dmabuf_manager->global ||
+		global == server.gamma_control_manager->global ||
+		global == server.security_context_manager_v1->global ||
+		global == server.layer_shell->global ||
+		global == server.session_lock_manager->global ||
+		global == server.keyboard_shortcuts_inhibit_manager->global ||
+		global == server.virtual_keyboard_manager->global ||
+		global == server.virtual_pointer_manager->global ||
+		global == server.xdg_output_manager->global ||
+		global == server.workspace_manager->global ||
+		global == screencopy_get_global() ||
+		global == image_copy_capture_get_global() ||
+		global == image_capture_source_get_global();
+}
+
+static bool filter_global(const struct wl_client *client, const struct wl_global *global, void *data) {
+	(void)data;
+	const struct wlr_security_context_v1_state *security_context = wlr_security_context_manager_v1_lookup_client(
+		server.security_context_manager_v1, (struct wl_client *)client);
+
+	if (is_privileged(global)) return security_context == NULL;
+
+	return true;
+}
 
 void server_init(void) {
   server = (struct server_t){0};
@@ -137,7 +172,7 @@ void server_init(void) {
   if (wlr_renderer_get_texture_formats(server.renderer, WLR_BUFFER_CAP_DMABUF)) {
   	wlr_drm_create(server.wl_display, server.renderer);
     server.linux_dmabuf = wlr_linux_dmabuf_v1_create_with_renderer(server.wl_display, 4, server.renderer);
-    wlr_export_dmabuf_manager_v1_create(server.wl_display);
+    server.export_dmabuf_manager = wlr_export_dmabuf_manager_v1_create(server.wl_display);
   }
 
   // drm syncobj
@@ -157,7 +192,7 @@ void server_init(void) {
 
   // output management
   server.output_layout = wlr_output_layout_create(server.wl_display);
-  wlr_xdg_output_manager_v1_create(server.wl_display, server.output_layout);
+  server.xdg_output_manager = wlr_xdg_output_manager_v1_create(server.wl_display, server.output_layout);
 
   server.output_power_manager = wlr_output_power_manager_v1_create(server.wl_display);
   server.output_power_set_mode.notify = handle_output_power_set_mode;
@@ -442,16 +477,17 @@ void server_init(void) {
   wlr_presentation_create(server.wl_display, server.backend, 2);
 
   // export dmabuf
-  wlr_export_dmabuf_manager_v1_create(server.wl_display);
+  server.export_dmabuf_manager = wlr_export_dmabuf_manager_v1_create(server.wl_display);
 
   // wlr data control
-  wlr_data_control_manager_v1_create(server.wl_display);
+  server.data_control_manager = wlr_data_control_manager_v1_create(server.wl_display);
 
   // ext data control
-  wlr_ext_data_control_manager_v1_create(server.wl_display, 1);
+  server.ext_data_control_manager = wlr_ext_data_control_manager_v1_create(server.wl_display, 1);
 
   // gamma control
-  wlr_scene_set_gamma_control_manager_v1(server.scene, wlr_gamma_control_manager_v1_create(server.wl_display));
+  server.gamma_control_manager = wlr_gamma_control_manager_v1_create(server.wl_display);
+  wlr_scene_set_gamma_control_manager_v1(server.scene, server.gamma_control_manager);
 
   // image copy capture
   image_copy_capture_init();
@@ -483,6 +519,14 @@ void server_init(void) {
   rule_init();
   output_config_init();
   input_init();
+
+  // security context manager
+  server.security_context_manager_v1 = wlr_security_context_manager_v1_create(server.wl_display);
+  if (!server.security_context_manager_v1) {
+    wlr_log(WLR_ERROR, "Failed to create security context manager");
+  } else {
+    wl_display_set_global_filter(server.wl_display, filter_global, NULL);
+  }
 }
 
 static int ipc_socket_handler(int fd, uint32_t mask, void *data) {
