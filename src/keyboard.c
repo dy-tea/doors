@@ -207,7 +207,9 @@ bool handle_keybind_raw(uint32_t modifiers, uint32_t keycode, bool pressed) {
 
   if (!matched_kb) return false;
 
-  if (matched_kb->action == BIND_INTERACTIVE_MOVE || matched_kb->action == BIND_INTERACTIVE_RESIZE)
+  if (matched_kb->action == BIND_INTERACTIVE_MOVE ||
+	  	matched_kb->action == BIND_INTERACTIVE_RESIZE ||
+	   	matched_kb->action == BIND_TILING_DRAG)
     return false;
 
   execute_keybind(matched_kb);

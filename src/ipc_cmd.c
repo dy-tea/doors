@@ -2921,6 +2921,15 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
       send_success(client_fd, presel_feedback_color);
       send_success(client_fd, "\n");
     }
+  } else if (streq("tiling_drag_indicator_color", *args)) {
+    if (num >= 2) {
+      strncpy(tiling_drag_indicator_color, args[1], sizeof(tiling_drag_indicator_color) - 1);
+      tiling_drag_indicator_color[sizeof(tiling_drag_indicator_color) - 1] = '\0';
+      send_success(client_fd, "tiling_drag_indicator_color set\n");
+    } else {
+      send_success(client_fd, tiling_drag_indicator_color);
+      send_success(client_fd, "\n");
+    }
   } else if (streq("normal_border_gradient", *args) || streq("active_border_gradient", *args) ||
       streq("focused_border_gradient", *args)) {
     float *grad;

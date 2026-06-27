@@ -224,6 +224,9 @@ bind_action_t parse_action(const char *cmd, int *desktop_index, char *submap_nam
 
       if (strcmp(args[1], "interactive_resize") == 0)
         return BIND_INTERACTIVE_RESIZE;
+
+      if (strcmp(args[1], "tiling_drag") == 0)
+        return BIND_TILING_DRAG;
     }
 
     if (strcmp(args[0], "desktop") == 0 && argc >= 2) {
@@ -1131,6 +1134,7 @@ void execute_bind(bind_t b) {
       break;
     case BIND_INTERACTIVE_MOVE:
     case BIND_INTERACTIVE_RESIZE:
+    case BIND_TILING_DRAG:
       break;
   }
 }
@@ -1275,7 +1279,7 @@ const char *bind_action_name(bind_action_t action) {
     "send_to_desktop_8", "send_to_desktop_9", "send_to_desktop_10", "desktop_1",
     "desktop_2", "desktop_3", "desktop_4", "desktop_5", "desktop_6", "desktop_7",
     "desktop_8", "desktop_9", "desktop_10", "resize_left", "resize_right", "resize_up",
-    "resize_down", "interactive_move", "interactive_resize", "external"
+    "resize_down", "interactive_move", "interactive_resize", "tiling_drag", "external"
   };
   if (action >= 0 && action < (int)(sizeof(names) / sizeof(names[0]))) return names[action];
 

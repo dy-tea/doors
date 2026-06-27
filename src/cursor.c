@@ -5,6 +5,7 @@
 #include "keyboard.h"
 #include "layer.h"
 #include "output.h"
+#include "tiling_drag.h"
 #include "server.h"
 #include "tabs.h"
 #include "toplevel.h"
@@ -454,6 +455,9 @@ static void process_cursor_motion(uint32_t time, double dx, double dy, double dx
   } else if (server.cursor_mode == CURSOR_RESIZE) {
     process_cursor_resize();
     return;
+  } else if (server.cursor_mode == CURSOR_TILING_DRAG) {
+    tiling_drag_motion();
+    return;
   }
 
   // hot corner detection
@@ -625,6 +629,11 @@ void cursor_button(struct wl_listener *listener, void *data) {
   wlr_idle_notifier_v1_notify_activity(server.idle_notifier, server.seat);
 
   if (event->state == WL_POINTER_BUTTON_STATE_RELEASED) {
+    if (server.cursor_mode == CURSOR_TILING_DRAG) {
+      tiling_drag_finish();
+      server.cursor_buttons &= ~(1 << (event->button - 272));
+      return;
+    }
     reset_cursor_mode();
     server.cursor_buttons &= ~(1 << (event->button - 272));
   } else {
@@ -713,16 +722,22 @@ void cursor_button(struct wl_listener *listener, void *data) {
           }
         }
 
-        if (matched_kb && (matched_kb->action == BIND_INTERACTIVE_MOVE || matched_kb->action == BIND_INTERACTIVE_RESIZE)) {
+        if (matched_kb && (matched_kb->action == BIND_INTERACTIVE_MOVE
+	        	|| matched_kb->action == BIND_INTERACTIVE_RESIZE
+	        	|| matched_kb->action == BIND_TILING_DRAG)) {
           toplevel_t *toplevel = NULL;
           if (type && ((toplevel_t *)type)->node)
             toplevel = type;
 
           if (toplevel && toplevel->node && toplevel->node->client) {
-            if (matched_kb->action == BIND_INTERACTIVE_MOVE) {
-              if (toplevel->node->client->state == STATE_FLOATING) {
+            if (matched_kb->action == BIND_TILING_DRAG) {
+              if (IS_TILED(toplevel->node->client))
+                tiling_drag_begin(toplevel->node);
+            } else if (matched_kb->action == BIND_INTERACTIVE_MOVE) {
+              if (toplevel->node->client->state == STATE_FLOATING)
                 begin_interactive(toplevel, CURSOR_MOVE, 0);
-              }
+              else if (IS_TILED(toplevel->node->client))
+                tiling_drag_begin(toplevel->node);
             } else if (matched_kb->action == BIND_INTERACTIVE_RESIZE) {
               client_t *c = toplevel->node->client;
               uint32_t edges = 0;

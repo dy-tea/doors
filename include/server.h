@@ -11,6 +11,7 @@
 #include <wayland-server.h>
 #include <wlr/types/wlr_ext_background_effect_v1.h>
 #include <wlr/types/wlr_content_type_v1.h>
+#include <wlr/util/edges.h>
 #include <wlr/types/wlr_ext_workspace_v1.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_output_power_management_v1.h>
@@ -26,6 +27,7 @@ enum cursor_mode {
   CURSOR_PASSTHROUGH,
   CURSOR_MOVE,
   CURSOR_RESIZE,
+  CURSOR_TILING_DRAG,
 };
 
 typedef struct output_t output_t;
@@ -191,6 +193,14 @@ typedef struct server_t {
   struct node_t *tiled_resize_parent_horizontal;
   double tiled_resize_initial_ratio_v;
   double tiled_resize_initial_ratio_h;
+
+  // tiling drag state
+  struct node_t *tiling_drag_node;
+  double tiling_drag_grab_x, tiling_drag_grab_y;
+  struct node_t *tiling_drag_target_node;
+  enum wlr_edges tiling_drag_target_edge;
+  struct wlr_scene_rect *tiling_drag_indicator;
+  bool tiling_drag_threshold_reached;
 
   output_t *focused_output;
 

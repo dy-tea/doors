@@ -80,6 +80,7 @@ int focused_border_gradient2_count = 0;
 float focused_border_gradient2_angle = 0.0f;
 float focused_border_gradient_lerp = 0.0f;
 char presel_feedback_color[16] = "ff5555ff";
+char tiling_drag_indicator_color[16] = "4d9eff4d";
 
 // global state
 output_t *mon = NULL;
@@ -1515,7 +1516,7 @@ static int hex_digit(char c) {
   return 0;
 }
 
-static void parse_color(const char *hex, float *color) {
+void parse_color(const char *hex, float *color) {
   if (!hex) {
     color[0] = color[1] = color[2] = 0.5f;
     color[3] = 1.0f;

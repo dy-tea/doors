@@ -70,6 +70,9 @@ void node_set_pending_position(node_t *n, int x, int y);
 void node_set_pending_rectangle(node_t *n, struct wlr_box rect);
 void node_set_pending_hidden(node_t *n, bool hidden);
 
+// Color helpers
+void parse_color(const char *hex, float *color);
+
 // Debug helpers
 void print_tree(node_t *n, int depth);
 void validate_tree(const char *context, desktop_t *d);

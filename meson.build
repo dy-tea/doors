@@ -112,6 +112,7 @@ executable(
 		'src' / 'xwayland.c',
 		'src' / 'input_method.c',
 		'src' / 'blur.c',
+		'src' / 'tiling_drag.c',
 		'src' / 'screencopy.c',
 		'src' / 'copy_capture.c',
 		'src' / 'text.c',

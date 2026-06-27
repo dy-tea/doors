@@ -212,6 +212,7 @@ extern char normal_border_color[16];
 extern char active_border_color[16];
 extern char focused_border_color[16];
 extern char presel_feedback_color[16];
+extern char tiling_drag_indicator_color[16];
 
 // broder gradients
 #define BORDER_GRADIENT_MAX_STOPS 10

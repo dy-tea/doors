@@ -293,6 +293,12 @@ doorsctl config presel_feedback_color <color>
 Sets the color of the preselection feedback indicator.
 
 ```
+doorsctl config tiling_drag_indicator_color <color>
+```
+
+Sets the color of the tiling drag overlay indicator (default: `4d9eff4d`).
+
+```
 doorsctl config normal_border_gradient <colors...> [angledeg]
 doorsctl config active_border_gradient <colors...> [angledeg]
 doorsctl config focused_border_gradient <colors...> [angledeg]
@@ -436,6 +442,7 @@ doorsctl node --presel-ratio <value>   						# Set preselection ratio
 doorsctl node --swap <id>              						# Swap with node by id
 doorsctl node interactive_move         						# Interactive move (for mouse button binds on floating windows)
 doorsctl node interactive_resize       						# Interactive resize (for mouse button binds on floating windows)
+doorsctl node tiling_drag              						# Tiling drag (for mouse button binds on tiled windows)
 ```
 
 #### Desktop Commands
