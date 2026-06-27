@@ -21,8 +21,7 @@ static bool is_keyboard_emulated_by_input_method(struct wlr_keyboard *keyboard,
 		wl_resource_get_client(virtual_keyboard->resource) == wl_resource_get_client(input_method->resource);
 }
 
-static struct wlr_input_method_keyboard_grab_v2 *get_keyboard_grab(struct wlr_keyboard *keyboard) {
-	ime_relay_t *relay = server.input_method_relay;
+static struct wlr_input_method_keyboard_grab_v2 *get_keyboard_grab(struct wlr_keyboard *keyboard, ime_relay_t *relay) {
 	struct wlr_input_method_v2 *input_method = relay->input_method;
 
 	if (!input_method || !input_method->keyboard_grab) return NULL;
@@ -31,8 +30,8 @@ static struct wlr_input_method_keyboard_grab_v2 *get_keyboard_grab(struct wlr_ke
 	return input_method->keyboard_grab;
 }
 
-bool input_method_keyboard_grab_forward_modifiers(struct wlr_keyboard *keyboard) {
-	struct wlr_input_method_keyboard_grab_v2 *keyboard_grab = get_keyboard_grab(keyboard);
+bool input_method_keyboard_grab_forward_modifiers(struct wlr_keyboard *keyboard, ime_relay_t *relay) {
+	struct wlr_input_method_keyboard_grab_v2 *keyboard_grab = get_keyboard_grab(keyboard, relay);
 
 	if (keyboard_grab) {
 		wlr_input_method_keyboard_grab_v2_set_keyboard(keyboard_grab, keyboard);
@@ -43,8 +42,8 @@ bool input_method_keyboard_grab_forward_modifiers(struct wlr_keyboard *keyboard)
 	return false;
 }
 
-bool input_method_keyboard_grab_forward_key(struct wlr_keyboard *keyboard, struct wlr_keyboard_key_event *event) {
-	struct wlr_input_method_keyboard_grab_v2 *keyboard_grab = get_keyboard_grab(keyboard);
+bool input_method_keyboard_grab_forward_key(struct wlr_keyboard *keyboard, struct wlr_keyboard_key_event *event, ime_relay_t *relay) {
+	struct wlr_input_method_keyboard_grab_v2 *keyboard_grab = get_keyboard_grab(keyboard, relay);
 
 	if (keyboard_grab) {
 		wlr_input_method_keyboard_grab_v2_set_keyboard(keyboard_grab, keyboard);
@@ -196,7 +195,7 @@ static void handle_input_method_grab_keyboard(struct wl_listener *listener, void
 	ime_relay_t *relay = wl_container_of(listener, relay, input_method_grab_keyboard);
 	struct wlr_input_method_keyboard_grab_v2 *keyboard_grab = data;
 
-	struct wlr_keyboard *active_keyboard = wlr_seat_get_keyboard(server.seat);
+	struct wlr_keyboard *active_keyboard = wlr_seat_get_keyboard(relay->wlr_seat);
 
 	if (!is_keyboard_emulated_by_input_method(active_keyboard, relay->input_method))
 		wlr_input_method_keyboard_grab_v2_set_keyboard(keyboard_grab, active_keyboard);
@@ -260,7 +259,7 @@ static void handle_input_method_new_popup_surface(struct wl_listener *listener, 
 static void handle_new_input_method(struct wl_listener *listener, void *data) {
 	ime_relay_t *relay = wl_container_of(listener, relay, new_input_method);
 	struct wlr_input_method_v2 *input_method = data;
-	if (server.seat != input_method->seat) return;
+	if (relay->wlr_seat != input_method->seat) return;
 
 	if (relay->input_method) {
 		wlr_input_method_v2_send_unavailable(input_method);
@@ -353,7 +352,7 @@ static void handle_new_text_input(struct wl_listener *listener, void *data) {
 	struct wlr_text_input_v3 *wlr_text_input = data;
 	ime_text_t *text_input = calloc(1, sizeof(*text_input));
 
-	if (server.seat != wlr_text_input->seat) return;
+	if (relay->wlr_seat != wlr_text_input->seat) return;
 
 	text_input->input = wlr_text_input;
 	text_input->relay = relay;
@@ -380,8 +379,9 @@ static void handle_focused_surface_destroy(struct wl_listener *listener, void *d
 	input_method_relay_set_focus(relay, NULL);
 }
 
-ime_relay_t *input_method_relay_create(void) {
+ime_relay_t *input_method_relay_create(struct wlr_seat *wlr_seat) {
 	ime_relay_t *relay = calloc(1, sizeof(*relay));
+	relay->wlr_seat = wlr_seat;
 	wl_list_init(&relay->text_inputs);
 	wl_list_init(&relay->popups);
 	relay->popup_tree = wlr_scene_tree_create(server.over_tree);

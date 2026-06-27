@@ -5,6 +5,7 @@
 #include "keyboard.h"
 #include "layer.h"
 #include "output.h"
+#include "seat.h"
 #include "tiling_drag.h"
 #include "server.h"
 #include "tabs.h"
@@ -880,13 +881,6 @@ void request_cursor(struct wl_listener *listener, void *data) {
     wlr_cursor_set_surface(server.cursor, event->surface, event->hotspot_x, event->hotspot_y);
 }
 
-void seat_pointer_focus_change(struct wl_listener *listener, void *data) {
-	(void)listener;
-  struct wlr_seat_pointer_focus_change_event *event = data;
-  if (event->new_surface == NULL)
-    wlr_cursor_set_xcursor(server.cursor, server.cursor_mgr, "default");
-}
-
 void handle_new_input(struct wl_listener *listener, void *data) {
 	(void)listener;
   struct wlr_input_device *device = data;
@@ -900,6 +894,7 @@ void handle_new_input(struct wl_listener *listener, void *data) {
     struct wlr_pointer *pointer = wlr_pointer_from_input_device(device);
     pointer_t *ptr = calloc(1, sizeof(*ptr));
     ptr->wlr_pointer = pointer;
+    ptr->seat = seat_default();
     wl_list_insert(&server.pointers, &ptr->link);
     input_apply_config(device);
     break;
@@ -908,17 +903,13 @@ void handle_new_input(struct wl_listener *listener, void *data) {
     break;
   }
 
-  uint32_t caps = WL_SEAT_CAPABILITY_POINTER;
-  if (!wl_list_empty(&server.keyboards))
-    caps |= WL_SEAT_CAPABILITY_KEYBOARD;
-
-  wlr_seat_set_capabilities(server.seat, caps);
-}
-
-void request_set_selection(struct wl_listener *listener, void *data) {
-	(void)listener;
-  struct wlr_seat_request_set_selection_event *event = data;
-  wlr_seat_set_selection(server.seat, event->source, event->serial);
+  seat_t *def = seat_default();
+  if (def) {
+    uint32_t caps = WL_SEAT_CAPABILITY_POINTER;
+    if (!wl_list_empty(&server.keyboards))
+      caps |= WL_SEAT_CAPABILITY_KEYBOARD;
+    wlr_seat_set_capabilities(def->wlr_seat, caps);
+  }
 }
 
 void cursor_check_constraint_region(void) {

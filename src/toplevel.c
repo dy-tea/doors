@@ -4,6 +4,7 @@
 #include "config.h"
 #include "toplevel.h"
 #include "input_method.h"
+#include "seat.h"
 #include "workspace.h"
 #include "ipc.h"
 #include "rule.h"
@@ -1292,7 +1293,9 @@ void focus_toplevel(struct toplevel_t *toplevel) {
 	    seat->keyboard_state.keyboard->num_keycodes, &seat->keyboard_state.keyboard->modifiers);
 
   // Update input method focus
-  input_method_relay_set_focus(server.input_method_relay, surface);
+  seat_t *s = seat_default();
+  if (s && s->input_method_relay)
+    input_method_relay_set_focus(s->input_method_relay, surface);
 
   if (toplevel->node && toplevel->node->output)
     server.focused_output = toplevel->node->output;

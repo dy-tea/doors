@@ -7,6 +7,7 @@
 #include "keyboard.h"
 #include "output.h"
 #include "rule.h"
+#include "seat.h"
 #include "scratchpad.h"
 #include "scroller.h"
 #include "server.h"
@@ -247,9 +248,12 @@ add_abs:
 	// focus override-redirect windows that want focus
 	if (wlr_xwayland_surface_override_redirect_wants_focus(xsurface)) {
 		struct wlr_xwayland *xwayland = server.xwayland.wlr_xwayland;
-		wlr_xwayland_set_seat(xwayland, server.seat);
-		wlr_seat_keyboard_notify_enter(server.seat, xsurface->surface, NULL, 0, NULL);
-		input_method_relay_set_focus(server.input_method_relay, xsurface->surface);
+		seat_t *s = seat_default();
+		if (!s) return;
+		wlr_xwayland_set_seat(xwayland, s->wlr_seat);
+		wlr_seat_keyboard_notify_enter(s->wlr_seat, xsurface->surface, NULL, 0, NULL);
+		if (s->input_method_relay)
+			input_method_relay_set_focus(s->input_method_relay, xsurface->surface);
 	}
 }
 
@@ -272,8 +276,11 @@ static void unmanaged_handle_request_activate(struct wl_listener *listener, void
 	if (xsurface->surface == NULL || !xsurface->surface->mapped) return;
 
 	if (wlr_xwayland_surface_override_redirect_wants_focus(xsurface)) {
-		wlr_seat_keyboard_notify_enter(server.seat, xsurface->surface, NULL, 0, NULL);
-		input_method_relay_set_focus(server.input_method_relay, xsurface->surface);
+		seat_t *s = seat_default();
+		if (!s) return;
+		wlr_seat_keyboard_notify_enter(s->wlr_seat, xsurface->surface, NULL, 0, NULL);
+		if (s->input_method_relay)
+			input_method_relay_set_focus(s->input_method_relay, xsurface->surface);
 	}
 }
 
@@ -451,16 +458,18 @@ void xwayland_view_set_activated(xwayland_toplevel_t *xwayland_view, bool activa
 			wlr_scene_node_raise_to_top(&xwayland_view->scene_tree->node);
 
 		// notify keyboard seat
-		struct wlr_seat *seat = server.seat;
-		if (seat->keyboard_state.keyboard != NULL) {
-			wlr_seat_keyboard_notify_enter(seat, surface->surface,
-				seat->keyboard_state.keyboard->keycodes,
-				seat->keyboard_state.keyboard->num_keycodes,
-				&seat->keyboard_state.keyboard->modifiers);
+		seat_t *s = seat_default();
+		if (s) {
+			struct wlr_seat *wlr_seat = s->wlr_seat;
+			if (wlr_seat->keyboard_state.keyboard != NULL) {
+				wlr_seat_keyboard_notify_enter(wlr_seat, surface->surface,
+					wlr_seat->keyboard_state.keyboard->keycodes,
+					wlr_seat->keyboard_state.keyboard->num_keycodes,
+					&wlr_seat->keyboard_state.keyboard->modifiers);
+			}
+			if (s->input_method_relay)
+				input_method_relay_set_focus(s->input_method_relay, surface->surface);
 		}
-
-		// update ime focus
-		input_method_relay_set_focus(server.input_method_relay, surface->surface);
 
 		// update foreign toplevel
 		if (xwayland_view->foreign_toplevel)
@@ -1298,5 +1307,6 @@ void handle_xwayland_ready(struct wl_listener *listener, void *data) {
 
 	xcb_disconnect(xcb_conn);
 
-	wlr_xwayland_set_seat(xwayland->wlr_xwayland, server.seat);
+	seat_t *s = seat_default();
+	wlr_xwayland_set_seat(xwayland->wlr_xwayland, s ? s->wlr_seat : NULL);
 }

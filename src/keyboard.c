@@ -4,6 +4,7 @@
 #include "input_method.h"
 #include "keyboard.h"
 #include "output.h"
+#include "seat.h"
 #include "server.h"
 #include "scroller.h"
 #include "toplevel.h"
@@ -60,6 +61,7 @@ void handle_new_keyboard(struct wlr_input_device *device) {
 
   keyboard_t *keyboard = calloc(1, sizeof(*keyboard));
   keyboard->wlr_keyboard = wlr_keyboard;
+  keyboard->seat = seat_default();
 
   input_config_t *config = input_config_get_for_device(device->name, INPUT_CONFIG_TYPE_KEYBOARD);
   if (config) {
@@ -94,18 +96,25 @@ void handle_new_keyboard(struct wlr_input_device *device) {
 void keyboard_modifiers(struct wl_listener *listener, void *data) {
 	(void)data;
   keyboard_t *keyboard = wl_container_of(listener, keyboard, modifiers);
-  wlr_seat_set_keyboard(server.seat, keyboard->wlr_keyboard);
+  seat_t *seat = keyboard->seat;
+  if (!seat) return;
+  struct wlr_seat *wlr_seat = seat->wlr_seat;
 
-  if (!input_method_keyboard_grab_forward_modifiers(keyboard->wlr_keyboard))
-    wlr_seat_keyboard_notify_modifiers(server.seat, &keyboard->wlr_keyboard->modifiers);
+  wlr_seat_set_keyboard(wlr_seat, keyboard->wlr_keyboard);
+
+  if (seat->input_method_relay &&
+      !input_method_keyboard_grab_forward_modifiers(keyboard->wlr_keyboard, seat->input_method_relay))
+    wlr_seat_keyboard_notify_modifiers(wlr_seat, &keyboard->wlr_keyboard->modifiers);
 }
 
 void keyboard_key(struct wl_listener *listener, void *data) {
   keyboard_t *keyboard = wl_container_of(listener, keyboard, key);
   struct wlr_keyboard_key_event *event = data;
-  struct wlr_seat *seat = server.seat;
+  seat_t *seat = keyboard->seat;
+  if (!seat) return;
+  struct wlr_seat *wlr_seat = seat->wlr_seat;
 
-  wlr_idle_notifier_v1_notify_activity(server.idle_notifier, seat);
+  wlr_idle_notifier_v1_notify_activity(server.idle_notifier, wlr_seat);
 
   // get keysym
   uint32_t keycode = event->keycode + 8;
@@ -118,10 +127,10 @@ void keyboard_key(struct wl_listener *listener, void *data) {
   // check keyboard shortcuts inhibitor
   bool shortcuts_inhibited = false;
   if (server.keyboard_shortcuts_inhibit_manager) {
-    struct wlr_surface *focused = seat->keyboard_state.focused_surface;
+    struct wlr_surface *focused = wlr_seat->keyboard_state.focused_surface;
     struct wlr_keyboard_shortcuts_inhibitor_v1 *inhib;
     wl_list_for_each(inhib, &server.keyboard_shortcuts_inhibit_manager->inhibitors, link) {
-      if (inhib->active && inhib->surface == focused && inhib->seat == seat) {
+      if (inhib->active && inhib->surface == focused && inhib->seat == wlr_seat) {
         shortcuts_inhibited = true;
         break;
       }
@@ -141,11 +150,12 @@ void keyboard_key(struct wl_listener *listener, void *data) {
   }
 
   if (!handled) {
-    // Forward key to input method if grabbed
-    if (!input_method_keyboard_grab_forward_key(keyboard->wlr_keyboard, event)) {
+    // forward key to input method if grabbed
+    if (!input_method_keyboard_grab_forward_key(keyboard->wlr_keyboard, event,
+        seat->input_method_relay)) {
       // pass key to focused client
-      wlr_seat_set_keyboard(seat, keyboard->wlr_keyboard);
-      wlr_seat_keyboard_notify_key(seat, event->time_msec, event->keycode, event->state);
+      wlr_seat_set_keyboard(wlr_seat, keyboard->wlr_keyboard);
+      wlr_seat_keyboard_notify_key(wlr_seat, event->time_msec, event->keycode, event->state);
     }
   }
 }
@@ -1260,6 +1270,7 @@ void keyboard_group_add(keyboard_t *keyboard) {
   rep->wlr_keyboard = &new_group->wlr_group->keyboard;
   rep->group = NULL;
   rep->is_representative = true;
+  rep->seat = seat_default();
 
   // listeners
   rep->modifiers.notify = keyboard_modifiers;

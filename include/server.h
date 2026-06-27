@@ -2,6 +2,7 @@
 
 #include "gesture.h"
 #include "input_method.h"
+#include "seat.h"
 #include "launcher.h"
 #include "lock.h"
 #include "toplevel.h"
@@ -110,12 +111,8 @@ typedef struct server_t {
   struct wl_listener new_virtual_keyboard;
 
   struct wlr_seat *seat;
+  struct wl_list seats;
   struct wl_listener new_input;
-  struct wl_listener request_cursor;
-  struct wl_listener pointer_focus_change;
-  struct wl_listener request_set_selection;
-  struct wl_listener request_start_drag;
-  struct wl_listener start_drag;
   struct wl_list keyboards;
   struct wl_list pointers;
   struct wl_list keyboard_groups;

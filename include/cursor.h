@@ -5,7 +5,10 @@
 #include "toplevel.h"
 #include <wlr/types/wlr_pointer.h>
 
+struct seat_t;
+
 typedef struct pointer_t {
+	struct seat_t *seat;
 	struct wlr_pointer *wlr_pointer;
 	struct wl_list link;
 } pointer_t;

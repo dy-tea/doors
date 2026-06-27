@@ -84,10 +84,6 @@
 #include <wlr/types/wlr_pointer_warp_v1.h>
 #include <wlr/types/wlr_security_context_v1.h>
 
-void handle_request_start_drag(struct wl_listener *listener, void *data);
-void handle_start_drag(struct wl_listener *listener, void *data);
-void handle_drag_icon_destroy(struct wl_listener *listener, void *data);
-void request_set_selection(struct wl_listener *listener, void *data);
 void handle_new_input(struct wl_listener *listener, void *data);
 void handle_keyboard_shortcuts_inhibit_new_inhibitor(struct wl_listener *listener, void *data);
 void handle_output_power_set_mode(struct wl_listener *listener, void *data);
@@ -332,30 +328,12 @@ void server_init(void) {
   // idle notifier
   server.idle_notifier = wlr_idle_notifier_v1_create(server.wl_display);
 
-  // seat
-  server.seat = wlr_seat_create(server.wl_display, "seat0");
+  // seats
+  wl_list_init(&server.seats);
   wl_list_init(&server.keyboards);
   wl_list_init(&server.pointers);
   wl_list_init(&server.keyboard_groups);
   wl_list_init(&server.physical_keyboards);
-
-  uint32_t caps = WL_SEAT_CAPABILITY_POINTER;
-  wlr_seat_set_capabilities(server.seat, caps);
-
-  server.request_cursor.notify = request_cursor;
-  wl_signal_add(&server.seat->events.request_set_cursor, &server.request_cursor);
-
-  server.pointer_focus_change.notify = seat_pointer_focus_change;
-  wl_signal_add(&server.seat->pointer_state.events.focus_change, &server.pointer_focus_change);
-
-  server.request_set_selection.notify = request_set_selection;
-  wl_signal_add(&server.seat->events.request_set_selection, &server.request_set_selection);
-
-  server.request_start_drag.notify = handle_request_start_drag;
-  wl_signal_add(&server.seat->events.request_start_drag, &server.request_start_drag);
-
-  server.start_drag.notify = handle_start_drag;
-  wl_signal_add(&server.seat->events.start_drag, &server.start_drag);
 
   // session lock
   server.session_lock_manager = wlr_session_lock_manager_v1_create(server.wl_display);
@@ -508,7 +486,10 @@ void server_init(void) {
   // input method support
   server.input_method_manager = wlr_input_method_manager_v2_create(server.wl_display);
   server.text_input_manager = wlr_text_input_manager_v3_create(server.wl_display);
-  server.input_method_relay = input_method_relay_create();
+
+  // default seat
+  seat_t *default_seat = seat_create("seat0");
+  server.seat = default_seat ? default_seat->wlr_seat : NULL;
 
   transaction_init();
   animation_init();
@@ -743,13 +724,7 @@ void server_fini(void) {
   wl_list_remove(&server.cursor_button.link);
   wl_list_remove(&server.cursor_axis.link);
   wl_list_remove(&server.cursor_frame.link);
-  wl_list_remove(&server.request_cursor.link);
-
-  wl_list_remove(&server.pointer_focus_change.link);
   wl_list_remove(&server.new_pointer_constraint.link);
-  wl_list_remove(&server.request_set_selection.link);
-  wl_list_remove(&server.request_start_drag.link);
-  wl_list_remove(&server.start_drag.link);
   wl_list_remove(&server.cursor_request_set_shape.link);
   wl_list_remove(&server.swipe_begin.link);
   wl_list_remove(&server.swipe_update.link);
@@ -799,7 +774,9 @@ void server_fini(void) {
 
   wl_event_loop_dispatch_idle(wl_display_get_event_loop(server.wl_display));
 
-  input_method_relay_finish(server.input_method_relay);
+  seat_t *seat, *tmp_seat;
+  wl_list_for_each_safe(seat, tmp_seat, &server.seats, link)
+    seat_destroy(seat);
 
   blur_fini();
 
@@ -811,35 +788,6 @@ void server_fini(void) {
 
   wl_display_destroy(server.wl_display);
 }
-
-void handle_request_start_drag(struct wl_listener *listener, void *data) {
-  (void)listener;
-  struct wlr_seat_request_start_drag_event *event = data;
-  if (wlr_seat_validate_pointer_grab_serial(server.seat, event->origin, event->serial))
-    wlr_seat_start_pointer_drag(server.seat, event->drag, event->serial);
-  else
-    wlr_data_source_destroy(event->drag->source);
-}
-
-void handle_start_drag(struct wl_listener *listener, void *data) {
-  (void)listener;
-  struct wlr_drag *drag = data;
-  if (!drag->icon) return;
-
-  struct wlr_scene_node *node = &wlr_scene_drag_icon_create(server.drag_tree, drag->icon)->node;
-  drag->icon->data = node;
-
-  struct wl_listener *listener_icon = calloc(1, sizeof(*listener_icon));
-  listener_icon->notify = handle_drag_icon_destroy;
-  wl_signal_add(&drag->icon->events.destroy, listener_icon);
-}
-
-void handle_drag_icon_destroy(struct wl_listener *listener, void *data) {
-  (void)data;
-  wl_list_remove(&listener->link);
-  free(listener);
-}
-
 static int handle_system_bell_timer(void *data) {
 	(void)data;
 	server.system_bell_timer = NULL;

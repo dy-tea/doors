@@ -2,11 +2,13 @@
 
 #include <wayland-server.h>
 #include <wlr/types/wlr_input_method_v2.h>
+#include <wlr/types/wlr_seat.h>
 #include <wlr/types/wlr_text_input_v3.h>
 
 struct ime_text_t;
 
 typedef struct ime_relay_t {
+	struct wlr_seat *wlr_seat;
 	struct wl_list text_inputs;
 	struct wlr_input_method_v2 *input_method;
 	struct wlr_surface *focused_surface;
@@ -52,9 +54,9 @@ typedef struct ime_text_t {
 	struct wl_listener destroy;
 } ime_text_t;
 
-struct ime_relay_t *input_method_relay_create(void);
+struct ime_relay_t *input_method_relay_create(struct wlr_seat *wlr_seat);
 void input_method_relay_finish(ime_relay_t *relay);
 void input_method_relay_set_focus(ime_relay_t *relay, struct wlr_surface *surface);
 
-bool input_method_keyboard_grab_forward_key(struct wlr_keyboard *keyboard, struct wlr_keyboard_key_event *event);
-bool input_method_keyboard_grab_forward_modifiers(struct wlr_keyboard *keyboard);
+bool input_method_keyboard_grab_forward_key(struct wlr_keyboard *keyboard, struct wlr_keyboard_key_event *event, struct ime_relay_t *relay);
+bool input_method_keyboard_grab_forward_modifiers(struct wlr_keyboard *keyboard, ime_relay_t *relay);

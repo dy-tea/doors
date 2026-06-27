@@ -5,7 +5,10 @@
 #include <wlr/types/wlr_input_device.h>
 #include <xkbcommon/xkbcommon.h>
 
+struct seat_t;
+
 typedef struct keyboard_t {
+  struct seat_t *seat;
   struct wl_list all_link;
   struct wl_list active_link;
   struct wlr_keyboard *wlr_keyboard;

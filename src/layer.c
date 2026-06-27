@@ -4,6 +4,7 @@
 #include "layer.h"
 #include "output.h"
 #include "popup.h"
+#include "seat.h"
 #include "server.h"
 #include "tree.h"
 #include <stdlib.h>
@@ -326,7 +327,9 @@ void focus_layer_surface(layer_surface_t *layer_surface) {
 	  wlr_seat_keyboard_notify_enter(server.seat, surface, keyboard->keycodes,
 	    keyboard->num_keycodes, &keyboard->modifiers);
 
-	input_method_relay_set_focus(server.input_method_relay, surface);
+	seat_t *s = seat_default();
+	if (s && s->input_method_relay)
+		input_method_relay_set_focus(s->input_method_relay, surface);
 }
 
 struct wlr_scene_tree *output_shell_layer(output_t *output, enum zwlr_layer_shell_v1_layer layer) {

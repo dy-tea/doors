@@ -5,6 +5,7 @@
 #include "input.h"
 #include "ipc.h"
 #include "ipc_helpers.h"
+#include "seat.h"
 #include "keyboard.h"
 #include "output.h"
 #include "output_config.h"
@@ -3809,6 +3810,30 @@ static void ipc_cmd_rule(char **args, int num, int client_fd) {
   }
 }
 
+static void ipc_cmd_seat(char **args, int num, int client_fd) {
+  if (num < 1) {
+    send_failure(client_fd, "seat: missing argument (use list)\n");
+    return;
+  }
+
+  if (streq("list", *args)) {
+    char buf[4096];
+    int offset = 0;
+    seat_t *s;
+    wl_list_for_each(s, &server.seats, link) {
+      offset += snprintf(buf + offset, sizeof(buf) - offset, "%s", s->name);
+      if (s == seat_default())
+        offset += snprintf(buf + offset, sizeof(buf) - offset, " (default)");
+      offset += snprintf(buf + offset, sizeof(buf) - offset, "\n");
+    }
+    if (offset == 0)
+      offset = snprintf(buf, sizeof(buf), "No seats\n");
+    send_success(client_fd, buf);
+  } else {
+    send_failure(client_fd, "seat: unknown subcommand (use list)\n");
+  }
+}
+
 static void ipc_cmd_keyboard_grouping(char **args, int num, int client_fd) {
   if (num < 1) {
     send_failure(client_fd, "keyboard_grouping: missing argument\n");
@@ -4173,9 +4198,11 @@ bool process_ipc_message(char *msg, int msg_len, int client_fd) {
      ipc_cmd_send(++args, --num, client_fd);
    } else if (streq("rule", *args)) {
      ipc_cmd_rule(++args, --num, client_fd);
-   } else if (streq("keyboard_grouping", *args)) {
+    } else if (streq("keyboard_grouping", *args)) {
      ipc_cmd_keyboard_grouping(++args, --num, client_fd);
-   } else if (streq("scroller", *args)) {
+    } else if (streq("seat", *args)) {
+     ipc_cmd_seat(++args, --num, client_fd);
+    } else if (streq("scroller", *args)) {
      ipc_cmd_scroller(++args, --num, client_fd);
    } else if (streq("hotkey", *args)) {
      ipc_cmd_hotkey(++args, --num, client_fd);

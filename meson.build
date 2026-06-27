@@ -114,6 +114,7 @@ executable(
 		'src' / 'blur.c',
 		'src' / 'tiling_drag.c',
 		'src' / 'screencopy.c',
+		'src' / 'seat.c',
 		'src' / 'copy_capture.c',
 		'src' / 'text.c',
 		'src' / 'tabs.c',

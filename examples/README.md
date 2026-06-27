@@ -755,6 +755,16 @@ doorsctl output <name> reorder-desktops <names...> # Reorder desktops on output
 - `srgb` - apply an sRGB inverse EOTF transfer function (useful for HDR-capable displays running in SDR mode)
 - `icc <path>` - load a custom ICC color profile from a file and apply it as a linear-to-display transform
 
+### Seat Commands
+
+Seats represent independent keyboard/pointer/focus contexts. Each seat has its own keyboard focus, pointer focus, clipboard, and input method state. By default a single seat (`seat0`) is created at startup.
+
+```
+doorsctl seat list
+```
+
+Lists all seats and marks the default seat with `(default)`.
+
 ### Input Commands
 
 Target specific devices:
