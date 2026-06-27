@@ -10,6 +10,7 @@
 #include <wayland-protocols/color-management-v1-enum.h>
 #include <wayland-server.h>
 #include <wlr/types/wlr_ext_background_effect_v1.h>
+#include <wlr/types/wlr_content_type_v1.h>
 #include <wlr/types/wlr_ext_workspace_v1.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_output_power_management_v1.h>
@@ -146,6 +147,8 @@ typedef struct server_t {
 
   struct wlr_idle_inhibit_manager_v1 *idle_inhibit_manager;
   struct wl_listener new_idle_inhibitor;
+
+  struct wlr_content_type_manager_v1 *content_type_manager;
 
   struct wlr_ext_foreign_toplevel_list_v1 *foreign_toplevel_list;
   struct wlr_foreign_toplevel_manager_v1 *foreign_toplevel_manager;

@@ -14,6 +14,7 @@
 #include "scratchpad.h"
 #include "server.h"
 #include "tabs.h"
+#include <wlr/types/wlr_content_type_v1.h>
 #include "transaction.h"
 #include "tree.h"
 #include "types.h"
@@ -513,6 +514,11 @@ void toplevel_map(struct wl_listener *listener, void *data) {
 
    	if (rule->has_border_radius)
     	toplevel_set_border_radius(toplevel, rule->border_radius);
+
+    if (rule->has_allow_tearing) {
+      n->client->allow_tearing = rule->allow_tearing;
+      n->client->allow_tearing_from_rule = true;
+    }
   }
 
   // create foreign toplevel handles
@@ -1665,5 +1671,17 @@ void handle_new_xdg_decoration(struct wl_listener *listener, void *data) {
 }
 
 bool toplevel_can_tear(struct toplevel_t *toplevel) {
-	return toplevel->tearing_hint == WP_TEARING_CONTROL_V1_PRESENTATION_HINT_ASYNC;
+  // per-window rule override takes precedence
+  if (toplevel->node && toplevel->node->client && toplevel->node->client->allow_tearing_from_rule)
+    return toplevel->node->client->allow_tearing;
+
+  // explicit tearing hint from client
+  if (toplevel->tearing_hint == WP_TEARING_CONTROL_V1_PRESENTATION_HINT_ASYNC)
+    return true;
+
+  // global allow_tearing toggle
+  if (allow_tearing)
+    return true;
+
+  return false;
 }

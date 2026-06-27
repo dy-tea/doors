@@ -143,6 +143,9 @@ void list_rules(char *buf, size_t buf_size) {
     if (r->consequence.has_block_out_from_screenshare)
       offset += snprintf(buf + offset, buf_size - offset, "block_out_from_screenshare=%s ",
         r->consequence.block_out_from_screenshare ? "on" : "off");
+    if (r->consequence.has_allow_tearing)
+      offset += snprintf(buf + offset, buf_size - offset, "allow_tearing=%s ",
+        r->consequence.allow_tearing ? "on" : "off");
 
     offset += snprintf(buf + offset, buf_size - offset, "\n");
 

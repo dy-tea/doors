@@ -188,6 +188,15 @@ doorsctl config click_to_focus true|false
 When true, clicking a window focuses it.
 
 ```
+doorsctl config allow_tearing true|false
+```
+
+When true, windows may use tearing page flips (screen tearing) for lower latency.
+This allows the compositor to bypass vertical sync for eligible windows.
+Can be overridden per-window via window rules (see below).
+Per-output tearing is configured separately via `doorsctl output <name> tearing on|off`. Default: false.
+
+```
 doorsctl config minimize_to_scratchpad true|false
 ```
 
@@ -558,6 +567,7 @@ doorsctl rule -a vesktop desktop=III
 - `scroller_proportion=<0.1-1.0>` - Set the scroller proportion for matched windows
 - `scroller_proportion_single=<0.1-1.0>` - Set the single-window scroller proportion for matched windows
 - `block_out_from_screenshare=on|off` - Blocks out the window from screenshare and screenshot tools.
+- `allow_tearing=on|off` - Enables or disables tearing for the matched window(s), overriding the global `allow_tearing` config.
 
 **Matching by Title:**
 

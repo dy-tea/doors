@@ -83,8 +83,10 @@ static void output_configure_scene(output_t *output) {
 		output_configure_scene_iterator, output);
 }
 
+static struct wlr_surface *fullscreen_surface(output_t *output);
+
 static bool output_can_tear(output_t *output) {
-	return output->allow_tearing;
+  return output->allow_tearing;
 }
 
 static bool output_has_fullscreen_cover(output_t *output) {

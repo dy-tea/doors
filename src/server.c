@@ -345,6 +345,9 @@ void server_init(void) {
   server.new_idle_inhibitor.notify = handle_new_idle_inhibitor;
   wl_signal_add(&server.idle_inhibit_manager->events.new_inhibitor, &server.new_idle_inhibitor);
 
+  // content type manager
+  server.content_type_manager = wlr_content_type_manager_v1_create(server.wl_display, 1);
+
   // keyboard shortcuts inhibitor
   server.keyboard_shortcuts_inhibit_manager = wlr_keyboard_shortcuts_inhibit_v1_create(server.wl_display);
   server.keyboard_shortcuts_inhibit_new_inhibitor.notify = handle_keyboard_shortcuts_inhibit_new_inhibitor;

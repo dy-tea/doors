@@ -45,6 +45,8 @@ typedef struct {
   bool has_border_radius;
   bool block_out_from_screenshare;
   bool has_block_out_from_screenshare;
+  bool allow_tearing;
+  bool has_allow_tearing;
 } rule_consequence_t;
 
 typedef struct rule_t {

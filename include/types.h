@@ -104,6 +104,10 @@ typedef struct client_t {
 
   // Screenshare privacy
   bool block_out_from_screenshare;
+
+  // Tearing
+  bool allow_tearing;
+  bool allow_tearing_from_rule;
 } client_t;
 
 typedef struct node_t {
@@ -185,6 +189,7 @@ extern bool focus_follows_pointer;
 extern bool pointer_follows_focus;
 extern bool record_history;
 extern bool click_to_focus;
+extern bool allow_tearing;
 extern decoration_mode_t decoration_mode;
 extern bool enable_animations;
 extern workspace_anim_direction_t workspace_anim_direction;

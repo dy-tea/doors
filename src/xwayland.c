@@ -604,6 +604,10 @@ static void handle_map(struct wl_listener *listener, void *data) {
 		if (rule->has_sticky) node->sticky = rule->sticky;
 		if (rule->has_locked) node->locked = rule->locked;
 		if (rule->has_block_out_from_screenshare) client->block_out_from_screenshare = rule->block_out_from_screenshare;
+		if (rule->has_allow_tearing) {
+			client->allow_tearing = rule->allow_tearing;
+			client->allow_tearing_from_rule = true;
+		}
 		if (rule->has_scroller_proportion || rule->has_scroller_proportion_single)
 			scroller_apply_client_rules(client, rule->has_scroller_proportion ? rule->scroller_proportion : 0.0f,
 			rule->has_scroller_proportion_single ? rule->scroller_proportion_single : 0.0f);

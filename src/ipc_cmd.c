@@ -3072,6 +3072,8 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
     ipc_handle_bool(args, num, client_fd, &click_to_focus, IPC_FLAG_NONE);
   } else if (streq("record_history", *args)) {
     ipc_handle_bool(args, num, client_fd, &record_history, IPC_FLAG_NONE);
+  } else if (streq("allow_tearing", *args)) {
+    ipc_handle_bool(args, num, client_fd, &allow_tearing, IPC_FLAG_COMMIT);
   } else if (streq("blur_enabled", *args)) {
     ipc_handle_bool(args, num, client_fd, &blur_enabled, IPC_FLAG_NONE);
   } else if (streq("blur_algorithm", *args)) {
@@ -3682,6 +3684,12 @@ static void ipc_cmd_rule(char **args, int num, int client_fd) {
       } else if (streq("block_out_from_screenshare=off", arg)) {
         r->consequence.block_out_from_screenshare = false;
         r->consequence.has_block_out_from_screenshare = true;
+      } else if (streq("allow_tearing=on", arg)) {
+        r->consequence.allow_tearing = true;
+        r->consequence.has_allow_tearing = true;
+      } else if (streq("allow_tearing=off", arg)) {
+        r->consequence.allow_tearing = false;
+        r->consequence.has_allow_tearing = true;
       }
 
       args++;
