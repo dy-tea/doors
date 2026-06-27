@@ -202,10 +202,14 @@ doorsctl config text_height <pixels>
 Sets the default text height in pixels used for compositor-rendered text.
 
 ```
-doorsctl config focus_follows_pointer true|false
+doorsctl config focus_follows_pointer no|yes|always
 ```
 
-When true, focus follows the pointer cursor as it moves between windows.
+Controls whether keyboard focus follows the pointer cursor.
+
+- **no** (default): Focus never follows the pointer.
+- **yes**: Focus follows the pointer when moving over a window.
+- **always**: Same as `yes`, but also clears keyboard focus when the pointer moves to the background or over non-window surfaces (e.g., bars, notifications).
 
 ```
 doorsctl config pointer_follows_focus true|false

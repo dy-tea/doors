@@ -37,6 +37,7 @@ typedef enum {
 typedef enum { DECORATION_NONE, DECORATION_TABS, DECORATION_ALWAYS, DECORATION_CSD } decoration_mode_t;
 
 typedef enum { FOCUS_ON_ACTIVATE_FOCUS, FOCUS_ON_ACTIVATE_NONE, FOCUS_ON_ACTIVATE_SMART, FOCUS_ON_ACTIVATE_URGENT } focus_on_activate_mode_t;
+typedef enum { FOLLOWS_NO, FOLLOWS_YES, FOLLOWS_ALWAYS } focus_follows_mouse_mode_t;
 
 typedef enum { LAYER_BELOW, LAYER_NORMAL, LAYER_ABOVE } stack_layer_t;
 
@@ -185,7 +186,7 @@ extern bool borderless_monocle;
 extern bool borderless_singleton;
 extern bool gapless_monocle;
 extern bool removal_adjustment;
-extern bool focus_follows_pointer;
+extern int focus_follows_mouse;
 extern bool pointer_follows_focus;
 extern bool record_history;
 extern bool click_to_focus;

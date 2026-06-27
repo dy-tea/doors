@@ -522,8 +522,8 @@ static void process_cursor_motion(uint32_t time, double dx, double dy, double dx
     wlr_seat_pointer_notify_enter(seat, surface, sx, sy);
     wlr_seat_pointer_notify_motion(seat, time, sx, sy);
 
-    // focus follows pointer
-    if (focus_follows_pointer && type != NULL) {
+    // focus follows mouse
+    if (focus_follows_mouse != FOLLOWS_NO && type != NULL) {
       node_t *node = NULL;
 
       struct wlr_xdg_surface *xdg_surface = wlr_xdg_surface_try_from_wlr_surface(surface);
@@ -540,9 +540,13 @@ static void process_cursor_motion(uint32_t time, double dx, double dy, double dx
 
       if (node && node->output && node->desktop)
         focus_node(node->output, node->desktop, node);
+    } else if (focus_follows_mouse == FOLLOWS_ALWAYS) {
+      wlr_seat_keyboard_notify_clear_focus(seat);
     }
   } else {
     wlr_seat_pointer_clear_focus(seat);
+    if (focus_follows_mouse == FOLLOWS_ALWAYS)
+      wlr_seat_keyboard_notify_clear_focus(seat);
   }
 }
 

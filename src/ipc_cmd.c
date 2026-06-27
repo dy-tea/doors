@@ -2456,6 +2456,12 @@ static void ipc_cmd_wm(char **args, int num, int client_fd) {
     offset += snprintf(buf + offset, sizeof(buf) - offset,
       "    \"focus_on_activate\": \"%s\",\n", m);
 
+    const char *ffm = "no";
+    if (focus_follows_mouse == FOLLOWS_YES) ffm = "yes";
+    else if (focus_follows_mouse == FOLLOWS_ALWAYS) ffm = "always";
+    offset += snprintf(buf + offset, sizeof(buf) - offset,
+      "    \"focus_follows_mouse\": \"%s\",\n", ffm);
+
     offset += snprintf(buf + offset, sizeof(buf) - offset,
       "    \"record_history\": %s\n", record_history ? "true" : "false");
     offset += snprintf(buf + offset, sizeof(buf) - offset, "  }\n");
@@ -2891,8 +2897,30 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
     ipc_handle_bool(args, num, client_fd, &scroller_ignore_proportion_single, IPC_FLAG_NONE);
   } else if (streq("scroller_structs", *args)) {
     ipc_handle_int(args, num, client_fd, &scroller_structs, IPC_FLAG_NONE, 0, 1000000, NULL);
-  } else if (streq("focus_follows_pointer", *args)) {
-    ipc_handle_bool(args, num, client_fd, &focus_follows_pointer, IPC_FLAG_COMMIT);
+  } else if (streq("focus_follows_pointer", *args) || streq("focus_follows_mouse", *args)) {
+    if (num >= 2) {
+      if (strcmp(args[1], "no") == 0 || strcmp(args[1], "false") == 0)
+        focus_follows_mouse = FOLLOWS_NO;
+      else if (strcmp(args[1], "yes") == 0 || strcmp(args[1], "true") == 0)
+        focus_follows_mouse = FOLLOWS_YES;
+      else if (strcmp(args[1], "always") == 0)
+        focus_follows_mouse = FOLLOWS_ALWAYS;
+      else {
+        send_failure(client_fd, "config focus_follows_pointer: expected \"no\", \"yes\", or \"always\"\n");
+        return;
+      }
+      transaction_commit_dirty();
+      send_success(client_fd, "focus_follows_pointer set\n");
+    } else {
+      const char *mode = "no";
+      if (focus_follows_mouse == FOLLOWS_YES)
+        mode = "yes";
+      else if (focus_follows_mouse == FOLLOWS_ALWAYS)
+        mode = "always";
+      char buf[64];
+      snprintf(buf, sizeof(buf), "%s\n", mode);
+      send_success(client_fd, buf);
+    }
   } else if (streq("pointer_follows_focus", *args)) {
     ipc_handle_bool(args, num, client_fd, &pointer_follows_focus, IPC_FLAG_COMMIT);
   } else if (streq("split_ratio", *args)) {
