@@ -60,6 +60,13 @@ When true, window borders are hidden when there is only one tiled window on the
 desktop.
 
 ```
+doorsctl config focus_wrapping true|false
+```
+
+When true, directional focus wraps around when there is no window in the target
+direction (e.g., focusing west from the leftmost window wraps to the rightmost).
+
+```
 doorsctl config gapless_monocle true|false
 ```
 
@@ -799,6 +806,7 @@ doorsctl config borderless_monocle [true|false]
 doorsctl config borderless_singleton [true|false]
 doorsctl config smart_gaps [true|false]
 doorsctl config smart_borders [true|false]
+doorsctl config focus_wrapping [true|false]
 doorsctl config gapless_monocle [true|false]
 doorsctl config enable_animations [true|false]
 doorsctl config edge_scroller_pointer_focus [true|false]

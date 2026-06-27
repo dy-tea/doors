@@ -2446,6 +2446,8 @@ static void ipc_cmd_wm(char **args, int num, int client_fd) {
     offset += snprintf(buf + offset, sizeof(buf) - offset,
       "    \"smart_borders\": %s,\n", smart_borders ? "true" : "false");
     offset += snprintf(buf + offset, sizeof(buf) - offset,
+      "    \"focus_wrapping\": %s,\n", focus_wrapping ? "true" : "false");
+    offset += snprintf(buf + offset, sizeof(buf) - offset,
       "    \"record_history\": %s\n", record_history ? "true" : "false");
     offset += snprintf(buf + offset, sizeof(buf) - offset, "  }\n");
     offset += snprintf(buf + offset, sizeof(buf) - offset, "}\n");
@@ -2577,6 +2579,8 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
     ipc_handle_bool(args, num, client_fd, &smart_gaps, IPC_FLAG_COMMIT);
   } else if (streq("smart_borders", *args)) {
     ipc_handle_bool(args, num, client_fd, &smart_borders, IPC_FLAG_COMMIT);
+  } else if (streq("focus_wrapping", *args)) {
+    ipc_handle_bool(args, num, client_fd, &focus_wrapping, IPC_FLAG_COMMIT);
   } else if (streq("gapless_monocle", *args)) {
     ipc_handle_bool(args, num, client_fd, &gapless_monocle, IPC_FLAG_COMMIT);
   } else if (streq("decoration_mode", *args)) {

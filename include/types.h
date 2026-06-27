@@ -207,6 +207,7 @@ extern int border_width;
 extern int window_gap;
 extern bool smart_gaps;
 extern bool smart_borders;
+extern bool focus_wrapping;
 extern double split_ratio;
 extern char normal_border_color[16];
 extern char active_border_color[16];

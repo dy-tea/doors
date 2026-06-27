@@ -45,6 +45,7 @@ int border_width = 2;
 int window_gap = 10;
 bool smart_gaps = false;
 bool smart_borders = false;
+bool focus_wrapping = true;
 double split_ratio = 0.5;
 
 // transaction settings

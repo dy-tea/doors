@@ -279,6 +279,15 @@ void focus_west(void) {
       focus_node(mon, mon->desk, n);
       wlr_log(WLR_DEBUG, "Focused west");
     }
+  } else if (focus_wrapping) {
+    desktop_t *d = mon->desk;
+    if (d->root) {
+      node_t *w = second_extrema(d->root);
+      if (w && w != d->focus) {
+        focus_node(mon, d, w);
+        wlr_log(WLR_DEBUG, "Focused west (wrapped)");
+      }
+    }
   }
 }
 
@@ -299,6 +308,15 @@ void focus_east(void) {
     if (n != NULL) {
       focus_node(mon, mon->desk, n);
       wlr_log(WLR_DEBUG, "Focused east");
+    }
+  } else if (focus_wrapping) {
+    desktop_t *d = mon->desk;
+    if (d->root) {
+      node_t *w = first_extrema(d->root);
+      if (w && w != d->focus) {
+        focus_node(mon, d, w);
+        wlr_log(WLR_DEBUG, "Focused east (wrapped)");
+      }
     }
   }
 }
@@ -322,6 +340,15 @@ void focus_south(void) {
       focus_node(mon, mon->desk, n);
       wlr_log(WLR_DEBUG, "Focused south");
     }
+  } else if (focus_wrapping) {
+    desktop_t *d = mon->desk;
+    if (d->root) {
+      node_t *w = first_extrema(d->root);
+      if (w && w != d->focus) {
+        focus_node(mon, d, w);
+        wlr_log(WLR_DEBUG, "Focused south (wrapped)");
+      }
+    }
   }
 }
 
@@ -342,6 +369,15 @@ void focus_north(void) {
     if (n != NULL) {
       focus_node(mon, mon->desk, n);
       wlr_log(WLR_DEBUG, "Focused north");
+    }
+  } else if (focus_wrapping) {
+    desktop_t *d = mon->desk;
+    if (d->root) {
+      node_t *w = second_extrema(d->root);
+      if (w && w != d->focus) {
+        focus_node(mon, d, w);
+        wlr_log(WLR_DEBUG, "Focused north (wrapped)");
+      }
     }
   }
 }
