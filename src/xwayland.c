@@ -684,10 +684,16 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	if (should_focus)
 		activate_node(target_monitor, target_desktop, node);
 
-	if (rule && rule->has_state && rule->state == STATE_FULLSCREEN)
+	if (xsurface->fullscreen &&
+	    target_desktop->fullscreen_recreate_pending_window_id == xsurface->window_id) {
+		target_desktop->fullscreen_recreate_pending_window_id = 0;
+	} else if (rule && rule->has_state && rule->state == STATE_FULLSCREEN) {
+		target_desktop->fullscreen_recreate_pending_window_id = 0;
 		enter_fullscreen(target_monitor, target_desktop, node);
-	else if (xsurface->fullscreen)
+	} else if (xsurface->fullscreen) {
+		target_desktop->fullscreen_recreate_pending_window_id = 0;
 		enter_fullscreen(target_monitor, target_desktop, node);
+	}
 
 	xwayland_view_apply_disable_decorations(xwayland_view);
 
@@ -764,6 +770,10 @@ static void handle_unmap(struct wl_listener *listener, void *data) {
 			xwayland_view->node->client->xwayland_view = NULL;
 
 		if (desk) {
+			if (xwayland_view->node && xwayland_view->node->client &&
+			    xwayland_view->node->client->state == STATE_FULLSCREEN) {
+				desk->fullscreen_recreate_pending_window_id = xwayland_view->xwayland_surface->window_id;
+			}
 			ipc_put_status(SUB_MASK_NODE_REMOVE, "node_remove[%s,%s,%u]\n",
 				xwayland_view->node->client && xwayland_view->node->client->app_id[0] ? xwayland_view->node->client->app_id : "?",
 				xwayland_view->node->client && xwayland_view->node->client->title[0] ? xwayland_view->node->client->title : "?",
@@ -892,9 +902,6 @@ static void handle_request_fullscreen(struct wl_listener *listener, void *data) 
 	output_t *m = node->output;
 	desktop_t *d = node->desktop;
 
-	wlr_log(WLR_INFO, "handle_request_fullscreen: xwayland wants fullscreen=%d, current state=%d last_state=%d",
-		xsurface->fullscreen, client->state, client->last_state);
-
 	struct wlr_scene_tree *scene_tree = client_get_scene_tree(client);
 	if (!scene_tree) {
 		wlr_log(WLR_ERROR, "handle_request_fullscreen: no scene tree");
@@ -902,6 +909,7 @@ static void handle_request_fullscreen(struct wl_listener *listener, void *data) 
 	}
 
 	if (xsurface->fullscreen) {
+		d->fullscreen_recreate_pending_window_id = 0;
 		if (client->state == STATE_FULLSCREEN) {
 			wlr_xwayland_surface_set_fullscreen(xsurface, true);
 			return;
@@ -912,21 +920,9 @@ static void handle_request_fullscreen(struct wl_listener *listener, void *data) 
 	} else {
 		if (client->state != STATE_FULLSCREEN) {
 			wlr_xwayland_surface_set_fullscreen(xsurface, false);
+			d->fullscreen_recreate_pending_window_id = 0;
 			return;
 		}
-		wlr_log(WLR_INFO, "handle_request_fullscreen: allowing remove-fullscreen");
-
-		client_state_t restore = client->last_state;
-		if (restore == STATE_FULLSCREEN) restore = STATE_TILED;
-		if (restore == STATE_FLOATING && node->parent != NULL) restore = STATE_TILED;
-
-		if (restore == STATE_FLOATING)
-			wlr_scene_node_reparent(&scene_tree->node, server.float_tree);
-		else
-			wlr_scene_node_reparent(&scene_tree->node, server.tile_tree);
-
-		wlr_xwayland_surface_set_fullscreen(xsurface, false);
-		set_state(m, d, node, restore);
 	}
 }
 

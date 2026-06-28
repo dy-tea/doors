@@ -170,6 +170,7 @@ typedef struct desktop_t {
   padding_t padding;
   int window_gap;
   struct output_t *output;
+  uint32_t fullscreen_recreate_pending_window_id;
 } desktop_t;
 
 typedef struct {

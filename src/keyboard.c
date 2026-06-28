@@ -615,6 +615,7 @@ void tile_focused(void) {
 void toggle_fullscreen(void) {
   if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL) return;
 
+  mon->desk->fullscreen_recreate_pending_window_id = 0;
   node_t *n = mon->desk->focus;
   if (n->client == NULL) return;
 
@@ -771,7 +772,10 @@ void send_to_desktop(int desktop_index) {
   arrange(mon, src_desk, true);
   arrange(target_mon, target, false);
 
-  wlr_log(WLR_INFO, "Sent window to desktop: %s", target->name);
+  n->output = target_mon;
+
+  wlr_log(WLR_INFO, "Sent window to desktop: %s (n->output=%p target_mon=%p)",
+    target->name, (void*)n->output, (void*)target_mon);
 }
 
 void send_to_desktop_by_name(const char *name) {
@@ -854,7 +858,10 @@ void send_to_desktop_by_name(const char *name) {
   arrange(mon, src_desk, true);
   arrange(target_mon, target, false);
 
-  wlr_log(WLR_INFO, "Sent window to desktop: %s", target->name);
+  n->output = target_mon;
+
+  wlr_log(WLR_INFO, "Sent window to desktop: %s (n->output=%p target_mon=%p)",
+    target->name, (void*)n->output, (void*)target_mon);
 }
 
 void send_to_next_desktop(void) {
