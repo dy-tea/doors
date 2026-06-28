@@ -617,7 +617,7 @@ void toplevel_map(struct wl_listener *listener, void *data) {
     activate_node(target_output, target_desktop, n);
 
   if (rule && rule->state == STATE_FULLSCREEN)
-  	toggle_fullscreen();
+    enter_fullscreen(target_output, target_desktop, n);
 
   toplevel_apply_disable_decorations(toplevel);
 

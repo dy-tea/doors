@@ -685,9 +685,9 @@ static void handle_map(struct wl_listener *listener, void *data) {
 		activate_node(target_monitor, target_desktop, node);
 
 	if (rule && rule->has_state && rule->state == STATE_FULLSCREEN)
-		toggle_fullscreen();
+		enter_fullscreen(target_monitor, target_desktop, node);
 	else if (xsurface->fullscreen)
-		toggle_fullscreen();
+		enter_fullscreen(target_monitor, target_desktop, node);
 
 	xwayland_view_apply_disable_decorations(xwayland_view);
 

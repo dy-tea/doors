@@ -186,7 +186,7 @@ static void update_window_visibility(node_t *node, output_t *m, desktop_t *curre
     if (node->scratchpad) {
       should_show = (node->desktop == current_desktop);
       found = true;
-    } else if (node->client && node->client->state == STATE_FLOATING && node->desktop != NULL) {
+    } else if (node->client && (node->client->state == STATE_FLOATING || node->client->state == STATE_FULLSCREEN) && node->desktop != NULL) {
       should_show = (node->desktop == current_desktop);
       found = true;
     } else {
@@ -240,7 +240,8 @@ static void update_all_toplevels_visibility(output_t *m, desktop_t *current_desk
     if (!xwayland_view->mapped || !xwayland_view->scene_tree || !xwayland_view->node)
       continue;
 
-    if (xwayland_view->node->client && xwayland_view->node->client->state == STATE_FLOATING)
+    client_state_t st = xwayland_view->node->client ? xwayland_view->node->client->state : STATE_TILED;
+    if (st == STATE_FLOATING || st == STATE_FULLSCREEN)
       update_window_visibility(xwayland_view->node, m, current_desktop, &window_count);
   }
 }

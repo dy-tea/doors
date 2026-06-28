@@ -47,6 +47,7 @@ bool is_adjacent(node_t *a, node_t *b, direction_t dir);
 void swap_nodes(struct output_t *m1, desktop_t *d1, node_t *n1, struct output_t *m2, desktop_t *d2, node_t *n2);
 bool set_state(struct output_t *m, desktop_t *d, node_t *n, client_state_t s);
 void set_floating(struct output_t *m, desktop_t *d, node_t *n, bool value);
+void enter_fullscreen(struct output_t *m, desktop_t *d, node_t *n);
 void close_node(node_t *n);
 
 // preselection

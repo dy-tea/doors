@@ -1256,6 +1256,28 @@ bool set_state(output_t *m, desktop_t *d, node_t *n, client_state_t s) {
   return true;
 }
 
+void enter_fullscreen(output_t *m, desktop_t *d, node_t *n) {
+  if (!n || !n->client) return;
+
+  struct wlr_scene_tree *scene_tree = client_get_scene_tree(n->client);
+  if (!scene_tree) {
+    wlr_log(WLR_ERROR, "cannot enter fullscreen, no scene tree");
+    return;
+  }
+
+  wlr_scene_node_reparent(&scene_tree->node, server.full_tree);
+
+  if (n->client->toplevel && n->client->toplevel->xdg_toplevel)
+    wlr_xdg_toplevel_set_fullscreen(n->client->toplevel->xdg_toplevel, true);
+  else if (n->client->xwayland_view)
+    wlr_xwayland_surface_set_fullscreen(n->client->xwayland_view->xwayland_surface, true);
+
+  set_state(m, d, n, STATE_FULLSCREEN);
+
+  if (n->client->toplevel)
+    update_foreign_toplevel_state(n->client->toplevel);
+}
+
 void set_floating(output_t *m, desktop_t *d, node_t *n, bool value) {
   if (n == NULL || n->client == NULL) return;
 
