@@ -14,6 +14,8 @@
 #include <limits.h>
 
 #define MIN(a, b) a < b ? a : b
+#define SPRING_FIXED_DT 0.001
+#define SPRING_MAX_STEPS 10
 
 typedef struct {
   struct wl_list link;
@@ -48,6 +50,7 @@ typedef struct {
   bool use_spring;
   double spring_position;
   double spring_velocity;
+  double spring_accumulator;
   struct timespec spring_last_tick;
   bool spring_done;
   char curve_name[64];
@@ -84,6 +87,7 @@ static void apply_config_to_entry(animation_entry_t *entry, int type_index) {
       entry->spring_position = 0.0;
       entry->spring_velocity = 0.0;
       entry->spring_done = false;
+      entry->spring_accumulator = 0.0;
       clock_gettime(CLOCK_MONOTONIC, &entry->spring_last_tick);
       snprintf(entry->curve_name, sizeof(entry->curve_name), "%s", cfg->spring_name);
       return;
@@ -353,12 +357,20 @@ static void destroy_snapshot_buffers(animation_entry_t *entry) {
 
 static void tick_entry(animation_entry_t *entry, struct timespec now) {
   if (entry->use_spring) {
-    double dt = elapsed_ms(entry->spring_last_tick, now) / 1000.0;
+    double elapsed = elapsed_ms(entry->spring_last_tick, now) / 1000.0;
     entry->spring_last_tick = now;
+    entry->spring_accumulator += elapsed;
+
     spring_curve_t *curve = spring_find(entry->curve_name);
 
     if (curve) {
-      entry->eased = spring_evaluate(curve, dt, &entry->spring_position, &entry->spring_velocity, &entry->spring_done);
+      int remaining = SPRING_MAX_STEPS;
+      while (entry->spring_accumulator >= SPRING_FIXED_DT && remaining > 0 && !entry->spring_done) {
+        entry->eased = spring_evaluate(curve, SPRING_FIXED_DT,
+          &entry->spring_position, &entry->spring_velocity, &entry->spring_done);
+        entry->spring_accumulator -= SPRING_FIXED_DT;
+        remaining--;
+      }
     } else {
       entry->eased = 1.0;
       entry->spring_done = true;

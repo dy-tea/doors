@@ -218,6 +218,8 @@ void output_frame(struct wl_listener *listener, void *data) {
 	wlr_output_state_init(&pending);
 	if (!wlr_scene_output_build_state(scene_output, &pending, &opts)) {
 		wlr_output_state_finish(&pending);
+		if (animating)
+			wlr_output_schedule_frame(output->wlr_output);
 		return;
 	}
 
@@ -233,6 +235,8 @@ void output_frame(struct wl_listener *listener, void *data) {
 	if (!wlr_output_commit_state(output->wlr_output, &pending))
 		wlr_log(WLR_ERROR, "Failed to commit output state");
 	wlr_output_state_finish(&pending);
+
+	clock_gettime(CLOCK_MONOTONIC, &now);
 	wlr_scene_output_send_frame_done(scene_output, &now);
 
   if (animating)
