@@ -724,13 +724,25 @@ bool animation_start_workspace_slide(output_t *output, node_t *node,
 
   if (!anim_type_configs[6].enabled) return false;
 
-  animation_cancel_node(node);
-
   animation_entry_t *entry = find_animation(node);
-  if (!entry) {
-    entry = create_animation_entry();
-    if (!entry) return false;
+  if (entry) {
+    entry->from.x = scene_tree->node.x;
+    entry->from.y = scene_tree->node.y;
+    entry->to = to;
+    entry->slide_out = slide_out;
+    clock_gettime(CLOCK_MONOTONIC, &entry->start);
+    entry->duration_ms = ANIMATION_DURATION_MS;
+    apply_config_to_entry(entry, 6);
+    entry->from_opacity = 1.0f;
+    entry->to_opacity = 1.0f;
+    schedule_output(output);
+    wlr_log(WLR_DEBUG, "animation: workspace_slide update entry=%p node=%u from=(%d,%d) to=(%d,%d)",
+      (void*)entry, node->id, entry->from.x, entry->from.y, to.x, to.y);
+    return true;
   }
+
+  entry = create_animation_entry();
+  if (!entry) return false;
 
   entry->node = node;
   entry->scene_tree = scene_tree;
