@@ -86,6 +86,8 @@ typedef struct toplevel_t {
   bool wants_fade;
   bool client_maximized;
 
+  int max_render_time;
+
   // tearing control
   enum wp_tearing_control_v1_presentation_hint tearing_hint;
 

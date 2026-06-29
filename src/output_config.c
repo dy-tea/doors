@@ -38,6 +38,7 @@ struct output_config *output_config_create(const char *name) {
   oc->render_bit_depth = OUTPUT_CONFIG_RENDER_BIT_DEPTH_AUTO;
   oc->subpixel = OUTPUT_CONFIG_SUBPIXEL_AUTO;
   oc->allow_tearing = -1;
+  oc->max_render_time = -1;
 
   return oc;
 }
@@ -224,6 +225,9 @@ void output_config_apply(struct output_config *oc) {
 
   if (output && oc->allow_tearing >= 0)
     output->allow_tearing = oc->allow_tearing;
+
+  if (output && oc->max_render_time >= 0)
+    output->max_render_time = oc->max_render_time;
 
   if (output && wlr_output->enabled) {
     strncpy(output->name, wlr_output->name, SMALEN - 1);

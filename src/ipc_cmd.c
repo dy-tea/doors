@@ -453,6 +453,28 @@ static void ipc_cmd_output(char **args, int num, int client_fd) {
 
     output_config_apply(oc);
     send_success(client_fd, "output tearing set\n");
+  } else if (streq("max_render_time", subcmd)) {
+    if (num < 2) {
+      send_failure(client_fd, "output max_render_time: missing value\n");
+      return;
+    }
+    args++;
+    num--;
+
+    if (streq("off", *args)) {
+      oc->max_render_time = 0;
+    } else {
+      char *end;
+      int val = (int)strtol(*args, &end, 10);
+      if (*end || val <= 0) {
+        send_failure(client_fd, "output max_render_time: invalid value (off or <ms>)\n");
+        return;
+      }
+      oc->max_render_time = val;
+    }
+
+    output_config_apply(oc);
+    send_success(client_fd, "output max_render_time set\n");
   } else if (streq("focus", subcmd) || streq("-f", subcmd) || streq("--focus", subcmd)) {
     if (!mon) {
       send_failure(client_fd, "output focus: no such output\n");

@@ -13,6 +13,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wayland-server-core.h>
 #include <wlr/backend/headless.h>
 #include <wlr/types/wlr_buffer.h>
 #include <wlr/types/wlr_compositor.h>
@@ -182,13 +183,12 @@ static bool output_try_direct_scanout(output_t *output) {
 	return ok;
 }
 
-void output_frame(struct wl_listener *listener, void *data) {
-	(void)data;
-	output_t *output = wl_container_of(listener, output, frame);
-	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(server.scene, output->wlr_output);
-  struct timespec now;
-  bool animating = false;
+const long NSEC_PER_MSEC = 1000000;
+const long NSEC_PER_SEC = 1000000000;
 
+static void output_repaint(output_t *output) {
+	struct wlr_scene_output *scene_output =
+		wlr_scene_get_scene_output(server.scene, output->wlr_output);
 	if (!scene_output) return;
 
 	bool has_fs = output_has_fullscreen_cover(output);
@@ -197,13 +197,15 @@ void output_frame(struct wl_listener *listener, void *data) {
 	if (has_fs) output_configure_scene_visible(output);
 	else output_configure_scene(output);
 
-  clock_gettime(CLOCK_MONOTONIC, &now);
-  animating = animation_update_output(output, now);
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	bool animating = animation_update_output(output, now);
 
 	if (blur_ctx.available && (fs_effects || !has_fs))
 		blur_output_frame(output, scene_output);
 
 	if (has_fs && !fs_effects && output_try_direct_scanout(output)) {
+		clock_gettime(CLOCK_MONOTONIC, &now);
 		wlr_scene_output_send_frame_done(scene_output, &now);
 		if (animating)
 			wlr_output_schedule_frame(output->wlr_output);
@@ -239,8 +241,57 @@ void output_frame(struct wl_listener *listener, void *data) {
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	wlr_scene_output_send_frame_done(scene_output, &now);
 
-  if (animating)
-    wlr_output_schedule_frame(output->wlr_output);
+	if (animating)
+		wlr_output_schedule_frame(output->wlr_output);
+}
+
+static int output_repaint_timer_handler(void *data) {
+	output_t *output = data;
+	if (!output->wlr_output->enabled) return 0;
+
+	output->wlr_output->frame_pending = false;
+	output_repaint(output);
+	return 0;
+}
+
+void output_frame(struct wl_listener *listener, void *data) {
+	(void)data;
+	output_t *output = wl_container_of(listener, output, frame);
+	if (!output->wlr_output->enabled) return;
+
+	if (output->max_render_time == 0) {
+		output_repaint(output);
+		return;
+	}
+
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+
+	int msec_until_refresh = 0;
+	if (output->last_presentation.tv_sec > 0) {
+		struct timespec predicted_refresh = output->last_presentation;
+		predicted_refresh.tv_nsec += (long)(output->refresh_nsec % NSEC_PER_SEC);
+		predicted_refresh.tv_sec += (long)(output->refresh_nsec / NSEC_PER_SEC);
+		if (predicted_refresh.tv_nsec >= NSEC_PER_SEC) {
+			predicted_refresh.tv_sec += 1;
+			predicted_refresh.tv_nsec -= NSEC_PER_SEC;
+		}
+
+		if (predicted_refresh.tv_sec >= now.tv_sec) {
+			long nsec_until_refresh = (predicted_refresh.tv_sec - now.tv_sec) * NSEC_PER_SEC +
+				(predicted_refresh.tv_nsec - now.tv_nsec);
+			msec_until_refresh = (int)(nsec_until_refresh / NSEC_PER_MSEC);
+		}
+	}
+
+	int delay = msec_until_refresh - output->max_render_time;
+
+	if (delay < 1) {
+		output_repaint(output);
+	} else {
+		output->wlr_output->frame_pending = true;
+		wl_event_source_timer_update(output->repaint_timer, delay);
+	}
 }
 
 static void handle_output_present(struct wl_listener *listener, void *data) {
@@ -279,6 +330,11 @@ static void handle_output_destroy(struct wl_listener *listener, void *data) {
   wl_list_remove(&output->present.link);
   wl_list_remove(&output->request_state.link);
   wl_list_remove(&output->destroy.link);
+
+  if (output->repaint_timer) {
+    wl_event_source_remove(output->repaint_timer);
+    output->repaint_timer = NULL;
+  }
 
   if (output->prev)
     output->prev->next = output->next;
@@ -390,6 +446,10 @@ void handle_new_output(struct wl_listener *listener, void *data) {
 
   output->present.notify = handle_output_present;
   wl_signal_add(&wlr_output->events.present, &output->present);
+
+  output->repaint_timer = wl_event_loop_add_timer(
+    wl_display_get_event_loop(server.wl_display),
+    output_repaint_timer_handler, output);
 
   output->destroy.notify = handle_output_destroy;
   wl_signal_add(&wlr_output->events.destroy, &output->destroy);

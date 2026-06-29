@@ -29,6 +29,7 @@ typedef struct output_t {
   struct wl_listener request_state;
   struct wl_listener destroy;
   struct wl_listener present;
+  struct wl_event_source *repaint_timer;
 
   struct wlr_session_lock_surface_v1 *lock_surface;
   struct wl_listener destroy_lock_surface;

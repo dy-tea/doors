@@ -68,6 +68,7 @@ struct output_config {
   enum output_config_subpixel subpixel;
   struct wlr_color_transform *color_transform;
   int allow_tearing;
+  int max_render_time;
 };
 
 struct output_config *output_config_create(const char *name);

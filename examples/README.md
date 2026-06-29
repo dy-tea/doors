@@ -732,6 +732,7 @@ doorsctl output <name> render_bit_depth 8|10                  # Set bits per pix
 doorsctl output <name> color_profile gamma22|srgb             # Set color profile
 doorsctl output <name> color_profile icc /path/to/profile.icc # Set icc color profile
 doorsctl output <name> tearing on|off                         # Set output to tear (no buffering)
+doorsctl output <name> max_render_time off|<ms>               # Set output max render time
 doorsctl output <name> focus                                  # Focus output
 doorsctl output <name> rename <newname>                       # Rename output
 doorsctl output <name> desktops                               # List desktop names on output
