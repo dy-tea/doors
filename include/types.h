@@ -113,6 +113,11 @@ typedef struct client_t {
   bool mica;
   bool acrylic;
   float border_radius;
+  bool shadow;
+  float shadow_size;
+  float shadow_offset_x;
+  float shadow_offset_y;
+  float shadow_color[4];
 
   // Screenshare privacy
   bool block_out_from_screenshare;
@@ -215,6 +220,13 @@ extern bool debug_noatomic;
 extern bool debug_txn_wait;
 extern int directional_focus_tightness;
 extern int ignore_ewmh_fullscreen;
+
+// Shadow settings
+extern float shadow_size;
+extern float shadow_offset_x;
+extern float shadow_offset_y;
+extern float shadow_color[4];
+
 extern padding_t monocle_padding;
 extern padding_t padding;
 extern int border_width;

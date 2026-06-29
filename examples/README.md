@@ -459,7 +459,8 @@ doorsctl node --flag marked=off        						# Toggle marked flag on window
 doorsctl node --flag blur=on|off       						# Toggle blur effect on window
 doorsctl node --flag mica=on|off       						# Toggle mica effect on window
 doorsctl node --flag acrylic=on|off    						# Toggle acrylic effect on window
-doorsctl node --flag border_radius=<float>  				# Set border radius on window
+doorsctl node --flag border_radius=<float>  			# Set border radius on window
+doorsctl node --flag shadow=on|off       					# Toggle shadow effect on window
 doorsctl node --move <dx> <dy>         						# Move floating window by delta x,y
 doorsctl node --resize <handle> <dx> <dy>  				# Resize floating window (handle: northwest/nw/north/n/ne/east/e/southeast/se/south/s/southwest/sw/west/w/center/c)
 doorsctl node --activate               						# Activate focused window
@@ -614,6 +615,7 @@ doorsctl rule -a vesktop desktop=III
 - `block_out_from_screenshare=on|off` - Blocks out the window from screenshare and screenshot tools.
 - `allow_tearing=on|off` - Enables or disables tearing for the matched window(s), overriding the global `allow_tearing` config.
 - `shortcuts_inhibitor=on|off` - Controls whether the matched window(s) can use the keyboard shortcuts inhibitor protocol to suppress compositor keybindings (default: on).
+- `shadow=on|off` - Whether a window should have the shadow effect set
 
 **Matching by Title:**
 
@@ -1106,6 +1108,34 @@ doorsctl config acrylic_blur_passes <n>
 ```
 
 Sets the number of blur passes for acrylic effect (0-10, default: 4). Higher values create stronger blur.
+
+### Shadow Settings
+
+Doors supports per-window drop shadows with configurable size, offset, and color.
+
+```
+doorsctl config shadow_size <pixels>
+```
+
+Sets the shadow blur radius in pixels (default: 8).
+
+```
+doorsctl config shadow_offset_x <pixels>
+```
+
+Sets the horizontal shadow offset in pixels (default: 0). Negative values shift left, positive shift right.
+
+```
+doorsctl config shadow_offset_y <pixels>
+```
+
+Sets the vertical shadow offset in pixels (default: 4). Negative values shift up, positive shift down.
+
+```
+doorsctl config shadow_color <R> <G> <B> <A>
+```
+
+Sets the shadow color (default: 0 0 0 0.5). RGBA values should be in the range 0.0-1.0.
 
 ### Refraction Settings
 

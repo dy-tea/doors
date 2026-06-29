@@ -91,6 +91,7 @@ typedef struct blur_ctx_t {
   GLuint prog_ext_blit;
   GLuint prog_border;
   GLuint prog_corner_mask;
+  GLuint prog_shadow;
 
   struct {
     GLint tex, halfpixel, offset, noise_strength, vibrancy, vibrancy_darkness, brightness, contrast;
@@ -135,6 +136,9 @@ typedef struct blur_ctx_t {
   struct {
     GLint tex, win_pos_uv, win_size_uv, win_size_px, border_radius_px;
   } u_corner_mask;
+  struct {
+    GLint resolution, shadow_size, shadow_color, border_radius, inner_size, hole_pos, hole_size;
+  } u_shadow;
 
   GLuint vbo;
   GLint attr_pos;

@@ -43,6 +43,8 @@ typedef struct {
   bool has_acrylic;
   float border_radius;
   bool has_border_radius;
+  bool shadow;
+  bool has_shadow;
   bool block_out_from_screenshare;
   bool has_block_out_from_screenshare;
   bool allow_tearing;

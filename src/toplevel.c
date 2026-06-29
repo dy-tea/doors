@@ -353,6 +353,9 @@ void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
       wlr_scene_subsurface_tree_set_clip(&toplevel->content_tree->node, NULL);
     }
   }
+
+  if (toplevel->shadow)
+    toplevel->shadow->shadow_dirty = true;
 }
 
 void toplevel_map(struct wl_listener *listener, void *data) {
@@ -515,6 +518,15 @@ void toplevel_map(struct wl_listener *listener, void *data) {
 
    	if (rule->has_border_radius)
     	toplevel_set_border_radius(toplevel, rule->border_radius);
+
+   	if (rule->has_shadow) {
+   	  n->client->shadow = rule->shadow;
+   	  n->client->shadow_size = shadow_size;
+   	  n->client->shadow_offset_x = shadow_offset_x;
+   	  n->client->shadow_offset_y = shadow_offset_y;
+   	  memcpy(n->client->shadow_color, shadow_color, sizeof(shadow_color));
+   	  toplevel_set_shadow(toplevel, rule->shadow);
+   	}
 
     if (rule->has_allow_tearing) {
       n->client->allow_tearing = rule->allow_tearing;
@@ -952,6 +964,9 @@ void toplevel_set_border_radius(toplevel_t *tl, float radius) {
   if (tl->node && tl->node->client)
     tl->node->client->border_radius = radius;
 
+  if (tl->shadow)
+    tl->shadow->shadow_dirty = true;
+
   if (radius > 0.0f) {
     if (!tl->rounded) {
       tl->rounded = calloc(1, sizeof(*tl->rounded));
@@ -1001,6 +1016,32 @@ void toplevel_set_border_radius(toplevel_t *tl, float radius) {
     } else {
       tl->rounded->border_dirty = true;
     }
+  }
+}
+
+void toplevel_set_shadow(toplevel_t *tl, bool enabled) {
+  if (!tl || !tl->scene_tree) return;
+
+  if (tl->node && tl->node->client)
+    tl->node->client->shadow = enabled;
+
+  if (enabled) {
+    if (!tl->shadow) {
+      tl->shadow = calloc(1, sizeof(*tl->shadow));
+      if (!tl->shadow) return;
+    }
+    tl->shadow->shadow_dirty = true;
+  } else if (tl->shadow) {
+    if (tl->shadow->shadow_node) {
+      wlr_scene_node_destroy(&tl->shadow->shadow_node->node);
+      tl->shadow->shadow_node = NULL;
+    }
+    if (tl->shadow->shadow_buf) {
+      wlr_buffer_unlock(tl->shadow->shadow_buf);
+      tl->shadow->shadow_buf = NULL;
+      tl->shadow->shadow_buf_fbo = 0;
+    }
+    tl->shadow->shadow_dirty = false;
   }
 }
 
@@ -1096,6 +1137,20 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
 
     free(toplevel->rounded);
     toplevel->rounded = NULL;
+  }
+
+  if (toplevel->shadow) {
+    if (toplevel->shadow->shadow_node) {
+      wlr_scene_node_destroy(&toplevel->shadow->shadow_node->node);
+      toplevel->shadow->shadow_node = NULL;
+    }
+    if (toplevel->shadow->shadow_buf) {
+      wlr_buffer_unlock(toplevel->shadow->shadow_buf);
+      toplevel->shadow->shadow_buf = NULL;
+      toplevel->shadow->shadow_buf_fbo = 0;
+    }
+    free(toplevel->shadow);
+    toplevel->shadow = NULL;
   }
 
   destroy_borders(&toplevel->border_tree, toplevel->border_rects);

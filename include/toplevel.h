@@ -41,6 +41,15 @@ typedef struct toplevel_rounded_t {
   GLuint corner_mask_buf_fbo;
 } toplevel_rounded_t;
 
+typedef struct toplevel_shadow_t {
+  struct wlr_scene_buffer *shadow_node;
+  struct wlr_buffer *shadow_buf;
+  GLuint shadow_buf_fbo;
+  int shadow_buf_w;
+  int shadow_buf_h;
+  bool shadow_dirty;
+} toplevel_shadow_t;
+
 typedef struct toplevel_t {
   struct wl_list link;
   struct wlr_xdg_toplevel *xdg_toplevel;
@@ -51,6 +60,7 @@ typedef struct toplevel_t {
 
   toplevel_blur_t *blur;
   toplevel_rounded_t *rounded;
+  toplevel_shadow_t *shadow;
 
   struct wlr_ext_foreign_toplevel_handle_v1 *ext_foreign_toplevel;
   struct wlr_foreign_toplevel_handle_v1 *foreign_toplevel;
@@ -129,6 +139,7 @@ void toplevel_set_blur(toplevel_t *tl, bool enabled);
 void toplevel_set_mica(toplevel_t *tl, bool enabled);
 void toplevel_set_acrylic(toplevel_t *tl, bool enabled);
 void toplevel_set_border_radius(toplevel_t *tl, float radius);
+void toplevel_set_shadow(toplevel_t *tl, bool enabled);
 void toplevel_apply_decoration_mode(toplevel_t *tl);
 
 bool toplevel_can_tear(toplevel_t *toplevel);

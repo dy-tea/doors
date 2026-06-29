@@ -1,4 +1,5 @@
 #include "animation.h"
+#include "blur.h"
 #include "fallthrough.h"
 #include "ipc.h"
 #include "master_stack.h"
@@ -148,6 +149,13 @@ client_t *make_client(void) {
   c->last_layer = LAYER_NORMAL;
   c->urgent = false;
   c->shown = false;
+
+  // initialize shadow defaults
+  c->shadow = false;
+  c->shadow_size = shadow_size;
+  c->shadow_offset_x = shadow_offset_x;
+  c->shadow_offset_y = shadow_offset_y;
+  memcpy(c->shadow_color, shadow_color, sizeof(shadow_color));
 
   // initialize scroller properties
   scroller_init_client(c);

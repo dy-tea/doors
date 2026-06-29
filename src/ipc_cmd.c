@@ -1092,6 +1092,20 @@ static void ipc_cmd_node(char **args, int num, int client_fd) {
       if (n->client->toplevel)
         toplevel_set_acrylic(n->client->toplevel, new_val);
       send_success(client_fd, "flag changed\n");
+    } else if (strcmp(key, "shadow") == 0) {
+      if (!n->client) {
+        send_failure(client_fd, "node -g: no client\n");
+        return;
+      }
+      bool new_val = has_value ? set_value : !n->client->shadow;
+      n->client->shadow = new_val;
+      n->client->shadow_size = shadow_size;
+      n->client->shadow_offset_x = shadow_offset_x;
+      n->client->shadow_offset_y = shadow_offset_y;
+      memcpy(n->client->shadow_color, shadow_color, sizeof(shadow_color));
+      if (n->client->toplevel)
+        toplevel_set_shadow(n->client->toplevel, new_val);
+      send_success(client_fd, "flag changed\n");
     } else if (strncmp(key, "border_radius", 13) == 0) {
       if (!n->client) {
         send_failure(client_fd, "node -g: no client\n");
@@ -2502,7 +2516,16 @@ static void ipc_cmd_wm(char **args, int num, int client_fd) {
       "    \"focus_follows_mouse\": \"%s\",\n", ffm);
 
     offset += snprintf(buf + offset, sizeof(buf) - offset,
-      "    \"record_history\": %s\n", record_history ? "true" : "false");
+      "    \"record_history\": %s,\n", record_history ? "true" : "false");
+    offset += snprintf(buf + offset, sizeof(buf) - offset,
+      "    \"shadow_size\": %.1f,\n", shadow_size);
+    offset += snprintf(buf + offset, sizeof(buf) - offset,
+      "    \"shadow_offset_x\": %.1f,\n", shadow_offset_x);
+    offset += snprintf(buf + offset, sizeof(buf) - offset,
+      "    \"shadow_offset_y\": %.1f,\n", shadow_offset_y);
+    offset += snprintf(buf + offset, sizeof(buf) - offset,
+      "    \"shadow_color\": [%.3f, %.3f, %.3f, %.3f]\n",
+      shadow_color[0], shadow_color[1], shadow_color[2], shadow_color[3]);
     offset += snprintf(buf + offset, sizeof(buf) - offset, "  }\n");
     offset += snprintf(buf + offset, sizeof(buf) - offset, "}\n");
 
@@ -3479,6 +3502,29 @@ static void ipc_cmd_config(char **args, int num, int client_fd) {
         send_success(client_fd, buf);
       }
     }
+  } else if (streq("shadow_size", *args)) {
+    ipc_handle_float(args, num, client_fd, &shadow_size, IPC_FLAG_NONE, 0.0f, 100.0f, "%.1f\n", "value must be 0-100");
+  } else if (streq("shadow_offset_x", *args)) {
+    ipc_handle_float(args, num, client_fd, &shadow_offset_x, IPC_FLAG_NONE, -100.0f, 100.0f, "%.1f\n", "value must be -100-100");
+  } else if (streq("shadow_offset_y", *args)) {
+    ipc_handle_float(args, num, client_fd, &shadow_offset_y, IPC_FLAG_NONE, -100.0f, 100.0f, "%.1f\n", "value must be -100-100");
+  } else if (streq("shadow_color", *args)) {
+    if (num >= 2) {
+      float r, g, b, a = 1.0f;
+      int n = sscanf(args[1], "%f %f %f %f", &r, &g, &b, &a);
+      if (n >= 3) {
+        shadow_color[0] = r; shadow_color[1] = g;
+        shadow_color[2] = b; shadow_color[3] = a;
+        send_success(client_fd, "shadow_color set\n");
+      } else {
+        send_failure(client_fd, "config shadow_color: expected \"R G B [A]\"\n");
+      }
+    } else {
+      char buf[128];
+      snprintf(buf, sizeof(buf), "%.3f %.3f %.3f %.3f\n",
+        shadow_color[0], shadow_color[1], shadow_color[2], shadow_color[3]);
+      send_success(client_fd, buf);
+    }
   } else {
     send_failure(client_fd, "config: unknown setting\n");
   }
@@ -3794,6 +3840,12 @@ static void ipc_cmd_rule(char **args, int num, int client_fd) {
       } else if (strncmp("border_radius=", arg, 14) == 0) {
         r->consequence.border_radius = atof(arg + 14);
         r->consequence.has_border_radius = true;
+      } else if (streq("shadow=on", arg)) {
+        r->consequence.shadow = true;
+        r->consequence.has_shadow = true;
+      } else if (streq("shadow=off", arg)) {
+        r->consequence.shadow = false;
+        r->consequence.has_shadow = true;
       } else if (streq("block_out_from_screenshare=on", arg)) {
         r->consequence.block_out_from_screenshare = true;
         r->consequence.has_block_out_from_screenshare = true;

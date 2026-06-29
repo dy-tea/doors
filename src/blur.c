@@ -45,6 +45,7 @@
 #include "invert_frag_src.h"
 #include "nightlight_frag_src.h"
 #include "sepia_frag_src.h"
+#include "shadow_frag_src.h"
 
 enum blur_algorithm blur_algorithm = BLUR_ALGORITHM_KAWASE;
 bool blur_enabled = true;
@@ -79,6 +80,11 @@ int refraction_texture_repeat_mode = 1;
 float refraction_offset = 1.0f;
 float refraction_noise_strength = 0.03f;
 float refraction_noise_scale = 1.0f;
+
+float shadow_size = 8.0f;
+float shadow_offset_x = 0.0f;
+float shadow_offset_y = 4.0f;
+float shadow_color[4] = {0.0f, 0.0f, 0.0f, 0.5f};
 
 blur_ctx_t blur_ctx = {0};
 
@@ -514,6 +520,7 @@ bool blur_init(void) {
   blur_ctx.prog_ext_blit = link_program(ext_blit_frag_src);
   blur_ctx.prog_border = link_program(border_frag_src);
   blur_ctx.prog_corner_mask = link_program(border_corner_mask_frag_src);
+  blur_ctx.prog_shadow = link_program(shadow_frag_src);
 
   if (!blur_ctx.prog_kawase || !blur_ctx.prog_gauss_h || !blur_ctx.prog_gauss_v ||
       !blur_ctx.prog_box_h || !blur_ctx.prog_box_v || !blur_ctx.prog_blit ||
@@ -596,6 +603,15 @@ bool blur_init(void) {
     blur_ctx.u_corner_mask.win_size_px = glGetUniformLocation(blur_ctx.prog_corner_mask, "win_size_px");
     blur_ctx.u_corner_mask.border_radius_px = glGetUniformLocation(blur_ctx.prog_corner_mask, "border_radius_px");
   }
+  if (blur_ctx.prog_shadow) {
+    blur_ctx.u_shadow.resolution = glGetUniformLocation(blur_ctx.prog_shadow, "resolution");
+    blur_ctx.u_shadow.shadow_size = glGetUniformLocation(blur_ctx.prog_shadow, "shadow_size");
+    blur_ctx.u_shadow.shadow_color = glGetUniformLocation(blur_ctx.prog_shadow, "shadow_color");
+    blur_ctx.u_shadow.border_radius = glGetUniformLocation(blur_ctx.prog_shadow, "border_radius");
+    blur_ctx.u_shadow.inner_size = glGetUniformLocation(blur_ctx.prog_shadow, "inner_size");
+    blur_ctx.u_shadow.hole_pos = glGetUniformLocation(blur_ctx.prog_shadow, "hole_pos");
+    blur_ctx.u_shadow.hole_size = glGetUniformLocation(blur_ctx.prog_shadow, "hole_size");
+  }
 
   blur_ctx.attr_pos = 0;
 
@@ -632,6 +648,8 @@ void blur_fini(void) {
     glDeleteProgram(blur_ctx.prog_border);
   if (blur_ctx.prog_corner_mask)
     glDeleteProgram(blur_ctx.prog_corner_mask);
+  if (blur_ctx.prog_shadow)
+    glDeleteProgram(blur_ctx.prog_shadow);
   if (screen_shader_prog)
     glDeleteProgram(screen_shader_prog);
   glDeleteBuffers(1, &blur_ctx.vbo);
@@ -1630,6 +1648,76 @@ static bool scene_buffer_no_input(struct wlr_scene_buffer *buffer, double *sx, d
   return false;
 }
 
+static bool blur_render_shadow(toplevel_t *tl) {
+  if (!blur_ctx.prog_shadow) return false;
+  if (!tl->shadow) return false;
+  if (!tl->node || !tl->node->client) return false;
+
+  client_t *c = tl->node->client;
+  if (!c->shadow) return false;
+  if (c->state == STATE_FULLSCREEN) return false;
+
+  struct wlr_box client_r = get_client_rect(tl);
+  if (client_r.width <= 0 || client_r.height <= 0) return false;
+
+  int size = (int)shadow_size;
+  if (size <= 0) return false;
+  int buf_w = client_r.width + 2 * size;
+  int buf_h = client_r.height + 2 * size;
+  if (buf_w <= 0 || buf_h <= 0) return false;
+
+  if (!tl->shadow->shadow_node) {
+    tl->shadow->shadow_node = wlr_scene_buffer_create(tl->scene_tree, NULL);
+    if (!tl->shadow->shadow_node) return false;
+    wlr_scene_node_lower_to_bottom(&tl->shadow->shadow_node->node);
+    tl->shadow->shadow_node->point_accepts_input = scene_buffer_no_input;
+  }
+
+  float scale = tl->node->output ? tl->node->output->wlr_output->scale : 1.0f;
+  double phys_buf_w = buf_w * scale;
+  double phys_buf_h = buf_h * scale;
+
+  GLuint dest_fbo = ensure_sized_buf(&tl->shadow->shadow_buf, &tl->shadow->shadow_buf_fbo,
+    &tl->shadow->shadow_buf_w, &tl->shadow->shadow_buf_h, (int)phys_buf_w, (int)phys_buf_h);
+  if (!dest_fbo) return false;
+
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_ONE, GL_ZERO);
+  glDisable(GL_SCISSOR_TEST);
+  glBindFramebuffer(GL_FRAMEBUFFER, dest_fbo);
+  glViewport(0, 0, (int)phys_buf_w, (int)phys_buf_h);
+  glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+  glClear(GL_COLOR_BUFFER_BIT);
+  glUseProgram(blur_ctx.prog_shadow);
+
+  glUniform2f(blur_ctx.u_shadow.resolution, (float)phys_buf_w, (float)phys_buf_h);
+  glUniform1f(blur_ctx.u_shadow.shadow_size, size * scale);
+  glUniform4fv(blur_ctx.u_shadow.shadow_color, 1, c->shadow_color);
+  glUniform1f(blur_ctx.u_shadow.border_radius, c->border_radius * scale);
+  glUniform2f(blur_ctx.u_shadow.inner_size, client_r.width * scale, client_r.height * scale);
+
+  float hole_x = (tl->content_tree->node.x - shadow_offset_x + size) * scale;
+  float hole_y = (tl->content_tree->node.y - shadow_offset_y + size) * scale;
+  glUniform2f(blur_ctx.u_shadow.hole_pos, hole_x, hole_y);
+  glUniform2f(blur_ctx.u_shadow.hole_size, client_r.width * scale, client_r.height * scale);
+
+  draw_quad();
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glDisable(GL_BLEND);
+  glFlush();
+
+  wlr_scene_node_lower_to_bottom(&tl->shadow->shadow_node->node);
+  wlr_scene_buffer_set_buffer(tl->shadow->shadow_node, tl->shadow->shadow_buf);
+  struct wlr_fbox src_box = {0, 0, phys_buf_w, phys_buf_h};
+  wlr_scene_buffer_set_source_box(tl->shadow->shadow_node, &src_box);
+  wlr_scene_buffer_set_dest_size(tl->shadow->shadow_node, buf_w, buf_h);
+
+  wlr_scene_node_set_position(&tl->shadow->shadow_node->node, shadow_offset_x - size, shadow_offset_y - size);
+  wlr_scene_node_set_enabled(&tl->shadow->shadow_node->node, true);
+
+  return true;
+}
+
 static bool blur_render_border(toplevel_t *tl, int content_w, int content_h) {
   if (!blur_ctx.prog_border) return false;
   if (!tl->border_tree) return false;
@@ -1742,9 +1830,67 @@ static bool rebuild_corner_masks(output_t *output, struct wlr_scene_output *scen
     if (bg_tex) {
       src = bg_tex;
     } else {
-      bool hide_flag = false;
-      src = capture_bg_to_tex1(output, ctx, scene_output, false,
-        &tl->scene_tree->node, tl->blur ? &tl->blur->blur_scene_hidden : &hide_flag);
+      int cw = output->width, ch = output->height;
+
+      wlr_scene_output_set_position(ctx->capture_scene_output, output->lx, output->ly);
+      wlr_scene_node_set_enabled(&server.top_tree->node, false);
+      wlr_scene_node_set_enabled(&server.full_tree->node, false);
+      wlr_scene_node_set_enabled(&server.over_tree->node, false);
+      wlr_scene_node_set_enabled(&server.lock_tree->node, false);
+
+      struct { struct wlr_scene_node *node; bool was; } restore[8];
+      int nr = 0;
+
+      #define HIDE_IF(n) do {                     \
+        if ((n) && (n)->enabled) {                \
+          restore[nr].node = (n);                 \
+          restore[nr].was = true;                 \
+          wlr_scene_node_set_enabled((n), false); \
+          nr++;                                   \
+        }                                         \
+      } while(0)
+
+      HIDE_IF(&tl->content_tree->node);
+      HIDE_IF(&tl->border_tree->node);
+      if (tl->blur) {
+        HIDE_IF(&tl->blur->blur_node->node);
+        HIDE_IF(&tl->blur->mica_node->node);
+        HIDE_IF(&tl->blur->acrylic_node->node);
+      }
+      if (tl->rounded)
+        HIDE_IF(&tl->rounded->corner_mask_node->node);
+
+      wlr_damage_ring_add_whole(&ctx->capture_scene_output->damage_ring);
+      struct wlr_output_state cap_state;
+      wlr_output_state_init(&cap_state);
+      wlr_output_state_set_enabled(&cap_state, true);
+      wlr_output_state_set_custom_mode(&cap_state, cw, ch, 0);
+      bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
+      egl_make_current();
+      glFlush();
+
+      for (int i = 0; i < nr; i++)
+        wlr_scene_node_set_enabled(restore[i].node, true);
+
+      #undef HIDE_IF
+
+      wlr_scene_node_set_enabled(&server.top_tree->node, true);
+      wlr_scene_node_set_enabled(&server.full_tree->node, true);
+      wlr_scene_node_set_enabled(&server.over_tree->node, true);
+      wlr_scene_node_set_enabled(&server.lock_tree->node, true);
+      wlr_scene_output_set_position(ctx->capture_scene_output, -0x7fff, -0x7fff);
+      wlr_damage_ring_add_whole(&scene_output->damage_ring);
+
+      if (!ok || !cap_state.buffer) {
+        egl_unset_current();
+        wlr_output_state_finish(&cap_state);
+        continue;
+      }
+
+      GLuint capture_fbo = wlr_gles2_renderer_get_buffer_fbo(server.renderer, cap_state.buffer);
+      src = capture_readback(ctx, capture_fbo, cw, ch);
+      egl_unset_current();
+      wlr_output_state_finish(&cap_state);
       if (!src) continue;
     }
 
@@ -2103,6 +2249,24 @@ void blur_output_frame(output_t *output, struct wlr_scene_output *scene_output) 
 
   if (ctx->width != output->width || ctx->height != output->height)
     blur_output_resize(ctx, output->width, output->height, output);
+  {
+    toplevel_t *tl;
+    wl_list_for_each(tl, &server.toplevels, link) {
+      if (!tl->shadow || !tl->shadow->shadow_dirty) continue;
+      if (!tl->node || !tl->node->client || !tl->node->client->shown) continue;
+      if (!tl->node->output || tl->node->output != output) continue;
+      if (!tl->node->client->shadow) {
+        tl->shadow->shadow_dirty = false;
+        if (tl->shadow->shadow_node)
+          wlr_scene_node_set_enabled(&tl->shadow->shadow_node->node, false);
+        continue;
+      }
+      egl_make_current();
+      blur_render_shadow(tl);
+      egl_unset_current();
+      tl->shadow->shadow_dirty = false;
+    }
+  }
 
   bool bg_damaged = background_capture_needed(scene_output);
   bool mica_dirty = mica_enabled && ctx->mica_dirty;

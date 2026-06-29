@@ -20,6 +20,9 @@ shaders = [
 	'blur_acrylic.frag',
 	'blur_refraction.frag',
 
+	# Shadows
+	'shadow.frag',
+
 	# Fullscreen effects
 	'grayscale.frag',
 	'invert.frag',
