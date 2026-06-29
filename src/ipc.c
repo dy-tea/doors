@@ -195,8 +195,7 @@ bool ipc_print_report(int fd) {
 
     if (m->desk) {
       offset += snprintf(buf + offset, sizeof(buf) - offset, ":L%c",
-        m->desk->layout == LAYOUT_TILED ? 'T' :
-        m->desk->layout == LAYOUT_MONOCLE ? 'M' : 'S');
+        layout_to_char(m->desk->layout));
 
       if (m->desk->focus) {
         char state_char = 'T';

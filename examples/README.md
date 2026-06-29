@@ -491,9 +491,10 @@ doorsctl desktop prev                  # Switch to previous desktop
 doorsctl desktop --focus <name>        # Focus named desktop
 doorsctl desktop --focus next          # Focus next desktop
 doorsctl desktop --focus prev          # Focus previous desktop
-doorsctl desktop --layout tiled        # Set desktop to tiled layout
-doorsctl desktop --layout monocle      # Set desktop to monocle layout
-doorsctl desktop --layout scroller     # Set desktop to scroller layout
+doorsctl desktop --layout tiled        # Toggle tiled layout on desktop
+doorsctl desktop --layout monocle      # Toggle monocle layout on desktop
+doorsctl desktop --layout scroller     # Toggle scroller layout on desktop
+doorsctl desktop --layout master_stack # Toggle master-stack layout on desktop
 doorsctl desktop --rename <newname>    # Rename desktop
 doorsctl desktop --swap <name>         # Swap contents with another desktop on same monitor
 doorsctl desktop --remove              # Remove current desktop (fails if only desktop)
@@ -536,6 +537,7 @@ doorsctl toggle floating                # Toggle focused window floating/tiled
 doorsctl toggle fullscreen              # Toggle focused window fullscreen
 doorsctl toggle pseudo_tiled            # Toggle focused window pseudo-tiled
 doorsctl toggle monocle                 # Toggle monocle layout on desktop
+doorsctl toggle master_stack            # Toggle master-stack layout on desktop
 ```
 
 #### Scratchpad Commands
@@ -1235,6 +1237,22 @@ doorsctl scroller set_proportion <value>      # Set scroller proportion (0.1-1.0
 doorsctl scroller cycle_preset                # Cycle to next proportion preset
 doorsctl scroller center                      # Center focused scroller window in viewport
 ```
+
+### Master-Stack Commands
+
+Master-stack layout splits the desktop into a master area (containing N windows) and a stack area (containing the remaining windows).
+
+```
+doorsctl master_stack cycle_orientation      # Cycle orientation: left, top, right, bottom
+doorsctl master_stack cycle_stack_layout     # Toggle stack area between vertical/horizontal
+doorsctl master_stack inc                    # Increase the number of master windows
+doorsctl master_stack dec                    # Decrease the number of master windows
+doorsctl master_stack flip                   # Flip master side (left to right, top to bottom)
+doorsctl master_stack set_count <n>          # Set master count to n (1-10)
+doorsctl master_stack set_ratio <0.1-0.9>    # Set master/stack split ratio
+```
+
+The master area is sized according to the configured ratio (default 0.5). The orientation controls which side the master is on. When only one window is present, it takes the full area regardless of the ratio. Use focus and swap binds (west/east) to move between master and stack.
 
 ### Hotkey Commands
 

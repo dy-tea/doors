@@ -77,6 +77,8 @@ void send_to_prev_desktop(void);
 void send_all_to_desktop(int desktop_index);
 void set_tiled_layout(void);
 void toggle_monocle(void);
+void toggle_master_stack(void);
+
 
 // layout
 void rotate_clockwise(void);

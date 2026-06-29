@@ -12,6 +12,7 @@
 #include "rule.h"
 #include "server.h"
 #include "scroller.h"
+#include "master_stack.h"
 #include "scratchpad.h"
 #include "spring.h"
 #include "tabs.h"
@@ -1969,6 +1970,8 @@ static void ipc_cmd_desktop(char **args, int num, int client_fd) {
       desk->layout = LAYOUT_MONOCLE;
     } else if (streq("scroller", *args)) {
       desk->layout = LAYOUT_SCROLLER;
+    } else if (streq("master_stack", *args)) {
+      desk->layout = LAYOUT_MASTER_STACK;
     } else {
       send_failure(client_fd, "desktop -l: unknown layout\n");
       return;
@@ -1981,7 +1984,7 @@ static void ipc_cmd_desktop(char **args, int num, int client_fd) {
       transaction_commit_dirty();
     }
     ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", desk->name,
-      desk->layout == LAYOUT_TILED ? 'T' : desk->layout == LAYOUT_MONOCLE ? 'M' : 'S');
+      layout_to_char(desk->layout));
     send_success(client_fd, "layout changed\n");
   } else if (streq("-n", *args) || streq("--rename", *args)) {
     if (num < 2) {
@@ -4019,6 +4022,66 @@ static void ipc_cmd_scroller(char **args, int num, int client_fd) {
   }
 }
 
+static void ipc_cmd_master_stack(char **args, int num, int client_fd) {
+  if (num < 1) {
+    send_failure(client_fd, "master_stack: missing arguments\n");
+    return;
+  }
+
+  output_t *mon = server.focused_output;
+  if (!mon || !mon->desk) {
+    send_failure(client_fd, "no desktop\n");
+    return;
+  }
+
+  desktop_t *desk = mon->desk;
+
+  if (streq("cycle_orientation", *args)) {
+    master_stack_cycle_orientation();
+    arrange(mon, desk, true);
+    send_success(client_fd, "orientation cycled\n");
+  } else if (streq("cycle_stack_layout", *args)) {
+    master_stack_cycle_stack_layout();
+    arrange(mon, desk, true);
+    send_success(client_fd, "stack layout cycled\n");
+  } else if (streq("inc", *args)) {
+    master_stack_increment();
+    arrange(mon, desk, true);
+    send_success(client_fd, "master count increased\n");
+  } else if (streq("dec", *args)) {
+    master_stack_decrement();
+    arrange(mon, desk, true);
+    send_success(client_fd, "master count decreased\n");
+  } else if (streq("flip", *args)) {
+    master_stack_flip_orientation();
+    arrange(mon, desk, true);
+    send_success(client_fd, "orientation flipped\n");
+  } else if (streq("set_count", *args)) {
+    if (num < 2) {
+      send_failure(client_fd, "master_stack set_count: missing count\n");
+      return;
+    }
+    master_stack_set_count(atoi(args[1]));
+    arrange(mon, desk, true);
+    send_success(client_fd, "master count set\n");
+  } else if (streq("set_ratio", *args)) {
+    if (num < 2) {
+      send_failure(client_fd, "master_stack set_ratio: missing ratio\n");
+      return;
+    }
+    float val = atof(args[1]);
+    if (val < 0.1f || val > 0.9f) {
+      send_failure(client_fd, "master_stack set_ratio: ratio must be between 0.1 and 0.9\n");
+      return;
+    }
+    master_stack_ratio = val;
+    arrange(mon, desk, true);
+    send_success(client_fd, "ratio set\n");
+  } else {
+    send_failure(client_fd, "master_stack: unknown subcommand\n");
+  }
+}
+
 static void ipc_cmd_hotkey(char **args, int num, int client_fd) {
   if (num < 1) {
     send_failure(client_fd, "hotkey: usage: list | <modifiers+key> <command> [args...]\n");
@@ -4239,7 +4302,9 @@ bool process_ipc_message(char *msg, int msg_len, int client_fd) {
      ipc_cmd_seat(++args, --num, client_fd);
     } else if (streq("scroller", *args)) {
      ipc_cmd_scroller(++args, --num, client_fd);
-   } else if (streq("hotkey", *args)) {
+    } else if (streq("master_stack", *args)) {
+     ipc_cmd_master_stack(++args, --num, client_fd);
+    } else if (streq("hotkey", *args)) {
      ipc_cmd_hotkey(++args, --num, client_fd);
    } else if (streq("bezier", *args)) {
      ++args; --num;

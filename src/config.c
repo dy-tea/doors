@@ -1,6 +1,8 @@
 #include "config.h"
 #include "keyboard.h"
+#include "master_stack.h"
 #include "server.h"
+#include "tree.h"
 #include "types.h"
 #include "workspace.h"
 #include <ctype.h>
@@ -241,6 +243,7 @@ bind_action_t parse_action(const char *cmd, int *desktop_index, char *submap_nam
       if ((strcmp(args[1], "-l") == 0 || strcmp(args[1], "--layout") == 0) && argc >= 3) {
         if (strcmp(args[2], "tiled") == 0) return BIND_DESKTOP_LAYOUT_TILED;
         if (strcmp(args[2], "monocle") == 0) return BIND_DESKTOP_LAYOUT_MONOCLE;
+        if (strcmp(args[2], "master_stack") == 0) return BIND_DESKTOP_LAYOUT_MASTER_STACK;
       }
 
       int d = atoi(args[1]);
@@ -1054,6 +1057,37 @@ void execute_bind(bind_t b) {
     case BIND_TOGGLE_MONOCLE:
       toggle_monocle();
       break;
+    case BIND_TOGGLE_MASTER_STACK:
+      toggle_master_stack();
+      break;
+    case BIND_DESKTOP_LAYOUT_MASTER_STACK:
+      toggle_master_stack();
+      break;
+    case BIND_MASTER_STACK_INC:
+      master_stack_increment();
+      if (mon && mon->desk && mon->desk->layout == LAYOUT_MASTER_STACK)
+        arrange(mon, mon->desk, true);
+      break;
+    case BIND_MASTER_STACK_DEC:
+      master_stack_decrement();
+      if (mon && mon->desk && mon->desk->layout == LAYOUT_MASTER_STACK)
+        arrange(mon, mon->desk, true);
+      break;
+    case BIND_MASTER_STACK_FLIP:
+      master_stack_flip_orientation();
+      if (mon && mon->desk && mon->desk->layout == LAYOUT_MASTER_STACK)
+        arrange(mon, mon->desk, true);
+      break;
+    case BIND_MASTER_STACK_CYCLE_ORIENTATION:
+      master_stack_cycle_orientation();
+      if (mon && mon->desk && mon->desk->layout == LAYOUT_MASTER_STACK)
+        arrange(mon, mon->desk, true);
+      break;
+    case BIND_MASTER_STACK_CYCLE_STACK_LAYOUT:
+      master_stack_cycle_stack_layout();
+      if (mon && mon->desk && mon->desk->layout == LAYOUT_MASTER_STACK)
+        arrange(mon, mon->desk, true);
+      break;
     case BIND_ROTATE_CW:
       rotate_clockwise();
       break;
@@ -1272,7 +1306,10 @@ const char *bind_action_name(bind_action_t action) {
     "focus_south", "focus_north", "focus_east", "swap_west", "swap_south", "swap_north",
     "swap_east", "presel_west", "presel_south", "presel_north", "presel_east",
     "presel_cancel", "toggle_floating", "toggle_fullscreen", "toggle_pseudo_tiled",
-    "toggle_monocle", "rotate_cw", "rotate_ccw", "flip_horizontal", "flip_vertical",
+    "toggle_monocle", "toggle_master_stack", "desktop_layout_master_stack",
+    "master_stack_inc", "master_stack_dec", "master_stack_flip",
+    "master_stack_cycle_orientation", "master_stack_cycle_stack_layout",
+    "rotate_cw", "rotate_ccw", "flip_horizontal", "flip_vertical",
     "desktop_next", "desktop_prev", "desktop_last", "send_to_desktop_next",
     "send_to_desktop_prev", "send_to_desktop_1", "send_to_desktop_2", "send_to_desktop_3",
     "send_to_desktop_4", "send_to_desktop_5", "send_to_desktop_6", "send_to_desktop_7",
@@ -1329,6 +1366,12 @@ bind_action_t bind_action_from_name(const char *name) {
   ACTION_IF_MATCH("toggle_fullscreen", BIND_TOGGLE_FULLSCREEN);
   ACTION_IF_MATCH("toggle_pseudo_tiled", BIND_TOGGLE_PSEUDO_TILED);
   ACTION_IF_MATCH("toggle_monocle", BIND_TOGGLE_MONOCLE);
+  ACTION_IF_MATCH("toggle_master_stack", BIND_TOGGLE_MASTER_STACK);
+  ACTION_IF_MATCH("master_stack_inc", BIND_MASTER_STACK_INC);
+  ACTION_IF_MATCH("master_stack_dec", BIND_MASTER_STACK_DEC);
+  ACTION_IF_MATCH("master_stack_flip", BIND_MASTER_STACK_FLIP);
+  ACTION_IF_MATCH("master_stack_cycle_orientation", BIND_MASTER_STACK_CYCLE_ORIENTATION);
+  ACTION_IF_MATCH("master_stack_cycle_stack_layout", BIND_MASTER_STACK_CYCLE_STACK_LAYOUT);
 
   ACTION_IF_MATCH("rotate_cw", BIND_ROTATE_CW);
   ACTION_IF_MATCH("rotate_ccw", BIND_ROTATE_CCW);

@@ -120,6 +120,7 @@ executable(
 		'src' / 'tabs.c',
 		'src' / 'tearing.c',
 		'src' / 'tablet.c',
+		'src' / 'master_stack.c',
 		'src' / 'launcher.c',
 		wl_protos_src,
 		shader_headers,

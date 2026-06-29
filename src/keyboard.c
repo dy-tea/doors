@@ -1,8 +1,10 @@
 #include "config.h"
+#include "fallthrough.h"
 #include "ipc.h"
 #include "input.h"
 #include "input_method.h"
 #include "keyboard.h"
+#include "master_stack.h"
 #include "output.h"
 #include "seat.h"
 #include "server.h"
@@ -278,7 +280,14 @@ void focus_west(void) {
       focus_node(mon, mon->desk, mon->desk->focus);
       wlr_log(WLR_DEBUG, "Focused west (scroller)");
     }
+    return;
+  }
 
+  if (mon->desk->layout == LAYOUT_MASTER_STACK) {
+    if (master_stack_focus_west(mon->desk)) {
+      focus_node(mon, mon->desk, mon->desk->focus);
+      wlr_log(WLR_DEBUG, "Focused west (master-stack)");
+    }
     return;
   }
 
@@ -312,6 +321,14 @@ void focus_east(void) {
     return;
   }
 
+  if (mon->desk->layout == LAYOUT_MASTER_STACK) {
+    if (master_stack_focus_east(mon->desk)) {
+      focus_node(mon, mon->desk, mon->desk->focus);
+      wlr_log(WLR_DEBUG, "Focused east (master-stack)");
+    }
+    return;
+  }
+
   node_t *n = find_fence(mon->desk->focus, DIR_EAST);
   if (n != NULL) {
     n = first_extrema(n);
@@ -339,7 +356,14 @@ void focus_south(void) {
       focus_node(mon, mon->desk, mon->desk->focus);
       wlr_log(WLR_DEBUG, "Focused south (scroller stack)");
     }
+    return;
+  }
 
+  if (mon->desk->layout == LAYOUT_MASTER_STACK) {
+    if (master_stack_focus_south(mon->desk)) {
+      focus_node(mon, mon->desk, mon->desk->focus);
+      wlr_log(WLR_DEBUG, "Focused south (master-stack)");
+    }
     return;
   }
 
@@ -373,6 +397,14 @@ void focus_north(void) {
     return;
   }
 
+  if (mon->desk->layout == LAYOUT_MASTER_STACK) {
+    if (master_stack_focus_north(mon->desk)) {
+      focus_node(mon, mon->desk, mon->desk->focus);
+      wlr_log(WLR_DEBUG, "Focused north (master-stack)");
+    }
+    return;
+  }
+
   node_t *n = find_fence(mon->desk->focus, DIR_NORTH);
   if (n != NULL) {
     n = first_extrema(n);
@@ -396,6 +428,13 @@ void focus_north(void) {
 void swap_west(void) {
   if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL) return;
 
+  if (mon->desk->layout == LAYOUT_MASTER_STACK) {
+    if (master_stack_swap_west(mon, mon->desk)) {
+      wlr_log(WLR_INFO, "Swapped with west window (master-stack)");
+    }
+    return;
+  }
+
   node_t *n = find_fence(mon->desk->focus, DIR_WEST);
   if (n != NULL) {
     n = second_extrema(n);
@@ -408,6 +447,13 @@ void swap_west(void) {
 
 void swap_east(void) {
   if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL) return;
+
+  if (mon->desk->layout == LAYOUT_MASTER_STACK) {
+    if (master_stack_swap_east(mon, mon->desk)) {
+      wlr_log(WLR_INFO, "Swapped with east window (master-stack)");
+    }
+    return;
+  }
 
   node_t *n = find_fence(mon->desk->focus, DIR_EAST);
   if (n != NULL) {
@@ -422,6 +468,13 @@ void swap_east(void) {
 void swap_north(void) {
   if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL) return;
 
+  if (mon->desk->layout == LAYOUT_MASTER_STACK) {
+    if (master_stack_swap_north(mon, mon->desk)) {
+      wlr_log(WLR_INFO, "Swapped with north window (master-stack)");
+    }
+    return;
+  }
+
   node_t *n = find_fence(mon->desk->focus, DIR_NORTH);
   if (n != NULL) {
     n = second_extrema(n);
@@ -434,6 +487,13 @@ void swap_north(void) {
 
 void swap_south(void) {
   if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL) return;
+
+  if (mon->desk->layout == LAYOUT_MASTER_STACK) {
+    if (master_stack_swap_south(mon, mon->desk)) {
+      wlr_log(WLR_INFO, "Swapped with south window (master-stack)");
+    }
+    return;
+  }
 
   node_t *n = find_fence(mon->desk->focus, DIR_SOUTH);
   if (n != NULL) {
@@ -918,7 +978,7 @@ void toggle_monocle(void) {
 
   arrange(mon, d, true);
   ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name,
-    d->layout == LAYOUT_TILED ? 'T' : d->layout == LAYOUT_MONOCLE ? 'M' : 'S');
+    layout_to_char(d->layout));
 
   if (d->focus != NULL)
   	focus_node(mon, d, d->focus);
@@ -942,7 +1002,47 @@ void set_tiled_layout(void) {
 
   arrange(mon, d, true);
   ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name,
-    d->layout == LAYOUT_TILED ? 'T' : d->layout == LAYOUT_MONOCLE ? 'M' : 'S');
+    layout_to_char(d->layout));
+
+  if (d->focus != NULL)
+    focus_node(mon, d, d->focus);
+}
+
+void toggle_master_stack(void) {
+  if (mon == NULL || mon->desk == NULL) return;
+
+  desktop_t *d = mon->desk;
+
+  if (d->layout == LAYOUT_MASTER_STACK) {
+    d->layout = d->user_layout;
+    wlr_log(WLR_INFO, "Switched to tiled layout");
+
+    if (d->root) {
+      for (node_t *n = first_extrema(d->root); n != NULL; n = next_leaf(n, d->root)) {
+        if (n->client && n->client->toplevel && n->client->state != STATE_FULLSCREEN) {
+          n->client->toplevel->client_maximized = false;
+          wlr_xdg_toplevel_set_maximized(n->client->toplevel->xdg_toplevel, false);
+        }
+      }
+    }
+  } else {
+    d->user_layout = d->layout;
+    d->layout = LAYOUT_MASTER_STACK;
+    wlr_log(WLR_INFO, "Switched to master-stack layout");
+
+    if (d->root) {
+      for (node_t *n = first_extrema(d->root); n != NULL; n = next_leaf(n, d->root)) {
+        if (n->client && n->client->toplevel && n->client->state != STATE_FULLSCREEN) {
+          n->client->toplevel->client_maximized = false;
+          wlr_xdg_toplevel_set_maximized(n->client->toplevel->xdg_toplevel, false);
+        }
+      }
+    }
+  }
+
+  arrange(mon, d, true);
+  ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name,
+    layout_to_char(d->layout));
 
   if (d->focus != NULL)
     focus_node(mon, d, d->focus);
@@ -1210,7 +1310,8 @@ void keyboard_group_remove_invalid(keyboard_t *keyboard) {
   case KEYBOARD_GROUP_NONE:
     should_remove = true;
     break;
-  case KEYBOARD_GROUP_DEFAULT:  // fallthrough
+  case KEYBOARD_GROUP_DEFAULT:
+ 		fallthrough;
   case KEYBOARD_GROUP_SMART: {
     if (!wlr_keyboard_keymaps_match(keyboard->wlr_keyboard->keymap, group->wlr_group->keyboard.keymap) ||
         !repeat_info_match(keyboard->wlr_keyboard, &group->wlr_group->keyboard)) {

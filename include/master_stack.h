@@ -1,0 +1,46 @@
+#pragma once
+
+#include "types.h"
+#include <stdbool.h>
+#include <wlr/util/box.h>
+
+typedef struct output_t output_t;
+
+typedef enum {
+  MASTER_LEFT,
+  MASTER_RIGHT,
+  MASTER_TOP,
+  MASTER_BOTTOM,
+} master_area_orientation_t;
+
+typedef enum {
+  STACK_VERTICAL,
+  STACK_HORIZONTAL,
+} stack_layout_t;
+
+extern int master_stack_count;
+extern float master_stack_ratio;
+extern master_area_orientation_t master_stack_orientation;
+extern stack_layout_t master_stack_layout;
+
+void master_stack_arrange(struct output_t *m, desktop_t *d, struct wlr_box available);
+
+int master_stack_collect(desktop_t *d, node_t ***out_nodes);
+int master_stack_find_index(desktop_t *d, node_t *n);
+
+bool master_stack_focus_south(desktop_t *d);
+bool master_stack_focus_north(desktop_t *d);
+bool master_stack_focus_east(desktop_t *d);
+bool master_stack_focus_west(desktop_t *d);
+
+bool master_stack_swap_south(output_t *m, desktop_t *d);
+bool master_stack_swap_north(output_t *m, desktop_t *d);
+bool master_stack_swap_east(output_t *m, desktop_t *d);
+bool master_stack_swap_west(output_t *m, desktop_t *d);
+
+void master_stack_increment(void);
+void master_stack_decrement(void);
+void master_stack_set_count(int count);
+void master_stack_flip_orientation(void);
+void master_stack_cycle_orientation(void);
+void master_stack_cycle_stack_layout(void);

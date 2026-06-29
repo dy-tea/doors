@@ -1,5 +1,7 @@
 #include "animation.h"
+#include "fallthrough.h"
 #include "ipc.h"
+#include "master_stack.h"
 #include "output.h"
 #include "scroller.h"
 #include "scratchpad.h"
@@ -301,31 +303,31 @@ void arrange(output_t *m, desktop_t *d, bool use_transaction) {
   rect.width -= m->padding.left + d->padding.left + d->padding.right + m->padding.right;
   rect.height -= m->padding.top + d->padding.top + d->padding.bottom + m->padding.bottom;
 
-  // handle scroller layout separately
-  if (d->layout == LAYOUT_SCROLLER) {
-    scroller_arrange(m, d, rect);
-    if (use_transaction)
-      transaction_commit_dirty();
-
-    return;
-  }
-
-  if (d->layout == LAYOUT_MONOCLE) {
-    rect.x += monocle_padding.left;
+  switch (d->layout) {
+ 	case LAYOUT_SCROLLER:
+   	scroller_arrange(m, d, rect);
+   	break;
+	case LAYOUT_MASTER_STACK:
+		master_stack_arrange(m, d, rect);
+		break;
+	case LAYOUT_MONOCLE:
+ 		rect.x += monocle_padding.left;
     rect.y += monocle_padding.top;
     rect.width -= monocle_padding.left + monocle_padding.right;
     rect.height -= monocle_padding.top + monocle_padding.bottom;
-  }
+    fallthrough;
+	default:
+		if (!gapless_monocle || d->layout != LAYOUT_MONOCLE) {
+	    int wg = smart_gaps && visible_tiled_count(d) <= 1 ? 0 : d->window_gap;
+	    rect.x += wg;
+	    rect.y += wg;
+	    rect.width -= wg;
+	    rect.height -= wg;
+  	}
 
-  if (!gapless_monocle || d->layout != LAYOUT_MONOCLE) {
-    int wg = smart_gaps && visible_tiled_count(d) <= 1 ? 0 : d->window_gap;
-    rect.x += wg;
-    rect.y += wg;
-    rect.width -= wg;
-    rect.height -= wg;
+  	apply_layout(m, d, d->root, rect, rect);
+		break;
   }
-
-  apply_layout(m, d, d->root, rect, rect);
 
   if (use_transaction)
     transaction_commit_dirty();
@@ -1048,6 +1050,10 @@ static bool focus_node_impl(output_t *m, desktop_t *d, node_t *n, bool give_keyb
     } else {
       wlr_log(WLR_DEBUG, "focus_node: scroller layout, skipping arrange (initial map)");
     }
+  } else if (is_current_desktop && d->root != NULL) { // FIXME: maybe refactor this?
+    for (node_t *node = first_extrema(d->root); node != NULL; node = next_leaf(node, d->root))
+      if (node->client != NULL)
+        node->client->shown = true;
   } else if (is_current_desktop) {
     // mark all windows as shown in tiled mode, but only for current desktop
     if (d->root != NULL)
@@ -1246,6 +1252,7 @@ bool set_state(output_t *m, desktop_t *d, node_t *n, client_state_t s) {
 
   n->client->last_state = n->client->state;
   n->client->state = s;
+  node_set_dirty(n);
 
   arrange(m, d, true);
   ipc_put_status(SUB_MASK_NODE_STATE, "node_state[%s,%s,%u,%c]\n",

@@ -41,7 +41,17 @@ typedef enum { FOLLOWS_NO, FOLLOWS_YES, FOLLOWS_ALWAYS } focus_follows_mouse_mod
 
 typedef enum { LAYER_BELOW, LAYER_NORMAL, LAYER_ABOVE } stack_layer_t;
 
-typedef enum { LAYOUT_TILED, LAYOUT_MONOCLE, LAYOUT_SCROLLER } layout_t;
+typedef enum { LAYOUT_TILED, LAYOUT_MONOCLE, LAYOUT_SCROLLER, LAYOUT_MASTER_STACK } layout_t;
+
+static inline char layout_to_char(layout_t l) {
+	switch (l) {
+	case LAYOUT_TILED: return 'T';
+	case LAYOUT_MONOCLE: return 'M';
+	case LAYOUT_SCROLLER: return 'S';
+	case LAYOUT_MASTER_STACK: return 'K';
+	}
+	return 0;
+}
 
 typedef enum { DIR_NORTH, DIR_WEST, DIR_SOUTH, DIR_EAST } direction_t;
 

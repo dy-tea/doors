@@ -26,6 +26,30 @@ alt + shift + space
 alt + m
 	doorsctl desktop --layout monocle
 
+# toggle tiled
+alt + t
+	doorsctl desktop --layout tiled
+
+# toggle master-stack
+alt + shift + m
+	doorsctl desktop --layout master_stack
+
+# master-stack: increment/decrement master count
+alt + ctrl + {i,o}
+	doorsctl master_stack {inc,dec}
+
+# master-stack: flip master side
+alt + ctrl + period
+	doorsctl master_stack flip
+
+# master-stack: cycle orientation (left, right, top, bottom)
+alt + ctrl + comma
+	doorsctl master_stack cycle_orientation
+
+# master-stack: cycle stack layout (vertical, horizontal)
+alt + ctrl + slash
+	doorsctl master_stack cycle_stack_layout
+
 # window navigation (using brace expansion)
 alt + {h,j,k,l}
 	doorsctl focus {west,south,north,east}
