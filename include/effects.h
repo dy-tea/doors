@@ -2,6 +2,7 @@
 
 #include <GLES2/gl2.h>
 #include <stdbool.h>
+#include <wlr/types/wlr_output.h>
 #include <wlr/util/box.h>
 
 typedef struct output_t output_t;
@@ -74,6 +75,7 @@ typedef struct effects_output_t {
   struct wlr_backend *capture_backend;
   struct wlr_output *capture_output;
   struct wlr_scene_output *capture_scene_output;
+  struct wlr_output_state capture_state;
 } effects_output_t;
 
 typedef struct effects_state_t {

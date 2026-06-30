@@ -132,9 +132,6 @@ static size_t capture_output_num = 0;
 const struct wlr_drm_format_set *wlr_renderer_get_render_formats(struct wlr_renderer *renderer);
 
 static bool create_capture_output(effects_output_t *ctx, int width, int height) {
-  (void)width;
-  (void)height;
-
   // backend
   ctx->capture_backend = calloc(1, sizeof(struct wlr_backend));
   if (!ctx->capture_backend) return false;
@@ -173,6 +170,10 @@ static bool create_capture_output(effects_output_t *ctx, int width, int height) 
     return false;
   }
 
+  wlr_output_state_init(&ctx->capture_state);
+  wlr_output_state_set_enabled(&ctx->capture_state, true);
+  wlr_output_state_set_custom_mode(&ctx->capture_state, width, height, 0);
+
   wlr_scene_output_set_position(ctx->capture_scene_output, -0x7fff, -0x7fff);
   wlr_log(WLR_INFO, "blur: created capture output %s", name);
   return true;
@@ -193,6 +194,7 @@ static void destroy_capture_output(effects_output_t *ctx) {
     free(ctx->capture_backend);
     ctx->capture_backend = NULL;
   }
+  wlr_output_state_finish(&ctx->capture_state);
 }
 
 static GLuint compile_shader(GLenum type, const char *src) {
@@ -776,6 +778,7 @@ void effects_output_resize(effects_output_t *ctx, int width, int height,
   ctx->width  = width;
   ctx->height = height;
   ctx->blur_w = new_bw;
+  wlr_output_state_set_custom_mode(&ctx->capture_state, width, height, 0);
   ctx->blur_h = new_bh;
   create_fbo(ctx->blur_w, ctx->blur_h, &ctx->fbo[0], &ctx->tex[0]);
   create_fbo(ctx->blur_w, ctx->blur_h, &ctx->fbo[1], &ctx->tex[1]);
@@ -979,13 +982,8 @@ static GLuint capture_bg_shared(output_t *output, effects_output_t *ctx) {
 
   wlr_damage_ring_add_whole(&ctx->capture_scene_output->damage_ring);
 
-  struct wlr_output_state cap_state;
-  wlr_output_state_init(&cap_state);
-  wlr_output_state_set_enabled(&cap_state, true);
-  wlr_output_state_set_custom_mode(&cap_state, w, h, 0);
-
   egl_unset_current();
-  bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
+  bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &ctx->capture_state, NULL);
   egl_make_current();
 
   wl_list_for_each(tl, &server.toplevels, link)
@@ -1001,14 +999,16 @@ static GLuint capture_bg_shared(output_t *output, effects_output_t *ctx) {
 
   wlr_scene_output_set_position(ctx->capture_scene_output, -0x7fff, -0x7fff);
 
-  if (!ok || !cap_state.buffer) {
-    wlr_output_state_finish(&cap_state);
+  if (!ok || !ctx->capture_state.buffer) {
+    wlr_buffer_unlock(ctx->capture_state.buffer);
+    ctx->capture_state.buffer = NULL;
     return 0;
   }
 
-  GLuint capture_fbo = wlr_gles2_renderer_get_buffer_fbo(server.renderer, cap_state.buffer);
+  GLuint capture_fbo = wlr_gles2_renderer_get_buffer_fbo(server.renderer, ctx->capture_state.buffer);
   GLuint result = capture_readback(ctx, capture_fbo, w, h);
-  wlr_output_state_finish(&cap_state);
+  wlr_buffer_unlock(ctx->capture_state.buffer);
+  ctx->capture_state.buffer = NULL;
   return result;
 }
 
@@ -1054,13 +1054,8 @@ static GLuint capture_bg_to_tex1(output_t *output, effects_output_t *ctx,
 
   wlr_damage_ring_add_whole(&ctx->capture_scene_output->damage_ring);
 
-  struct wlr_output_state cap_state;
-  wlr_output_state_init(&cap_state);
-  wlr_output_state_set_enabled(&cap_state, true);
-  wlr_output_state_set_custom_mode(&cap_state, w, h, 0);
-
   egl_unset_current();
-  bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
+  bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &ctx->capture_state, NULL);
 
   egl_make_current();
 
@@ -1085,16 +1080,18 @@ static GLuint capture_bg_to_tex1(output_t *output, effects_output_t *ctx,
   // prevent output overlap by parking offscreen
   wlr_scene_output_set_position(ctx->capture_scene_output, -0x7fff, -0x7fff);
 
-  if (!ok || !cap_state.buffer) {
+  if (!ok || !ctx->capture_state.buffer) {
     wlr_log(WLR_INFO, "capture_bg_to_tex1: no buffer from build_state");
-    wlr_output_state_finish(&cap_state);
+    wlr_buffer_unlock(ctx->capture_state.buffer);
+    ctx->capture_state.buffer = NULL;
     return 0;
   }
 
-  GLuint capture_fbo = wlr_gles2_renderer_get_buffer_fbo(server.renderer, cap_state.buffer);
+  GLuint capture_fbo = wlr_gles2_renderer_get_buffer_fbo(server.renderer, ctx->capture_state.buffer);
   GLuint result = capture_readback(ctx, capture_fbo, w, h);
 
-  wlr_output_state_finish(&cap_state);
+  wlr_buffer_unlock(ctx->capture_state.buffer);
+  ctx->capture_state.buffer = NULL;
 
   return result;
 }
@@ -1128,13 +1125,8 @@ static GLuint capture_bg_combined(output_t *output, effects_output_t *ctx) {
 
   wlr_damage_ring_add_whole(&ctx->capture_scene_output->damage_ring);
 
-  struct wlr_output_state cap_state;
-  wlr_output_state_init(&cap_state);
-  wlr_output_state_set_enabled(&cap_state, true);
-  wlr_output_state_set_custom_mode(&cap_state, w, h, 0);
-
   egl_unset_current();
-  bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
+  bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &ctx->capture_state, NULL);
 
   egl_make_current();
 
@@ -1153,16 +1145,18 @@ static GLuint capture_bg_combined(output_t *output, effects_output_t *ctx) {
 
   wlr_scene_output_set_position(ctx->capture_scene_output, -0x7fff, -0x7fff);
 
-  if (!ok || !cap_state.buffer) {
+  if (!ok || !ctx->capture_state.buffer) {
     wlr_log(WLR_INFO, "capture_bg_combined: no buffer from build_state");
-    wlr_output_state_finish(&cap_state);
+    wlr_buffer_unlock(ctx->capture_state.buffer);
+    ctx->capture_state.buffer = NULL;
     return 0;
   }
 
-  GLuint capture_fbo = wlr_gles2_renderer_get_buffer_fbo(server.renderer, cap_state.buffer);
+  GLuint capture_fbo = wlr_gles2_renderer_get_buffer_fbo(server.renderer, ctx->capture_state.buffer);
   GLuint result = capture_readback(ctx, capture_fbo, w, h);
 
-  wlr_output_state_finish(&cap_state);
+  wlr_buffer_unlock(ctx->capture_state.buffer);
+  ctx->capture_state.buffer = NULL;
   return result;
 }
 
@@ -2060,13 +2054,8 @@ static GLuint capture_full_scene_to_tex(output_t *output, effects_output_t *ctx)
 
   wlr_damage_ring_add_whole(&ctx->capture_scene_output->damage_ring);
 
-  struct wlr_output_state cap_state;
-  wlr_output_state_init(&cap_state);
-  wlr_output_state_set_enabled(&cap_state, true);
-  wlr_output_state_set_custom_mode(&cap_state, w, h, 0);
-
   egl_unset_current();
-  bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
+  bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &ctx->capture_state, NULL);
 
   egl_make_current();
 
@@ -2075,12 +2064,13 @@ static GLuint capture_full_scene_to_tex(output_t *output, effects_output_t *ctx)
 
   wlr_scene_output_set_position(ctx->capture_scene_output, -0x7fff, -0x7fff);
 
-  if (!ok || !cap_state.buffer) {
-    wlr_output_state_finish(&cap_state);
+  if (!ok || !ctx->capture_state.buffer) {
+    wlr_buffer_unlock(ctx->capture_state.buffer);
+    ctx->capture_state.buffer = NULL;
     return 0;
   }
 
-  GLuint capture_fbo = wlr_gles2_renderer_get_buffer_fbo(server.renderer, cap_state.buffer);
+  GLuint capture_fbo = wlr_gles2_renderer_get_buffer_fbo(server.renderer, ctx->capture_state.buffer);
   GLuint result = 0;
 
   if (capture_fbo) {
@@ -2140,7 +2130,8 @@ static GLuint capture_full_scene_to_tex(output_t *output, effects_output_t *ctx)
     }
   }
 
-  wlr_output_state_finish(&cap_state);
+  wlr_buffer_unlock(ctx->capture_state.buffer);
+  ctx->capture_state.buffer = NULL;
   return result;
 }
 
