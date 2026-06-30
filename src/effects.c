@@ -994,7 +994,6 @@ static GLuint capture_bg_to_tex1(output_t *output, effects_output_t *ctx,
   bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
 
   egl_make_current();
-  glFlush();
 
   if (hide_node) {
     if (*hide_flag)
@@ -1072,7 +1071,6 @@ static GLuint capture_bg_combined(output_t *output, effects_output_t *ctx,
   bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
 
   egl_make_current();
-  glFlush();
 
   // restore blur-layer surfaces
   for (int i = 0; i < 4; i++) {
@@ -1683,7 +1681,6 @@ static bool blur_render_shadow(toplevel_t *tl) {
   draw_quad();
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glDisable(GL_BLEND);
-  glFlush();
 
   wlr_scene_node_lower_to_bottom(&tl->shadow->shadow_node->node);
   wlr_scene_buffer_set_buffer(tl->shadow->shadow_node, tl->shadow->shadow_buf);
@@ -1758,7 +1755,6 @@ static bool blur_render_border(toplevel_t *tl, int content_w, int content_h) {
   draw_quad();
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glDisable(GL_BLEND);
-  glFlush();
 
   wlr_scene_buffer_set_buffer(tl->rounded->border_shader_node, tl->rounded->border_shader_buf);
   struct wlr_fbox src_box = {0, 0, phys_fw, phys_fh};
@@ -1847,7 +1843,6 @@ static bool rebuild_corner_masks(output_t *output, struct wlr_scene_output *scen
       egl_unset_current();
       bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
       egl_make_current();
-      glFlush();
 
       for (int i = 0; i < nr; i++)
         wlr_scene_node_set_enabled(restore[i].node, true);
@@ -1981,7 +1976,6 @@ static GLuint capture_full_scene_to_tex(output_t *output, effects_output_t *ctx,
   bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
 
   egl_make_current();
-  glFlush();
 
   if (server.shader_tree)
     wlr_scene_node_set_enabled(&server.shader_tree->node, true);
