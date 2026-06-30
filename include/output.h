@@ -37,6 +37,7 @@ typedef struct output_t {
 
   bool enabled;
   bool allow_tearing;
+  bool frame_scheduled;
   int lx, ly;
   int width, height;
 
@@ -77,3 +78,4 @@ void output_set_scale_filter(output_t *output, enum scale_filter_mode mode);
 void output_get_identifier(char *identifier, size_t len, output_t *output);
 void output_update_scale(output_t *output, float scale);
 output_t *output_get_valid(void);
+void output_schedule_frame(output_t *output);

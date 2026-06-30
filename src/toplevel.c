@@ -356,7 +356,7 @@ void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
   }
 
   if (toplevel->shadow)
-    toplevel->shadow->shadow_dirty = true;
+    toplevel->shadow->shadow_geometry_dirty = true;
 }
 
 void xdg_toplevel_tag_manager_v1_handle_set_tag(struct wl_listener *listener, void *data) {
@@ -898,7 +898,7 @@ void toplevel_set_blur(toplevel_t *tl, bool enabled) {
           if (so) {
             pixman_region32_union_rect(&so->damage_ring.current, &so->damage_ring.current,
               0, 0, (unsigned int)tl->node->output->width, (unsigned int)tl->node->output->height);
-            wlr_output_schedule_frame(tl->node->output->wlr_output);
+            output_schedule_frame(tl->node->output);
           }
         }
       }
@@ -932,7 +932,7 @@ void toplevel_set_mica(toplevel_t *tl, bool enabled) {
           if (so) {
             pixman_region32_union_rect(&so->damage_ring.current, &so->damage_ring.current,
               0, 0, (unsigned int)tl->node->output->width, (unsigned int)tl->node->output->height);
-            wlr_output_schedule_frame(tl->node->output->wlr_output);
+            output_schedule_frame(tl->node->output);
           }
         }
       }
@@ -961,7 +961,7 @@ void toplevel_set_acrylic(toplevel_t *tl, bool enabled) {
           if (so) {
             pixman_region32_union_rect(&so->damage_ring.current, &so->damage_ring.current,
               0, 0, (unsigned int)tl->node->output->width, (unsigned int)tl->node->output->height);
-            wlr_output_schedule_frame(tl->node->output->wlr_output);
+            output_schedule_frame(tl->node->output);
           }
         }
       }

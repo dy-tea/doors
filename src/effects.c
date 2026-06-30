@@ -48,6 +48,8 @@
 #include "shadow_frag_src.h"
 
 enum blur_algorithm blur_algorithm = BLUR_ALGORITHM_KAWASE;
+
+static const struct wlr_drm_format *s_render_fmt = NULL;
 bool blur_enabled = true;
 int blur_passes = 1;
 float blur_radius = 5.0f;
@@ -502,6 +504,16 @@ bool effects_init(void) {
   struct wlr_egl *egl = wlr_gles2_renderer_get_egl(server.renderer);
   s_egl_display = wlr_egl_get_display(egl);
   s_egl_context = wlr_egl_get_context(egl);
+
+  {
+    const struct wlr_drm_format_set *fmts = wlr_renderer_get_render_formats(server.renderer);
+    s_render_fmt = fmts ? wlr_drm_format_set_get(fmts, DRM_FORMAT_ARGB8888) : NULL;
+    if (!s_render_fmt) s_render_fmt = fmts ? wlr_drm_format_set_get(fmts, DRM_FORMAT_XRGB8888) : NULL;
+    if (!s_render_fmt) {
+      wlr_log(WLR_ERROR, "Failed to find a suitable DRM render format");
+      return false;
+    }
+  }
 
   if (!egl_make_current()) {
     wlr_log(WLR_ERROR, "blur: failed to make EGL context current");
@@ -1105,13 +1117,9 @@ static GLuint capture_bg_combined(output_t *output, effects_output_t *ctx,
 static GLuint ensure_output_buf(struct wlr_buffer **buf_out, GLuint *fbo_out,
     int w, int h) {
   if (*buf_out) return *fbo_out;
+  if (!s_render_fmt) return 0;
 
-  const struct wlr_drm_format_set *fmts = wlr_renderer_get_render_formats(server.renderer);
-  const struct wlr_drm_format *fmt = fmts ? wlr_drm_format_set_get(fmts, DRM_FORMAT_ARGB8888) : NULL;
-  if (!fmt) fmt = fmts ? wlr_drm_format_set_get(fmts, DRM_FORMAT_XRGB8888) : NULL;
-  if (!fmt) return 0;
-
-  struct wlr_buffer *buf = wlr_allocator_create_buffer(server.allocator, w, h, fmt);
+  struct wlr_buffer *buf = wlr_allocator_create_buffer(server.allocator, w, h, s_render_fmt);
   if (!buf) return 0;
 
   GLuint fbo = wlr_gles2_renderer_get_buffer_fbo(server.renderer, buf);
@@ -1138,12 +1146,9 @@ static GLuint ensure_sized_buf(struct wlr_buffer **buf_out, GLuint *fbo_out,
     *fbo_out = 0;
   }
 
-  const struct wlr_drm_format_set *fmts = wlr_renderer_get_render_formats(server.renderer);
-  const struct wlr_drm_format *fmt = fmts ? wlr_drm_format_set_get(fmts, DRM_FORMAT_ARGB8888) : NULL;
-  if (!fmt) fmt = fmts ? wlr_drm_format_set_get(fmts, DRM_FORMAT_XRGB8888) : NULL;
-  if (!fmt) return 0;
+  if (!s_render_fmt) return 0;
 
-  struct wlr_buffer *buf = wlr_allocator_create_buffer(server.allocator, w, h, fmt);
+  struct wlr_buffer *buf = wlr_allocator_create_buffer(server.allocator, w, h, s_render_fmt);
   if (!buf) return 0;
 
   GLuint fbo = wlr_gles2_renderer_get_buffer_fbo(server.renderer, buf);
@@ -2214,17 +2219,41 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
   {
     toplevel_t *tl;
     wl_list_for_each(tl, &server.toplevels, link) {
-      if (!tl->shadow || !tl->shadow->shadow_dirty) continue;
+      if (!tl->shadow || (!tl->shadow->shadow_dirty && !tl->shadow->shadow_geometry_dirty)) continue;
       if (!tl->node || !tl->node->client || !tl->node->client->shown) continue;
       if (!tl->node->output || tl->node->output != output) continue;
+
       if (!tl->node->client->shadow) {
         tl->shadow->shadow_dirty = false;
+        tl->shadow->shadow_geometry_dirty = false;
         if (tl->shadow->shadow_node)
           wlr_scene_node_set_enabled(&tl->shadow->shadow_node->node, false);
         continue;
       }
+
+      if (tl->shadow->shadow_geometry_dirty && !tl->shadow->shadow_dirty) {
+        int size = (int)shadow_size;
+        if (tl->shadow->shadow_node && size > 0) {
+          struct wlr_box client_r = get_client_rect(tl);
+          int buf_w = client_r.width + 2 * size;
+          int buf_h = client_r.height + 2 * size;
+          if (buf_w > 0 && buf_h > 0) {
+            float scale = tl->node->output ? tl->node->output->wlr_output->scale : 1.0f;
+            if (tl->shadow->shadow_buf_w == (int)(buf_w * scale) &&
+                tl->shadow->shadow_buf_h == (int)(buf_h * scale)) {
+              wlr_scene_node_lower_to_bottom(&tl->shadow->shadow_node->node);
+              wlr_scene_node_set_position(&tl->shadow->shadow_node->node, shadow_offset_x - size, shadow_offset_y - size);
+              wlr_scene_node_set_enabled(&tl->shadow->shadow_node->node, true);
+              tl->shadow->shadow_geometry_dirty = false;
+              continue;
+            }
+          }
+        }
+      }
+
       blur_render_shadow(tl);
       tl->shadow->shadow_dirty = false;
+      tl->shadow->shadow_geometry_dirty = false;
     }
   }
 

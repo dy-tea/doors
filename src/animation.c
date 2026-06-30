@@ -207,7 +207,7 @@ static void set_opacity_iterator(struct wlr_scene_buffer *buffer, int sx, int sy
 static void schedule_output(output_t *output) {
   if (!output || !output->wlr_output || !output->enabled) return;
 
-  wlr_output_schedule_frame(output->wlr_output);
+  output_schedule_frame(output);
 }
 
 static struct wlr_fbox clamp_buffer_source_box(struct wlr_scene_buffer *buffer,
@@ -1048,8 +1048,6 @@ bool animation_update_output(output_t *output, struct timespec now) {
       }
 
       tick_entry(entry, now);
-      float opacity = (float)(entry->from_opacity + (entry->to_opacity - entry->from_opacity) * entry->eased);
-      wlr_scene_node_for_each_buffer(&entry->scene_tree->node, set_opacity_iterator, &opacity);
 
       if (is_entry_done(entry)) {
         float full = 1.0f;
@@ -1064,6 +1062,8 @@ bool animation_update_output(output_t *output, struct timespec now) {
         wl_list_remove(&entry->link);
         free(entry);
       } else {
+        float opacity = (float)(entry->from_opacity + (entry->to_opacity - entry->from_opacity) * entry->eased);
+        wlr_scene_node_for_each_buffer(&entry->scene_tree->node, set_opacity_iterator, &opacity);
         active = true;
       }
       continue;
@@ -1108,10 +1108,6 @@ bool animation_update_output(output_t *output, struct timespec now) {
     int y = (int)(entry->from.y + (entry->to.y - entry->from.y) * entry->eased);
     wlr_scene_node_set_position(&entry->scene_tree->node, x, y);
 
-    float cur_opacity = (float)(entry->from_opacity + (entry->to_opacity - entry->from_opacity) * entry->eased);
-    if (entry->from_opacity != entry->to_opacity)
-      wlr_scene_node_for_each_buffer(&entry->scene_tree->node, set_opacity_iterator, &cur_opacity);
-
     if (is_entry_done(entry)) {
       if (entry->from_opacity != entry->to_opacity) {
         float full = 1.0f;
@@ -1127,6 +1123,10 @@ bool animation_update_output(output_t *output, struct timespec now) {
       wl_list_remove(&entry->link);
       free(entry);
     } else {
+      if (entry->from_opacity != entry->to_opacity) {
+        float cur_opacity = (float)(entry->from_opacity + (entry->to_opacity - entry->from_opacity) * entry->eased);
+        wlr_scene_node_for_each_buffer(&entry->scene_tree->node, set_opacity_iterator, &cur_opacity);
+      }
       active = true;
     }
   }

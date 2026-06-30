@@ -216,7 +216,8 @@ static void output_repaint(output_t *output) {
 		clock_gettime(CLOCK_MONOTONIC, &now);
 		wlr_scene_output_send_frame_done(scene_output, &now);
 		if (animating)
-			wlr_output_schedule_frame(output->wlr_output);
+			output_schedule_frame(output);
+
 		return;
 	}
 
@@ -229,7 +230,8 @@ static void output_repaint(output_t *output) {
 	if (!wlr_scene_output_build_state(scene_output, &pending, &opts)) {
 		wlr_output_state_finish(&pending);
 		if (animating)
-			wlr_output_schedule_frame(output->wlr_output);
+			output_schedule_frame(output);
+
 		return;
 	}
 
@@ -250,7 +252,13 @@ static void output_repaint(output_t *output) {
 	wlr_scene_output_send_frame_done(scene_output, &now);
 
 	if (animating)
-		wlr_output_schedule_frame(output->wlr_output);
+		output_schedule_frame(output);
+}
+
+void output_schedule_frame(output_t *output) {
+  if (!output || output->frame_scheduled) return;
+  output->frame_scheduled = true;
+  wlr_output_schedule_frame(output->wlr_output);
 }
 
 static int output_repaint_timer_handler(void *data) {
@@ -266,6 +274,7 @@ void output_frame(struct wl_listener *listener, void *data) {
 	(void)data;
 	output_t *output = wl_container_of(listener, output, frame);
 	if (!output->wlr_output->enabled) return;
+	output->frame_scheduled = false;
 
 	if (output->max_render_time == 0) {
 		output_repaint(output);

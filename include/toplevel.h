@@ -48,6 +48,7 @@ typedef struct toplevel_shadow_t {
   int shadow_buf_w;
   int shadow_buf_h;
   bool shadow_dirty;
+  bool shadow_geometry_dirty;
 } toplevel_shadow_t;
 
 typedef struct toplevel_t {

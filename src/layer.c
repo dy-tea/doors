@@ -42,7 +42,7 @@ void layer_surface_set_blur(layer_surface_t *ls, bool enabled) {
       if (so) {
         pixman_region32_union_rect(&so->damage_ring.current, &so->damage_ring.current,
           0, 0, (unsigned int)ls->output->width, (unsigned int)ls->output->height);
-        wlr_output_schedule_frame(ls->output->wlr_output);
+        output_schedule_frame(ls->output);
       }
     }
   } else if (!enabled && ls->blur_node) {

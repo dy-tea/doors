@@ -42,17 +42,22 @@ static struct transaction_t *transaction_create(void) {
 }
 
 static void transaction_destroy(transaction_t *txn) {
-  if (!txn) return;
+	if (!txn) return;
 
-  // free all instructions
-  transaction_inst_t *instruction, *tmp;
-  wl_list_for_each_safe(instruction, tmp, &txn->instructions, link) {
-    node_t *node = instruction->node;
+	bool is_pending = (txn == txn_state.pending_transaction);
 
-    wlr_log(WLR_DEBUG, "transaction_destroy: node %u ntxnrefs=%zu destroying=%d",
-      node->id, (size_t)node->ntxnrefs, node->destroying);
+	// free all instructions
+	transaction_inst_t *instruction, *tmp;
+	wl_list_for_each_safe(instruction, tmp, &txn->instructions, link) {
+		node_t *node = instruction->node;
 
-    node->ntxnrefs--;
+		wlr_log(WLR_DEBUG, "transaction_destroy: node %u ntxnrefs=%zu destroying=%d",
+			node->id, (size_t)node->ntxnrefs, node->destroying);
+
+		if (is_pending)
+			node->pending_inst = NULL;
+
+		node->ntxnrefs--;
 
     if (node->instruction == instruction)
       node->instruction = NULL;
@@ -97,40 +102,39 @@ static void copy_node_state(node_t *node, transaction_inst_t *instruction) {
 }
 
 static void transaction_add_node(transaction_t *txn, node_t *node, bool server_request) {
-  if (!txn || !node) return;
+	if (!txn || !node) return;
 
-  // check if already in transaction
-  transaction_inst_t *existing;
-  wl_list_for_each(existing, &txn->instructions, link) {
-    if (existing->node == node) {
-      copy_node_state(node, existing);
-      if (server_request)
-        existing->server_request = true;
-      return;
-    }
-  }
+	// check cached pending instruction pointer
+	if (node->pending_inst) {
+		copy_node_state(node, node->pending_inst);
+		if (server_request)
+			node->pending_inst->server_request = true;
 
-  // create new instruction
-  transaction_inst_t *instruction = calloc(1, sizeof(*instruction));
-  if (!instruction) {
-    wlr_log(WLR_ERROR, "Failed to allocate transaction instruction");
-    return;
-  }
+		return;
+	}
 
-  instruction->transaction = txn;
-  instruction->node = node;
-  instruction->waiting = false;
-  instruction->server_request = server_request;
-  instruction->serial = 0;
+	// create new instruction
+	transaction_inst_t *instruction = calloc(1, sizeof(*instruction));
+	if (!instruction) {
+		wlr_log(WLR_ERROR, "Failed to allocate transaction instruction");
+		return;
+	}
 
-  copy_node_state(node, instruction);
+	instruction->transaction = txn;
+	instruction->node = node;
+	instruction->waiting = false;
+	instruction->server_request = server_request;
+	instruction->serial = 0;
 
-  // instruction is updated at commit
-  node->ntxnrefs++;
-  wlr_log(WLR_DEBUG, "transaction_add_node: node %u ntxnrefs=%zu destroying=%d",
-    node->id, (size_t)node->ntxnrefs, node->destroying);
+	copy_node_state(node, instruction);
 
-  wl_list_insert(&txn->instructions, &instruction->link);
+	// instruction is updated at commit
+	node->pending_inst = instruction;
+	node->ntxnrefs++;
+	wlr_log(WLR_DEBUG, "transaction_add_node: node %u ntxnrefs=%zu destroying=%d",
+		node->id, (size_t)node->ntxnrefs, node->destroying);
+
+	wl_list_insert(&txn->instructions, &instruction->link);
 }
 
 static void copy_node_current_state(node_t *node, transaction_inst_t *instruction) {
@@ -348,14 +352,8 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 }
 
 static bool node_in_transaction(transaction_t *txn, node_t *node) {
-  if (!txn || !node) return false;
-
-  transaction_inst_t *inst;
-  wl_list_for_each(inst, &txn->instructions, link)
-    if (inst->node == node)
-      return true;
-
-  return false;
+	(void)txn;
+	return node && node->pending_inst;
 }
 
 static bool should_skip_node(node_t *node) {
@@ -572,10 +570,11 @@ static void transaction_commit(transaction_t *txn) {
       }
     }
 
-    node->instruction = instruction;
-  }
+		node->instruction = instruction;
+		node->pending_inst = NULL;
+	}
 
-  txn->num_configures = num_configures;
+	txn->num_configures = num_configures;
 
   wlr_log(WLR_DEBUG, "Transaction committing with %zu configures (%zu total instructions), waiting=%zu",
 	  num_configures, (size_t)wl_list_length(&txn->instructions), txn->num_waiting);

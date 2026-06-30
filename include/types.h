@@ -150,6 +150,7 @@ typedef struct node_t {
 
   // transaction support
   struct transaction_inst_t *instruction;
+  struct transaction_inst_t *pending_inst;
   size_t ntxnrefs;
   bool dirty;
   bool destroying;

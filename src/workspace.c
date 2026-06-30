@@ -402,7 +402,7 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
     wlr_ext_workspace_handle_v1_set_hidden(new_ws, false);
   }
 
-  wlr_output_schedule_frame(output->wlr_output);
+  output_schedule_frame(output);
   wlr_log(WLR_DEBUG, "Switched from %s to %s (animated slide %s)",
     old_desk ? old_desk->name : "NULL", new_desk->name,
     workspace_anim_direction == WORKSPACE_ANIM_VERTICAL ? "vertical" : "horizontal");
