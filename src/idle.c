@@ -5,6 +5,7 @@
 #include <wlr/types/wlr_idle_inhibit_v1.h>
 #include <wlr/types/wlr_idle_notify_v1.h>
 #include <wlr/types/wlr_scene.h>
+#include <wlr/util/log.h>
 
 void update_idle_inhibitors(struct wlr_surface *sans) {
 	bool inhibited = false;
@@ -36,6 +37,10 @@ void handle_new_idle_inhibitor(struct wl_listener *listener, void *data) {
 	struct wlr_idle_inhibitor_v1 *idle_inhibitor = data;
 
 	idle_inhibitor_t *idle = calloc(1, sizeof(*idle));
+	if (!idle) {
+		wlr_log(WLR_ERROR, "allocation failed");
+		return;
+	}
 	idle->idle_inhibitor = idle_inhibitor;
 
 	idle->destroy.notify = handle_idle_inhibitor_destroy;

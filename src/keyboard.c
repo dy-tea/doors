@@ -62,6 +62,10 @@ void handle_new_keyboard(struct wlr_input_device *device) {
   struct wlr_keyboard *wlr_keyboard = wlr_keyboard_from_input_device(device);
 
   keyboard_t *keyboard = calloc(1, sizeof(*keyboard));
+  if (!keyboard) {
+    wlr_log(WLR_ERROR, "allocation failed");
+    return;
+  }
   keyboard->wlr_keyboard = wlr_keyboard;
   keyboard->seat = seat_default();
 

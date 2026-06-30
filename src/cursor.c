@@ -896,6 +896,10 @@ void handle_new_input(struct wl_listener *listener, void *data) {
     wlr_cursor_attach_input_device(server.cursor, device);
     struct wlr_pointer *pointer = wlr_pointer_from_input_device(device);
     pointer_t *ptr = calloc(1, sizeof(*ptr));
+    if (!ptr) {
+      wlr_log(WLR_ERROR, "allocation failed");
+      return;
+    }
     ptr->wlr_pointer = pointer;
     ptr->seat = def;
     wl_list_insert(&server.pointers, &ptr->link);
@@ -1050,6 +1054,10 @@ void handle_pointer_constraint(struct wl_listener *listener, void *data) {
 	struct wlr_pointer_constraint_v1 *constraint = data;
 
 	cursor_constraint_t *cursor_constraint = calloc(1, sizeof(*cursor_constraint));
+	if (!cursor_constraint) {
+		wlr_log(WLR_ERROR, "allocation failed");
+		return;
+	}
 	cursor_constraint->constraint = constraint;
 	cursor_constraint->set_region.notify = handle_constraint_set_region;
 	wl_signal_add(&constraint->events.set_region, &cursor_constraint->set_region);

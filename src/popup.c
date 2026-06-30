@@ -69,6 +69,10 @@ void popup_destroy(struct wl_listener *listener, void *data) {
 static void create_xdg_popup(struct wlr_xdg_popup *xdg_popup,
 	struct wlr_scene_tree *parent_tree, struct wlr_scene_tree *image_capture_parent_tree) {
   popup_t *popup = calloc(1, sizeof(*popup));
+  if (!popup) {
+    wlr_log(WLR_ERROR, "allocation failed");
+    return;
+  }
   popup->xdg_popup = xdg_popup;
   popup->parent_tree = wlr_scene_xdg_surface_create(parent_tree, xdg_popup->base);
   xdg_popup->base->data = popup->parent_tree;

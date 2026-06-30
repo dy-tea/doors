@@ -367,6 +367,10 @@ void xdg_toplevel_tag_manager_v1_handle_set_tag(struct wl_listener *listener, vo
 
   free(toplevel->tag);
   toplevel->tag = strdup(event->tag);
+  if (!toplevel->tag) {
+    wlr_log(WLR_ERROR, "allocation failed");
+    return;
+  }
 
   if (toplevel->node && toplevel->node->client) {
     const char *app_id = toplevel->node->client->app_id;
@@ -1435,6 +1439,10 @@ void handle_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 
   wlr_log(WLR_INFO, "New XDG toplevel");
   toplevel_t *toplevel = calloc(1, sizeof(*toplevel));
+  if (!toplevel) {
+    wlr_log(WLR_ERROR, "allocation failed");
+    return;
+  }
 
   toplevel->xdg_toplevel = xdg_toplevel;
   toplevel->mapped = false;

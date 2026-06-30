@@ -177,6 +177,10 @@ void server_init(void) {
     EXT_BACKGROUND_EFFECT_MANAGER_V1_CAPABILITY_BLUR);
 
   server.compositor = wlr_compositor_create(server.wl_display, 6, server.renderer);
+  if (!server.compositor) {
+    wlr_log(WLR_ERROR, "Failed to create compositor");
+    exit(EXIT_FAILURE);
+  }
   wlr_subcompositor_create(server.wl_display);
 
   // dmabuf support
@@ -203,13 +207,29 @@ void server_init(void) {
 
   // output management
   server.output_layout = wlr_output_layout_create(server.wl_display);
+  if (!server.output_layout) {
+    wlr_log(WLR_ERROR, "Failed to create output layout");
+    exit(EXIT_FAILURE);
+  }
   server.xdg_output_manager = wlr_xdg_output_manager_v1_create(server.wl_display, server.output_layout);
+  if (!server.xdg_output_manager) {
+    wlr_log(WLR_ERROR, "Failed to create xdg output manager");
+    exit(EXIT_FAILURE);
+  }
 
   server.output_power_manager = wlr_output_power_manager_v1_create(server.wl_display);
+  if (!server.output_power_manager) {
+    wlr_log(WLR_ERROR, "Failed to create output power manager");
+    exit(EXIT_FAILURE);
+  }
   server.output_power_set_mode.notify = handle_output_power_set_mode;
   wl_signal_add(&server.output_power_manager->events.set_mode, &server.output_power_set_mode);
 
   server.output_manager = wlr_output_manager_v1_create(server.wl_display);
+  if (!server.output_manager) {
+    wlr_log(WLR_ERROR, "Failed to create output manager");
+    exit(EXIT_FAILURE);
+  }
   server.output_manager_apply.notify = handle_output_manager_apply;
   wl_signal_add(&server.output_manager->events.apply, &server.output_manager_apply);
   server.output_manager_test.notify = handle_output_manager_test;
@@ -217,6 +237,10 @@ void server_init(void) {
 
   // scene graph
   server.scene = wlr_scene_create();
+  if (!server.scene) {
+    wlr_log(WLR_ERROR, "Failed to create scene");
+    exit(EXIT_FAILURE);
+  }
   server.scene_layout = wlr_scene_attach_output_layout(server.scene, server.output_layout);
   if (server.linux_dmabuf)
  		wlr_scene_set_linux_dmabuf_v1(server.scene, server.linux_dmabuf);
@@ -235,6 +259,11 @@ void server_init(void) {
 
   // xdg shell
   server.xdg_shell = wlr_xdg_shell_create(server.wl_display, 5);
+  if (!server.xdg_shell) {
+    wlr_log(WLR_ERROR, "Failed to create xdg shell");
+    exit(EXIT_FAILURE);
+  }
+
   wl_list_init(&server.toplevels);
 
   server.new_xdg_toplevel.notify = handle_new_xdg_toplevel;
@@ -242,17 +271,29 @@ void server_init(void) {
 
   // xdg toplevel tag
   struct wlr_xdg_toplevel_tag_manager_v1 *xdg_toplevel_tag_manager_v1 = wlr_xdg_toplevel_tag_manager_v1_create(server.wl_display, 1);
+  if (!xdg_toplevel_tag_manager_v1) {
+    wlr_log(WLR_ERROR, "Failed to create xdg toplevel tag manager");
+    exit(EXIT_FAILURE);
+  }
   server.xdg_toplevel_tag_manager_v1_set_tag.notify = xdg_toplevel_tag_manager_v1_handle_set_tag;
   wl_signal_add(&xdg_toplevel_tag_manager_v1->events.set_tag, &server.xdg_toplevel_tag_manager_v1_set_tag);
 
   // xdg decoration
   server.xdg_decoration_manager = wlr_xdg_decoration_manager_v1_create(server.wl_display, 2);
+  if (!server.xdg_decoration_manager) {
+    wlr_log(WLR_ERROR, "Failed to create xdg decoration manager");
+    exit(EXIT_FAILURE);
+  }
   server.new_xdg_decoration.notify = handle_new_xdg_decoration;
   wl_signal_add(&server.xdg_decoration_manager->events.new_toplevel_decoration, &server.new_xdg_decoration);
 
   // xdg activation
   wl_list_init(&server.pending_launcher_ctxs);
   server.xdg_activation_v1 = wlr_xdg_activation_v1_create(server.wl_display);
+  if (!server.xdg_activation_v1) {
+    wlr_log(WLR_ERROR, "Failed to create xdg activation");
+    exit(EXIT_FAILURE);
+  }
   server.xdg_activation_request_activate.notify = handle_xdg_activation_request_activate;
   wl_signal_add(&server.xdg_activation_v1->events.request_activate, &server.xdg_activation_request_activate);
   server.xdg_activation_new_token.notify = handle_xdg_activation_new_token;
@@ -260,15 +301,27 @@ void server_init(void) {
 
   // layer shell
   server.layer_shell = wlr_layer_shell_v1_create(server.wl_display, 5);
+  if (!server.layer_shell) {
+    wlr_log(WLR_ERROR, "Failed to create layer shell");
+    exit(EXIT_FAILURE);
+  }
 
   server.new_layer_surface.notify = handle_new_layer_surface;
   wl_signal_add(&server.layer_shell->events.new_surface, &server.new_layer_surface);
 
   // cursor
   server.cursor = wlr_cursor_create();
+  if (!server.cursor) {
+    wlr_log(WLR_ERROR, "Failed to create cursor");
+    exit(EXIT_FAILURE);
+  }
   wlr_cursor_attach_output_layout(server.cursor, server.output_layout);
 
   server.cursor_mgr = wlr_xcursor_manager_create(NULL, 24);
+  if (!server.cursor_mgr) {
+    wlr_log(WLR_ERROR, "Failed to create cursor manager");
+    exit(EXIT_FAILURE);
+  }
   wlr_xcursor_manager_load(server.cursor_mgr, 1);
 
   server.cursor_mode = CURSOR_PASSTHROUGH;
@@ -305,9 +358,17 @@ void server_init(void) {
 
   // relative pointer
   server.relative_pointer_manager = wlr_relative_pointer_manager_v1_create(server.wl_display);
+  if (!server.relative_pointer_manager) {
+    wlr_log(WLR_ERROR, "Failed to create relative pointer manager");
+    exit(EXIT_FAILURE);
+  }
 
   // pointer constraints
   server.pointer_constraints = wlr_pointer_constraints_v1_create(server.wl_display);
+  if (!server.pointer_constraints) {
+    wlr_log(WLR_ERROR, "Failed to create pointer constraints");
+    exit(EXIT_FAILURE);
+  }
 
   server.cursor_requires_warp = false;
   wl_list_init(&server.pointer_constraint_commit.link);
@@ -317,11 +378,19 @@ void server_init(void) {
 
   // pointer warp
   server.pointer_warp_manager = wlr_pointer_warp_v1_create(server.wl_display, 1);
+  if (!server.pointer_warp_manager) {
+    wlr_log(WLR_ERROR, "Failed to create pointer warp manager");
+    exit(EXIT_FAILURE);
+  }
   server.pointer_warp.notify = handle_pointer_warp;
   wl_signal_add(&server.pointer_warp_manager->events.warp, &server.pointer_warp);
 
   // cursor shape
   server.cursor_shape_manager = wlr_cursor_shape_manager_v1_create(server.wl_display, 1);
+  if (!server.cursor_shape_manager) {
+    wlr_log(WLR_ERROR, "Failed to create cursor shape manager");
+    exit(EXIT_FAILURE);
+  }
 
   server.cursor_request_set_shape.notify = handle_cursor_request_set_shape;
   wl_signal_add(&server.cursor_shape_manager->events.request_set_shape, &server.cursor_request_set_shape);
@@ -331,12 +400,20 @@ void server_init(void) {
 
   // virtual pointer
   server.virtual_pointer_manager = wlr_virtual_pointer_manager_v1_create(server.wl_display);
+  if (!server.virtual_pointer_manager) {
+    wlr_log(WLR_ERROR, "Failed to create virtual pointer manager");
+    exit(EXIT_FAILURE);
+  }
 
   server.new_virtual_pointer.notify = handle_new_virtual_pointer;
   wl_signal_add(&server.virtual_pointer_manager->events.new_virtual_pointer, &server.new_virtual_pointer);
 
   // virtual keyboard
   server.virtual_keyboard_manager = wlr_virtual_keyboard_manager_v1_create(server.wl_display);
+  if (!server.virtual_keyboard_manager) {
+    wlr_log(WLR_ERROR, "Failed to create virtual keyboard manager");
+    exit(EXIT_FAILURE);
+  }
 
   server.new_virtual_keyboard.notify = handle_new_virtual_keyboard;
   wl_signal_add(&server.virtual_keyboard_manager->events.new_virtual_keyboard, &server.new_virtual_keyboard);
@@ -358,6 +435,10 @@ void server_init(void) {
 
   // idle notifier
   server.idle_notifier = wlr_idle_notifier_v1_create(server.wl_display);
+  if (!server.idle_notifier) {
+    wlr_log(WLR_ERROR, "Failed to create idle notifier");
+    exit(EXIT_FAILURE);
+  }
 
   // seats
   wl_list_init(&server.seats);
@@ -368,6 +449,10 @@ void server_init(void) {
 
   // session lock
   server.session_lock_manager = wlr_session_lock_manager_v1_create(server.wl_display);
+  if (!server.session_lock_manager) {
+    wlr_log(WLR_ERROR, "Failed to create session lock manager");
+    exit(EXIT_FAILURE);
+  }
 
   server.new_session_lock.notify = handle_new_session_lock;
   wl_signal_add(&server.session_lock_manager->events.new_lock, &server.new_session_lock);
@@ -382,19 +467,35 @@ void server_init(void) {
 
   // xdg system bell
   server.xdg_system_bell = wlr_xdg_system_bell_v1_create(server.wl_display, 1);
+  if (!server.xdg_system_bell) {
+    wlr_log(WLR_ERROR, "Failed to create xdg system bell");
+    exit(EXIT_FAILURE);
+  }
   server.ring_system_bell.notify = handle_ring_system_bell;
   wl_signal_add(&server.xdg_system_bell->events.ring, &server.ring_system_bell);
 
   // idle inhibitor
   server.idle_inhibit_manager = wlr_idle_inhibit_v1_create(server.wl_display);
+  if (!server.idle_inhibit_manager) {
+    wlr_log(WLR_ERROR, "Failed to create idle inhibit manager");
+    exit(EXIT_FAILURE);
+  }
   server.new_idle_inhibitor.notify = handle_new_idle_inhibitor;
   wl_signal_add(&server.idle_inhibit_manager->events.new_inhibitor, &server.new_idle_inhibitor);
 
   // content type manager
   server.content_type_manager = wlr_content_type_manager_v1_create(server.wl_display, 1);
+  if (!server.content_type_manager) {
+    wlr_log(WLR_ERROR, "Failed to create content type manager");
+    exit(EXIT_FAILURE);
+  }
 
   // keyboard shortcuts inhibitor
   server.keyboard_shortcuts_inhibit_manager = wlr_keyboard_shortcuts_inhibit_v1_create(server.wl_display);
+  if (!server.keyboard_shortcuts_inhibit_manager) {
+    wlr_log(WLR_ERROR, "Failed to create keyboard shortcuts inhibit manager");
+    exit(EXIT_FAILURE);
+  }
   server.keyboard_shortcuts_inhibit_new_inhibitor.notify = handle_keyboard_shortcuts_inhibit_new_inhibitor;
   wl_signal_add(&server.keyboard_shortcuts_inhibit_manager->events.new_inhibitor, &server.keyboard_shortcuts_inhibit_new_inhibitor);
 
@@ -456,12 +557,24 @@ void server_init(void) {
 
   // foreign toplevel list
   server.foreign_toplevel_list = wlr_ext_foreign_toplevel_list_v1_create(server.wl_display, 1);
+  if (!server.foreign_toplevel_list) {
+    wlr_log(WLR_ERROR, "Failed to create foreign toplevel list");
+    exit(EXIT_FAILURE);
+  }
 
   // foreign toplevel manager
   server.foreign_toplevel_manager = wlr_foreign_toplevel_manager_v1_create(server.wl_display);
+  if (!server.foreign_toplevel_manager) {
+    wlr_log(WLR_ERROR, "Failed to create foreign toplevel manager");
+    exit(EXIT_FAILURE);
+  }
 
   // foreign toplevel image capture source
   server.foreign_toplevel_image_capture_source_manager = wlr_ext_foreign_toplevel_image_capture_source_manager_v1_create(server.wl_display, 1);
+  if (!server.foreign_toplevel_image_capture_source_manager) {
+    wlr_log(WLR_ERROR, "Failed to create foreign toplevel image capture source manager");
+    exit(EXIT_FAILURE);
+  }
 
   server.new_toplevel_capture_request.notify = handle_new_toplevel_capture_request;
   wl_signal_add(&server.foreign_toplevel_image_capture_source_manager->events.capture_request, &server.new_toplevel_capture_request);
@@ -488,15 +601,31 @@ void server_init(void) {
 
   // export dmabuf
   server.export_dmabuf_manager = wlr_export_dmabuf_manager_v1_create(server.wl_display);
+  if (!server.export_dmabuf_manager) {
+    wlr_log(WLR_ERROR, "Failed to create export dmabuf manager");
+    exit(EXIT_FAILURE);
+  }
 
   // wlr data control
   server.data_control_manager = wlr_data_control_manager_v1_create(server.wl_display);
+  if (!server.data_control_manager) {
+    wlr_log(WLR_ERROR, "Failed to create data control manager");
+    exit(EXIT_FAILURE);
+  }
 
   // ext data control
   server.ext_data_control_manager = wlr_ext_data_control_manager_v1_create(server.wl_display, 1);
+  if (!server.ext_data_control_manager) {
+    wlr_log(WLR_ERROR, "Failed to create ext data control manager");
+    exit(EXIT_FAILURE);
+  }
 
   // gamma control
   server.gamma_control_manager = wlr_gamma_control_manager_v1_create(server.wl_display);
+  if (!server.gamma_control_manager) {
+    wlr_log(WLR_ERROR, "Failed to create gamma control manager");
+    exit(EXIT_FAILURE);
+  }
   wlr_scene_set_gamma_control_manager_v1(server.scene, server.gamma_control_manager);
 
   // image copy capture
@@ -510,16 +639,32 @@ void server_init(void) {
 
   // tearing control
   server.tearing_control_v1 = wlr_tearing_control_manager_v1_create(server.wl_display, 1);
+  if (!server.tearing_control_v1) {
+    wlr_log(WLR_ERROR, "Failed to create tearing control manager");
+    exit(EXIT_FAILURE);
+  }
   server.tearing_control_new_object.notify = handle_new_tearing_hint;
   wl_list_init(&server.tearing_controllers);
   wl_signal_add(&server.tearing_control_v1->events.new_object, &server.tearing_control_new_object);
 
   // tablet support
   server.tablet_v2 = wlr_tablet_v2_create(server.wl_display);
+  if (!server.tablet_v2) {
+    wlr_log(WLR_ERROR, "Failed to create tablet v2");
+    exit(EXIT_FAILURE);
+  }
 
   // input method support
   server.input_method_manager = wlr_input_method_manager_v2_create(server.wl_display);
+  if (!server.input_method_manager) {
+    wlr_log(WLR_ERROR, "Failed to create input method manager");
+    exit(EXIT_FAILURE);
+  }
   server.text_input_manager = wlr_text_input_manager_v3_create(server.wl_display);
+  if (!server.text_input_manager) {
+    wlr_log(WLR_ERROR, "Failed to create text input manager");
+    exit(EXIT_FAILURE);
+  }
 
   // default seat
   seat_t *default_seat = seat_create("seat0");

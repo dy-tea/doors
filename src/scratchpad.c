@@ -120,6 +120,10 @@ void scratchpad_add(node_t *n) {
   n->scratchpad = true;
 
   scratchpad_entry_t *entry = calloc(1, sizeof(*entry));
+  if (!entry) {
+    wlr_log(WLR_ERROR, "allocation failed");
+    return;
+  }
   entry->node = n;
   entry->saved_state = saved_state;
   entry->saved_tiled_rect = saved_tiled;
@@ -262,6 +266,10 @@ void scratchpad_hide(node_t *n) {
 
     // add to scratchpad list with saved state
     scratchpad_entry_t *entry = calloc(1, sizeof(*entry));
+    if (!entry) {
+      wlr_log(WLR_ERROR, "allocation failed");
+      return;
+    }
     entry->node = n;
     entry->saved_state = STATE_FLOATING;
     entry->saved_tiled_rect = n->client->tiled_rectangle;

@@ -190,6 +190,11 @@ void master_stack_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 
   bool master_vertical = horiz;
   struct wlr_box *geoms = calloc(mc > sc ? mc : sc, sizeof(struct wlr_box));
+  if (!geoms) {
+    wlr_log(WLR_ERROR, "allocation failed");
+    free(nodes);
+    return;
+  }
   distribute_area(master_area, geoms, mc, wg, master_vertical);
   for (int i = 0; i < mc; i++)
     set_node_geom(nodes[i], geoms[i], m, d);

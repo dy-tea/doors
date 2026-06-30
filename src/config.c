@@ -66,6 +66,10 @@ uint32_t parse_modifiers(const char *mod_str) {
   if (!mod_str || mod_str[0] == '\0') return 0;
 
   char *tmp = strdup(mod_str);
+  if (!tmp) {
+    wlr_log(WLR_ERROR, "allocation failed");
+    return 0;
+  }
   char *saveptr;
   char *token = strtok_r(tmp, "+", &saveptr);
 

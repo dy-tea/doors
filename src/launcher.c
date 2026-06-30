@@ -98,6 +98,11 @@ launcher_ctx_t *launcher_ctx_create(struct wlr_xdg_activation_token_v1 *token, c
   if (ctx == NULL) return NULL;
 
   ctx->desktop_name = strdup(desktop_name);
+  if (!ctx->desktop_name) {
+    wlr_log(WLR_ERROR, "allocation failed");
+    free(ctx);
+    return NULL;
+  }
   ctx->token = token;
   ctx->had_focused_surface = token->surface != NULL;
 

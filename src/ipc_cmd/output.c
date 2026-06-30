@@ -482,6 +482,10 @@ void ipc_cmd_output(char **args, int num, int client_fd) {
     num--;
     while (num > 0) {
       desktop_t *d = (desktop_t *)calloc(1, sizeof(desktop_t));
+      if (!d) {
+        wlr_log(WLR_ERROR, "allocation failed");
+        return;
+      }
       d->id = next_desktop_id++;
       strncpy(d->name, *args, SMALEN - 1);
       d->name[SMALEN - 1] = '\0';
@@ -538,6 +542,10 @@ void ipc_cmd_output(char **args, int num, int client_fd) {
 
       while (num > 0) {
         desktop_t *newd = (desktop_t *)calloc(1, sizeof(desktop_t));
+        if (!newd) {
+          wlr_log(WLR_ERROR, "allocation failed");
+          return;
+        }
         newd->id = next_desktop_id++;
         strncpy(newd->name, *args, SMALEN - 1);
         newd->name[SMALEN - 1] = '\0';

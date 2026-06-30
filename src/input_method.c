@@ -6,6 +6,7 @@
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_virtual_keyboard_v1.h>
 #include <wlr/types/wlr_xdg_shell.h>
+#include <wlr/util/log.h>
 
 extern struct server_t server;
 
@@ -237,6 +238,10 @@ static void handle_input_method_new_popup_surface(struct wl_listener *listener, 
 	ime_relay_t *relay = wl_container_of(listener, relay, input_method_new_popup_surface);
 
 	ime_popup_t *popup = calloc(1, sizeof(*popup));
+	if (!popup) {
+		wlr_log(WLR_ERROR, "allocation failed");
+		return;
+	}
 	popup->popup_surface = data;
 	popup->relay = relay;
 
@@ -351,6 +356,10 @@ static void handle_new_text_input(struct wl_listener *listener, void *data) {
 	ime_relay_t *relay = wl_container_of(listener, relay, new_text_input);
 	struct wlr_text_input_v3 *wlr_text_input = data;
 	ime_text_t *text_input = calloc(1, sizeof(*text_input));
+	if (!text_input) {
+		wlr_log(WLR_ERROR, "allocation failed");
+		return;
+	}
 
 	if (relay->wlr_seat != wlr_text_input->seat) return;
 
@@ -381,6 +390,10 @@ static void handle_focused_surface_destroy(struct wl_listener *listener, void *d
 
 ime_relay_t *input_method_relay_create(struct wlr_seat *wlr_seat) {
 	ime_relay_t *relay = calloc(1, sizeof(*relay));
+	if (!relay) {
+		wlr_log(WLR_ERROR, "allocation failed");
+		return NULL;
+	}
 	relay->wlr_seat = wlr_seat;
 	wl_list_init(&relay->text_inputs);
 	wl_list_init(&relay->popups);

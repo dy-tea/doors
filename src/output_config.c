@@ -24,6 +24,11 @@ struct output_config *output_config_create(const char *name) {
   if (!oc) return NULL;
 
   oc->name = strdup(name);
+  if (!oc->name) {
+    wlr_log(WLR_ERROR, "allocation failed");
+    free(oc);
+    return NULL;
+  }
   oc->enable = OUTPUT_CONFIG_ENABLE_AUTO;
   oc->x = -1;
   oc->y = -1;
