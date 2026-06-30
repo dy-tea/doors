@@ -47,28 +47,29 @@ void add_rule(rule_t *r) {
 void remove_rule(rule_t *r) {
   if (r == NULL) return;
 
-  if (r == rule_head)
+  rule_t *prev = NULL;
+  rule_t *cur = rule_head;
+  while (cur && cur != r) {
+    prev = cur;
+    cur = cur->next;
+  }
+  if (cur == NULL) return;
+
+  if (prev)
+    prev->next = r->next;
+  else
     rule_head = r->next;
 
   if (r == rule_tail)
-    rule_tail = NULL;
-
-  if (r->next)
-    r->next = r->next;
+    rule_tail = prev;
 
   free(r);
 }
 
 bool remove_rule_by_index(int idx) {
-  rule_t *r = rule_head;
-  int i = 0;
-  for (; r != NULL && i < idx; r = r->next, i++)
-  	;
-  if (r == NULL) return false;
-
   rule_t *prev = NULL;
   rule_t *cur = rule_head;
-  for (i = 0; cur != NULL && i < idx; prev = cur, cur = cur->next, ++i)
+  for (int i = 0; cur != NULL && i < idx; prev = cur, cur = cur->next, ++i)
     ;
 
   if (cur == NULL) return false;

@@ -752,8 +752,13 @@ void transaction_add_dirty_node(node_t *node) {
   if (txn_state.dirty_count >= txn_state.dirty_capacity) {
     txn_state.dirty_capacity = txn_state.dirty_capacity == 0 ? 32 :
       txn_state.dirty_capacity * 2;
-    txn_state.dirty_nodes = realloc(txn_state.dirty_nodes,
+    node_t **new_nodes = realloc(txn_state.dirty_nodes,
       txn_state.dirty_capacity * sizeof(node_t*));
+    if (!new_nodes) {
+      wlr_log(WLR_ERROR, "failed to realloc dirty nodes array");
+      return;
+    }
+    txn_state.dirty_nodes = new_nodes;
   }
   txn_state.dirty_nodes[txn_state.dirty_count++] = node;
 
