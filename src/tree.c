@@ -63,29 +63,9 @@ char normal_border_color[16] = "444444ff";
 char active_border_color[16] = "555555ff";
 char focused_border_color[16] = "1793dfff";
 
-float normal_border_gradient[BORDER_GRADIENT_MAX_STOPS * 4] = {0};
-int normal_border_gradient_count = 0;
-float normal_border_gradient_angle = 0.0f;
-float normal_border_gradient2[BORDER_GRADIENT_MAX_STOPS * 4] = {0};
-int normal_border_gradient2_count = 0;
-float normal_border_gradient2_angle = 0.0f;
-float normal_border_gradient_lerp = 0.0f;
-
-float active_border_gradient[BORDER_GRADIENT_MAX_STOPS * 4] = {0};
-int active_border_gradient_count = 0;
-float active_border_gradient_angle = 0.0f;
-float active_border_gradient2[BORDER_GRADIENT_MAX_STOPS * 4] = {0};
-int active_border_gradient2_count = 0;
-float active_border_gradient2_angle = 0.0f;
-float active_border_gradient_lerp = 0.0f;
-
-float focused_border_gradient[BORDER_GRADIENT_MAX_STOPS * 4] = {0};
-int focused_border_gradient_count = 0;
-float focused_border_gradient_angle = 0.0f;
-float focused_border_gradient2[BORDER_GRADIENT_MAX_STOPS * 4] = {0};
-int focused_border_gradient2_count = 0;
-float focused_border_gradient2_angle = 0.0f;
-float focused_border_gradient_lerp = 0.0f;
+border_theme_t normal_border_theme = {0};
+border_theme_t active_border_theme = {0};
+border_theme_t focused_border_theme = {0};
 char presel_feedback_color[16] = "ff5555ff";
 char tiling_drag_indicator_color[16] = "4d9eff4d";
 
@@ -389,6 +369,129 @@ static void render_leaf(output_t *m, desktop_t *d, node_t *n,
   n->client->tiled_rectangle = r;
 }
 
+static void validate_split_children(node_t *n) {
+  static uintptr_t sentinel = 0xDEADBEEF;
+  bool first_valid = n->first_child != NULL &&
+    (uintptr_t)n->first_child > 0x400000 &&
+    (uintptr_t)n->first_child < 0x7fffffffffff &&
+    (uintptr_t)n->first_child->client != sentinel &&
+    !n->first_child->destroying;
+  bool second_valid = n->second_child != NULL &&
+    (uintptr_t)n->second_child > 0x400000 &&
+    (uintptr_t)n->second_child < 0x7fffffffffff &&
+    (uintptr_t)n->second_child->client != sentinel &&
+    !n->second_child->destroying;
+
+  if (n->first_child != NULL && !first_valid) {
+    wlr_log(WLR_ERROR, "Node %u has invalid/destroying/freed first_child pointer %p (destroying=%d), nulling",
+      n->id, (void*)n->first_child,
+      n->first_child && (uintptr_t)n->first_child->client != sentinel ? n->first_child->destroying : -1);
+    n->first_child = NULL;
+  }
+
+  if (n->second_child != NULL && !second_valid) {
+    wlr_log(WLR_ERROR, "Node %u has invalid/destroying/freed second_child pointer %p (destroying=%d), nulling",
+      n->id, (void*)n->second_child,
+      n->second_child && (uintptr_t)n->second_child->client != sentinel ? n->second_child->destroying : -1);
+    n->second_child = NULL;
+  }
+}
+
+static bool repair_split_node(node_t *n, desktop_t *d, output_t *m,
+    struct wlr_box rect, struct wlr_box root_rect) {
+  bool first_ok = n->first_child != NULL;
+  bool second_ok = n->second_child != NULL;
+
+  if ((first_ok && !second_ok) || (!first_ok && second_ok)) {
+    node_t *valid = first_ok ? n->first_child : n->second_child;
+    wlr_log(WLR_ERROR, "apply_layout: node %u has only one valid child - "
+      "promoting child %u; this indicates a tree inconsistency that should have been "
+      "resolved by remove_node", n->id, valid->id);
+
+    if (n->parent != NULL) {
+      if (is_first_child(n))
+        n->parent->first_child = valid;
+      else
+        n->parent->second_child = valid;
+      valid->parent = n->parent;
+    } else {
+      d->root = valid;
+      valid->parent = NULL;
+    }
+
+    n->first_child = NULL;
+    n->second_child = NULL;
+    n->parent = NULL;
+
+    apply_layout(m, d, valid, rect, root_rect);
+    return true;
+  }
+  return false;
+}
+
+static void compute_split_rects(node_t *n, desktop_t *d, struct wlr_box rect,
+    struct wlr_box *first_rect, struct wlr_box *second_rect) {
+  bool first_fullscreen = n->first_child && n->first_child->client && n->first_child->client->state == STATE_FULLSCREEN;
+  bool second_fullscreen = n->second_child && n->second_child->client && n->second_child->client->state == STATE_FULLSCREEN;
+  bool first_hidden = n->first_child && n->first_child->hidden;
+  bool second_hidden = n->second_child && n->second_child->hidden;
+
+  if (d->layout == LAYOUT_MONOCLE) {
+    *first_rect = rect;
+    *second_rect = rect;
+  } else if (n->split_type == TYPE_VERTICAL) {
+    if ((first_hidden || first_fullscreen) && n->second_child && !(second_hidden || second_fullscreen)) {
+      *first_rect = (struct wlr_box){0, 0, 0, 0};
+      *second_rect = rect;
+    } else if ((second_hidden || second_fullscreen) && n->first_child && !(first_hidden || first_fullscreen)) {
+      *first_rect = rect;
+      *second_rect = (struct wlr_box){0, 0, 0, 0};
+    } else {
+      *first_rect = rect;
+      *second_rect = rect;
+
+      int fence = (int)(n->split_ratio * rect.width);
+      uint16_t first_min = n->first_child ? n->first_child->constraints.min_width : 0;
+      uint16_t second_min = n->second_child ? n->second_child->constraints.min_width : 0;
+      if (first_min + second_min <= rect.width) {
+        if (fence < first_min)
+          fence = first_min;
+        else if (fence > rect.width - second_min)
+          fence = rect.width - second_min;
+      }
+
+      first_rect->width = fence;
+      second_rect->x += fence;
+      second_rect->width = rect.width - fence;
+    }
+  } else {
+    if ((first_hidden || first_fullscreen) && n->second_child && !(second_hidden || second_fullscreen)) {
+      *first_rect = (struct wlr_box){0, 0, 0, 0};
+      *second_rect = rect;
+    } else if ((second_hidden || second_fullscreen) && n->first_child && !(first_hidden || first_fullscreen)) {
+      *first_rect = rect;
+      *second_rect = (struct wlr_box){0, 0, 0, 0};
+    } else {
+      *first_rect = rect;
+      *second_rect = rect;
+
+      int fence = (int)(n->split_ratio * rect.height);
+      uint16_t first_min = n->first_child ? n->first_child->constraints.min_height : 0;
+      uint16_t second_min = n->second_child ? n->second_child->constraints.min_height : 0;
+      if (first_min + second_min <= rect.height) {
+        if (fence < first_min)
+          fence = first_min;
+        else if (fence > rect.height - second_min)
+          fence = rect.height - second_min;
+      }
+
+      first_rect->height = fence;
+      second_rect->y += fence;
+      second_rect->height = rect.height - fence;
+    }
+  }
+}
+
 static void apply_layout_tabbed_subtree(output_t *m, desktop_t *d, node_t *n,
     struct wlr_box content_rect, struct wlr_box root_rect) {
   if (n == NULL) return;
@@ -492,120 +595,12 @@ void apply_layout(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect,
     struct wlr_box first_rect;
     struct wlr_box second_rect;
 
-    // please help why am I doing this
-    static uintptr_t sentinel = 0xDEADBEEF;
-    bool first_valid = n->first_child != NULL &&
-      (uintptr_t)n->first_child > 0x400000 &&
-      (uintptr_t)n->first_child < 0x7fffffffffff &&
-      (uintptr_t)n->first_child->client != sentinel &&
-      !n->first_child->destroying;
-    bool second_valid = n->second_child != NULL &&
-      (uintptr_t)n->second_child > 0x400000 &&
-      (uintptr_t)n->second_child < 0x7fffffffffff &&
-      (uintptr_t)n->second_child->client != sentinel &&
-      !n->second_child->destroying;
+    validate_split_children(n);
 
-    if (n->first_child != NULL && !first_valid) {
-      wlr_log(WLR_ERROR, "Node %u has invalid/destroying/freed first_child pointer %p (destroying=%d), nulling",
-        n->id, (void*)n->first_child,
-        n->first_child && (uintptr_t)n->first_child->client != sentinel ? n->first_child->destroying : -1);
-      n->first_child = NULL;
-      first_valid = false;
-    }
-
-    if (n->second_child != NULL && !second_valid) {
-      wlr_log(WLR_ERROR, "Node %u has invalid/destroying/freed second_child pointer %p (destroying=%d), nulling",
-        n->id, (void*)n->second_child,
-        n->second_child && (uintptr_t)n->second_child->client != sentinel ? n->second_child->destroying : -1);
-      n->second_child = NULL;
-      second_valid = false;
-    }
-
-    // fix tree structure
-    if ((first_valid && !second_valid) || (!first_valid && second_valid)) {
-      node_t *valid_child = first_valid ? n->first_child : n->second_child;
-      wlr_log(WLR_ERROR, "apply_layout: node %u has only one valid child (first_valid=%d second_valid=%d) - "
-        "promoting child %u; this indicates a tree inconsistency that should have been "
-        "resolved by remove_node", n->id, first_valid, second_valid, valid_child->id);
-
-      if (n->parent != NULL) {
-        if (is_first_child(n))
-          n->parent->first_child = valid_child;
-        else
-          n->parent->second_child = valid_child;
-        valid_child->parent = n->parent;
-      } else {
-        d->root = valid_child;
-        valid_child->parent = NULL;
-      }
-
-      n->first_child = NULL;
-      n->second_child = NULL;
-      n->parent = NULL;
-
-      apply_layout(m, d, valid_child, rect, root_rect);
+    if (repair_split_node(n, d, m, rect, root_rect))
       return;
-    }
 
-    bool first_fullscreen = first_valid && n->first_child->client && n->first_child->client->state == STATE_FULLSCREEN;
-    bool second_fullscreen = second_valid && n->second_child->client && n->second_child->client->state == STATE_FULLSCREEN;
-    bool first_hidden = first_valid && n->first_child->hidden;
-    bool second_hidden = second_valid && n->second_child->hidden;
-
-    if (d->layout == LAYOUT_MONOCLE) {
-      first_rect = rect;
-      second_rect = rect;
-    } else if (n->split_type == TYPE_VERTICAL) {
-      if ((first_hidden || first_fullscreen) && n->second_child && !(second_hidden || second_fullscreen)) {
-        first_rect = (struct wlr_box){0, 0, 0, 0};
-        second_rect = rect;
-      } else if ((second_hidden || second_fullscreen) && n->first_child && !(first_hidden || first_fullscreen)) {
-        first_rect = rect;
-        second_rect = (struct wlr_box){0, 0, 0, 0};
-      } else {
-        first_rect = rect;
-        second_rect = rect;
-
-        int fence = (int)(n->split_ratio * rect.width);
-        uint16_t first_min = n->first_child ? n->first_child->constraints.min_width : 0;
-        uint16_t second_min = n->second_child ? n->second_child->constraints.min_width : 0;
-        if (first_min + second_min <= rect.width) {
-          if (fence < first_min)
-            fence = first_min;
-          else if (fence > rect.width - second_min)
-            fence = rect.width - second_min;
-        }
-
-        first_rect.width = fence;
-        second_rect.x += fence;
-        second_rect.width = rect.width - fence;
-      }
-    } else {
-      if ((first_hidden || first_fullscreen) && n->second_child && !(second_hidden || second_fullscreen)) {
-        first_rect = (struct wlr_box){0, 0, 0, 0};
-        second_rect = rect;
-      } else if ((second_hidden || second_fullscreen) && n->first_child && !(first_hidden || first_fullscreen)) {
-        first_rect = rect;
-        second_rect = (struct wlr_box){0, 0, 0, 0};
-      } else {
-        first_rect = rect;
-        second_rect = rect;
-
-        int fence = (int)(n->split_ratio * rect.height);
-        uint16_t first_min = n->first_child ? n->first_child->constraints.min_height : 0;
-        uint16_t second_min = n->second_child ? n->second_child->constraints.min_height : 0;
-        if (first_min + second_min <= rect.height) {
-          if (fence < first_min)
-            fence = first_min;
-          else if (fence > rect.height - second_min)
-            fence = rect.height - second_min;
-        }
-
-        first_rect.height = fence;
-        second_rect.y += fence;
-        second_rect.height = rect.height - fence;
-      }
-    }
+    compute_split_rects(n, d, rect, &first_rect, &second_rect);
 
     apply_layout(m, d, n->first_child, first_rect, root_rect);
     apply_layout(m, d, n->second_child, second_rect, root_rect);
@@ -1744,36 +1739,15 @@ void update_border_colors(struct wlr_scene_tree *border_tree, struct wlr_scene_r
   bool is_focused = (d && d->focus && d->focus->client == client);
   bool is_active  = (d && d->focus && d->focus->client != NULL);
 
-  float *grad, *grad2;
-  int gcount, g2count;
-  float gangle, g2angle, glerp;
-  if (is_focused) {
-    grad = focused_border_gradient;
-    gcount = focused_border_gradient_count;
-    gangle = focused_border_gradient_angle;
-    grad2 = focused_border_gradient2;
-    g2count = focused_border_gradient2_count;
-    g2angle = focused_border_gradient2_angle;
-    glerp = focused_border_gradient_lerp;
-  } else if (is_active) {
-    grad = active_border_gradient;
-    gcount = active_border_gradient_count;
-    gangle = active_border_gradient_angle;
-    grad2 = active_border_gradient2;
-    g2count = active_border_gradient2_count;
-    g2angle = active_border_gradient2_angle;
-    glerp = active_border_gradient_lerp;
-  } else {
-    grad = normal_border_gradient;
-    gcount = normal_border_gradient_count;
-    gangle = normal_border_gradient_angle;
-    grad2 = normal_border_gradient2;
-    g2count = normal_border_gradient2_count;
-    g2angle = normal_border_gradient2_angle;
-    glerp = normal_border_gradient_lerp;
-  }
+  border_theme_t *bt;
+  if (is_focused)
+    bt = &focused_border_theme;
+  else if (is_active)
+    bt = &active_border_theme;
+  else
+    bt = &normal_border_theme;
 
-  bool has_gradient = (gcount >= 2);
+  bool has_gradient = (bt->gradient_count >= 2);
   bool use_shader = (has_gradient || (client->border_radius > 0.0f));
 
   if (use_shader && client->toplevel) {
@@ -1790,13 +1764,13 @@ void update_border_colors(struct wlr_scene_tree *border_tree, struct wlr_scene_r
     r->border_color[2] = color[2];
     r->border_color[3] = color[3];
 
-    memcpy(r->gradient_colors, grad, gcount * 4 * sizeof(float));
-    r->gradient_count = gcount;
-    r->gradient_angle = gangle;
-    memcpy(r->gradient2_colors, grad2, g2count * 4 * sizeof(float));
-    r->gradient2_count = g2count;
-    r->gradient2_angle = g2angle;
-    r->gradient_lerp = glerp;
+    memcpy(r->gradient_colors, bt->gradient, bt->gradient_count * 4 * sizeof(float));
+    r->gradient_count = bt->gradient_count;
+    r->gradient_angle = bt->gradient_angle;
+    memcpy(r->gradient2_colors, bt->gradient2, bt->gradient2_count * 4 * sizeof(float));
+    r->gradient2_count = bt->gradient2_count;
+    r->gradient2_angle = bt->gradient2_angle;
+    r->gradient_lerp = bt->gradient_lerp;
     r->border_dirty = true;
 
     static const float transparent[4] = {0.0f, 0.0f, 0.0f, 0.0f};

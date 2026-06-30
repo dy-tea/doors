@@ -242,31 +242,21 @@ extern char focused_border_color[16];
 extern char presel_feedback_color[16];
 extern char tiling_drag_indicator_color[16];
 
-// broder gradients
+// border gradient theme
 #define BORDER_GRADIENT_MAX_STOPS 10
-extern float normal_border_gradient[BORDER_GRADIENT_MAX_STOPS * 4];
-extern int normal_border_gradient_count;
-extern float normal_border_gradient_angle;
-extern float normal_border_gradient2[BORDER_GRADIENT_MAX_STOPS * 4];
-extern int normal_border_gradient2_count;
-extern float normal_border_gradient2_angle;
-extern float normal_border_gradient_lerp;
+typedef struct {
+  float gradient[BORDER_GRADIENT_MAX_STOPS * 4];
+  int gradient_count;
+  float gradient_angle;
+  float gradient2[BORDER_GRADIENT_MAX_STOPS * 4];
+  int gradient2_count;
+  float gradient2_angle;
+  float gradient_lerp;
+} border_theme_t;
 
-extern float active_border_gradient[BORDER_GRADIENT_MAX_STOPS * 4];
-extern int active_border_gradient_count;
-extern float active_border_gradient_angle;
-extern float active_border_gradient2[BORDER_GRADIENT_MAX_STOPS * 4];
-extern int active_border_gradient2_count;
-extern float active_border_gradient2_angle;
-extern float active_border_gradient_lerp;
-
-extern float focused_border_gradient[BORDER_GRADIENT_MAX_STOPS * 4];
-extern int focused_border_gradient_count;
-extern float focused_border_gradient_angle;
-extern float focused_border_gradient2[BORDER_GRADIENT_MAX_STOPS * 4];
-extern int focused_border_gradient2_count;
-extern float focused_border_gradient2_angle;
-extern float focused_border_gradient_lerp;
+extern border_theme_t normal_border_theme;
+extern border_theme_t active_border_theme;
+extern border_theme_t focused_border_theme;
 
 // global state
 extern struct output_t *mon;

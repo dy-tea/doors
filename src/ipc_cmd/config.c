@@ -474,107 +474,60 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
       send_success(client_fd, "\n");
     }
   } else if (streq("normal_border_gradient", *args) || streq("active_border_gradient", *args) ||
-      streq("focused_border_gradient", *args)) {
-    float *grad;
-    int *gcount;
-    float *gangle;
-    if (args[0][0] == 'n') {
-      grad = normal_border_gradient;
-      gcount = &normal_border_gradient_count;
-      gangle = &normal_border_gradient_angle;
-    } else if (args[0][0] == 'a') {
-      grad = active_border_gradient;
-      gcount = &active_border_gradient_count;
-      gangle = &active_border_gradient_angle;
-    } else {
-      grad = focused_border_gradient;
-      gcount = &focused_border_gradient_count;
-      gangle = &focused_border_gradient_angle;
-    }
-
-    if (num >= 2) {
-      char joined[512] = "";
-      for (int i = 1; i < num; i++) {
-        if (i > 1) strncat(joined, " ", sizeof(joined) - strlen(joined) - 1);
-        strncat(joined, args[i], sizeof(joined) - strlen(joined) - 1);
-      }
-
-      if (streq(joined, "clear")) {
-        *gcount = 0;
-        *gangle = 0.0f;
-      } else {
-        ipc_parse_gradient(joined, grad, gcount, gangle);
-      }
-
-      refresh_border_colors();
-      transaction_commit_dirty();
-      send_success(client_fd, "border gradient set\n");
-    } else {
-      char buf[512];
-      ipc_format_gradient(buf, sizeof(buf), grad, *gcount, *gangle);
-      send_success(client_fd, buf);
-      send_success(client_fd, "\n");
-    }
-  } else if (streq("normal_border_gradient2", *args) || streq("active_border_gradient2", *args) ||
-      streq("focused_border_gradient2", *args)) {
-    float *grad;
-    int *gcount;
-    float *gangle;
-    if (args[0][0] == 'n') {
-      grad = normal_border_gradient2;
-      gcount = &normal_border_gradient2_count;
-      gangle = &normal_border_gradient2_angle;
-    } else if (args[0][0] == 'a') {
-      grad = active_border_gradient2;
-      gcount = &active_border_gradient2_count;
-      gangle = &active_border_gradient2_angle;
-    } else {
-      grad = focused_border_gradient2;
-      gcount = &focused_border_gradient2_count;
-      gangle = &focused_border_gradient2_angle;
-    }
-
-    if (num >= 2) {
-      char joined[512] = "";
-      for (int i = 1; i < num; i++) {
-        if (i > 1) strncat(joined, " ", sizeof(joined) - strlen(joined) - 1);
-        strncat(joined, args[i], sizeof(joined) - strlen(joined) - 1);
-      }
-
-      if (streq(joined, "clear")) {
-        *gcount = 0;
-        *gangle = 0.0f;
-      } else {
-        ipc_parse_gradient(joined, grad, gcount, gangle);
-      }
-
-      refresh_border_colors();
-      transaction_commit_dirty();
-      send_success(client_fd, "border gradient2 set\n");
-    } else {
-      char buf[512];
-      ipc_format_gradient(buf, sizeof(buf), grad, *gcount, *gangle);
-      send_success(client_fd, buf);
-      send_success(client_fd, "\n");
-    }
-  } else if (streq("normal_border_gradient_lerp", *args) || streq("active_border_gradient_lerp", *args) ||
+      streq("focused_border_gradient", *args) ||
+      streq("normal_border_gradient2", *args) || streq("active_border_gradient2", *args) ||
+      streq("focused_border_gradient2", *args) ||
+      streq("normal_border_gradient_lerp", *args) || streq("active_border_gradient_lerp", *args) ||
       streq("focused_border_gradient_lerp", *args)) {
-    float *lerp;
-    if (args[0][0] == 'n') lerp = &normal_border_gradient_lerp;
-    else if (args[0][0] == 'a') lerp = &active_border_gradient_lerp;
-    else lerp = &focused_border_gradient_lerp;
+    border_theme_t *bt;
+    if (args[0][0] == 'n') bt = &normal_border_theme;
+    else if (args[0][0] == 'a') bt = &active_border_theme;
+    else bt = &focused_border_theme;
 
-    if (num >= 2) {
-      *lerp = (float)atof(args[1]);
-      if (*lerp < 0.0f) *lerp = 0.0f;
-      if (*lerp > 1.0f) *lerp = 1.0f;
-      refresh_border_colors();
-      transaction_commit_dirty();
-      send_success(client_fd, "border gradient lerp set\n");
+    bool is_gradient2 = (strstr(*args, "gradient2") != NULL);
+    bool is_lerp = (strstr(*args, "lerp") != NULL);
+
+    if (is_lerp) {
+      if (num >= 2) {
+        bt->gradient_lerp = (float)atof(args[1]);
+        if (bt->gradient_lerp < 0.0f) bt->gradient_lerp = 0.0f;
+        if (bt->gradient_lerp > 1.0f) bt->gradient_lerp = 1.0f;
+        refresh_border_colors();
+        transaction_commit_dirty();
+        send_success(client_fd, "border gradient lerp set\n");
+      } else {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%f\n", bt->gradient_lerp);
+        send_success(client_fd, buf);
+      }
     } else {
-      char buf[32];
-      snprintf(buf, sizeof(buf), "%f\n", *lerp);
-      send_success(client_fd, buf);
+      float *grad = is_gradient2 ? bt->gradient2 : bt->gradient;
+      int *gcount = is_gradient2 ? &bt->gradient2_count : &bt->gradient_count;
+      float *gangle = is_gradient2 ? &bt->gradient2_angle : &bt->gradient_angle;
+
+      if (num >= 2) {
+        char joined[512] = "";
+        for (int i = 1; i < num; i++) {
+          if (i > 1) strncat(joined, " ", sizeof(joined) - strlen(joined) - 1);
+          strncat(joined, args[i], sizeof(joined) - strlen(joined) - 1);
+        }
+
+        if (streq(joined, "clear")) {
+          *gcount = 0;
+          *gangle = 0.0f;
+        } else {
+          ipc_parse_gradient(joined, grad, gcount, gangle);
+        }
+
+        refresh_border_colors();
+        transaction_commit_dirty();
+        send_success(client_fd, is_gradient2 ? "border gradient2 set\n" : "border gradient set\n");
+      } else {
+        char buf[512];
+        ipc_format_gradient(buf, sizeof(buf), grad, *gcount, *gangle);
+        send_success(client_fd, buf);
+        send_success(client_fd, "\n");
+      }
     }
   } else if (streq("automatic_scheme", *args)) {
     if (num >= 2) {

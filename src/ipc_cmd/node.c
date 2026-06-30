@@ -33,6 +33,61 @@
 
 void toplevel_map(struct wl_listener *listener, void *data);
 
+static void hide_node_client(node_t *n) {
+  n->client->shown = false;
+  struct wlr_scene_tree *st = client_get_scene_tree(n->client);
+  if (st)
+    wlr_scene_node_set_enabled(&st->node, false);
+}
+
+static void unhide_leaves(desktop_t *desk) {
+  for (node_t *ni = first_extrema(desk->root); ni; ni = next_leaf(ni, desk->root)) {
+    if (!ni->client) continue;
+
+    ni->client->shown = true;
+    bool configured = true;
+    if (ni->client->toplevel)
+      configured = ni->client->toplevel->configured;
+
+    if (!configured) continue;
+
+    struct wlr_scene_tree *st = client_get_scene_tree(ni->client);
+    if (st)
+      wlr_scene_node_set_enabled(&st->node, true);
+  }
+}
+
+static void hide_leaves(desktop_t *desk) {
+  for (node_t *ni = first_extrema(desk->root); ni; ni = next_leaf(ni, desk->root)) {
+    if (!ni->client) continue;
+
+    ni->client->shown = false;
+    struct wlr_scene_tree *st = client_get_scene_tree(ni->client);
+    if (st)
+      wlr_scene_node_set_enabled(&st->node, false);
+  }
+}
+
+static void unlink_and_refocus(node_t *n, desktop_t *src, output_t *mon) {
+  n->destroying = false;
+  n->ntxnrefs = 0;
+  hide_node_client(n);
+  remove_node(src, n);
+  if (src->root) {
+    node_t *nf = first_extrema(src->root);
+    if (nf) {
+      src->focus = nf;
+      focus_node(mon, src, nf);
+    } else {
+      src->focus = NULL;
+    }
+  } else {
+    src->focus = NULL;
+  }
+  n->destroying = false;
+  n->ntxnrefs = 0;
+}
+
 void ipc_cmd_node(char **args, int num, int client_fd) {
   if (num < 1) {
     send_failure(client_fd, "node: Missing arguments\n");
@@ -112,62 +167,19 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
 
     desktop_t *src_desk = m->desk;
 
-    n->destroying = false;
-    n->ntxnrefs = 0;
-
-    n->client->shown = false;
-    struct wlr_scene_tree *scene_tree = client_get_scene_tree(n->client);
-    if (scene_tree)
-      wlr_scene_node_set_enabled(&scene_tree->node, false);
-
-    remove_node(src_desk, n);
-
-    if (src_desk != target && src_desk->root != NULL) {
-      node_t *new_focus = first_extrema(src_desk->root);
-      if (new_focus != NULL) {
-        src_desk->focus = new_focus;
-        focus_node(m, src_desk, new_focus);
-      } else {
-        src_desk->focus = NULL;
-      }
-    } else {
-      src_desk->focus = NULL;
-    }
-
-    n->destroying = false;
-    n->ntxnrefs = 0;
+    unlink_and_refocus(n, src_desk, m);
 
     insert_node(target, n, find_public(target));
 
     target->focus = n;
-    if (target == m->desk && target->focus == n) {
+    if (target == m->desk)
       focus_node(m, target, n);
-    }
 
     if (target == m->desk) {
-      for (node_t *n_iter = first_extrema(target->root); n_iter != NULL; n_iter = next_leaf(n_iter, target->root)) {
-        if (n_iter->client) {
-          n_iter->client->shown = true;
-          bool already_configured = true;
-          if (n_iter->client->toplevel)
-            already_configured = n_iter->client->toplevel->configured;
-          if (already_configured) {
-            struct wlr_scene_tree *scene_tree = client_get_scene_tree(n_iter->client);
-            if (scene_tree)
-              wlr_scene_node_set_enabled(&scene_tree->node, true);
-          }
-        }
-      }
+      unhide_leaves(target);
       arrange(m, target, true);
     } else {
-      for (node_t *n_iter = first_extrema(target->root); n_iter != NULL; n_iter = next_leaf(n_iter, target->root)) {
-        if (n_iter->client) {
-          n_iter->client->shown = false;
-          struct wlr_scene_tree *scene_tree = client_get_scene_tree(n_iter->client);
-          if (scene_tree)
-            wlr_scene_node_set_enabled(&scene_tree->node, false);
-        }
-      }
+      hide_leaves(target);
       arrange(m, target, false);
     }
 
@@ -556,46 +568,12 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
 			return;
 		}
 
-    n->destroying = false;
-    n->ntxnrefs = 0;
-    n->client->shown = false;
-    struct wlr_scene_tree *scene_tree = client_get_scene_tree(n->client);
-    if (scene_tree)
-      wlr_scene_node_set_enabled(&scene_tree->node, false);
-
-    remove_node(src_desk, n);
-
-    if (src_desk->root) {
-      node_t *new_focus = first_extrema(src_desk->root);
-      if (new_focus) {
-        src_desk->focus = new_focus;
-        focus_node(m, src_desk, new_focus);
-      } else {
-        src_desk->focus = NULL;
-      }
-    } else {
-      src_desk->focus = NULL;
-    }
-
-    n->destroying = false;
-    n->ntxnrefs = 0;
+    unlink_and_refocus(n, src_desk, m);
 
     insert_node(target_desk, n, find_public(target_desk));
     target_desk->focus = n;
 
-    for (node_t *n_iter = first_extrema(target_desk->root); n_iter != NULL; n_iter = next_leaf(n_iter, target_desk->root)) {
-      if (n_iter->client) {
-        n_iter->client->shown = true;
-        bool already_configured = true;
-        if (n_iter->client->toplevel)
-          already_configured = n_iter->client->toplevel->configured;
-        if (already_configured) {
-          struct wlr_scene_tree *scene_tree = client_get_scene_tree(n_iter->client);
-          if (scene_tree)
-            wlr_scene_node_set_enabled(&scene_tree->node, true);
-        }
-      }
-    }
+    unhide_leaves(target_desk);
 
     arrange(target, target_desk, true);
     arrange(m, src_desk, src_desk->root != NULL);
@@ -647,29 +625,7 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
     desktop_t *src_desk = m->desk;
     desktop_t *target_desk = src_desk;
 
-    n1->destroying = false;
-    n1->ntxnrefs = 0;
-    n1->client->shown = false;
-    struct wlr_scene_tree *scene_tree = client_get_scene_tree(n1->client);
-    if (scene_tree)
-      wlr_scene_node_set_enabled(&scene_tree->node, false);
-
-    remove_node(src_desk, n1);
-
-    if (src_desk->root) {
-      node_t *new_focus = first_extrema(src_desk->root);
-      if (new_focus) {
-        src_desk->focus = new_focus;
-        focus_node(m, src_desk, new_focus);
-      } else {
-        src_desk->focus = NULL;
-      }
-    } else {
-      src_desk->focus = NULL;
-    }
-
-    n1->destroying = false;
-    n1->ntxnrefs = 0;
+    unlink_and_refocus(n1, src_desk, m);
 
     if (n2->first_child) {
       n1->parent = n2;
@@ -683,19 +639,7 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
     if (target_desk == m->desk)
       focus_node(m, target_desk, n1);
 
-    for (node_t *n_iter = first_extrema(target_desk->root); n_iter != NULL; n_iter = next_leaf(n_iter, target_desk->root)) {
-      if (n_iter->client) {
-        n_iter->client->shown = true;
-        bool already_configured = true;
-        if (n_iter->client->toplevel)
-          already_configured = n_iter->client->toplevel->configured;
-        if (already_configured) {
-          struct wlr_scene_tree *scene_tree = client_get_scene_tree(n_iter->client);
-          if (scene_tree)
-            wlr_scene_node_set_enabled(&scene_tree->node, true);
-        }
-      }
-    }
+    unhide_leaves(target_desk);
 
     arrange(m, target_desk, true);
     if (src_desk != target_desk)
