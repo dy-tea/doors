@@ -56,5 +56,8 @@ const char *ipc_get_socket_path(void);
 void ipc_put_status(subscriber_mask_t mask, const char *fmt, ...);
 bool ipc_print_report(int fd);
 
+void send_success(int client_fd, const char *msg);
+void send_failure(int client_fd, const char *msg);
+
 /* Returns true when the command takes ownership of client_fd. */
 bool process_ipc_message(char *msg, int msg_len, int client_fd);

@@ -6,8 +6,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-void send_failure(int client_fd, const char *msg);
-
 static subscriber_t *make_subscriber(int client_fd, char *fifo_path, subscriber_mask_t mask, int count) {
   subscriber_t *sb = calloc(1, sizeof(*sb));
   if (!sb) {

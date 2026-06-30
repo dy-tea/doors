@@ -1,0 +1,27 @@
+#pragma once
+
+void ipc_cmd_quit(char **args, int num, int client_fd);
+void ipc_cmd_output(char **args, int num, int client_fd);
+void ipc_cmd_input(char **args, int num, int client_fd);
+void ipc_cmd_node(char **args, int num, int client_fd);
+void ipc_cmd_desktop(char **args, int num, int client_fd);
+void ipc_cmd_query(char **args, int num, int client_fd);
+void ipc_cmd_wm(char **args, int num, int client_fd);
+void ipc_cmd_config(char **args, int num, int client_fd);
+void ipc_cmd_focus(char **args, int num, int client_fd);
+void ipc_cmd_swap(char **args, int num, int client_fd);
+void ipc_cmd_presel(char **args, int num, int client_fd);
+void ipc_cmd_resize(char **args, int num, int client_fd);
+void ipc_cmd_toggle(char **args, int num, int client_fd);
+void ipc_cmd_rotate(char **args, int num, int client_fd);
+void ipc_cmd_flip(char **args, int num, int client_fd);
+void ipc_cmd_equalize(char **args, int num, int client_fd);
+void ipc_cmd_balance(char **args, int num, int client_fd);
+void ipc_cmd_send(char **args, int num, int client_fd);
+void ipc_cmd_rule(char **args, int num, int client_fd);
+void ipc_cmd_seat(char **args, int num, int client_fd);
+void ipc_cmd_keyboard_grouping(char **args, int num, int client_fd);
+void ipc_cmd_scroller(char **args, int num, int client_fd);
+void ipc_cmd_master_stack(char **args, int num, int client_fd);
+void ipc_cmd_hotkey(char **args, int num, int client_fd);
+void ipc_cmd_scratchpad(char **args, int num, int client_fd);
