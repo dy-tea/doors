@@ -32,6 +32,13 @@
 #include <wlr/util/log.h>
 #include <wlr/xwayland.h>
 
+static void tabs_rebuild_all(void) {
+  for (output_t *m = mon_head; m; m = m->next)
+    for (desktop_t *d = m->desk; d; d = d->next)
+      if (d->root)
+      	tabs_rebuild(d->root);
+}
+
 void ipc_cmd_config(char **args, int num, int client_fd) {
   if (num < 1) {
     send_failure(client_fd, "config: Missing arguments\n");
@@ -119,10 +126,7 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
         send_failure(client_fd, "config decoration_mode: expected \"none\", \"tabs\", \"always\", or \"csd\"\n");
         return;
       }
-      for (output_t *m = mon_head; m != NULL; m = m->next)
-        for (desktop_t *d = m->desk; d != NULL; d = d->next)
-          if (d->root != NULL)
-            tabs_rebuild(d->root);
+      tabs_rebuild_all();
       transaction_commit_dirty();
       send_success(client_fd, "decoration_mode set\n");
     } else {
@@ -163,139 +167,45 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
     ipc_handle_bool(args, num, client_fd, &workspace_anim_slide_up, IPC_FLAG_NONE);
   } else if (streq("edge_scroller_pointer_focus", *args)) {
     ipc_handle_bool(args, num, client_fd, &edge_scroller_pointer_focus, IPC_FLAG_NONE);
-  } else if (streq("tab_color_bar_bg", *args)) {
-    if (num >= 2) {
-      float r, g, b, a = 1.0f;
-      int n = sscanf(args[1], "%f %f %f %f", &r, &g, &b, &a);
-      if (n >= 3) {
-        color_bar_bg[0] = r; color_bar_bg[1] = g;
-        color_bar_bg[2] = b; color_bar_bg[3] = a;
-        for (output_t *m = mon_head; m != NULL; m = m->next)
-          for (desktop_t *d = m->desk; d != NULL; d = d->next)
-            if (d->root != NULL)
-              tabs_rebuild(d->root);
-        send_success(client_fd, "tab_color_bar_bg set\n");
-      } else {
-        send_failure(client_fd, "config tab_color_bar_bg: expected \"R G B [A]\"\n");
+  } else if (args[0][0] == 't' && strncmp(*args, "tab_color_", 10) == 0) {
+    typedef struct { const char *name; float *color; } tab_cfg_t;
+    static const tab_cfg_t tab_colors[] = {
+      {"bar_bg", color_bar_bg},
+      {"bg", color_tab_bg},
+      {"bg_active", color_tab_bg_active},
+      {"text", color_tab_text},
+      {"text_active", color_tab_text_active},
+      {"sep", color_tab_sep},
+    };
+    const char *suffix = *args + 10;
+    for (size_t i = 0; i < sizeof(tab_colors)/sizeof(tab_colors[0]); i++) {
+      if (streq(suffix, tab_colors[i].name)) {
+        if (num >= 2) {
+          float rgba[4];
+          if (ipc_parse_color_float(args[1], rgba)) {
+            memcpy(tab_colors[i].color, rgba, sizeof(rgba));
+            tabs_rebuild_all();
+            char msg[128];
+            snprintf(msg, sizeof(msg), "%s set\n", *args);
+            send_success(client_fd, msg);
+          } else {
+            char msg[128];
+            snprintf(msg, sizeof(msg), "config %s: expected \"R G B [A]\"\n", *args);
+            send_failure(client_fd, msg);
+          }
+        } else {
+          char buf[128];
+          ipc_format_color_float(buf, sizeof(buf), tab_colors[i].color);
+          send_success(client_fd, buf);
+        }
+        return;
       }
-    } else {
-      char buf[128];
-      snprintf(buf, sizeof(buf), "%.3f %.3f %.3f %.3f\n",
-        color_bar_bg[0], color_bar_bg[1], color_bar_bg[2], color_bar_bg[3]);
-      send_success(client_fd, buf);
     }
-  } else if (streq("tab_color_bg", *args)) {
-    if (num >= 2) {
-      float r, g, b, a = 1.0f;
-      int n = sscanf(args[1], "%f %f %f %f", &r, &g, &b, &a);
-      if (n >= 3) {
-        color_tab_bg[0] = r; color_tab_bg[1] = g;
-        color_tab_bg[2] = b; color_tab_bg[3] = a;
-        for (output_t *m = mon_head; m != NULL; m = m->next)
-          for (desktop_t *d = m->desk; d != NULL; d = d->next)
-            if (d->root != NULL)
-              tabs_rebuild(d->root);
-        send_success(client_fd, "tab_color_bg set\n");
-      } else {
-        send_failure(client_fd, "config tab_color_bg: expected \"R G B [A]\"\n");
-      }
-    } else {
-      char buf[128];
-      snprintf(buf, sizeof(buf), "%.3f %.3f %.3f %.3f\n",
-        color_tab_bg[0], color_tab_bg[1], color_tab_bg[2], color_tab_bg[3]);
-      send_success(client_fd, buf);
-    }
-  } else if (streq("tab_color_bg_active", *args)) {
-    if (num >= 2) {
-      float r, g, b, a = 1.0f;
-      int n = sscanf(args[1], "%f %f %f %f", &r, &g, &b, &a);
-      if (n >= 3) {
-        color_tab_bg_active[0] = r; color_tab_bg_active[1] = g;
-        color_tab_bg_active[2] = b; color_tab_bg_active[3] = a;
-        for (output_t *m = mon_head; m != NULL; m = m->next)
-          for (desktop_t *d = m->desk; d != NULL; d = d->next)
-            if (d->root != NULL)
-              tabs_rebuild(d->root);
-        send_success(client_fd, "tab_color_bg_active set\n");
-      } else {
-        send_failure(client_fd, "config tab_color_bg_active: expected \"R G B [A]\"\n");
-      }
-    } else {
-      char buf[128];
-      snprintf(buf, sizeof(buf), "%.3f %.3f %.3f %.3f\n",
-        color_tab_bg_active[0], color_tab_bg_active[1], color_tab_bg_active[2], color_tab_bg_active[3]);
-      send_success(client_fd, buf);
-    }
-  } else if (streq("tab_color_text", *args)) {
-    if (num >= 2) {
-      float r, g, b, a = 1.0f;
-      int n = sscanf(args[1], "%f %f %f %f", &r, &g, &b, &a);
-      if (n >= 3) {
-        color_tab_text[0] = r; color_tab_text[1] = g;
-        color_tab_text[2] = b; color_tab_text[3] = a;
-        for (output_t *m = mon_head; m != NULL; m = m->next)
-          for (desktop_t *d = m->desk; d != NULL; d = d->next)
-            if (d->root != NULL)
-              tabs_rebuild(d->root);
-        send_success(client_fd, "tab_color_text set\n");
-      } else {
-        send_failure(client_fd, "config tab_color_text: expected \"R G B [A]\"\n");
-      }
-    } else {
-      char buf[128];
-      snprintf(buf, sizeof(buf), "%.3f %.3f %.3f %.3f\n",
-        color_tab_text[0], color_tab_text[1], color_tab_text[2], color_tab_text[3]);
-      send_success(client_fd, buf);
-    }
-  } else if (streq("tab_color_text_active", *args)) {
-    if (num >= 2) {
-      float r, g, b, a = 1.0f;
-      int n = sscanf(args[1], "%f %f %f %f", &r, &g, &b, &a);
-      if (n >= 3) {
-        color_tab_text_active[0] = r; color_tab_text_active[1] = g;
-        color_tab_text_active[2] = b; color_tab_text_active[3] = a;
-        for (output_t *m = mon_head; m != NULL; m = m->next)
-          for (desktop_t *d = m->desk; d != NULL; d = d->next)
-            if (d->root != NULL)
-              tabs_rebuild(d->root);
-        send_success(client_fd, "tab_color_text_active set\n");
-      } else {
-        send_failure(client_fd, "config tab_color_text_active: expected \"R G B [A]\"\n");
-      }
-    } else {
-      char buf[128];
-      snprintf(buf, sizeof(buf), "%.3f %.3f %.3f %.3f\n",
-        color_tab_text_active[0], color_tab_text_active[1], color_tab_text_active[2], color_tab_text_active[3]);
-      send_success(client_fd, buf);
-    }
-  } else if (streq("tab_color_sep", *args)) {
-    if (num >= 2) {
-      float r, g, b, a = 1.0f;
-      int n = sscanf(args[1], "%f %f %f %f", &r, &g, &b, &a);
-      if (n >= 3) {
-        color_tab_sep[0] = r; color_tab_sep[1] = g;
-        color_tab_sep[2] = b; color_tab_sep[3] = a;
-        for (output_t *m = mon_head; m != NULL; m = m->next)
-          for (desktop_t *d = m->desk; d != NULL; d = d->next)
-            if (d->root != NULL)
-              tabs_rebuild(d->root);
-        send_success(client_fd, "tab_color_sep set\n");
-      } else {
-        send_failure(client_fd, "config tab_color_sep: expected \"R G B [A]\"\n");
-      }
-    } else {
-      char buf[128];
-      snprintf(buf, sizeof(buf), "%.3f %.3f %.3f %.3f\n",
-        color_tab_sep[0], color_tab_sep[1], color_tab_sep[2], color_tab_sep[3]);
-      send_success(client_fd, buf);
-    }
+    send_failure(client_fd, "config: unknown tab_color setting\n");
   } else if (streq("text_font", *args)) {
     if (num >= 2) {
       snprintf(text_font, sizeof(text_font), "%s", args[1]);
-      for (output_t *m = mon_head; m != NULL; m = m->next)
-        for (desktop_t *d = m->desk; d != NULL; d = d->next)
-          if (d->root != NULL)
-            tabs_rebuild(d->root);
+      tabs_rebuild_all();
       send_success(client_fd, "text_font set\n");
     } else {
       char buf[256];
@@ -307,10 +217,7 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
       int val = atoi(args[1]);
       if (val > 0) {
         text_height = val;
-        for (output_t *m = mon_head; m != NULL; m = m->next)
-          for (desktop_t *d = m->desk; d != NULL; d = d->next)
-            if (d->root != NULL)
-              tabs_rebuild(d->root);
+        tabs_rebuild_all();
         send_success(client_fd, "text_height set\n");
       } else {
         send_failure(client_fd, "config text_height: value must be > 0\n");
@@ -692,11 +599,9 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
     }
   } else if (streq("mica_tint", *args)) {
     if (num >= 2) {
-      float r, g, b, a = 1.0f;
-      int n = sscanf(args[1], "%f %f %f %f", &r, &g, &b, &a);
-      if (n >= 3) {
-        mica_tint[0] = r; mica_tint[1] = g;
-        mica_tint[2] = b; mica_tint[3] = a;
+      float rgba[4];
+      if (ipc_parse_color_float(args[1], rgba)) {
+        memcpy(mica_tint, rgba, sizeof(rgba));
         for (output_t *output = mon_head; output; output = output->next)
           blur_invalidate_mica(output->blur_ctx);
         send_success(client_fd, "mica_tint set\n");
@@ -705,25 +610,21 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
       }
     } else {
       char buf[128];
-      snprintf(buf, sizeof(buf), "%.3f %.3f %.3f %.3f\n",
-      	mica_tint[0], mica_tint[1], mica_tint[2], mica_tint[3]);
-    send_success(client_fd, buf);
-  }
+      ipc_format_color_float(buf, sizeof(buf), mica_tint);
+      send_success(client_fd, buf);
+    }
   } else if (streq("acrylic_tint", *args)) {
     if (num >= 2) {
-      float r, g, b, a = 1.0f;
-      int n = sscanf(args[1], "%f %f %f %f", &r, &g, &b, &a);
-      if (n >= 3) {
-        acrylic_tint[0] = r; acrylic_tint[1] = g;
-        acrylic_tint[2] = b; acrylic_tint[3] = a;
+      float rgba[4];
+      if (ipc_parse_color_float(args[1], rgba)) {
+        memcpy(acrylic_tint, rgba, sizeof(rgba));
         send_success(client_fd, "acrylic_tint set\n");
       } else {
         send_failure(client_fd, "config acrylic_tint: expected \"R G B [A]\"\n");
       }
     } else {
       char buf[128];
-      snprintf(buf, sizeof(buf), "%.3f %.3f %.3f %.3f\n",
-        acrylic_tint[0], acrylic_tint[1], acrylic_tint[2], acrylic_tint[3]);
+      ipc_format_color_float(buf, sizeof(buf), acrylic_tint);
       send_success(client_fd, buf);
     }
   } else if (streq("acrylic_tint_strength", *args)) {
@@ -875,19 +776,16 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
     ipc_handle_float(args, num, client_fd, &shadow_offset_y, IPC_FLAG_NONE, -100.0f, 100.0f, "%.1f\n", "value must be -100-100");
   } else if (streq("shadow_color", *args)) {
     if (num >= 2) {
-      float r, g, b, a = 1.0f;
-      int n = sscanf(args[1], "%f %f %f %f", &r, &g, &b, &a);
-      if (n >= 3) {
-        shadow_color[0] = r; shadow_color[1] = g;
-        shadow_color[2] = b; shadow_color[3] = a;
+      float rgba[4];
+      if (ipc_parse_color_float(args[1], rgba)) {
+        memcpy(shadow_color, rgba, sizeof(rgba));
         send_success(client_fd, "shadow_color set\n");
       } else {
         send_failure(client_fd, "config shadow_color: expected \"R G B [A]\"\n");
       }
     } else {
       char buf[128];
-      snprintf(buf, sizeof(buf), "%.3f %.3f %.3f %.3f\n",
-        shadow_color[0], shadow_color[1], shadow_color[2], shadow_color[3]);
+      ipc_format_color_float(buf, sizeof(buf), shadow_color);
       send_success(client_fd, buf);
     }
   } else {

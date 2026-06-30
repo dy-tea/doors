@@ -34,6 +34,17 @@ bool ipc_parse_color(const char *hex, float *rgba) {
   return true;
 }
 
+bool ipc_parse_color_float(const char *str, float rgba[4]) {
+  if (!str) return false;
+  rgba[3] = 1.0f;
+  int n = sscanf(str, "%f %f %f %f", &rgba[0], &rgba[1], &rgba[2], &rgba[3]);
+  return n >= 3;
+}
+
+void ipc_format_color_float(char *buf, size_t bufsz, const float rgba[4]) {
+  snprintf(buf, bufsz, "%.3f %.3f %.3f %.3f\n", rgba[0], rgba[1], rgba[2], rgba[3]);
+}
+
 bool ipc_parse_gradient(const char *str, float out[BORDER_GRADIENT_MAX_STOPS * 4], int *count, float *angle_out) {
   if (!str) return false;
   char buf[512];
