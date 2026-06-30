@@ -990,6 +990,7 @@ static GLuint capture_bg_to_tex1(output_t *output, effects_output_t *ctx,
   wlr_output_state_set_enabled(&cap_state, true);
   wlr_output_state_set_custom_mode(&cap_state, w, h, 0);
 
+  egl_unset_current();
   bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
 
   egl_make_current();
@@ -1020,7 +1021,6 @@ static GLuint capture_bg_to_tex1(output_t *output, effects_output_t *ctx,
 
   if (!ok || !cap_state.buffer) {
     wlr_log(WLR_INFO, "capture_bg_to_tex1: no buffer from build_state");
-    egl_unset_current();
     wlr_output_state_finish(&cap_state);
     return 0;
   }
@@ -1028,7 +1028,6 @@ static GLuint capture_bg_to_tex1(output_t *output, effects_output_t *ctx,
   GLuint capture_fbo = wlr_gles2_renderer_get_buffer_fbo(server.renderer, cap_state.buffer);
   GLuint result = capture_readback(ctx, capture_fbo, w, h);
 
-  egl_unset_current();
   wlr_output_state_finish(&cap_state);
 
   return result;
@@ -1069,6 +1068,7 @@ static GLuint capture_bg_combined(output_t *output, effects_output_t *ctx,
   wlr_output_state_set_enabled(&cap_state, true);
   wlr_output_state_set_custom_mode(&cap_state, w, h, 0);
 
+  egl_unset_current();
   bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
 
   egl_make_current();
@@ -1092,7 +1092,6 @@ static GLuint capture_bg_combined(output_t *output, effects_output_t *ctx,
 
   if (!ok || !cap_state.buffer) {
     wlr_log(WLR_INFO, "capture_bg_combined: no buffer from build_state");
-    egl_unset_current();
     wlr_output_state_finish(&cap_state);
     return 0;
   }
@@ -1100,7 +1099,6 @@ static GLuint capture_bg_combined(output_t *output, effects_output_t *ctx,
   GLuint capture_fbo = wlr_gles2_renderer_get_buffer_fbo(server.renderer, cap_state.buffer);
   GLuint result = capture_readback(ctx, capture_fbo, w, h);
 
-  egl_unset_current();
   wlr_output_state_finish(&cap_state);
   return result;
 }
@@ -1196,14 +1194,11 @@ static bool rebuild_live_blur(output_t *output, struct wlr_scene_output *scene_o
       &tl->scene_tree->node, &tl->blur->blur_scene_hidden);
     if (!src) continue;
 
-    egl_make_current();
     GLuint blurred = apply_blur(ctx, src, ctx->blur_w, ctx->blur_h);
 
     GLuint dest_fbo = ensure_output_buf(&tl->blur->blur_buf, &tl->blur->blur_buf_fbo, w, h);
-    if (!dest_fbo) {
-      egl_unset_current();
+    if (!dest_fbo)
       continue;
-    }
 
     glDisable(GL_BLEND);
     glDisable(GL_SCISSOR_TEST);
@@ -1240,8 +1235,6 @@ static bool rebuild_live_blur(output_t *output, struct wlr_scene_output *scene_o
 
     glBindTexture(GL_TEXTURE_2D, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glFlush();
-    egl_unset_current();
     any = true;
   }
   return any;
@@ -1340,14 +1333,11 @@ static bool rebuild_live_blur_layers(output_t *output, struct wlr_scene_output *
         if (!src) continue;
       }
 
-      egl_make_current();
       GLuint blurred = apply_blur(ctx, src, ctx->blur_w, ctx->blur_h);
 
       GLuint dest_fbo = ensure_output_buf(&ls->blur_buf, &ls->blur_buf_fbo, w, h);
-      if (!dest_fbo) {
-        egl_unset_current();
+      if (!dest_fbo)
         continue;
-      }
 
       // clear with transparent, draw the blurred texture clipped to the blur region
       glDisable(GL_BLEND);
@@ -1374,8 +1364,6 @@ static bool rebuild_live_blur_layers(output_t *output, struct wlr_scene_output *
       glDisable(GL_SCISSOR_TEST);
       glBindTexture(GL_TEXTURE_2D, 0);
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
-      glFlush();
-      egl_unset_current();
       any = true;
     }
   }
@@ -1468,8 +1456,6 @@ static bool rebuild_live_acrylic(output_t *output, struct wlr_scene_output *scen
     GLuint dest_fbo = ensure_output_buf(&tl->blur->acrylic_buf, &tl->blur->acrylic_buf_fbo, w, h);
     if (!dest_fbo) continue;
 
-    egl_make_current();
-
     glDisable(GL_BLEND);
     glDisable(GL_SCISSOR_TEST);
     GLuint blurred = src;
@@ -1522,8 +1508,6 @@ static bool rebuild_live_acrylic(output_t *output, struct wlr_scene_output *scen
 
     glBindTexture(GL_TEXTURE_2D, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glFlush();
-    egl_unset_current();
     any = true;
   }
   return any;
@@ -1571,14 +1555,11 @@ static bool rebuild_mica(output_t *output, struct wlr_scene_output *scene_output
   GLuint src = capture_bg_to_tex1(output, ctx, scene_output, true, NULL, NULL);
   if (!src) return false;
 
-  egl_make_current();
   GLuint blurred = apply_blur(ctx, src, ctx->blur_w, ctx->blur_h);
 
   GLuint dest_fbo = ensure_output_buf(&ctx->mica_buf, &ctx->mica_buf_fbo, w, h);
-  if (!dest_fbo) {
-    egl_unset_current();
+  if (!dest_fbo)
     return false;
-  }
 
   glDisable(GL_BLEND);
   glDisable(GL_SCISSOR_TEST);
@@ -1593,8 +1574,6 @@ static bool rebuild_mica(output_t *output, struct wlr_scene_output *scene_output
   draw_quad();
   glBindTexture(GL_TEXTURE_2D, 0);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
-  glFlush();
-  egl_unset_current();
 
   ctx->mica_dirty = false;
   return true;
@@ -1865,6 +1844,7 @@ static bool rebuild_corner_masks(output_t *output, struct wlr_scene_output *scen
       wlr_output_state_init(&cap_state);
       wlr_output_state_set_enabled(&cap_state, true);
       wlr_output_state_set_custom_mode(&cap_state, cw, ch, 0);
+      egl_unset_current();
       bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
       egl_make_current();
       glFlush();
@@ -1882,26 +1862,20 @@ static bool rebuild_corner_masks(output_t *output, struct wlr_scene_output *scen
       wlr_damage_ring_add_whole(&scene_output->damage_ring);
 
       if (!ok || !cap_state.buffer) {
-        egl_unset_current();
         wlr_output_state_finish(&cap_state);
         continue;
       }
 
       GLuint capture_fbo = wlr_gles2_renderer_get_buffer_fbo(server.renderer, cap_state.buffer);
       src = capture_readback(ctx, capture_fbo, cw, ch);
-      egl_unset_current();
       wlr_output_state_finish(&cap_state);
       if (!src) continue;
     }
 
-    egl_make_current();
-
     GLuint dest_fbo = ensure_output_buf(&tl->rounded->corner_mask_buf,
       &tl->rounded->corner_mask_buf_fbo, w, h);
-    if (!dest_fbo) {
-    	egl_unset_current();
-    	continue;
-    }
+    if (!dest_fbo)
+      continue;
 
     float ow = (float)w, oh = (float)h;
     int bw_i = (c->state == STATE_FULLSCREEN) ? 0 : border_width;
@@ -1933,8 +1907,6 @@ static bool rebuild_corner_masks(output_t *output, struct wlr_scene_output *scen
     draw_quad();
     glBindTexture(GL_TEXTURE_2D, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glFlush();
-    egl_unset_current();
 
     any = true;
   }
@@ -2005,6 +1977,7 @@ static GLuint capture_full_scene_to_tex(output_t *output, effects_output_t *ctx,
   wlr_output_state_set_enabled(&cap_state, true);
   wlr_output_state_set_custom_mode(&cap_state, w, h, 0);
 
+  egl_unset_current();
   bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
 
   egl_make_current();
@@ -2017,7 +1990,6 @@ static GLuint capture_full_scene_to_tex(output_t *output, effects_output_t *ctx,
   wlr_damage_ring_add_whole(&real_scene_output->damage_ring);
 
   if (!ok || !cap_state.buffer) {
-    egl_unset_current();
     wlr_output_state_finish(&cap_state);
     return 0;
   }
@@ -2082,7 +2054,6 @@ static GLuint capture_full_scene_to_tex(output_t *output, effects_output_t *ctx,
     }
   }
 
-  egl_unset_current();
   wlr_output_state_finish(&cap_state);
   return result;
 }
@@ -2105,11 +2076,8 @@ static void handle_screen_shader_frame(output_t *output, struct wlr_scene_output
     return;
   }
 
-  egl_make_current();
-
   GLuint dest_fbo = ensure_output_buf(&ctx->screen_shader_buf, &ctx->screen_shader_buf_fbo, w, h);
   if (!dest_fbo) {
-    egl_unset_current();
     wlr_scene_node_set_enabled(&ctx->screen_shader_node->node, false);
     return;
   }
@@ -2137,9 +2105,6 @@ static void handle_screen_shader_frame(output_t *output, struct wlr_scene_output
   draw_quad();
   glBindTexture(GL_TEXTURE_2D, 0);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
-  glFlush();
-
-  egl_unset_current();
 
   wlr_scene_buffer_set_buffer(ctx->screen_shader_node, ctx->screen_shader_buf);
   struct wlr_fbox src_box = {0, 0, (double)w, (double)h};
@@ -2249,6 +2214,9 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 
   if (ctx->width != output->width || ctx->height != output->height)
     effects_output_resize(ctx, output->width, output->height, output);
+
+  egl_make_current();
+
   {
     toplevel_t *tl;
     wl_list_for_each(tl, &server.toplevels, link) {
@@ -2261,9 +2229,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
           wlr_scene_node_set_enabled(&tl->shadow->shadow_node->node, false);
         continue;
       }
-      egl_make_current();
       blur_render_shadow(tl);
-      egl_unset_current();
       tl->shadow->shadow_dirty = false;
     }
   }
@@ -2399,14 +2365,14 @@ after_capture:
           content_r.height = tl->geometry.height;
       }
 
-      egl_make_current();
       blur_render_border(tl, content_r.width, content_r.height);
-      egl_unset_current();
       tl->rounded->border_dirty = false;
     }
   }
 
   handle_screen_shader_frame(output, scene_output);
+
+  egl_unset_current();
 }
 
 enum blur_algorithm blur_algorithm_from_str(const char *str) {
