@@ -42,11 +42,11 @@ typedef struct gesture_t {
 } gesture_t;
 
 char *gesture_parse(const char *input, gesture_t *output);
-char *gesture_to_string(gesture_t *gesture);
-bool gesture_check(gesture_t *target, enum gesture_type type, uint8_t fingers);
-bool gesture_match(gesture_t *target, gesture_t *to_match, bool exact);
-bool gesture_equal(gesture_t *a, gesture_t *b);
-int8_t gesture_compare(gesture_t *a, gesture_t *b);
+char *gesture_to_string(const gesture_t *gesture);
+bool gesture_check(const gesture_t *target, enum gesture_type type, uint8_t fingers);
+bool gesture_match(const gesture_t *target, const gesture_t *to_match, bool exact);
+bool gesture_equal(const gesture_t *a, const gesture_t *b);
+int8_t gesture_compare(const gesture_t *a, const gesture_t *b);
 
 typedef struct gesture_tracker_t {
 	enum gesture_type type;

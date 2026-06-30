@@ -21,7 +21,7 @@ void scroller_arrange(struct output_t *m, desktop_t *d, struct wlr_box available
 
 void scroller_stack_push(client_t *head, client_t *new_client);
 void scroller_stack_remove(client_t *client);
-client_t *scroller_get_stack_head(client_t *client);
+client_t *scroller_get_stack_head(const client_t *client);
 
 void scroller_resize_width(client_t *client, float delta);
 void scroller_resize_stack(client_t *client, float delta);
@@ -31,7 +31,7 @@ void scroller_cycle_proportion_preset(client_t *client);
 
 void scroller_center_window(desktop_t *d, client_t *client);
 
-bool scroller_is_tiled(client_t *c);
+bool scroller_is_tiled(const client_t *c);
 int scroller_count_tiled_clients(desktop_t *d);
 void scroller_init_client(client_t *c);
 

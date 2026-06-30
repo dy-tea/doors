@@ -99,9 +99,9 @@ void input_config_destroy(input_config_t *config);
 input_config_t *input_config_get(const char *identifier);
 input_config_t *input_config_get_for_device(const char *identifier, enum input_config_type type);
 bool input_config_add(input_config_t *config);
-void input_config_merge(input_config_t *base, input_config_t *overlay);
+void input_config_merge(input_config_t *base, const input_config_t *overlay);
 bool input_config_set_value(input_config_t *config, const char *name, const char *value);
-void input_config_apply(input_config_t *config, struct wlr_input_device *device);
+void input_config_apply(const input_config_t *config, struct wlr_input_device *device);
 
 void input_init(void);
 void input_fini(void);

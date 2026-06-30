@@ -21,7 +21,7 @@ bool edge_scroller_pointer_focus = true;
 float *scroller_proportion_preset = NULL;
 int scroller_proportion_preset_count = 0;
 
-bool scroller_is_tiled(client_t *c) {
+bool scroller_is_tiled(const client_t *c) {
   if (!c) return false;
   return c->state == STATE_TILED || c->state == STATE_PSEUDO_TILED;
 }
@@ -40,11 +40,11 @@ void scroller_init_client(client_t *c) {
   c->cursor_in_upper_half = false;
 }
 
-client_t *scroller_get_stack_head(client_t *c) {
+client_t *scroller_get_stack_head(const client_t *c) {
   if (!c) return NULL;
   while (c->prev_in_stack)
     c = c->prev_in_stack;
-  return c;
+  return (client_t *)c;
 }
 
 int scroller_collect_nodes(desktop_t *d, node_t ***out_nodes) {

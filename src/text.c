@@ -224,7 +224,7 @@ static void handle_destroy(struct wl_listener *listener, void *data) {
 }
 
 text_node_t *text_node_create(struct wlr_scene_tree *parent, const char *text,
-		float color[4], bool pango_markup) {
+		const float color[4], bool pango_markup) {
   struct text_buffer_t *buffer = calloc(1, sizeof(*buffer));
   if (!buffer) return NULL;
 
@@ -262,7 +262,7 @@ text_node_t *text_node_create(struct wlr_scene_tree *parent, const char *text,
   return &buffer->props;
 }
 
-void text_node_set_color(text_node_t *node, float color[4]) {
+void text_node_set_color(text_node_t *node, const float color[4]) {
   if (!node) return;
   if (memcmp(node->color, color, sizeof(float) * 4) == 0) return;
 
@@ -271,7 +271,7 @@ void text_node_set_color(text_node_t *node, float color[4]) {
   render_backing_buffer(buffer);
 }
 
-void text_node_set_background(text_node_t *node, float background[4]) {
+void text_node_set_background(text_node_t *node, const float background[4]) {
   if (!node) return;
   if (memcmp(node->background, background, sizeof(float) * 4) == 0) return;
 

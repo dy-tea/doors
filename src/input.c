@@ -148,7 +148,7 @@ bool input_config_add(input_config_t *config) {
   return true;
 }
 
-void input_config_merge(input_config_t *base, input_config_t *overlay) {
+void input_config_merge(input_config_t *base, const input_config_t *overlay) {
   if (!base || !overlay)
     return;
 
@@ -357,7 +357,7 @@ bool input_config_set_value(input_config_t *config, const char *name, const char
   return true;
 }
 
-void input_config_apply(input_config_t *config, struct wlr_input_device *device) {
+void input_config_apply(const input_config_t *config, struct wlr_input_device *device) {
   if (!config || !device)
     return;
 

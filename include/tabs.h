@@ -48,7 +48,7 @@ node_t *tab_focus_leaf(node_t *tabbed_node, node_t *focus);
 node_t *tab_next_leaf(node_t *tabbed_node, node_t *focus);
 node_t *tab_prev_leaf(node_t *tabbed_node, node_t *focus);
 
-node_t *tabs_hit_test(node_t *n, double lx, double ly);
+node_t *tabs_hit_test(const node_t *n, double lx, double ly);
 node_t *tabs_hit_test_desktop(desktop_t *d, double lx, double ly);
 
 void tabs_show(node_t *n, bool show);

@@ -99,7 +99,7 @@ double bezier_evaluate(const char *name, double x) {
   return bezier_evaluate_curve(curve, x);
 }
 
-double bezier_evaluate_curve(bezier_curve_t *curve, double x) {
+double bezier_evaluate_curve(const bezier_curve_t *curve, double x) {
   if (!curve) return x;
   if (x <= 0.0) return 0.0;
   if (x >= 1.0) return 1.0;

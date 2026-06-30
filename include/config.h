@@ -98,8 +98,8 @@ typedef enum {
 typedef struct {
 	bind_action_t action;
 	int desktop_index;
-	char *submap_name;
-	char *external_cmd;
+	const char *submap_name;
+	const char *external_cmd;
 } bind_t;
 
 typedef struct {
@@ -157,8 +157,8 @@ void run_config_idle(void *data);
 void load_hotkeys_idle(void *data);
 void load_hotkeys(const char *config_path);
 void reload_hotkeys(void);
-bool keybind_matches(keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode);
-void execute_keybind(keybind_t *kb);
+bool keybind_matches(const keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode);
+void execute_keybind(const keybind_t *kb);
 void execute_bell_bind(void);
 int get_hotkey_watch_fd(void);
 void setup_hotkey_event_listener(struct wl_event_loop *event_loop);
@@ -168,13 +168,13 @@ void exit_submap(void);
 keyboard_grouping_t get_keyboard_grouping(void);
 void set_keyboard_grouping(keyboard_grouping_t grouping);
 
-bool gesturebind_matches(gesturebind_t *gb, enum gesture_type type, uint8_t fingers);
-void execute_gesturebind(gesturebind_t *gb);
+bool gesturebind_matches(const gesturebind_t *gb, enum gesture_type type, uint8_t fingers);
+void execute_gesturebind(const gesturebind_t *gb);
 void reload_gesturebinds(void);
 
-bool hotcornerbind_matches(hotcornerbind_t *hc, int corner_x, int corner_y);
+bool hotcornerbind_matches(const hotcornerbind_t *hc, int corner_x, int corner_y);
 hotcornerbind_t *hotcorner_bind_match(int corner_x, int corner_y);
-void execute_hotcornerbind(hotcornerbind_t *hc);
+void execute_hotcornerbind(const hotcornerbind_t *hc);
 void reload_hotcornerbinds(void);
 
 void execute_bind(bind_t b);

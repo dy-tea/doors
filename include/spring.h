@@ -23,4 +23,4 @@ spring_curve_t *spring_add(const char *name, double stiffness, double damping, d
 bool spring_exists(const char *name);
 spring_curve_t *spring_find(const char *name);
 
-double spring_evaluate(spring_curve_t *curve, double dt, double *position, double *velocity, bool *done);
+double spring_evaluate(const spring_curve_t *curve, double dt, double *position, double *velocity, bool *done);

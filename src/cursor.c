@@ -44,14 +44,14 @@
 extern keybind_t keybinds[];
 extern size_t num_keybinds;
 extern submap_t *active_submap;
-extern bool keybind_matches(keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode);
-extern void execute_keybind(keybind_t *kb);
+extern bool keybind_matches(const keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode);
+extern void execute_keybind(const keybind_t *kb);
 extern bool handle_keybind_raw(uint32_t modifiers, uint32_t keycode, bool pressed);
 extern hotcornerbind_t hotcorner_bindings[];
 extern size_t num_hotcornerbinds;
-extern bool hotcornerbind_matches(hotcornerbind_t *hc, int corner_x, int corner_y);
+extern bool hotcornerbind_matches(const hotcornerbind_t *hc, int corner_x, int corner_y);
 extern hotcornerbind_t *hotcorner_bind_match(int corner_x, int corner_y);
-extern void execute_hotcornerbind(hotcornerbind_t *hc);
+extern void execute_hotcornerbind(const hotcornerbind_t *hc);
 extern bool gapless_monocle;
 
 // Hot corner settings

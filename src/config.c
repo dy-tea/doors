@@ -956,7 +956,7 @@ static int hotkey_reload_handler(int fd, uint32_t mask, void *data) {
   return 0;
 }
 
-bool keybind_matches(keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode) {
+bool keybind_matches(const keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode) {
   if (!kb) return false;
 
   if (kb->use_keycode)
@@ -1173,7 +1173,7 @@ void execute_bind(bind_t b) {
   }
 }
 
-void execute_keybind(keybind_t *kb) {
+void execute_keybind(const keybind_t *kb) {
 	if (!kb) return;
 	bind_t bind = {
 		.action = kb->action,
@@ -1245,7 +1245,7 @@ void set_keyboard_grouping(keyboard_grouping_t grouping) {
   }
 }
 
-bool gesturebind_matches(gesturebind_t *gb, enum gesture_type type, uint8_t fingers) {
+bool gesturebind_matches(const gesturebind_t *gb, enum gesture_type type, uint8_t fingers) {
   if (!gb) return false;
   if (gb->type != type) return false;
   if (gb->fingers != GESTURE_FINGERS_ANY && gb->fingers != fingers) return false;
@@ -1253,7 +1253,7 @@ bool gesturebind_matches(gesturebind_t *gb, enum gesture_type type, uint8_t fing
   return true;
 }
 
-void execute_gesturebind(gesturebind_t *gb) {
+void execute_gesturebind(const gesturebind_t *gb) {
   if (!gb) return;
   if (gb->action == BIND_ENTER_SUBMAP) return; // FIXME: support this?
   bind_t bind = {
@@ -1269,7 +1269,7 @@ void reload_gesturebinds(void) {
   num_gesturebinds = 0;
 }
 
-bool hotcornerbind_matches(hotcornerbind_t *hc, int corner_x, int corner_y) {
+bool hotcornerbind_matches(const hotcornerbind_t *hc, int corner_x, int corner_y) {
   if (!hc) return false;
   return hc->corner_x == corner_x && hc->corner_y == corner_y;
 }
@@ -1282,7 +1282,7 @@ hotcornerbind_t *hotcorner_bind_match(int corner_x, int corner_y) {
   return NULL;
 }
 
-void execute_hotcornerbind(hotcornerbind_t *hc) {
+void execute_hotcornerbind(const hotcornerbind_t *hc) {
   if (!hc) return;
   if (hc->action == BIND_ENTER_SUBMAP) return; // FIXME: support this?
   bind_t bind = {

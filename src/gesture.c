@@ -140,7 +140,7 @@ char *gesture_parse(const char *input, gesture_t *output) {
 	return NULL;
 }
 
-char *gesture_to_string(gesture_t *gesture) {
+char *gesture_to_string(const gesture_t *gesture) {
 	if (!gesture) return strdup("");
 
 	char buf[256] = {0};
@@ -191,14 +191,14 @@ char *gesture_to_string(gesture_t *gesture) {
 	return strdup(buf);
 }
 
-bool gesture_check(gesture_t *target, enum gesture_type type, uint8_t fingers) {
+bool gesture_check(const gesture_t *target, enum gesture_type type, uint8_t fingers) {
 	if (!target || target->type != type) return false;
 	if (target->fingers != GESTURE_FINGERS_ANY && target->fingers != fingers) return false;
 
 	return true;
 }
 
-bool gesture_match(gesture_t *target, gesture_t *to_match, bool exact) {
+bool gesture_match(const gesture_t *target, const gesture_t *to_match, bool exact) {
 	if (!target || !to_match) return false;
 	if (target->type != to_match->type) return false;
 	if (target->fingers != GESTURE_FINGERS_ANY && target->fingers != to_match->fingers) return false;
@@ -208,14 +208,14 @@ bool gesture_match(gesture_t *target, gesture_t *to_match, bool exact) {
 	return (target->directions & to_match->directions) != 0;
 }
 
-bool gesture_equal(gesture_t *a, gesture_t *b) {
+bool gesture_equal(const gesture_t *a, const gesture_t *b) {
 	if (!a || !b) return false;
 
 	return a->type == b->type && a->fingers == b->fingers &&
 		a->directions == b->directions;
 }
 
-int8_t gesture_compare(gesture_t *a, gesture_t *b) {
+int8_t gesture_compare(const gesture_t *a, const gesture_t *b) {
 	if (!a || !b) return -1;
 	if (a->type != b->type) return -1;
 

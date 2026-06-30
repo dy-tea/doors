@@ -297,7 +297,7 @@ void tabs_update_label_for_leaf(node_t *leaf) {
   }
 }
 
-node_t *tabs_hit_test(node_t *n, double lx, double ly) {
+node_t *tabs_hit_test(const node_t *n, double lx, double ly) {
   if (n == NULL || n->tab_bar == NULL || n->tab_bar->tree == NULL) return NULL;
   if (!n->tab_bar->tree->node.enabled) return NULL;
 

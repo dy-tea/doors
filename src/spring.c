@@ -72,7 +72,7 @@ spring_curve_t *spring_find(const char *name) {
   return NULL;
 }
 
-double spring_evaluate(spring_curve_t *curve, double dt,
+double spring_evaluate(const spring_curve_t *curve, double dt,
     double *position, double *velocity, bool *done) {
   if (!curve || !position || !velocity) return *position;
 

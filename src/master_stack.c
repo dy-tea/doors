@@ -11,7 +11,7 @@ float master_stack_ratio = 0.5f;
 master_area_orientation_t master_stack_orientation = MASTER_LEFT;
 stack_layout_t master_stack_layout = STACK_VERTICAL;
 
-static int collect_tiled_nodes(desktop_t *d, node_t ***out_nodes) {
+static int collect_tiled_nodes(const desktop_t *d, node_t ***out_nodes) {
   if (!d || !d->root) return 0;
 
   int count = 0;
@@ -239,7 +239,7 @@ int master_stack_collect(desktop_t *d, node_t ***out_nodes) {
   return collect_tiled_nodes(d, out_nodes);
 }
 
-int master_stack_find_index(desktop_t *d, node_t *n) {
+int master_stack_find_index(const desktop_t *d, const node_t *n) {
   if (!d || !n) return -1;
 
   node_t **nodes = NULL;

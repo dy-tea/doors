@@ -21,4 +21,4 @@ bezier_curve_t *bezier_add(const char *name, double p1x, double p1y, double p2x,
 bool bezier_exists(const char *name);
 bezier_curve_t *bezier_find(const char *name);
 double bezier_evaluate(const char *name, double x);
-double bezier_evaluate_curve(bezier_curve_t *curve, double x);
+double bezier_evaluate_curve(const bezier_curve_t *curve, double x);

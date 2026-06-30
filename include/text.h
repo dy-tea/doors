@@ -19,10 +19,10 @@ typedef struct text_node_t {
 } text_node_t;
 
 text_node_t *text_node_create(struct wlr_scene_tree *parent,
-	const char *text, float color[4], bool pango_markup);
+	const char *text, const float color[4], bool pango_markup);
 
-void text_node_set_color(text_node_t *node, float color[4]);
-void text_node_set_background(text_node_t *node, float background[4]);
+void text_node_set_color(text_node_t *node, const float color[4]);
+void text_node_set_background(text_node_t *node, const float background[4]);
 void text_node_set_text(text_node_t *node, const char *text);
 void text_node_set_max_width(text_node_t *node, int max_width);
 
