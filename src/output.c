@@ -57,6 +57,8 @@ static void output_configure_scene_iterator(struct wlr_scene_buffer *buffer,
 static void output_configure_scene(output_t *output) {
 	if (!output)
 		return;
+	if (output->scale_filter_mode == output->applied_scale_filter)
+		return;
 
 	wlr_scene_node_for_each_buffer(&server.bg_tree->node,
 		output_configure_scene_iterator, output);
@@ -83,6 +85,8 @@ static void output_configure_scene(output_t *output) {
 		output_configure_scene_iterator, output);
 	wlr_scene_node_for_each_buffer(&output->layer_overlay->node,
 		output_configure_scene_iterator, output);
+
+	output->applied_scale_filter = output->scale_filter_mode;
 }
 
 static struct wlr_surface *fullscreen_surface(output_t *output);
@@ -125,6 +129,8 @@ static struct wlr_surface *fullscreen_surface(output_t *output) {
 
 static void output_configure_scene_visible(output_t *output) {
 	if (!output) return;
+	if (output->scale_filter_mode == output->applied_scale_filter)
+		return;
 
 	wlr_scene_node_for_each_buffer(&server.full_tree->node,
 		output_configure_scene_iterator, output);
@@ -139,6 +145,8 @@ static void output_configure_scene_visible(output_t *output) {
 
 	wlr_scene_node_for_each_buffer(&output->layer_overlay->node,
 		output_configure_scene_iterator, output);
+
+	output->applied_scale_filter = output->scale_filter_mode;
 }
 
 static bool output_try_direct_scanout(output_t *output) {

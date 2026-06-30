@@ -45,6 +45,7 @@ typedef struct output_t {
   int max_render_time;
 
   enum scale_filter_mode scale_filter_mode;
+  enum scale_filter_mode applied_scale_filter;
   enum wl_output_subpixel detected_subpixel;
 
   struct wlr_color_transform *color_transform;
