@@ -1,5 +1,5 @@
 #include "animation.h"
-#include "blur.h"
+#include "effects.h"
 #include "fallthrough.h"
 #include "ipc.h"
 #include "master_stack.h"

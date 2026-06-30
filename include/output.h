@@ -8,7 +8,7 @@
 #include <wlr/render/color.h>
 #include <wlr/util/box.h>
 
-typedef struct blur_output_ctx_t blur_output_ctx_t;
+typedef struct effects_output_t effects_output_t;
 typedef struct desktop_t desktop_t;
 
 enum scale_filter_mode {
@@ -48,7 +48,7 @@ typedef struct output_t {
   enum wl_output_subpixel detected_subpixel;
 
   struct wlr_color_transform *color_transform;
-  blur_output_ctx_t *blur_ctx;
+  effects_output_t *effects;
 
   char name[64]; // SMALEN
   uint32_t id;

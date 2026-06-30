@@ -51,14 +51,14 @@ extern float refraction_rgb_fringing;
 extern int refraction_texture_repeat_mode;
 extern float refraction_offset;
 
-typedef struct blur_output_ctx_t {
+typedef struct effects_output_t {
   int width, height;
   int blur_w, blur_h;
 
   GLuint fbo[2];
   GLuint tex[2];
 
-  GLuint staging_tex;  // full-res staging texture for renderbuffer→texture copy
+  GLuint staging_tex;  // full-res staging texture for renderbuffer->texture copy
 
   GLuint screen_fbo;  /* full-res intermediate for screen shader */
   GLuint screen_tex;
@@ -74,9 +74,9 @@ typedef struct blur_output_ctx_t {
   struct wlr_backend *capture_backend;
   struct wlr_output *capture_output;
   struct wlr_scene_output *capture_scene_output;
-} blur_output_ctx_t;
+} effects_output_t;
 
-typedef struct blur_ctx_t {
+typedef struct effects_state_t {
   bool available;
 
   GLuint prog_kawase;
@@ -142,24 +142,24 @@ typedef struct blur_ctx_t {
 
   GLuint vbo;
   GLint attr_pos;
-} blur_ctx_t;
+} effects_state_t;
 
-extern blur_ctx_t blur_ctx;
+extern effects_state_t effects_state;
 
-bool blur_init(void);
-void blur_fini(void);
+bool effects_init(void);
+void effects_fini(void);
 
-blur_output_ctx_t *blur_output_init(int width, int height);
-void blur_output_fini(blur_output_ctx_t *ctx);
-void blur_output_resize(blur_output_ctx_t *ctx, int width, int height, output_t *output);
+effects_output_t *effects_output_init(int width, int height);
+void effects_output_fini(effects_output_t *ctx);
+void effects_output_resize(effects_output_t *ctx, int width, int height, output_t *output);
 
-void blur_invalidate_mica(blur_output_ctx_t *ctx);
+void effects_invalidate_mica(effects_output_t *ctx);
 
-void blur_output_frame(output_t *output, struct wlr_scene_output *scene_output);
-void blur_evict_buffers(void);
+void effects_output_frame(output_t *output, struct wlr_scene_output *scene_output);
+void effects_evict_buffers(void);
 
 enum blur_algorithm blur_algorithm_from_str(const char *str);
-const char *blur_algorithm_to_str(enum blur_algorithm algo);
+const char *effects_algorithm_to_str(enum blur_algorithm algo);
 
 bool screen_shader_set(const char *name);
 bool screen_shader_load_file(const char *path);

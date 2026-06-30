@@ -125,7 +125,7 @@ executable(
 		'src' / 'spring.c',
 		'src' / 'xwayland.c',
 		'src' / 'input_method.c',
-		'src' / 'blur.c',
+		'src' / 'effects.c',
 		'src' / 'tiling_drag.c',
 		'src' / 'screencopy.c',
 		'src' / 'seat.c',

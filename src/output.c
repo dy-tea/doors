@@ -1,5 +1,5 @@
 #include "animation.h"
-#include "blur.h"
+#include "effects.h"
 #include "idle.h"
 #include "layer.h"
 #include "lock.h"
@@ -201,8 +201,8 @@ static void output_repaint(output_t *output) {
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	bool animating = animation_update_output(output, now);
 
-	if (blur_ctx.available && (fs_effects || !has_fs))
-		blur_output_frame(output, scene_output);
+	if (effects_state.available && (fs_effects || !has_fs))
+		effects_output_frame(output, scene_output);
 
 	if (has_fs && !fs_effects && output_try_direct_scanout(output)) {
 		clock_gettime(CLOCK_MONOTONIC, &now);
@@ -352,7 +352,7 @@ static void handle_output_destroy(struct wl_listener *listener, void *data) {
     mon = mon_head;
 
   wlr_color_transform_unref(output->color_transform);
-  blur_output_fini(output->blur_ctx);
+  effects_output_fini(output->effects);
 
   desktop_t *d = output->desk_head;
   while (d) {
@@ -472,7 +472,7 @@ void handle_new_output(struct wl_listener *listener, void *data) {
   wlr_output_layout_get_box(server.output_layout, wlr_output, &layout_box);
   output->rectangle = layout_box;
   output->usable_area = layout_box;
-  output->blur_ctx = blur_output_init(output->rectangle.width, output->rectangle.height);
+  output->effects = effects_output_init(output->rectangle.width, output->rectangle.height);
 
   output_enable(output);
   ipc_put_status(SUB_MASK_MONITOR_ADD, "monitor_add[%s]\n", output->name);
@@ -620,7 +620,7 @@ void output_update_scale(output_t *output, float scale) {
     }
   }
 
-  blur_invalidate_mica(output->blur_ctx);
+  effects_invalidate_mica(output->effects);
 
   // rearrange all desktop on this output
   for (desktop_t *d = output->desk; d != NULL; d = d->next)

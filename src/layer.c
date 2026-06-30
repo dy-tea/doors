@@ -1,5 +1,5 @@
 #include "animation.h"
-#include "blur.h"
+#include "effects.h"
 #include "input_method.h"
 #include "layer.h"
 #include "output.h"
@@ -123,7 +123,7 @@ static void layer_surface_map(struct wl_listener *listener, void *data) {
 	if (layer->layer_surface->current.layer >= ZWLR_LAYER_SHELL_V1_LAYER_TOP)
 		focus_layer_surface(layer);
 
-	blur_invalidate_mica(layer->output->blur_ctx);
+	effects_invalidate_mica(layer->output->effects);
 	animation_fade_in_layer(layer);
 }
 

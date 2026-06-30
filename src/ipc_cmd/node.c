@@ -1,5 +1,5 @@
 #include "animation.h"
-#include "blur.h"
+#include "effects.h"
 #include "ipc.h"
 #include "ipc_cmd.h"
 #include "ipc_helpers.h"

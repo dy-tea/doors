@@ -1,6 +1,6 @@
 #include "animation.h"
 #include "bezier.h"
-#include "blur.h"
+#include "effects.h"
 #include "config.h"
 #include "ipc.h"
 #include "ipc_cmd.h"
@@ -499,7 +499,7 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
       }
     } else {
       char buf[64];
-      snprintf(buf, sizeof(buf), "%s\n", blur_algorithm_to_str(blur_algorithm));
+      snprintf(buf, sizeof(buf), "%s\n", effects_algorithm_to_str(blur_algorithm));
       send_success(client_fd, buf);
     }
   } else if (streq("blur_passes", *args)) {
@@ -550,8 +550,8 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
       if (val >= 1 && val <= 8) {
         blur_downsample = val;
         for (output_t *m = mon_head; m; m = m->next) {
-          if (m && m->blur_ctx)
-            blur_output_resize(m->blur_ctx, m->width, m->height, m);
+          if (m && m->effects)
+            effects_output_resize(m->effects, m->width, m->height, m);
         }
         send_success(client_fd, "blur_downsample set\n");
       } else {
@@ -576,7 +576,7 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
     if (num >= 2) {
       mica_enabled = (strcmp(args[1], "true") == 0);
       for (output_t *output = mon_head; output; output = output->next)
-        blur_invalidate_mica(output->blur_ctx);
+        effects_invalidate_mica(output->effects);
       send_success(client_fd, "mica_enabled set\n");
     } else {
       send_success(client_fd, mica_enabled ? "true\n" : "false\n");
@@ -587,7 +587,7 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
       if (val >= 0.0f && val <= 1.0f) {
         mica_tint_strength = val;
         for (output_t *output = mon_head; output; output = output->next)
-          blur_invalidate_mica(output->blur_ctx);
+          effects_invalidate_mica(output->effects);
         send_success(client_fd, "mica_tint_strength set\n");
       } else {
         send_failure(client_fd, "config mica_tint_strength: value must be 0.0-1.0\n");
@@ -603,7 +603,7 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
       if (ipc_parse_color_float(args[1], rgba)) {
         memcpy(mica_tint, rgba, sizeof(rgba));
         for (output_t *output = mon_head; output; output = output->next)
-          blur_invalidate_mica(output->blur_ctx);
+          effects_invalidate_mica(output->effects);
         send_success(client_fd, "mica_tint set\n");
       } else {
         send_failure(client_fd, "config mica_tint: expected \"R G B [A]\"\n");

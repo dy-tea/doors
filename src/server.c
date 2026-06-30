@@ -14,7 +14,7 @@
 #include "rule.h"
 #include "keyboard.h"
 #include "xwayland.h"
-#include "blur.h"
+#include "effects.h"
 #include "screencopy.h"
 #include "copy_capture.h"
 #include "animation.h"
@@ -171,7 +171,7 @@ void server_init(void) {
     exit(EXIT_FAILURE);
   }
 
-  blur_init();
+  effects_init();
 
   server.bg_effect_manager = wlr_ext_background_effect_manager_v1_create(server.wl_display, 1,
     EXT_BACKGROUND_EFFECT_MANAGER_V1_CAPABILITY_BLUR);
@@ -967,7 +967,7 @@ void server_fini(void) {
   wl_list_for_each_safe(seat, tmp_seat, &server.seats, link)
     seat_destroy(seat);
 
-  blur_fini();
+  effects_fini();
 
   wlr_scene_node_destroy(&server.scene->tree.node);
   wlr_cursor_destroy(server.cursor);

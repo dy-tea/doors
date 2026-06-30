@@ -1,6 +1,6 @@
 #include "copy_capture.h"
 #include "animation.h"
-#include "blur.h"
+#include "effects.h"
 #include "config.h"
 #include "toplevel.h"
 #include "input_method.h"
