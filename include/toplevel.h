@@ -66,6 +66,7 @@ typedef struct toplevel_t {
   struct wlr_foreign_toplevel_handle_v1 *foreign_toplevel;
 
   char *foreign_identifier;
+  char *tag;
 
   struct wlr_ext_image_capture_source_v1 *image_capture_source;
   struct wlr_scene_surface *image_capture_surface;

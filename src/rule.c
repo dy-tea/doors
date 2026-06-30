@@ -29,6 +29,7 @@ rule_t *make_rule(void) {
   if (r) {
     r->match.app_id[0] = '\0';
     r->match.title[0] = '\0';
+    r->match.tag[0] = '\0';
     r->match.one_shot = false;
   }
   return r;
@@ -96,6 +97,8 @@ void list_rules(char *buf, size_t buf_size) {
       offset += snprintf(buf + offset, buf_size - offset, "app_id=%s ", r->match.app_id);
     if (r->match.title[0] != '\0')
       offset += snprintf(buf + offset, buf_size - offset, "title=%s ", r->match.title);
+    if (r->match.tag[0] != '\0')
+      offset += snprintf(buf + offset, buf_size - offset, "tag=%s ", r->match.tag);
 
     if (r->match.one_shot)
       offset += snprintf(buf + offset, buf_size - offset, "one_shot ");
@@ -169,15 +172,16 @@ static bool match_string(const char *pattern, const char *value) {
   return strcmp(pattern, value) == 0;
 }
 
-rule_consequence_t *find_matching_rule(const char *app_id, const char *title) {
+rule_consequence_t *find_matching_rule(const char *app_id, const char *title, const char *tag) {
   rule_t *r = rule_head;
   rule_t *matched = NULL;
 
   while (r != NULL) {
     bool app_id_matches = match_string(r->match.app_id, app_id);
     bool title_matches = match_string(r->match.title, title);
+    bool tag_matches = match_string(r->match.tag, tag);
 
-    if (app_id_matches && title_matches) {
+    if (app_id_matches && title_matches && tag_matches) {
       matched = r;
       break;
     }

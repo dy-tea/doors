@@ -223,6 +223,9 @@ typedef struct server_t {
   xwayland_t xwayland;
   struct wl_listener xwayland_surface;
   struct wl_listener xwayland_ready;
+
+  // xdg toplevel tag
+  struct wl_listener xdg_toplevel_tag_manager_v1_set_tag;
 } server_t;
 
 extern struct server_t server;

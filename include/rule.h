@@ -9,6 +9,7 @@
 typedef struct {
   char app_id[MAXLEN];
   char title[MAXLEN];
+  char tag[MAXLEN];
   bool one_shot;
 } rule_match_t;
 
@@ -69,4 +70,4 @@ void add_rule(rule_t *r);
 void remove_rule(rule_t *r);
 bool remove_rule_by_index(int idx);
 void list_rules(char *buf, size_t buf_size);
-rule_consequence_t *find_matching_rule(const char *app_id, const char *title);
+rule_consequence_t *find_matching_rule(const char *app_id, const char *title, const char *tag);

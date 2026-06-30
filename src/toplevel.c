@@ -16,9 +16,8 @@
 #include "tablet.h"
 #include "server.h"
 #include "tabs.h"
-#include <wlr/types/wlr_content_type_v1.h>
-#include "transaction.h"
 #include "tree.h"
+#include "transaction.h"
 #include "types.h"
 #include "xwayland.h"
 #include <math.h>
@@ -27,6 +26,7 @@
 #include <stdlib.h>
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_buffer.h>
+#include <wlr/types/wlr_content_type_v1.h>
 #include <wlr/types/wlr_ext_background_effect_v1.h>
 #include <wlr/types/wlr_ext_image_capture_source_v1.h>
 #include <wlr/types/wlr_fractional_scale_v1.h>
@@ -34,6 +34,7 @@
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_xdg_shell.h>
+#include <wlr/types/wlr_xdg_toplevel_tag_v1.h>
 #include <wlr/types/wlr_xdg_decoration_v1.h>
 #include <wlr/util/log.h>
 
@@ -358,6 +359,28 @@ void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
     toplevel->shadow->shadow_dirty = true;
 }
 
+void xdg_toplevel_tag_manager_v1_handle_set_tag(struct wl_listener *listener, void *data) {
+  (void)listener;
+  const struct wlr_xdg_toplevel_tag_manager_v1_set_tag_event *event = data;
+  toplevel_t *toplevel = event->toplevel->base->data;
+  if (!toplevel) return;
+
+  free(toplevel->tag);
+  toplevel->tag = strdup(event->tag);
+
+  if (toplevel->node && toplevel->node->client) {
+    const char *app_id = toplevel->node->client->app_id;
+    const char *title = toplevel->node->client->title;
+    find_matching_rule(app_id, title, toplevel->tag);
+    ipc_put_status(SUB_MASK_NODE_CHANGE, "node_change[%s,%s,%u,tag]\n",
+      app_id && app_id[0] ? app_id : "?",
+      title && title[0] ? title : "?",
+      toplevel->node->id);
+  }
+
+  transaction_commit_dirty();
+}
+
 void toplevel_map(struct wl_listener *listener, void *data) {
 	(void)data;
   toplevel_t *toplevel = wl_container_of(listener, toplevel, map);
@@ -421,7 +444,7 @@ void toplevel_map(struct wl_listener *listener, void *data) {
   wlr_log(WLR_INFO, "New window: %s (%s)", title ? title : "untitled",
     app_id ? app_id : "unknown");
 
-  rule_consequence_t *rule = find_matching_rule(app_id, title);
+  rule_consequence_t *rule = find_matching_rule(app_id, title, toplevel->tag);
 
   if (rule && rule->has_manage && !rule->manage) {
     wlr_log(WLR_INFO, "Window %s ignored by rule (manage=off)", app_id ? app_id : "?");
@@ -1178,6 +1201,7 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
 
   wl_list_remove(&toplevel->link);
 
+  free(toplevel->tag);
   free(toplevel);
 }
 

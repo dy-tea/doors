@@ -617,10 +617,11 @@ doorsctl rule -a vesktop desktop=III
 - `shortcuts_inhibitor=on|off` - Controls whether the matched window(s) can use the keyboard shortcuts inhibitor protocol to suppress compositor keybindings (default: on).
 - `shadow=on|off` - Whether a window should have the shadow effect set
 
-**Matching by Title:**
+**Matching by Title or Tag:**
 
 ```
 doorsctl rule -a title="Exact Window Title" desktop=I
+doorsctl rule -a tag="browser" desktop=II
 ```
 
 **Examples:**
@@ -631,6 +632,9 @@ doorsctl rule -a dev.zed.Zed desktop=I follow=off
 
 # Send Firefox to desktop II as floating window
 doorsctl rule -a firefox desktop=II state=floating
+
+# Match by tag (set by client via xdg_toplevel_tag protocol)
+doorsctl rule -a tag="important" state=floating
 
 # Ignore a window (don't manage it)
 doorsctl rule -a some-app manage=off

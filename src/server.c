@@ -82,6 +82,7 @@
 #include <wlr/types/wlr_xdg_system_bell_v1.h>
 #include <wlr/types/wlr_virtual_keyboard_v1.h>
 #include <wlr/types/wlr_keyboard_shortcuts_inhibit_v1.h>
+#include <wlr/types/wlr_xdg_toplevel_tag_v1.h>
 #include <wlr/xwayland.h>
 #include <wlr/types/wlr_pointer_warp_v1.h>
 #include <wlr/types/wlr_security_context_v1.h>
@@ -94,6 +95,7 @@ void handle_output_manager_test(struct wl_listener *listener, void *data);
 
 void handle_drm_lease_request(struct wl_listener *listener, void *data);
 static void handle_ring_system_bell(struct wl_listener *listener, void *data);
+void xdg_toplevel_tag_manager_v1_handle_set_tag(struct wl_listener *listener, void *data);
 
 static bool is_privileged(const struct wl_global *global) {
 	return
@@ -237,6 +239,11 @@ void server_init(void) {
 
   server.new_xdg_toplevel.notify = handle_new_xdg_toplevel;
   wl_signal_add(&server.xdg_shell->events.new_toplevel, &server.new_xdg_toplevel);
+
+  // xdg toplevel tag
+  struct wlr_xdg_toplevel_tag_manager_v1 *xdg_toplevel_tag_manager_v1 = wlr_xdg_toplevel_tag_manager_v1_create(server.wl_display, 1);
+  server.xdg_toplevel_tag_manager_v1_set_tag.notify = xdg_toplevel_tag_manager_v1_handle_set_tag;
+  wl_signal_add(&xdg_toplevel_tag_manager_v1->events.set_tag, &server.xdg_toplevel_tag_manager_v1_set_tag);
 
   // xdg decoration
   server.xdg_decoration_manager = wlr_xdg_decoration_manager_v1_create(server.wl_display, 2);
@@ -554,11 +561,14 @@ void handle_keyboard_shortcuts_inhibit_new_inhibitor(struct wl_listener *listene
   struct wlr_keyboard_shortcuts_inhibitor_v1 *inhibitor = data;
   const char *app_id = NULL;
   const char *title = NULL;
+  const char *tag = NULL;
 
   struct wlr_xdg_surface *xdg_surface = wlr_xdg_surface_try_from_wlr_surface(inhibitor->surface);
   if (xdg_surface && xdg_surface->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
     app_id = xdg_surface->toplevel->app_id;
     title = xdg_surface->toplevel->title;
+    toplevel_t *tl = xdg_surface->toplevel->base->data;
+    if (tl) tag = tl->tag;
   } else {
     struct wlr_xwayland_surface *xwayland_surface = wlr_xwayland_surface_try_from_wlr_surface(inhibitor->surface);
     if (xwayland_surface) {
@@ -568,8 +578,8 @@ void handle_keyboard_shortcuts_inhibit_new_inhibitor(struct wl_listener *listene
   }
 
   bool allow = true;
-  if (app_id || title) {
-    rule_consequence_t *rule = find_matching_rule(app_id, title);
+  if (app_id || title || tag) {
+    rule_consequence_t *rule = find_matching_rule(app_id, title, tag);
     if (rule && rule->has_shortcuts_inhibitor) allow = rule->shortcuts_inhibitor;
   }
 
@@ -796,6 +806,8 @@ void server_fini(void) {
   wl_list_remove(&server.new_toplevel_capture_request.link);
 
   wl_list_remove(&server.ring_system_bell.link);
+
+  wl_list_remove(&server.xdg_toplevel_tag_manager_v1_set_tag.link);
 
 #ifdef WLR_HAS_DRM_BACKEND
 	if (server.drm_lease_manager)

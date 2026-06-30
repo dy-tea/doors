@@ -580,7 +580,7 @@ static void handle_map(struct wl_listener *listener, void *data) {
 		client->title[MAXLEN - 1] = '\0';
 	}
 
-	rule_consequence_t *rule = find_matching_rule(app_id, title);
+	rule_consequence_t *rule = find_matching_rule(app_id, title, NULL);
 
 	if (rule && rule->has_manage && !rule->manage) {
 		wlr_log(WLR_INFO, "XWayland window %s ignored by rule (manage=off)", app_id ? app_id : "?");
