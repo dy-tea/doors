@@ -20,6 +20,7 @@
 
 #define DOORS_CONFIG_DIR "/.config/doors"
 #define GLOBAL_CONFIG_DIR "/etc/doors"
+#define CONFIG_PATH_MAX (PATH_MAX + sizeof(DOORSHKRC_NAME) + 2)
 #define DOORSRC_NAME "doorsrc"
 #define DOORSHKRC_NAME "doorshkrc"
 
@@ -670,8 +671,8 @@ static void parse_hotkey_line(const char *hotkey_str, const char *command_str) {
   }
 }
 
-static char config_path[PATH_MAX];
-static char hotkey_init_path[PATH_MAX];
+static char config_path[CONFIG_PATH_MAX];
+static char hotkey_init_path[CONFIG_PATH_MAX];
 static bool config_ran = false;
 
 void run_config(const char *config_path_arg) {
@@ -899,11 +900,11 @@ void config_init_with_config_dir(const char *config_dir) {
   custom_config_dir = config_dir;
 
   const char *config_home = get_config_home();
-  char doorsrc_path[PATH_MAX];
+  char doorsrc_path[CONFIG_PATH_MAX];
   const char *config_source = config_home;
 
   if (!custom_config_dir) {
-    char test_path[PATH_MAX];
+    char test_path[CONFIG_PATH_MAX];
     snprintf(test_path, sizeof(test_path), "%s/%s", config_home, DOORSRC_NAME);
     if (access(test_path, R_OK) != 0) {
       snprintf(test_path, sizeof(test_path), "%s/%s", config_home, DOORSHKRC_NAME);
