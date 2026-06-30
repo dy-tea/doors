@@ -1334,7 +1334,8 @@ static void push_blur_to_toplevels(output_t *output) {
   }
 }
 
-static bool rebuild_live_blur_layers(output_t *output, GLuint bg_tex) {
+static bool rebuild_live_blur_layers(output_t *output, GLuint bg_tex,
+    pixman_region32_t *damage) {
   effects_output_t *ctx = output->effects;
   int w = output->width, h = output->height;
   bool any = false;
@@ -1343,6 +1344,34 @@ static bool rebuild_live_blur_layers(output_t *output, GLuint bg_tex) {
     layer_surface_t *ls;
     wl_list_for_each(ls, &output->layers[i], link) {
       if (!ls->blur_node || !ls->mapped) continue;
+
+      // skip if blur buffer exists and damage doesn't overlap the blur region
+      if (ls->blur_buf && damage && !pixman_region32_empty(damage)) {
+        int nboxes_check;
+        pixman_box32_t *boxes_check = pixman_region32_rectangles(&ls->blur_region, &nboxes_check);
+        if (nboxes_check > 0) {
+          int lx_check, ly_check;
+          if (wlr_scene_node_coords(&ls->scene_tree->node, &lx_check, &ly_check)) {
+            int out_lx_check = lx_check - output->lx;
+            int out_ly_check = ly_check - output->ly;
+            pixman_region32_t blur_rgn, intersection;
+            pixman_region32_init_rect(&blur_rgn,
+              boxes_check[0].x1 + out_lx_check, boxes_check[0].y1 + out_ly_check,
+              boxes_check[0].x2 - boxes_check[0].x1, boxes_check[0].y2 - boxes_check[0].y1);
+            for (int b = 1; b < nboxes_check; b++)
+              pixman_region32_union_rect(&blur_rgn, &blur_rgn,
+                boxes_check[b].x1 + out_lx_check, boxes_check[b].y1 + out_ly_check,
+                boxes_check[b].x2 - boxes_check[b].x1, boxes_check[b].y2 - boxes_check[b].y1);
+
+            pixman_region32_init(&intersection);
+            pixman_region32_intersect(&intersection, damage, &blur_rgn);
+            bool overlaps = !pixman_region32_empty(&intersection);
+            pixman_region32_fini(&intersection);
+            pixman_region32_fini(&blur_rgn);
+            if (!overlaps) continue;
+          }
+        }
+      }
 
       // get blur region bounds
       int nboxes;
@@ -2391,22 +2420,60 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
   }
 
   // apply corner masks and blur if needed
-  if (has_layer_blur && any_cm) {
-    GLuint bg_tex = capture_bg_combined(output, ctx);
-    if (bg_tex && blur_enabled) {
-      rebuild_live_blur_layers(output, bg_tex);
-      push_blur_to_layers(output);
-    } else if (blur_enabled) {
-      rebuild_live_blur_layers(output, 0);
-      push_blur_to_layers(output);
+  if (has_layer_blur) {
+    bool any_layer_needs_blur = false;
+    if (blur_enabled && bg_damaged) {
+      pixman_region32_t *damage = &scene_output->damage_ring.current;
+      for (int i = 0; i < 4 && !any_layer_needs_blur; i++) {
+        layer_surface_t *ls;
+        wl_list_for_each(ls, &output->layers[i], link) {
+          if (!ls->blur_node || !ls->mapped) continue;
+          if (!ls->blur_buf) { any_layer_needs_blur = true; break; }
+          if (pixman_region32_empty(damage)) continue;
+          int nboxes;
+          pixman_box32_t *boxes = pixman_region32_rectangles(&ls->blur_region, &nboxes);
+          if (nboxes == 0) continue;
+          int lx, ly;
+          if (!wlr_scene_node_coords(&ls->scene_tree->node, &lx, &ly)) continue;
+          int out_lx = lx - output->lx, out_ly = ly - output->ly;
+          pixman_region32_t blur_rgn, intersection;
+          pixman_region32_init_rect(&blur_rgn,
+            boxes[0].x1 + out_lx, boxes[0].y1 + out_ly,
+            boxes[0].x2 - boxes[0].x1, boxes[0].y2 - boxes[0].y1);
+          for (int b = 1; b < nboxes; b++)
+            pixman_region32_union_rect(&blur_rgn, &blur_rgn,
+              boxes[b].x1 + out_lx, boxes[b].y1 + out_ly,
+              boxes[b].x2 - boxes[b].x1, boxes[b].y2 - boxes[b].y1);
+
+          pixman_region32_init(&intersection);
+          pixman_region32_intersect(&intersection, damage, &blur_rgn);
+          if (!pixman_region32_empty(&intersection)) any_layer_needs_blur = true;
+          pixman_region32_fini(&intersection);
+          pixman_region32_fini(&blur_rgn);
+        }
+      }
     }
-    if (effects_state.prog_corner_mask) {
+
+    if (any_layer_needs_blur && any_cm) {
+      GLuint bg_tex = capture_bg_combined(output, ctx);
+      if (bg_tex && blur_enabled) {
+        rebuild_live_blur_layers(output, bg_tex, &scene_output->damage_ring.current);
+        push_blur_to_layers(output);
+      } else if (blur_enabled) {
+        rebuild_live_blur_layers(output, 0, &scene_output->damage_ring.current);
+        push_blur_to_layers(output);
+      }
+      if (effects_state.prog_corner_mask) {
+        rebuild_corner_masks(output, 0);
+        push_corner_masks_to_toplevels(output);
+      }
+    } else if (any_layer_needs_blur) {
+      rebuild_live_blur_layers(output, 0, &scene_output->damage_ring.current);
+      push_blur_to_layers(output);
+    } else if (any_cm && effects_state.prog_corner_mask) {
       rebuild_corner_masks(output, 0);
       push_corner_masks_to_toplevels(output);
     }
-  } else if (has_layer_blur && blur_enabled) {
-    rebuild_live_blur_layers(output, 0);
-    push_blur_to_layers(output);
   } else if (any_cm && effects_state.prog_corner_mask) {
     rebuild_corner_masks(output, 0);
     push_corner_masks_to_toplevels(output);
