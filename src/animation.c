@@ -1133,3 +1133,21 @@ bool animation_update_output(output_t *output, struct timespec now) {
 
   return active;
 }
+
+bool animation_get_toplevel_resize_progress(toplevel_t *toplevel, double *progress,
+		struct wlr_box *anim_from, struct wlr_box *anim_to) {
+	if (!toplevel || !toplevel->node) return false;
+
+	animation_entry_t *entry = find_animation(toplevel->node);
+	if (!entry || !entry->snapshot_resize || entry->node != toplevel->node)
+		return false;
+
+	if (progress)
+		*progress = entry->eased;
+	if (anim_from)
+		*anim_from = entry->from;
+	if (anim_to)
+		*anim_to = entry->to;
+
+	return true;
+}

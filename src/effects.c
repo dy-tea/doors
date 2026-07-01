@@ -1230,8 +1230,14 @@ static bool rebuild_live_blur(output_t *output,
     if (!tl->node->client->shown) continue;
     if (!tl->node->output || tl->node->output != output) continue;
 
+    // Check if there's a resize animation in progress
+    double progress = 1.0;
+    struct wlr_box anim_from, anim_to;
+    bool animating = animation_get_toplevel_resize_progress(tl, &progress, &anim_from, &anim_to);
+
     // skip if toplevel already has a valid blur and the damage doesn't overlap it
-    if (tl->blur->blur_buf && damage && !pixman_region32_empty(damage)) {
+    // but don't skip if we're animating (need to update position)
+    if (tl->blur->blur_buf && damage && !pixman_region32_empty(damage) && !animating) {
       struct wlr_box r = get_client_rect(tl);
       pixman_region32_t tl_rgn, intersection;
       pixman_region32_init_rect(&tl_rgn, r.x - output->lx, r.y - output->ly, r.width, r.height);
@@ -1318,12 +1324,24 @@ static void push_blur_to_toplevels(output_t *output) {
     else if (c->state == STATE_FLOATING)                  r = c->floating_rectangle;
     else                                                  r = c->tiled_rectangle;
 
+    double progress = 1.0;
+    struct wlr_box anim_from, anim_to;
+    if (animation_get_toplevel_resize_progress(tl, &progress, &anim_from, &anim_to)) {
+      r.x = (int)(anim_from.x + (anim_to.x - anim_from.x) * progress);
+      r.y = (int)(anim_from.y + (anim_to.y - anim_from.y) * progress);
+      r.width = (int)(anim_from.width + (anim_to.width - anim_from.width) * progress);
+      r.height = (int)(anim_from.height + (anim_to.height - anim_from.height) * progress);
+      if (r.width < 1) r.width = 1;
+      if (r.height < 1) r.height = 1;
+    }
+
     struct wlr_fbox src; int dw, dh;
     if (!compute_src_box(output, &r, &src, &dw, &dh)) {
       wlr_scene_buffer_set_buffer(tl->blur->blur_node, NULL);
       wlr_scene_node_set_position(&tl->blur->blur_node->node, 0, 0);
       continue;
     }
+
     int node_ox = (r.x < output->lx) ? (output->lx - r.x) : 0;
     int node_oy = (r.y < output->ly) ? (output->ly - r.y) : 0;
     wlr_scene_node_set_position(&tl->blur->blur_node->node, node_ox, node_oy);
@@ -1523,7 +1541,11 @@ static bool rebuild_live_acrylic(output_t *output,
     if (!tl->node->output || tl->node->output != output) continue;
 
     // skip if toplevel already has a valid acrylic buffer and the damage doesn't overlap it
-    if (tl->blur->acrylic_buf && damage && !pixman_region32_empty(damage)) {
+    // but don't skip if we're animating (need to update position)
+    double progress = 1.0;
+    struct wlr_box anim_from, anim_to;
+    if (tl->blur->acrylic_buf && damage && !pixman_region32_empty(damage) &&
+		    !animation_get_toplevel_resize_progress(tl, &progress, &anim_from, &anim_to)) {
       struct wlr_box r = get_client_rect(tl);
       pixman_region32_t tl_rgn, intersection;
       pixman_region32_init_rect(&tl_rgn, r.x - output->lx, r.y - output->ly, r.width, r.height);
@@ -1625,6 +1647,18 @@ static void push_acrylic_to_toplevels(output_t *output) {
     else if (c->state == STATE_FLOATING)                  r = c->floating_rectangle;
     else                                                  r = c->tiled_rectangle;
 
+    double progress = 1.0;
+    struct wlr_box anim_from, anim_to;
+    if (animation_get_toplevel_resize_progress(tl, &progress, &anim_from, &anim_to)) {
+      // Interpolate the rectangle for animation
+      r.x = (int)(anim_from.x + (anim_to.x - anim_from.x) * progress);
+      r.y = (int)(anim_from.y + (anim_to.y - anim_from.y) * progress);
+      r.width = (int)(anim_from.width + (anim_to.width - anim_from.width) * progress);
+      r.height = (int)(anim_from.height + (anim_to.height - anim_from.height) * progress);
+      if (r.width < 1) r.width = 1;
+      if (r.height < 1) r.height = 1;
+    }
+
     struct wlr_fbox src; int dw, dh;
     if (!compute_src_box(output, &r, &src, &dw, &dh)) {
       wlr_scene_buffer_set_buffer(tl->blur->acrylic_node, NULL);
@@ -1688,6 +1722,17 @@ static void push_mica_to_toplevels(output_t *output) {
     if (c->state == STATE_FULLSCREEN && tl->node->output) r = tl->node->output->rectangle;
     else if (c->state == STATE_FLOATING)                  r = c->floating_rectangle;
     else                                                  r = c->tiled_rectangle;
+
+    double progress = 1.0;
+    struct wlr_box anim_from, anim_to;
+    if (animation_get_toplevel_resize_progress(tl, &progress, &anim_from, &anim_to)) {
+      r.x = (int)(anim_from.x + (anim_to.x - anim_from.x) * progress);
+      r.y = (int)(anim_from.y + (anim_to.y - anim_from.y) * progress);
+      r.width = (int)(anim_from.width + (anim_to.width - anim_from.width) * progress);
+      r.height = (int)(anim_from.height + (anim_to.height - anim_from.height) * progress);
+      if (r.width < 1) r.width = 1;
+      if (r.height < 1) r.height = 1;
+    }
 
     struct wlr_fbox src;
     int dw, dh;
@@ -2029,6 +2074,14 @@ static void push_corner_masks_to_toplevels(output_t *output) {
     }
 
     struct wlr_box content_r = get_client_rect(tl);
+
+    double progress = 1.0;
+    struct wlr_box anim_from, anim_to;
+    if (animation_get_toplevel_resize_progress(tl, &progress, &anim_from, &anim_to)) {
+      content_r.x = (int)(anim_from.x + (anim_to.x - anim_from.x) * progress);
+      content_r.y = (int)(anim_from.y + (anim_to.y - anim_from.y) * progress);
+    }
+
     struct wlr_fbox src; int dw, dh;
     if (!compute_src_box(output, &content_r, &src, &dw, &dh)) {
       wlr_scene_node_set_enabled(&tl->rounded->corner_mask_node->node, false);
@@ -2524,6 +2577,16 @@ after_capture:
       }
 
       struct wlr_box content_r = get_client_rect(tl);
+
+      double progress = 1.0;
+      struct wlr_box anim_from, anim_to;
+      if (animation_get_toplevel_resize_progress(tl, &progress, &anim_from, &anim_to)) {
+        content_r.width = (int)(anim_from.width + (anim_to.width - anim_from.width) * progress);
+        content_r.height = (int)(anim_from.height + (anim_to.height - anim_from.height) * progress);
+        if (content_r.width < 1) content_r.width = 1;
+        if (content_r.height < 1) content_r.height = 1;
+      }
+
       if ((c->state == STATE_TILED || c->state == STATE_PSEUDO_TILED) && tl->geometry.width > 0 && tl->geometry.height > 0) {
         if ((int)tl->geometry.width < content_r.width)
           content_r.width = tl->geometry.width;

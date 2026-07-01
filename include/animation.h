@@ -54,3 +54,9 @@ bool animation_has_fade_out(struct wlr_scene_tree *scene_tree);
 void animation_cancel_scene_tree(struct wlr_scene_tree *scene_tree);
 
 bool animation_update_output(output_t *output, struct timespec now);
+
+// Get the current animation progress for a toplevel resize (returns true if animating)
+// If progress is not NULL, it will be set to the eased progress value (0.0 to 1.0)
+// The anim_from and anim_to boxes will be set to the animation bounds if the toplevel is animating
+bool animation_get_toplevel_resize_progress(toplevel_t *toplevel, double *progress,
+	struct wlr_box *anim_from, struct wlr_box *anim_to);
