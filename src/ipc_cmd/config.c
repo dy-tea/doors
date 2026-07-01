@@ -788,6 +788,8 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
       ipc_format_color_float(buf, sizeof(buf), shadow_color);
       send_success(client_fd, buf);
     }
+  } else if (streq("render_unfocused_fps", *args)) {
+    ipc_handle_int(args, num, client_fd, &render_unfocused_fps, IPC_FLAG_NONE, 1, INT_MAX, "value must be >=1");
   } else {
     send_failure(client_fd, "config: unknown setting\n");
   }

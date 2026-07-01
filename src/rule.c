@@ -155,6 +155,9 @@ void list_rules(char *buf, size_t buf_size) {
     if (r->consequence.has_shortcuts_inhibitor)
       offset += snprintf(buf + offset, buf_size - offset, "shortcuts_inhibitor=%s ",
         r->consequence.shortcuts_inhibitor ? "on" : "off");
+    if (r->consequence.has_render_unfocused)
+      offset += snprintf(buf + offset, buf_size - offset, "render_unfocused=%s ",
+        r->consequence.render_unfocused ? "on" : "off");
 
     offset += snprintf(buf + offset, buf_size - offset, "\n");
 

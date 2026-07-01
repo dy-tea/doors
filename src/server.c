@@ -1,26 +1,27 @@
-#include "server.h"
+#include "animation.h"
+#include "bezier.h"
+#include "config.h"
+#include "copy_capture.h"
 #include "cursor.h"
+#include "effects.h"
+#include "idle.h"
+#include "ipc.h"
+#include "input.h"
+#include "keyboard.h"
+#include "layer.h"
+#include "lock.h"
 #include "output.h"
+#include "output_config.h"
+#include "render_unfocused.h"
+#include "rule.h"
+#include "scratchpad.h"
+#include "screencopy.h"
+#include "server.h"
+#include "spring.h"
 #include "toplevel.h"
 #include "transaction.h"
 #include "workspace.h"
-#include "ipc.h"
-#include "layer.h"
-#include "config.h"
-#include "lock.h"
-#include "output_config.h"
-#include "input.h"
-#include "idle.h"
-#include "rule.h"
-#include "keyboard.h"
 #include "xwayland.h"
-#include "effects.h"
-#include "screencopy.h"
-#include "copy_capture.h"
-#include "animation.h"
-#include "bezier.h"
-#include "spring.h"
-#include "scratchpad.h"
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -676,6 +677,7 @@ void server_init(void) {
   spring_init();
   scratchpad_init();
   workspace_init();
+  render_unfocused_init();
   ipc_init();
   rule_init();
   output_config_init();
@@ -878,6 +880,7 @@ void server_fini(void) {
 
   screencopy_fini();
   image_copy_capture_fini();
+  render_unfocused_fini();
   animation_fini();
   transaction_fini();
   scratchpad_fini();

@@ -167,6 +167,12 @@ void ipc_cmd_rule(char **args, int num, int client_fd) {
       } else if (streq("shortcuts_inhibitor=off", arg)) {
         r->consequence.shortcuts_inhibitor = false;
         r->consequence.has_shortcuts_inhibitor = true;
+      } else if (streq("render_unfocused=on", arg)) {
+        r->consequence.render_unfocused = true;
+        r->consequence.has_render_unfocused = true;
+      } else if (streq("render_unfocused=off", arg)) {
+        r->consequence.render_unfocused = false;
+        r->consequence.has_render_unfocused = true;
       }
 
       args++;

@@ -1,11 +1,11 @@
-#include "copy_capture.h"
 #include "animation.h"
+#include "copy_capture.h"
 #include "config.h"
 #include "ipc.h"
 #include "input_method.h"
 #include "launcher.h"
-#include "keyboard.h"
 #include "output.h"
+#include "render_unfocused.h"
 #include "rule.h"
 #include "seat.h"
 #include "scratchpad.h"
@@ -620,7 +620,13 @@ static void handle_map(struct wl_listener *listener, void *data) {
 		if (rule->has_scroller_proportion || rule->has_scroller_proportion_single)
 			scroller_apply_client_rules(client, rule->has_scroller_proportion ? rule->scroller_proportion : 0.0f,
 			rule->has_scroller_proportion_single ? rule->scroller_proportion_single : 0.0f);
+		if (rule->has_render_unfocused) {
+			client->render_unfocused = rule->render_unfocused;
+			client->render_unfocused_from_rule = true;
+		}
 	}
+
+	render_unfocused_client_update(client);
 
 	wlr_log(WLR_INFO, "XWayland window mapped: %s (%s) wants_float=%d size=%dx%d",
 		title ? title : "untitled", app_id ? app_id : "unknown",
@@ -811,8 +817,10 @@ static void handle_destroy(struct wl_listener *listener, void *data) {
 		server.last_focused_xwayland_view = NULL;
 	}
 
-	if (xwayland_view->node && xwayland_view->node->client)
+	if (xwayland_view->node && xwayland_view->node->client) {
+		render_unfocused_client_remove(xwayland_view->node->client);
 		animation_cancel_node(xwayland_view->node);
+	}
 	if (xwayland_view->node && xwayland_view->node->client)
 		xwayland_view->node->client->xwayland_view = NULL;
 	xwayland_view->xwayland_surface = NULL;

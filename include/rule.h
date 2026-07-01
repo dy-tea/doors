@@ -52,6 +52,8 @@ typedef struct {
   bool has_allow_tearing;
   bool shortcuts_inhibitor;
   bool has_shortcuts_inhibitor;
+  bool render_unfocused;
+  bool has_render_unfocused;
 } rule_consequence_t;
 
 typedef struct rule_t {

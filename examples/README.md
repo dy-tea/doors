@@ -616,6 +616,7 @@ doorsctl rule -a vesktop desktop=III
 - `allow_tearing=on|off` - Enables or disables tearing for the matched window(s), overriding the global `allow_tearing` config.
 - `shortcuts_inhibitor=on|off` - Controls whether the matched window(s) can use the keyboard shortcuts inhibitor protocol to suppress compositor keybindings (default: on).
 - `shadow=on|off` - Whether a window should have the shadow effect set
+- `render_unfocused=on|off` - When on, the window continues rendering even when hidden/unfocused. Configure the throttle rate via `doorsctl config render_unfocused_fps <value>` (default: 15).
 
 **Matching by Title or Tag:**
 
@@ -851,6 +852,7 @@ doorsctl config scroller_proportion_preset [<values>]
 doorsctl config animation_bezier [<name>]
 doorsctl config animation_duration [<ms>]
 doorsctl config animation <type> [bezier|duration|spring|enabled] [<value>]
+doorsctl config render_unfocused_fps [<n>]   # Get or set render_unfocused FPS throttle (1>=, default 15)
 ```
 
 ### Animation Settings

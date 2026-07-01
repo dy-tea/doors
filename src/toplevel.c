@@ -11,10 +11,11 @@
 #include "keyboard.h"
 #include "output.h"
 #include "popup.h"
+#include "render_unfocused.h"
 #include "scroller.h"
 #include "scratchpad.h"
-#include "tablet.h"
 #include "server.h"
+#include "tablet.h"
 #include "tabs.h"
 #include "tree.h"
 #include "transaction.h"
@@ -561,6 +562,11 @@ void toplevel_map(struct wl_listener *listener, void *data) {
       n->client->allow_tearing = rule->allow_tearing;
       n->client->allow_tearing_from_rule = true;
     }
+
+    if (rule->has_render_unfocused) {
+      n->client->render_unfocused = rule->render_unfocused;
+      n->client->render_unfocused_from_rule = true;
+    }
   }
 
   // create foreign toplevel handles
@@ -679,6 +685,8 @@ void toplevel_map(struct wl_listener *listener, void *data) {
   }
 
   update_foreign_toplevel_state(toplevel);
+
+  render_unfocused_client_update(n->client);
 
   wlr_log(WLR_INFO, "Window mapped and tiled: %s",
     n->client->title[0] ? n->client->title : "untitled");
@@ -1185,6 +1193,9 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
     toplevel->shadow = NULL;
   }
 
+  if (toplevel->node && toplevel->node->client)
+    render_unfocused_client_remove(toplevel->node->client);
+
   destroy_borders(&toplevel->border_tree, toplevel->border_rects);
 
   toplevel_remove_saved_buffer(toplevel);
@@ -1645,7 +1656,7 @@ void toplevel_remove_saved_buffer(struct toplevel_t *toplevel) {
     wlr_scene_node_set_enabled(&toplevel->content_tree->node, true);
 }
 
-static void send_frame_done_iterator(struct wlr_scene_buffer *scene_buffer,
+void toplevel_send_frame_done_interator(struct wlr_scene_buffer *scene_buffer,
     int x, int y, void *data) {
   (void)x;
   (void)y;
@@ -1664,7 +1675,7 @@ void toplevel_send_frame_done(struct toplevel_t *toplevel) {
 
   struct wlr_scene_node *node;
   wl_list_for_each(node, &toplevel->content_tree->children, link)
-    wlr_scene_node_for_each_buffer(node, send_frame_done_iterator, &when);
+    wlr_scene_node_for_each_buffer(node, toplevel_send_frame_done_interator, &when);
 }
 
 void handle_new_toplevel_capture_request(struct wl_listener *listener, void *data) {

@@ -125,6 +125,10 @@ typedef struct client_t {
   // Tearing
   bool allow_tearing;
   bool allow_tearing_from_rule;
+
+  // Render-unfocused
+  bool render_unfocused;
+  bool render_unfocused_from_rule;
 } client_t;
 
 typedef struct node_t {
@@ -221,6 +225,9 @@ extern bool debug_noatomic;
 extern bool debug_txn_wait;
 extern int directional_focus_tightness;
 extern int ignore_ewmh_fullscreen;
+
+// Render-unfocused settings
+extern int render_unfocused_fps;
 
 // Shadow settings
 extern float shadow_size;

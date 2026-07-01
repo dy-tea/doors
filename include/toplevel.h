@@ -148,3 +148,6 @@ void toplevel_set_shadow(toplevel_t *tl, bool enabled);
 void toplevel_apply_decoration_mode(toplevel_t *tl);
 
 bool toplevel_can_tear(toplevel_t *toplevel);
+
+void toplevel_send_frame_done_interator(struct wlr_scene_buffer *scene_buffer,
+  int x, int y, void *data);
