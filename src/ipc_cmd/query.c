@@ -72,6 +72,15 @@ void ipc_cmd_query(char **args, int num, int client_fd) {
         }
       }
       if (!filter_node) {
+        struct xwayland_toplevel_t *xwayland_view;
+        wl_list_for_each(xwayland_view, &server.xwayland.views, link) {
+          if (xwayland_view->node && xwayland_view->node->id == (uint32_t)node_id) {
+            filter_node = xwayland_view->node;
+            break;
+          }
+        }
+      }
+      if (!filter_node) {
         send_failure(client_fd, "query -n: node not found\n");
         return;
       }
@@ -132,6 +141,25 @@ void ipc_cmd_query(char **args, int num, int client_fd) {
           toplevel->foreign_identifier ? toplevel->foreign_identifier : "?");
     }
 
+    struct xwayland_toplevel_t *xwayland_view;
+    wl_list_for_each(xwayland_view, &server.xwayland.views, link) {
+      bool include = true;
+      if (filter_node && xwayland_view->node != filter_node)
+        include = false;
+      if (filter_desk && xwayland_view->node && xwayland_view->node->output &&
+          xwayland_view->node->output->desk != filter_desk)
+        include = false;
+      if (filter_mon && xwayland_view->node && xwayland_view->node->output != filter_mon)
+        include = false;
+
+      if (include)
+        offset += snprintf(buf + offset, sizeof(buf) - offset,
+          "  \"xwayland\": {\"app_id\": \"%s\", \"title\": \"%s\", \"identifier\": \"%s\"}\n",
+          xwayland_view->node && xwayland_view->node->client ? xwayland_view->node->client->app_id : "?",
+          xwayland_view->node && xwayland_view->node->client ? xwayland_view->node->client->title : "?",
+          xwayland_view->foreign_identifier ? xwayland_view->foreign_identifier : "?");
+    }
+
     offset += snprintf(buf + offset, sizeof(buf) - offset, "}\n");
     send_success(client_fd, buf);
   } else if (streq("-M", *args) || streq("--monitors", *args)) {
@@ -185,6 +213,33 @@ void ipc_cmd_query(char **args, int num, int client_fd) {
         }
       }
     }
+
+    struct xwayland_toplevel_t *xwayland_view;
+    wl_list_for_each(xwayland_view, &server.xwayland.views, link) {
+      bool include = true;
+      if (filter_node && xwayland_view->node != filter_node)
+        include = false;
+      if (filter_desk && xwayland_view->node && xwayland_view->node->output &&
+          xwayland_view->node->output->desk != filter_desk)
+        include = false;
+      if (filter_mon && xwayland_view->node && xwayland_view->node->output != filter_mon)
+        include = false;
+
+      if (include) {
+        if (use_names) {
+          const char *name = "?";
+          if (xwayland_view->node && xwayland_view->node->client && xwayland_view->node->client->title[0])
+            name = xwayland_view->node->client->title;
+          else if (xwayland_view->node && xwayland_view->node->client && xwayland_view->node->client->app_id[0])
+            name = xwayland_view->node->client->app_id;
+          offset += snprintf(buf + offset, sizeof(buf) - offset, "%s\n", name);
+        } else {
+          offset += snprintf(buf + offset, sizeof(buf) - offset, "%u %s\n",
+            xwayland_view->node ? xwayland_view->node->id : 0,
+            xwayland_view->foreign_identifier ? xwayland_view->foreign_identifier : "?");
+        }
+      }
+    }
     send_success(client_fd, buf);
   } else if (streq("-f", *args) || streq("--focused", *args)) {
     output_t *m = server.focused_output;
@@ -204,6 +259,14 @@ void ipc_cmd_query(char **args, int num, int client_fd) {
         foreign_id = toplevel->foreign_identifier ? toplevel->foreign_identifier : "?";
         break;
       }
+    if (foreign_id[0] == '?') {
+      struct xwayland_toplevel_t *xwayland_view;
+      wl_list_for_each(xwayland_view, &server.xwayland.views, link)
+        if (xwayland_view->node == n) {
+          foreign_id = xwayland_view->foreign_identifier ? xwayland_view->foreign_identifier : "?";
+          break;
+        }
+    }
 
     if (use_names) {
       offset += snprintf(buf + offset, sizeof(buf) - offset,
