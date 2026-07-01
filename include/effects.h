@@ -130,13 +130,13 @@ typedef struct effects_state_t {
     GLint tex;
   } u_ext_blit;
   struct {
-    GLint resolution, border_radius, border_width_px, border_color;
+    GLint resolution, border_radius, border_width_px, border_color, scale;
     GLint gradient_colors, gradient_count, gradient_angle;
     GLint gradient2_colors, gradient2_count, gradient2_angle;
     GLint gradient_lerp;
   } u_border;
   struct {
-    GLint tex, win_pos_uv, win_size_uv, win_size_px, border_radius_px;
+    GLint tex, win_pos_uv, win_size_uv, win_size_px, border_radius_px, scale;
   } u_corner_mask;
   struct {
     GLint resolution, shadow_size, shadow_color, border_radius, inner_size, hole_pos, hole_size;

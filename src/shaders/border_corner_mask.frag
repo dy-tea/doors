@@ -5,11 +5,34 @@ uniform vec2 win_pos_uv;
 uniform vec2 win_size_uv;
 uniform vec2 win_size_px;
 uniform float border_radius_px;
+uniform float niri_scale;
 varying vec2 v_uv;
 
-float sdRoundedBox(vec2 p, vec2 b, float r) {
-  vec2 q = abs(p) - b + r;
-  return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
+float rounding_alpha(vec2 coords, vec2 size, float radius) {
+  if (radius <= 0.0) return 1.0;
+
+  vec2 center;
+  bool in_corner = false;
+
+  if (coords.x < radius && coords.y < radius) {
+    center = vec2(radius, radius);
+    in_corner = true;
+  } else if (size.x - radius < coords.x && coords.y < radius) {
+    center = vec2(size.x - radius, radius);
+    in_corner = true;
+  } else if (size.x - radius < coords.x && size.y - radius < coords.y) {
+    center = vec2(size.x - radius, size.y - radius);
+    in_corner = true;
+  } else if (coords.x < radius && size.y - radius < coords.y) {
+    center = vec2(radius, size.y - radius);
+    in_corner = true;
+  }
+
+  if (!in_corner) return 1.0;
+
+  float dist = distance(coords, center);
+  float t = clamp((dist - radius) * niri_scale + 0.5, 0.0, 1.0);
+  return 1.0 - t * t * (3.0 - 2.0 * t);
 }
 
 void main() {
@@ -18,18 +41,8 @@ void main() {
     gl_FragColor = vec4(0.0);
     return;
   }
-  vec2 p_px = (win_local - 0.5) * win_size_px;
-  vec2 half_px = win_size_px * 0.5;
-
-  vec2 dist_to_edge = half_px - abs(p_px);
-  if (dist_to_edge.x > border_radius_px || dist_to_edge.y > border_radius_px) {
-    gl_FragColor = vec4(0.0);
-    return;
-  }
-
-  float d = sdRoundedBox(p_px, half_px, border_radius_px);
-  float fw = max(length(vec2(dFdx(d), dFdy(d))), 0.5);
-  float alpha = smoothstep(-fw * 0.5, fw * 0.5, d);
+  vec2 coords = win_local * win_size_px;
+  float alpha = rounding_alpha(coords, win_size_px, border_radius_px);
   vec4 bg = texture2D(tex, v_uv);
   gl_FragColor = vec4(bg.rgb * alpha, alpha);
 }

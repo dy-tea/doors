@@ -602,6 +602,7 @@ bool effects_init(void) {
     effects_state.u_border.border_radius = glGetUniformLocation(effects_state.prog_border, "border_radius");
     effects_state.u_border.border_width_px = glGetUniformLocation(effects_state.prog_border, "border_width_px");
     effects_state.u_border.border_color = glGetUniformLocation(effects_state.prog_border, "border_color");
+    effects_state.u_border.scale = glGetUniformLocation(effects_state.prog_border, "niri_scale");
     effects_state.u_border.gradient_colors  = glGetUniformLocation(effects_state.prog_border, "gradient_colors");
     effects_state.u_border.gradient_count = glGetUniformLocation(effects_state.prog_border, "gradient_count");
     effects_state.u_border.gradient_angle = glGetUniformLocation(effects_state.prog_border, "gradient_angle");
@@ -616,6 +617,7 @@ bool effects_init(void) {
     effects_state.u_corner_mask.win_size_uv = glGetUniformLocation(effects_state.prog_corner_mask, "win_size_uv");
     effects_state.u_corner_mask.win_size_px = glGetUniformLocation(effects_state.prog_corner_mask, "win_size_px");
     effects_state.u_corner_mask.border_radius_px = glGetUniformLocation(effects_state.prog_corner_mask, "border_radius_px");
+    effects_state.u_corner_mask.scale = glGetUniformLocation(effects_state.prog_corner_mask, "niri_scale");
   }
   if (effects_state.prog_shadow) {
     effects_state.u_shadow.resolution = glGetUniformLocation(effects_state.prog_shadow, "resolution");
@@ -1277,13 +1279,14 @@ static bool rebuild_live_blur(output_t *output,
       float inner_r = (c->border_radius > (float)bw_i) ? c->border_radius - (float)bw_i : 0.0f;
 
       glEnable(GL_BLEND);
-      glBlendFunc(GL_ZERO, GL_ONE_MINUS_SRC_ALPHA);
+      glBlendFunc(GL_ZERO, GL_SRC_ALPHA);
       glUseProgram(effects_state.prog_corner_mask);
       glUniform1i(effects_state.u_corner_mask.tex, 0);
       glUniform2f(effects_state.u_corner_mask.win_pos_uv, win_u, win_v);
       glUniform2f(effects_state.u_corner_mask.win_size_uv, win_sw, win_sh);
       glUniform2f(effects_state.u_corner_mask.win_size_px, (float)content_r.width, (float)content_r.height);
       glUniform1f(effects_state.u_corner_mask.border_radius_px, inner_r);
+      glUniform1f(effects_state.u_corner_mask.scale, output->wlr_output->scale);
       draw_quad();
       glDisable(GL_BLEND);
     }
@@ -1583,13 +1586,14 @@ static bool rebuild_live_acrylic(output_t *output,
       float inner_r = (c->border_radius > (float)bw_i) ? c->border_radius - (float)bw_i : 0.0f;
 
       glEnable(GL_BLEND);
-      glBlendFunc(GL_ZERO, GL_ONE_MINUS_SRC_ALPHA);
+      glBlendFunc(GL_ZERO, GL_SRC_ALPHA);
       glUseProgram(effects_state.prog_corner_mask);
       glUniform1i(effects_state.u_corner_mask.tex, 0);
       glUniform2f(effects_state.u_corner_mask.win_pos_uv, win_u, win_v);
       glUniform2f(effects_state.u_corner_mask.win_size_uv, win_sw, win_sh);
       glUniform2f(effects_state.u_corner_mask.win_size_px, (float)content_r.width, (float)content_r.height);
       glUniform1f(effects_state.u_corner_mask.border_radius_px, inner_r);
+      glUniform1f(effects_state.u_corner_mask.scale, output->wlr_output->scale);
       draw_quad();
       glDisable(GL_BLEND);
     }
@@ -1798,8 +1802,9 @@ static bool blur_render_border(toplevel_t *tl, int content_w, int content_h) {
   double log_fh = (double)content_h + 2 * bw_i;
   if (log_fw <= 0 || log_fh <= 0) return false;
 
-  double phys_fw = log_fw * scale;
-  double phys_fh = log_fh * scale;
+  int phys_w = (int)(log_fw * scale + 0.5);
+  int phys_h = (int)(log_fh * scale + 0.5);
+  if (phys_w <= 0 || phys_h <= 0) return false;
 
   if (!tl->rounded->border_shader_node) {
     tl->rounded->border_shader_node = wlr_scene_buffer_create(tl->border_tree, NULL);
@@ -1809,21 +1814,25 @@ static bool blur_render_border(toplevel_t *tl, int content_w, int content_h) {
   }
 
   GLuint dest_fbo = ensure_sized_buf(&tl->rounded->border_shader_buf, &tl->rounded->border_shader_buf_fbo,
-    &tl->rounded->border_shader_buf_w, &tl->rounded->border_shader_buf_h, phys_fw, phys_fh);
+    &tl->rounded->border_shader_buf_w, &tl->rounded->border_shader_buf_h, phys_w, phys_h);
   if (!dest_fbo) return false;
 
   glEnable(GL_BLEND);
   glBlendFunc(GL_ONE, GL_ZERO);
   glDisable(GL_SCISSOR_TEST);
   glBindFramebuffer(GL_FRAMEBUFFER, dest_fbo);
-  glViewport(0, 0, phys_fw, phys_fh);
+  glViewport(0, 0, phys_w, phys_h);
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
   glClear(GL_COLOR_BUFFER_BIT);
   glUseProgram(effects_state.prog_border);
 
-  glUniform2f(effects_state.u_border.resolution, (float)phys_fw, (float)phys_fh);
-  glUniform1f(effects_state.u_border.border_radius, (float)c->border_radius * scale);
-  glUniform1f(effects_state.u_border.border_width_px, (float)bw_i * scale);
+  float render_scale_x = (float)phys_w / (float)log_fw;
+  float render_scale_y = (float)phys_h / (float)log_fh;
+  float render_scale = (render_scale_x + render_scale_y) * 0.5f;
+  glUniform2f(effects_state.u_border.resolution, (float)log_fw, (float)log_fh);
+  glUniform1f(effects_state.u_border.border_radius, (float)c->border_radius);
+  glUniform1f(effects_state.u_border.border_width_px, (float)bw_i);
+  glUniform1f(effects_state.u_border.scale, render_scale);
   glUniform4fv(effects_state.u_border.border_color, 1, tl->rounded->border_color);
 
   // gradient uniforms
@@ -1847,9 +1856,9 @@ static bool blur_render_border(toplevel_t *tl, int content_w, int content_h) {
   glDisable(GL_BLEND);
 
   wlr_scene_buffer_set_buffer(tl->rounded->border_shader_node, tl->rounded->border_shader_buf);
-  struct wlr_fbox src_box = {0, 0, phys_fw, phys_fh};
+  struct wlr_fbox src_box = {0, 0, (float)phys_w, (float)phys_h};
   wlr_scene_buffer_set_source_box(tl->rounded->border_shader_node, &src_box);
-  wlr_scene_buffer_set_dest_size(tl->rounded->border_shader_node, log_fw, log_fh);
+  wlr_scene_buffer_set_dest_size(tl->rounded->border_shader_node, (int)log_fw, (int)log_fh);
   wlr_scene_node_set_enabled(&tl->rounded->border_shader_node->node, true);
 
   static const float transparent[4] = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -1962,16 +1971,12 @@ static bool rebuild_corner_masks(output_t *output, GLuint bg_tex) {
 
     float ow = (float)w, oh = (float)h;
     int bw_i = (c->state == STATE_FULLSCREEN) ? 0 : border_width;
+    float inner_r = (c->border_radius > (float)bw_i) ? c->border_radius - (float)bw_i : 0.0f;
 
-    float outer_x = (float)(content_r.x - output->lx - bw_i);
-    float outer_y = (float)(content_r.y - output->ly - bw_i);
-    float outer_w = (float)(content_r.width  + 2 * bw_i);
-    float outer_h = (float)(content_r.height + 2 * bw_i);
-
-    float win_u = outer_x / ow;
-    float win_v = outer_y / oh;
-    float win_sw = outer_w / ow;
-    float win_sh = outer_h / oh;
+    float win_u = (float)(content_r.x - output->lx) / ow;
+    float win_v = (float)(content_r.y - output->ly) / oh;
+    float win_sw = (float)content_r.width / ow;
+    float win_sh = (float)content_r.height / oh;
 
     glDisable(GL_BLEND);
     glDisable(GL_SCISSOR_TEST);
@@ -1981,13 +1986,22 @@ static bool rebuild_corner_masks(output_t *output, GLuint bg_tex) {
     glClear(GL_COLOR_BUFFER_BIT);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, src);
+
+    glUseProgram(effects_state.prog_blit);
+    glUniform1i(effects_state.u_blit.tex, 0);
+    draw_quad();
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ZERO, GL_ONE_MINUS_SRC_ALPHA);
     glUseProgram(effects_state.prog_corner_mask);
     glUniform1i(effects_state.u_corner_mask.tex, 0);
-    glUniform2f(effects_state.u_corner_mask.win_pos_uv,  win_u,  win_v);
+    glUniform2f(effects_state.u_corner_mask.win_pos_uv, win_u, win_v);
     glUniform2f(effects_state.u_corner_mask.win_size_uv, win_sw, win_sh);
-    glUniform2f(effects_state.u_corner_mask.win_size_px, outer_w, outer_h);
-    glUniform1f(effects_state.u_corner_mask.border_radius_px, c->border_radius);
+    glUniform2f(effects_state.u_corner_mask.win_size_px, (float)content_r.width, (float)content_r.height);
+    glUniform1f(effects_state.u_corner_mask.border_radius_px, inner_r);
+    glUniform1f(effects_state.u_corner_mask.scale, output->wlr_output->scale);
     draw_quad();
+    glDisable(GL_BLEND);
     glBindTexture(GL_TEXTURE_2D, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -2015,23 +2029,14 @@ static void push_corner_masks_to_toplevels(output_t *output) {
     }
 
     struct wlr_box content_r = get_client_rect(tl);
-    int bw_i = (c->state == STATE_FULLSCREEN) ? 0 : border_width;
-
-    struct wlr_box outer_r = {
-      .x = content_r.x - bw_i,
-      .y = content_r.y - bw_i,
-      .width = content_r.width  + 2 * bw_i,
-      .height = content_r.height + 2 * bw_i,
-    };
-
     struct wlr_fbox src; int dw, dh;
-    if (!compute_src_box(output, &outer_r, &src, &dw, &dh)) {
+    if (!compute_src_box(output, &content_r, &src, &dw, &dh)) {
       wlr_scene_node_set_enabled(&tl->rounded->corner_mask_node->node, false);
       continue;
     }
 
-    int node_ox = (outer_r.x < output->lx) ? (output->lx - outer_r.x) : -bw_i;
-    int node_oy = (outer_r.y < output->ly) ? (output->ly - outer_r.y) : -bw_i;
+    int node_ox = (content_r.x < output->lx) ? (output->lx - content_r.x) : 0;
+    int node_oy = (content_r.y < output->ly) ? (output->ly - content_r.y) : 0;
 
     wlr_scene_node_set_enabled(&tl->rounded->corner_mask_node->node, true);
     wlr_scene_buffer_set_buffer(tl->rounded->corner_mask_node, tl->rounded->corner_mask_buf);

@@ -1,8 +1,8 @@
-#extension GL_OES_standard_derivatives : enable
 precision highp float;
 uniform vec2 resolution;
 uniform float border_radius;
 uniform float border_width_px;
+uniform float niri_scale;
 
 uniform vec4 gradient_colors[10];
 uniform int gradient_count;
@@ -15,9 +15,35 @@ uniform float gradient_lerp;
 uniform vec4 border_color;
 varying vec2 v_uv;
 
-float sdRoundedBox(vec2 p, vec2 b, float r) {
-  vec2 q = abs(p) - b + r;
-  return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
+float rounding_alpha(vec2 coords, vec2 size, float radius) {
+  if (size.x <= 0.0 || size.y <= 0.0) return 0.0;
+  if (coords.x < 0.0 || coords.x > size.x || coords.y < 0.0 || coords.y > size.y) return 0.0;
+
+  float r = min(radius, min(size.x, size.y) * 0.5);
+  if (r <= 0.0) return 1.0;
+
+  vec2 center;
+  bool in_corner = false;
+
+  if (coords.x < r && coords.y < r) {
+    center = vec2(r, r);
+    in_corner = true;
+  } else if (size.x - r < coords.x && coords.y < r) {
+    center = vec2(size.x - r, r);
+    in_corner = true;
+  } else if (size.x - r < coords.x && size.y - r < coords.y) {
+    center = vec2(size.x - r, size.y - r);
+    in_corner = true;
+  } else if (coords.x < r && size.y - r < coords.y) {
+    center = vec2(r, size.y - r);
+    in_corner = true;
+  }
+
+  if (!in_corner) return 1.0;
+
+  float dist = distance(coords, center);
+  float t = clamp((dist - r) * niri_scale + 0.5, 0.0, 1.0);
+  return 1.0 - t * t * (3.0 - 2.0 * t);
 }
 
 // sample a linear gradient defined by an array of color stops at a given angle
@@ -47,16 +73,14 @@ vec4 sampleGradient(vec2 uv, vec4 colors[10], int count, float angle) {
 
 void main() {
   vec2 px = v_uv * resolution;
-  vec2 center = resolution * 0.5;
-  vec2 p = px - center;
-  float d_outer = sdRoundedBox(p, center, border_radius);
+
+  float a_outer = rounding_alpha(px, resolution, border_radius);
+
   float inner_r = max(border_radius - border_width_px, 0.0);
-  vec2 inner_half = center - vec2(border_width_px);
-  float d_inner = sdRoundedBox(p, inner_half, inner_r);
-  float aa = fwidth(d_outer) * 0.5;
-  float a_outer = 1.0 - smoothstep(-aa, aa, d_outer);
-  aa = fwidth(d_inner) * 0.5;
-  float a_inner = smoothstep(-aa, aa, d_inner);
+  vec2 inner_offset = vec2(border_width_px);
+  vec2 inner_size = resolution - inner_offset * 2.0;
+  float a_inner = rounding_alpha(px - inner_offset, inner_size, inner_r);
+
   vec4 col;
   if (gradient_count >= 2) {
     vec4 g1 = sampleGradient(v_uv, gradient_colors, gradient_count, gradient_angle);
@@ -69,7 +93,8 @@ void main() {
   } else {
     col = border_color;
   }
-  float alpha = a_outer * a_inner * col.a;
+
+  float alpha = a_outer * (1.0 - a_inner) * col.a;
   if (alpha < 0.001) discard;
   gl_FragColor = vec4(col.rgb * alpha, alpha);
 }
