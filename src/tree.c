@@ -1772,6 +1772,7 @@ void update_border_colors(struct wlr_scene_tree *border_tree, struct wlr_scene_r
     r->gradient2_angle = bt->gradient2_angle;
     r->gradient_lerp = bt->gradient_lerp;
     r->border_dirty = true;
+    r->corner_mask_dirty = true;
 
     static const float transparent[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     for (int i = 0; i < 4; i++)

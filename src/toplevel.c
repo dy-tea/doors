@@ -307,6 +307,7 @@ void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
       if (toplevel->rounded && toplevel->rounded->border_shader_node &&
           (c->border_radius > 0.0f || toplevel->rounded->gradient_count >= 2)) {
         toplevel->rounded->border_dirty = true;
+        toplevel->rounded->corner_mask_dirty = true;
         int new_fw = border_w + 2 * (int)bw;
         int new_fh = border_h + 2 * (int)bw;
         if (new_fw > 0 && new_fh > 0)
@@ -319,6 +320,7 @@ void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
       if (toplevel->rounded && toplevel->rounded->border_shader_node &&
           (c->border_radius > 0.0f || toplevel->rounded->gradient_count >= 2)) {
         toplevel->rounded->border_dirty = true;
+        toplevel->rounded->corner_mask_dirty = true;
         int new_fw = container_rect->width + 2 * (int)bw;
         int new_fh = container_rect->height + 2 * (int)bw;
         if (new_fw > 0 && new_fh > 0)
@@ -1013,6 +1015,7 @@ void toplevel_set_border_radius(toplevel_t *tl, float radius) {
       }
     }
     tl->rounded->border_dirty = true;
+    tl->rounded->corner_mask_dirty = true;
   } else if (tl->rounded) {
     if (tl->rounded->corner_mask_node) {
       wlr_scene_node_destroy(&tl->rounded->corner_mask_node->node);
@@ -1040,8 +1043,10 @@ void toplevel_set_border_radius(toplevel_t *tl, float radius) {
         }
       }
       tl->rounded->border_dirty = false;
+      tl->rounded->corner_mask_dirty = false;
     } else {
       tl->rounded->border_dirty = true;
+      tl->rounded->corner_mask_dirty = true;
     }
   }
 }

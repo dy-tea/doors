@@ -834,6 +834,7 @@ void effects_output_resize(effects_output_t *ctx, int width, int height,
         tl->rounded->border_shader_buf_h = 0;
       }
       tl->rounded->border_dirty = true;
+      tl->rounded->corner_mask_dirty = true;
     }
   }
 
@@ -1990,6 +1991,7 @@ static bool rebuild_corner_masks(output_t *output, GLuint bg_tex) {
     glBindTexture(GL_TEXTURE_2D, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+    tl->rounded->corner_mask_dirty = false;
     any = true;
   }
   return any;
@@ -2357,6 +2359,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 
   // check if corner masks need rendering
   bool any_cm = false;
+  bool any_cm_dirty = false;
   {
     toplevel_t *tl;
     wl_list_for_each(tl, &server.toplevels, link) {
@@ -2365,7 +2368,8 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
           tl->node->client->state != STATE_FULLSCREEN &&
           tl->node->output && tl->node->output == output) {
         any_cm = true;
-        break;
+        if (tl->rounded->corner_mask_dirty)
+          any_cm_dirty = true;
       }
     }
   }
@@ -2455,18 +2459,21 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
         push_blur_to_layers(output);
       }
       if (effects_state.prog_corner_mask) {
-        rebuild_corner_masks(output, 0);
+        if (any_cm_dirty)
+          rebuild_corner_masks(output, 0);
         push_corner_masks_to_toplevels(output);
       }
     } else if (any_layer_needs_blur) {
       rebuild_live_blur_layers(output, 0, &scene_output->damage_ring.current);
       push_blur_to_layers(output);
     } else if (any_cm && effects_state.prog_corner_mask) {
-      rebuild_corner_masks(output, 0);
+      if (any_cm_dirty)
+        rebuild_corner_masks(output, 0);
       push_corner_masks_to_toplevels(output);
     }
   } else if (any_cm && effects_state.prog_corner_mask) {
-    rebuild_corner_masks(output, 0);
+    if (any_cm_dirty)
+      rebuild_corner_masks(output, 0);
     push_corner_masks_to_toplevels(output);
   }
 
@@ -2507,6 +2514,7 @@ after_capture:
       bool has_gradient = (tl->rounded->gradient_count >= 2);
       if (c->border_radius <= 0.0f && !has_gradient) {
         tl->rounded->border_dirty = false;
+        tl->rounded->corner_mask_dirty = false;
         continue;
       }
 
@@ -2520,6 +2528,7 @@ after_capture:
 
       blur_render_border(tl, content_r.width, content_r.height);
       tl->rounded->border_dirty = false;
+      tl->rounded->corner_mask_dirty = false;
     }
   }
 

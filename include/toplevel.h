@@ -26,6 +26,7 @@ typedef struct toplevel_rounded_t {
   int border_shader_buf_w;
   int border_shader_buf_h;
   bool border_dirty;
+  bool corner_mask_dirty;
   float border_color[4];
 
   float gradient_colors[BORDER_GRADIENT_MAX_STOPS * 4];
