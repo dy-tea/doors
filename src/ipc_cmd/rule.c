@@ -40,14 +40,21 @@ void ipc_cmd_rule(char **args, int num, int client_fd) {
     while (num > 0) {
       char *arg = *args;
 
-      if (arg[0] != '-' && app_id == NULL) {
-        app_id = arg;
-        strncpy(r->match.app_id, app_id, MAXLEN - 1);
-        r->match.app_id[MAXLEN - 1] = '\0';
-      } else if (streq("title=", arg) || strncmp(arg, "title=", 6) == 0) {
+      if (strncmp(arg, "title=", 6) == 0) {
         title = arg + 6;
         strncpy(r->match.title, title, MAXLEN - 1);
         r->match.title[MAXLEN - 1] = '\0';
+      } else if (strncmp(arg, "tag=", 4) == 0) {
+        strncpy(r->match.tag, arg + 4, MAXLEN - 1);
+        r->match.tag[MAXLEN - 1] = '\0';
+      } else if (strncmp(arg, "app_id=", 7) == 0) {
+        app_id = arg + 7;
+        strncpy(r->match.app_id, app_id, MAXLEN - 1);
+        r->match.app_id[MAXLEN - 1] = '\0';
+      } else if (arg[0] != '-' && app_id == NULL && strchr(arg, '=') == NULL) {
+        app_id = arg;
+        strncpy(r->match.app_id, app_id, MAXLEN - 1);
+        r->match.app_id[MAXLEN - 1] = '\0';
       } else if (streq("state=tiled", arg)) {
         r->consequence.state = STATE_TILED;
         r->consequence.has_state = true;
@@ -166,9 +173,9 @@ void ipc_cmd_rule(char **args, int num, int client_fd) {
       num--;
     }
 
-    if (!app_id && !title) {
+    if (!app_id && !title && r->match.tag[0] == '\0') {
       free(r);
-      send_failure(client_fd, "rule -a: must specify app_id or title\n");
+      send_failure(client_fd, "rule -a: must specify app_id, title, or tag\n");
       return;
     }
 
