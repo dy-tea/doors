@@ -981,17 +981,24 @@ static void update_snapshot_entry(animation_entry_t *entry, struct timespec now)
         continue;
       }
 
+      float scale = 1.0f;
+      if (copy->buffer->buffer && copy->buffer->dst_width > 0)
+        scale = (float)copy->buffer->buffer->width / (float)copy->buffer->dst_width;
+
+      int logical_w = vis_x2 - vis_x1;
+      int logical_h = vis_y2 - vis_y1;
+
       struct wlr_fbox src_fbox = {
-        .x = (float)(vis_x1 - copy->x),
-        .y = (float)(vis_y1 - copy->y),
-        .width = (float)(vis_x2 - vis_x1),
-        .height = (float)(vis_y2 - vis_y1),
+        .x = (float)(vis_x1 - copy->x) * scale,
+        .y = (float)(vis_y1 - copy->y) * scale,
+        .width = (float)logical_w * scale,
+        .height = (float)logical_h * scale,
       };
 
       src_fbox = clamp_buffer_source_box(copy->buffer, src_fbox);
       wlr_scene_buffer_set_source_box(copy->buffer, &src_fbox);
       wlr_scene_node_set_position(&copy->buffer->node, vis_x1, vis_y1);
-      wlr_scene_buffer_set_dest_size(copy->buffer, (int)src_fbox.width, (int)src_fbox.height);
+      wlr_scene_buffer_set_dest_size(copy->buffer, logical_w, logical_h);
     }
   }
 
