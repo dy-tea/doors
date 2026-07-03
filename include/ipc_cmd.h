@@ -8,6 +8,7 @@ void ipc_cmd_desktop(char **args, int num, int client_fd);
 void ipc_cmd_query(char **args, int num, int client_fd);
 void ipc_cmd_wm(char **args, int num, int client_fd);
 void ipc_cmd_config(char **args, int num, int client_fd);
+void ipc_cmd_env(char **args, int num, int client_fd);
 void ipc_cmd_focus(char **args, int num, int client_fd);
 void ipc_cmd_swap(char **args, int num, int client_fd);
 void ipc_cmd_presel(char **args, int num, int client_fd);

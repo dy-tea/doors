@@ -3,6 +3,9 @@
 # Example doorsrc configuration
 # This file is executed at server startup
 
+# Set environment inherited by applications launched later from Doors hotkeys
+# doorsctl env set XCURSOR_SIZE 24
+
 # Set up desktops on HDMI-A-1 (names separated by spaces)
 doorsctl output HDMI-A-1 -d I II III IV V VI VII VIII IX X
 

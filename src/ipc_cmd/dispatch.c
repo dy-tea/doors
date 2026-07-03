@@ -55,6 +55,8 @@ bool process_ipc_message(char *msg, int msg_len, int client_fd) {
     ipc_cmd_wm(++args, --num, client_fd);
   } else if (streq("config", *args)) {
     ipc_cmd_config(++args, --num, client_fd);
+  } else if (streq("env", *args)) {
+    ipc_cmd_env(++args, --num, client_fd);
   } else if (streq("quit", *args)) {
     ipc_cmd_quit(++args, --num, client_fd);
   } else if (streq("subscribe", *args)) {

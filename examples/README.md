@@ -12,6 +12,30 @@ Both files use `doorsctl` to communicate with the running compositor via IPC.
 This file is executed as a shell script at server startup. Use it to configure
 initial settings and set up desktops.
 
+### Global Environment
+
+Set a variable in the Doors process with IPC:
+
+```sh
+doorsctl env set XCURSOR_SIZE 24
+doorsctl env set QT_QPA_PLATFORM "wayland;xcb"
+```
+
+Commands launched later by Doors, including commands from hotkeys, inherit these
+values. To remove a variable, use `doorsctl env unset <name>`.
+
+An `export` in `doorsrc` only changes the environment of that shell and commands
+launched directly by it; a child process cannot modify the environment of the
+already-running Doors parent. If a value is needed by both, do both explicitly:
+
+```sh
+export XCURSOR_SIZE=24
+doorsctl env set XCURSOR_SIZE "$XCURSOR_SIZE"
+```
+
+Environment variables used while Doors initializes must still be set before
+launching Doors; IPC is only available after initialization.
+
 ### Config Settings
 
 ```
