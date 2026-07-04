@@ -1485,6 +1485,15 @@ output_t *client_get_output(client_t *client) {
   return n ? n->output : NULL;
 }
 
+border_state_t get_border_state(client_t *client) {
+  border_state_t state = {0};
+  state.output = client_get_output(client);
+  state.desk = state.output ? state.output->desk : NULL;
+  state.is_focused = (state.desk && state.desk->focus && state.desk->focus->client == client);
+  state.is_active = (state.desk && state.desk->focus && state.desk->focus->client != NULL);
+  return state;
+}
+
 struct wlr_scene_tree *client_border_tree(client_t *client) {
   if (!client) return NULL;
   if (client->toplevel) return client->toplevel->border_tree;
@@ -1635,12 +1644,11 @@ static void get_border_color(client_t *client, float *color) {
   }
 
   const char *color_str;
-  output_t *m = client_get_output(client);
-  desktop_t *d = m ? m->desk : NULL;
+  border_state_t bs = get_border_state(client);
 
-  bool the_only_window = (mon_head == mon_tail) && d && d->root && d->root->client;
-  bool no_border = (borderless_monocle && d &&
-  	d->layout == LAYOUT_MONOCLE && IS_TILED(client)) ||
+  bool the_only_window = (mon_head == mon_tail) && bs.desk && bs.desk->root && bs.desk->root->client;
+  bool no_border = (borderless_monocle && bs.desk &&
+  	bs.desk->layout == LAYOUT_MONOCLE && IS_TILED(client)) ||
     (borderless_singleton && the_only_window) ||
     client->state == STATE_FULLSCREEN;
 
@@ -1657,11 +1665,9 @@ static void get_border_color(client_t *client, float *color) {
     return;
   }
 
-  bool is_focused = (d && d->focus && d->focus->client == client);
-  bool is_active = (d && d->focus && d->focus->client != NULL);
-  if (is_focused)
+  if (bs.is_focused)
     color_str = focused_border_color;
-  else if (is_active)
+  else if (bs.is_active)
     color_str = active_border_color;
   else
     color_str = normal_border_color;
@@ -1752,15 +1758,12 @@ void update_border_colors(client_t *client) {
   struct wlr_scene_rect **rects = client_border_rects(client);
 
   // determine which gradient set applies to this client
-  output_t *m = client_get_output(client);
-  desktop_t *d = m ? m->desk : NULL;
-  bool is_focused = (d && d->focus && d->focus->client == client);
-  bool is_active  = (d && d->focus && d->focus->client != NULL);
+  border_state_t bs = get_border_state(client);
 
   border_theme_t *bt;
-  if (is_focused)
+  if (bs.is_focused)
     bt = &focused_border_theme;
-  else if (is_active)
+  else if (bs.is_active)
     bt = &active_border_theme;
   else
     bt = &normal_border_theme;

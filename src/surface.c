@@ -239,3 +239,40 @@ void surface_update_rounded(surface_rounded_t **rounded, float color[4], border_
   r->border_dirty = true;
   r->corner_mask_dirty = true;
 }
+
+void surface_client_set_blur(client_t *client, bool enabled) {
+  if (client->toplevel)
+    toplevel_set_blur(client->toplevel, enabled);
+  else if (client->xwayland_view)
+    xwayland_set_blur(client->xwayland_view, enabled);
+}
+
+void surface_client_set_mica(client_t *client, bool enabled) {
+  if (client->toplevel)
+    toplevel_set_mica(client->toplevel, enabled);
+  else if (client->xwayland_view)
+    xwayland_set_mica(client->xwayland_view, enabled);
+}
+
+void surface_client_set_acrylic(client_t *client, bool enabled) {
+  if (client->toplevel)
+    toplevel_set_acrylic(client->toplevel, enabled);
+  else if (client->xwayland_view)
+    xwayland_set_acrylic(client->xwayland_view, enabled);
+}
+
+void surface_client_set_border_radius(client_t *client, float radius) {
+  if (client->toplevel)
+    toplevel_set_border_radius(client->toplevel, radius);
+  else if (client->xwayland_view)
+    xwayland_set_border_radius(client->xwayland_view, radius);
+  else
+    client->border_radius = radius;
+}
+
+void surface_client_set_shadow(client_t *client, bool enabled) {
+  if (client->toplevel)
+    toplevel_set_shadow(client->toplevel, enabled);
+  else if (client->xwayland_view)
+    xwayland_set_shadow(client->xwayland_view, enabled);
+}

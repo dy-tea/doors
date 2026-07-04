@@ -87,6 +87,15 @@ node_t *client_get_node(client_t *client);
 output_t *client_get_output(client_t *client);
 surface_rounded_t *client_get_rounded(client_t *client);
 
+typedef struct {
+  output_t *output;
+  desktop_t *desk;
+  bool is_focused;
+  bool is_active;
+} border_state_t;
+
+border_state_t get_border_state(client_t *client);
+
 // Border helpers
 void create_borders(struct wlr_scene_tree *parent, struct wlr_scene_tree **border_tree,
  struct wlr_scene_rect *rects[4]);
