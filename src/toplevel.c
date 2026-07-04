@@ -5,6 +5,7 @@
 #include "toplevel.h"
 #include "input_method.h"
 #include "seat.h"
+#include "surface.h"
 #include "workspace.h"
 #include "ipc.h"
 #include "rule.h"
@@ -12,7 +13,6 @@
 #include "output.h"
 #include "popup.h"
 #include "render_unfocused.h"
-#include "scroller.h"
 #include "scratchpad.h"
 #include "server.h"
 #include "tablet.h"
@@ -459,9 +459,6 @@ void toplevel_map(struct wl_listener *listener, void *data) {
     return;
   }
 
-  if (rule && rule->has_state)
-    n->client->state = rule->state;
-
   bool should_focus = true;
   if (rule) {
     if (rule->has_focus && !rule->focus)
@@ -516,57 +513,14 @@ void toplevel_map(struct wl_listener *listener, void *data) {
   wlr_log(WLR_DEBUG, "  Final target desktop: %s (changed=%d)",
     target_desktop->name, desktop_changed);
 
-  // apply other rules
+  rule_apply_consequence(n, n->client, rule);
+
   if (rule) {
-	  if (rule->has_hidden) n->hidden = rule->hidden;
-	  if (rule->has_sticky) n->sticky = rule->sticky;
-		if (rule->has_locked) n->locked = rule->locked;
-
-	  if (rule->has_scroller_proportion || rule->has_scroller_proportion_single)
-	    scroller_apply_client_rules(n->client,
-	      rule->has_scroller_proportion ? rule->scroller_proportion : 0.0f,
-	      rule->has_scroller_proportion_single ? rule->scroller_proportion_single : 0.0f);
-
-	  if (rule->has_block_out_from_screenshare)
-	    n->client->block_out_from_screenshare = rule->block_out_from_screenshare;
-
-		if (rule->has_blur) {
-	    n->client->blur = rule->blur;
-	    n->client->blur_from_rule = true;
-	    toplevel_set_blur(toplevel, rule->blur);
-  	}
-
-		if (rule->has_mica) {
-	    n->client->mica = rule->mica;
-	    toplevel_set_mica(toplevel, rule->mica);
-  	}
-
-  	if (rule->has_acrylic) {
-	    n->client->acrylic = rule->acrylic;
-	    toplevel_set_acrylic(toplevel, rule->acrylic);
-	  }
-
-   	if (rule->has_border_radius)
-    	toplevel_set_border_radius(toplevel, rule->border_radius);
-
-   	if (rule->has_shadow) {
-   	  n->client->shadow = rule->shadow;
-   	  n->client->shadow_size = shadow_size;
-   	  n->client->shadow_offset_x = shadow_offset_x;
-   	  n->client->shadow_offset_y = shadow_offset_y;
-   	  memcpy(n->client->shadow_color, shadow_color, sizeof(shadow_color));
-   	  toplevel_set_shadow(toplevel, rule->shadow);
-   	}
-
-    if (rule->has_allow_tearing) {
-      n->client->allow_tearing = rule->allow_tearing;
-      n->client->allow_tearing_from_rule = true;
-    }
-
-    if (rule->has_render_unfocused) {
-      n->client->render_unfocused = rule->render_unfocused;
-      n->client->render_unfocused_from_rule = true;
-    }
+    if (rule->has_blur) toplevel_set_blur(toplevel, rule->blur);
+    if (rule->has_mica) toplevel_set_mica(toplevel, rule->mica);
+    if (rule->has_acrylic) toplevel_set_acrylic(toplevel, rule->acrylic);
+    if (rule->has_border_radius) toplevel_set_border_radius(toplevel, rule->border_radius);
+    if (rule->has_shadow) toplevel_set_shadow(toplevel, rule->shadow);
   }
 
   // create foreign toplevel handles
@@ -601,7 +555,6 @@ void toplevel_map(struct wl_listener *listener, void *data) {
   // set app_id on foreign toplevel handle
   if (app_id)
     wlr_foreign_toplevel_handle_v1_set_app_id(toplevel->foreign_toplevel, app_id);
-
 
   // center to output if floating, also ensure it does not tile
   if (rule && rule->state == STATE_FLOATING) {
@@ -892,197 +845,24 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
 }
 
 void toplevel_set_blur(toplevel_t *tl, bool enabled) {
-  if (!tl || !tl->scene_tree) return;
-
-  if (enabled) {
-    if (!tl->blur) {
-      tl->blur = calloc(1, sizeof(*tl->blur));
-      if (!tl->blur) return;
-    }
-    if (!tl->blur->blur_node) {
-      tl->blur->blur_node = wlr_scene_buffer_create(tl->scene_tree, NULL);
-      if (tl->blur->blur_node) {
-        wlr_scene_node_lower_to_bottom(&tl->blur->blur_node->node);
-        if (tl->node && tl->node->output) {
-          struct wlr_scene_output *so = wlr_scene_get_scene_output(server.scene, tl->node->output->wlr_output);
-          if (so) {
-            pixman_region32_union_rect(&so->damage_ring.current, &so->damage_ring.current,
-              0, 0, (unsigned int)tl->node->output->width, (unsigned int)tl->node->output->height);
-            output_schedule_frame(tl->node->output);
-          }
-        }
-      }
-    }
-  } else if (tl->blur && tl->blur->blur_node) {
-    wlr_scene_node_destroy(&tl->blur->blur_node->node);
-    tl->blur->blur_node = NULL;
-    if (tl->blur->blur_buf) {
-      wlr_buffer_unlock(tl->blur->blur_buf);
-      tl->blur->blur_buf = NULL;
-      tl->blur->blur_buf_fbo = 0;
-    }
-  }
+  surface_set_blur(tl->scene_tree, tl->node, &tl->blur, enabled);
 }
 
 void toplevel_set_mica(toplevel_t *tl, bool enabled) {
-  if (!tl || !tl->scene_tree) return;
-
-  if (enabled) {
-    if (!tl->blur) {
-      tl->blur = calloc(1, sizeof(*tl->blur));
-      if (!tl->blur) return;
-    }
-
-    if (!tl->blur->mica_node) {
-      tl->blur->mica_node = wlr_scene_buffer_create(tl->scene_tree, NULL);
-      if (tl->blur->mica_node) {
-        wlr_scene_node_lower_to_bottom(&tl->blur->mica_node->node);
-        if (tl->node && tl->node->output) {
-          struct wlr_scene_output *so = wlr_scene_get_scene_output(server.scene, tl->node->output->wlr_output);
-          if (so) {
-            pixman_region32_union_rect(&so->damage_ring.current, &so->damage_ring.current,
-              0, 0, (unsigned int)tl->node->output->width, (unsigned int)tl->node->output->height);
-            output_schedule_frame(tl->node->output);
-          }
-        }
-      }
-    }
-  } else if (tl->blur && tl->blur->mica_node) {
-    wlr_scene_node_destroy(&tl->blur->mica_node->node);
-    tl->blur->mica_node = NULL;
-  }
+  surface_set_mica(tl->scene_tree, tl->node, &tl->blur, enabled);
 }
 
 void toplevel_set_acrylic(toplevel_t *tl, bool enabled) {
-  if (!tl || !tl->scene_tree) return;
-
-  if (enabled) {
-    if (!tl->blur) {
-      tl->blur = calloc(1, sizeof(*tl->blur));
-      if (!tl->blur) return;
-    }
-
-    if (!tl->blur->acrylic_node) {
-      tl->blur->acrylic_node = wlr_scene_buffer_create(tl->scene_tree, NULL);
-      if (tl->blur->acrylic_node) {
-        wlr_scene_node_lower_to_bottom(&tl->blur->acrylic_node->node);
-        if (tl->node && tl->node->output) {
-          struct wlr_scene_output *so = wlr_scene_get_scene_output(server.scene, tl->node->output->wlr_output);
-          if (so) {
-            pixman_region32_union_rect(&so->damage_ring.current, &so->damage_ring.current,
-              0, 0, (unsigned int)tl->node->output->width, (unsigned int)tl->node->output->height);
-            output_schedule_frame(tl->node->output);
-          }
-        }
-      }
-    }
-  } else if (tl->blur && tl->blur->acrylic_node) {
-    wlr_scene_node_destroy(&tl->blur->acrylic_node->node);
-    tl->blur->acrylic_node = NULL;
-
-    if (tl->blur->acrylic_buf) {
-      wlr_buffer_unlock(tl->blur->acrylic_buf);
-      tl->blur->acrylic_buf = NULL;
-      tl->blur->acrylic_buf_fbo = 0;
-    }
-  }
-}
-
-static bool corner_mask_no_input(struct wlr_scene_buffer *buffer, double *sx, double *sy) {
-  (void)buffer;
-  (void)sx;
-  (void)sy;
-  return false;
+  surface_set_acrylic(tl->scene_tree, tl->node, &tl->blur, enabled);
 }
 
 void toplevel_set_border_radius(toplevel_t *tl, float radius) {
-  if (!tl || !tl->scene_tree || !tl->content_tree) return;
-
-  if (tl->node && tl->node->client)
-    tl->node->client->border_radius = radius;
-
-  if (tl->shadow)
-    tl->shadow->shadow_dirty = true;
-
-  if (radius > 0.0f) {
-    if (!tl->rounded) {
-      tl->rounded = calloc(1, sizeof(*tl->rounded));
-      if (!tl->rounded) return;
-    }
-
-    if (!tl->rounded->corner_mask_node) {
-      tl->rounded->corner_mask_node = wlr_scene_buffer_create(tl->scene_tree, NULL);
-      if (tl->rounded->corner_mask_node) {
-        wlr_scene_node_place_above(&tl->rounded->corner_mask_node->node, &tl->content_tree->node);
-
-        if (tl->border_tree)
-          wlr_scene_node_place_below(&tl->rounded->corner_mask_node->node,
-            &tl->border_tree->node);
-
-        tl->rounded->corner_mask_node->point_accepts_input = corner_mask_no_input;
-      }
-    }
-    tl->rounded->border_dirty = true;
-    tl->rounded->corner_mask_dirty = true;
-  } else if (tl->rounded) {
-    if (tl->rounded->corner_mask_node) {
-      wlr_scene_node_destroy(&tl->rounded->corner_mask_node->node);
-      tl->rounded->corner_mask_node = NULL;
-
-      if (tl->rounded->corner_mask_buf) {
-        wlr_buffer_unlock(tl->rounded->corner_mask_buf);
-        tl->rounded->corner_mask_buf = NULL;
-        tl->rounded->corner_mask_buf_fbo = 0;
-      }
-    }
-
-    bool has_gradient = (tl->rounded->gradient_count >= 2);
-    if (!has_gradient) {
-      if (tl->rounded->border_shader_node) {
-        wlr_scene_node_destroy(&tl->rounded->border_shader_node->node);
-        tl->rounded->border_shader_node = NULL;
-
-        if (tl->rounded->border_shader_buf) {
-          wlr_buffer_unlock(tl->rounded->border_shader_buf);
-          tl->rounded->border_shader_buf = NULL;
-          tl->rounded->border_shader_buf_fbo = 0;
-          tl->rounded->border_shader_buf_w = 0;
-          tl->rounded->border_shader_buf_h = 0;
-        }
-      }
-      tl->rounded->border_dirty = false;
-      tl->rounded->corner_mask_dirty = false;
-    } else {
-      tl->rounded->border_dirty = true;
-      tl->rounded->corner_mask_dirty = true;
-    }
-  }
+  surface_set_border_radius(tl->scene_tree, tl->content_tree, tl->border_tree,
+    tl->node, &tl->rounded, &tl->shadow, radius);
 }
 
 void toplevel_set_shadow(toplevel_t *tl, bool enabled) {
-  if (!tl || !tl->scene_tree) return;
-
-  if (tl->node && tl->node->client)
-    tl->node->client->shadow = enabled;
-
-  if (enabled) {
-    if (!tl->shadow) {
-      tl->shadow = calloc(1, sizeof(*tl->shadow));
-      if (!tl->shadow) return;
-    }
-    tl->shadow->shadow_dirty = true;
-  } else if (tl->shadow) {
-    if (tl->shadow->shadow_node) {
-      wlr_scene_node_destroy(&tl->shadow->shadow_node->node);
-      tl->shadow->shadow_node = NULL;
-    }
-    if (tl->shadow->shadow_buf) {
-      wlr_buffer_unlock(tl->shadow->shadow_buf);
-      tl->shadow->shadow_buf = NULL;
-      tl->shadow->shadow_buf_fbo = 0;
-    }
-    tl->shadow->shadow_dirty = false;
-  }
+  surface_set_shadow(tl->scene_tree, tl->node, &tl->shadow, enabled);
 }
 
 void toplevel_destroy(struct wl_listener *listener, void *data) {

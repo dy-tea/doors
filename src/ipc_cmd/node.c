@@ -10,6 +10,7 @@
 #include "scratchpad.h"
 #include "tabs.h"
 #include "toplevel.h"
+#include "xwayland.h"
 #include "transaction.h"
 #include "tree.h"
 #include "workspace.h"
@@ -276,6 +277,8 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
       n->client->blur = new_blur;
       if (n->client->toplevel)
         toplevel_set_blur(n->client->toplevel, new_blur);
+      else if (n->client->xwayland_view)
+        xwayland_set_blur(n->client->xwayland_view, new_blur);
       send_success(client_fd, "flag changed\n");
     } else if (strcmp(key, "mica") == 0) {
       if (!n->client) {
@@ -286,6 +289,8 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
       n->client->mica = new_val;
       if (n->client->toplevel)
         toplevel_set_mica(n->client->toplevel, new_val);
+      else if (n->client->xwayland_view)
+        xwayland_set_mica(n->client->xwayland_view, new_val);
       send_success(client_fd, "flag changed\n");
     } else if (strcmp(key, "acrylic") == 0) {
       if (!n->client) {
@@ -296,6 +301,8 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
       n->client->acrylic = new_val;
       if (n->client->toplevel)
         toplevel_set_acrylic(n->client->toplevel, new_val);
+      else if (n->client->xwayland_view)
+        xwayland_set_acrylic(n->client->xwayland_view, new_val);
       send_success(client_fd, "flag changed\n");
     } else if (strcmp(key, "shadow") == 0) {
       if (!n->client) {
@@ -310,6 +317,8 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
       memcpy(n->client->shadow_color, shadow_color, sizeof(shadow_color));
       if (n->client->toplevel)
         toplevel_set_shadow(n->client->toplevel, new_val);
+      else if (n->client->xwayland_view)
+        xwayland_set_shadow(n->client->xwayland_view, new_val);
       send_success(client_fd, "flag changed\n");
     } else if (strncmp(key, "border_radius", 13) == 0) {
       if (!n->client) {
@@ -319,7 +328,9 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
       float r = atof(key + 14);
       if (n->client->toplevel)
         toplevel_set_border_radius(n->client->toplevel, r);
-      else if (n->client)
+      else if (n->client->xwayland_view)
+        xwayland_set_border_radius(n->client->xwayland_view, r);
+      else
         n->client->border_radius = r;
       send_success(client_fd, "border_radius set\n");
     } else {

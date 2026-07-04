@@ -1,4 +1,5 @@
 #include "rule.h"
+#include "scroller.h"
 #include "types.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -198,4 +199,55 @@ rule_consequence_t *find_matching_rule(const char *app_id, const char *title, co
     remove_rule(matched);
 
   return &matched->consequence;
+}
+
+void rule_apply_consequence(node_t *node, client_t *client, const rule_consequence_t *rule) {
+  if (!rule) return;
+
+  if (rule->has_state)
+    client->state = rule->state;
+
+  if (rule->has_hidden) node->hidden = rule->hidden;
+  if (rule->has_sticky) node->sticky = rule->sticky;
+  if (rule->has_locked) node->locked = rule->locked;
+
+  if (rule->has_scroller_proportion || rule->has_scroller_proportion_single)
+    scroller_apply_client_rules(client,
+      rule->has_scroller_proportion ? rule->scroller_proportion : 0.0f,
+      rule->has_scroller_proportion_single ? rule->scroller_proportion_single : 0.0f);
+
+  if (rule->has_block_out_from_screenshare)
+    client->block_out_from_screenshare = rule->block_out_from_screenshare;
+
+  if (rule->has_allow_tearing) {
+    client->allow_tearing = rule->allow_tearing;
+    client->allow_tearing_from_rule = true;
+  }
+
+  if (rule->has_render_unfocused) {
+    client->render_unfocused = rule->render_unfocused;
+    client->render_unfocused_from_rule = true;
+  }
+
+  if (rule->has_blur) {
+    client->blur = rule->blur;
+    client->blur_from_rule = true;
+  }
+
+  if (rule->has_mica)
+    client->mica = rule->mica;
+
+  if (rule->has_acrylic)
+    client->acrylic = rule->acrylic;
+
+  if (rule->has_border_radius)
+    client->border_radius = rule->border_radius;
+
+  if (rule->has_shadow) {
+    client->shadow = rule->shadow;
+    client->shadow_size = shadow_size;
+    client->shadow_offset_x = shadow_offset_x;
+    client->shadow_offset_y = shadow_offset_y;
+    memcpy(client->shadow_color, shadow_color, sizeof(shadow_color));
+  }
 }

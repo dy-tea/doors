@@ -9,7 +9,7 @@
 #include "rule.h"
 #include "seat.h"
 #include "scratchpad.h"
-#include "scroller.h"
+#include "surface.h"
 #include "server.h"
 #include "tabs.h"
 #include "toplevel.h"
@@ -18,6 +18,7 @@
 #include "workspace.h"
 #include "xwayland.h"
 #include <wlr/types/wlr_buffer.h>
+#include <pixman.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wayland-server-core.h>
@@ -589,9 +590,6 @@ static void handle_map(struct wl_listener *listener, void *data) {
 		return;
 	}
 
-	if (rule && rule->has_state)
-		client->state = rule->state;
-
 	bool should_focus = true;
 	if (rule && rule->has_focus && !rule->focus)
 		should_focus = false;
@@ -608,22 +606,14 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	output_t *target_monitor = target_desktop->output ? target_desktop->output : mon;
 	node->output = target_monitor;
 
+	rule_apply_consequence(node, client, rule);
+
 	if (rule) {
-		if (rule->has_hidden) node->hidden = rule->hidden;
-		if (rule->has_sticky) node->sticky = rule->sticky;
-		if (rule->has_locked) node->locked = rule->locked;
-		if (rule->has_block_out_from_screenshare) client->block_out_from_screenshare = rule->block_out_from_screenshare;
-		if (rule->has_allow_tearing) {
-			client->allow_tearing = rule->allow_tearing;
-			client->allow_tearing_from_rule = true;
-		}
-		if (rule->has_scroller_proportion || rule->has_scroller_proportion_single)
-			scroller_apply_client_rules(client, rule->has_scroller_proportion ? rule->scroller_proportion : 0.0f,
-			rule->has_scroller_proportion_single ? rule->scroller_proportion_single : 0.0f);
-		if (rule->has_render_unfocused) {
-			client->render_unfocused = rule->render_unfocused;
-			client->render_unfocused_from_rule = true;
-		}
+		if (rule->has_blur) xwayland_set_blur(xwayland_view, rule->blur);
+		if (rule->has_mica) xwayland_set_mica(xwayland_view, rule->mica);
+		if (rule->has_acrylic) xwayland_set_acrylic(xwayland_view, rule->acrylic);
+		if (rule->has_border_radius) xwayland_set_border_radius(xwayland_view, rule->border_radius);
+		if (rule->has_shadow) xwayland_set_shadow(xwayland_view, rule->shadow);
 	}
 
 	render_unfocused_client_update(client);
@@ -729,6 +719,28 @@ static void handle_map(struct wl_listener *listener, void *data) {
 
 	wlr_log(WLR_DEBUG, "XWayland window map complete: scene_tree enabled=%d shown=%d",
 		xwayland_view->scene_tree->node.enabled, client->shown);
+}
+
+void xwayland_set_blur(xwayland_toplevel_t *xwayland_view, bool enabled) {
+  surface_set_blur(xwayland_view->scene_tree, xwayland_view->node, &xwayland_view->blur, enabled);
+}
+
+void xwayland_set_mica(xwayland_toplevel_t *xwayland_view, bool enabled) {
+  surface_set_mica(xwayland_view->scene_tree, xwayland_view->node, &xwayland_view->blur, enabled);
+}
+
+void xwayland_set_acrylic(xwayland_toplevel_t *xwayland_view, bool enabled) {
+  surface_set_acrylic(xwayland_view->scene_tree, xwayland_view->node, &xwayland_view->blur, enabled);
+}
+
+void xwayland_set_border_radius(xwayland_toplevel_t *xwayland_view, float radius) {
+  surface_set_border_radius(xwayland_view->scene_tree, xwayland_view->content_tree,
+    xwayland_view->border_tree, xwayland_view->node,
+    &xwayland_view->rounded, &xwayland_view->shadow, radius);
+}
+
+void xwayland_set_shadow(xwayland_toplevel_t *xwayland_view, bool enabled) {
+  surface_set_shadow(xwayland_view->scene_tree, xwayland_view->node, &xwayland_view->shadow, enabled);
 }
 
 static void handle_unmap(struct wl_listener *listener, void *data) {
@@ -1236,6 +1248,65 @@ static void xwayland_view_destroy(xwayland_toplevel_t *xwayland_view) {
 	}
 
 	wl_list_remove(&xwayland_view->link);
+
+	if (xwayland_view->blur) {
+		if (xwayland_view->blur->blur_node) {
+			wlr_scene_node_destroy(&xwayland_view->blur->blur_node->node);
+			xwayland_view->blur->blur_node = NULL;
+		}
+		if (xwayland_view->blur->blur_buf) {
+			wlr_buffer_unlock(xwayland_view->blur->blur_buf);
+			xwayland_view->blur->blur_buf = NULL;
+		}
+		if (xwayland_view->blur->mica_node) {
+			wlr_scene_node_destroy(&xwayland_view->blur->mica_node->node);
+			xwayland_view->blur->mica_node = NULL;
+		}
+		if (xwayland_view->blur->acrylic_node) {
+			wlr_scene_node_destroy(&xwayland_view->blur->acrylic_node->node);
+			xwayland_view->blur->acrylic_node = NULL;
+		}
+		if (xwayland_view->blur->acrylic_buf) {
+			wlr_buffer_unlock(xwayland_view->blur->acrylic_buf);
+			xwayland_view->blur->acrylic_buf = NULL;
+		}
+		free(xwayland_view->blur);
+		xwayland_view->blur = NULL;
+	}
+
+	if (xwayland_view->shadow) {
+		if (xwayland_view->shadow->shadow_node) {
+			wlr_scene_node_destroy(&xwayland_view->shadow->shadow_node->node);
+			xwayland_view->shadow->shadow_node = NULL;
+		}
+		if (xwayland_view->shadow->shadow_buf) {
+			wlr_buffer_unlock(xwayland_view->shadow->shadow_buf);
+			xwayland_view->shadow->shadow_buf = NULL;
+		}
+		free(xwayland_view->shadow);
+		xwayland_view->shadow = NULL;
+	}
+
+	if (xwayland_view->rounded) {
+		if (xwayland_view->rounded->corner_mask_node) {
+			wlr_scene_node_destroy(&xwayland_view->rounded->corner_mask_node->node);
+			xwayland_view->rounded->corner_mask_node = NULL;
+		}
+		if (xwayland_view->rounded->corner_mask_buf) {
+			wlr_buffer_unlock(xwayland_view->rounded->corner_mask_buf);
+			xwayland_view->rounded->corner_mask_buf = NULL;
+		}
+		if (xwayland_view->rounded->border_shader_node) {
+			wlr_scene_node_destroy(&xwayland_view->rounded->border_shader_node->node);
+			xwayland_view->rounded->border_shader_node = NULL;
+		}
+		if (xwayland_view->rounded->border_shader_buf) {
+			wlr_buffer_unlock(xwayland_view->rounded->border_shader_buf);
+			xwayland_view->rounded->border_shader_buf = NULL;
+		}
+		free(xwayland_view->rounded);
+		xwayland_view->rounded = NULL;
+	}
 
 	free(xwayland_view);
 }

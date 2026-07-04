@@ -152,9 +152,12 @@ void workspace_create_desktop(const char *name) {
 }
 
 static void update_window_visibility(node_t *node, output_t *m, desktop_t *current_desktop, int *count) {
-  if (!node || !node->client) return;
+  if (!node) return;
 
-  struct wlr_scene_tree *scene_tree = client_get_scene_tree(node->client);
+  client_t *c = node->client;
+  if (!c || (uintptr_t)c == 0xDEADBEEF) return;
+
+  struct wlr_scene_tree *scene_tree = client_get_scene_tree(c);
   if (!scene_tree) return;
 
   (*count)++;

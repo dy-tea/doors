@@ -128,6 +128,7 @@ executable(
 		'src' / 'seat.c',
 		'src' / 'server.c',
 		'src' / 'spring.c',
+		'src' / 'surface.c',
 		'src' / 'tabs.c',
 		'src' / 'tablet.c',
 		'src' / 'tearing.c',

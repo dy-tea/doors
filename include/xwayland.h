@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.h"
+#include "surface.h"
 #include <wayland-server-core.h>
 #include <wlr/xwayland.h>
 #include <wlr/util/box.h>
@@ -37,10 +38,14 @@ typedef struct xwayland_toplevel_t {
 	struct wlr_scene_tree *content_tree;
 	struct wlr_scene_buffer *output_handler;
 
-	struct wlr_scene_tree *border_tree;
-	struct wlr_scene_rect *border_rects[4];
+  struct wlr_scene_tree *border_tree;
+  struct wlr_scene_rect *border_rects[4];
 
-	bool mapped;
+  surface_blur_t *blur;
+  surface_rounded_t *rounded;
+  surface_shadow_t *shadow;
+
+  bool mapped;
 	struct wlr_box geometry;
 
 	struct wlr_ext_foreign_toplevel_handle_v1 *ext_foreign_toplevel;
@@ -96,3 +101,9 @@ void handle_xwayland_surface(struct wl_listener *listener, void *data);
 
 void xwayland_view_close(xwayland_toplevel_t *xwayland_view);
 void xwayland_view_set_activated(xwayland_toplevel_t *xwayland_view, bool activated);
+
+void xwayland_set_blur(xwayland_toplevel_t *xwayland_view, bool enabled);
+void xwayland_set_mica(xwayland_toplevel_t *xwayland_view, bool enabled);
+void xwayland_set_acrylic(xwayland_toplevel_t *xwayland_view, bool enabled);
+void xwayland_set_border_radius(xwayland_toplevel_t *xwayland_view, float radius);
+void xwayland_set_shadow(xwayland_toplevel_t *xwayland_view, bool enabled);

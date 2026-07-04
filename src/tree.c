@@ -1616,8 +1616,11 @@ static void get_border_color(client_t *client, float *color) {
   }
 
   const char *color_str;
-  output_t *m = client->toplevel ? client->toplevel->node->output :
-  	client->xwayland_view ? client->xwayland_view->node->output : NULL;
+  output_t *m = NULL;
+  if (client->toplevel && client->toplevel->node)
+    m = client->toplevel->node->output;
+  else if (client->xwayland_view && client->xwayland_view->node)
+    m = client->xwayland_view->node->output;
   desktop_t *d = m ? m->desk : NULL;
 
   bool the_only_window = (mon_head == mon_tail) && d && d->root && d->root->client;
@@ -1633,8 +1636,9 @@ static void get_border_color(client_t *client, float *color) {
   }
 
   // check if this client's node has an active preselection
-  node_t *n = client->toplevel ? client->toplevel->node :
-  	client->xwayland_view ? client->xwayland_view->node : NULL;
+  node_t *n = NULL;
+  if (client->toplevel) n = client->toplevel->node;
+  else if (client->xwayland_view) n = client->xwayland_view->node;
   if (n && n->presel) {
     parse_color(presel_feedback_color, color);
     return;
@@ -1733,8 +1737,11 @@ void update_border_colors(struct wlr_scene_tree *border_tree, struct wlr_scene_r
   get_border_color(client, color);
 
   // determine which gradient set applies to this client
-  output_t *m = client->toplevel ? client->toplevel->node->output :
-    client->xwayland_view ? client->xwayland_view->node->output : NULL;
+  output_t *m = NULL;
+  if (client->toplevel && client->toplevel->node)
+    m = client->toplevel->node->output;
+  else if (client->xwayland_view && client->xwayland_view->node)
+    m = client->xwayland_view->node->output;
   desktop_t *d = m ? m->desk : NULL;
   bool is_focused = (d && d->focus && d->focus->client == client);
   bool is_active  = (d && d->focus && d->focus->client != NULL);
@@ -1750,29 +1757,41 @@ void update_border_colors(struct wlr_scene_tree *border_tree, struct wlr_scene_r
   bool has_gradient = (bt->gradient_count >= 2);
   bool use_shader = (has_gradient || (client->border_radius > 0.0f));
 
-  if (use_shader && client->toplevel) {
-    toplevel_t *tl = client->toplevel;
+  if (use_shader) {
+    surface_rounded_t *r = NULL;
 
-    if (!tl->rounded) {
-      tl->rounded = calloc(1, sizeof(*tl->rounded));
-      if (!tl->rounded) goto fallback_rects;
+    if (client->toplevel) {
+      toplevel_t *tl = client->toplevel;
+      if (!tl->rounded) {
+        tl->rounded = calloc(1, sizeof(*tl->rounded));
+        if (!tl->rounded) goto fallback_rects;
+      }
+      r = tl->rounded;
+    } else if (client->xwayland_view) {
+      xwayland_toplevel_t *xv = client->xwayland_view;
+      if (!xv->rounded) {
+        xv->rounded = calloc(1, sizeof(*xv->rounded));
+        if (!xv->rounded) goto fallback_rects;
+      }
+      r = xv->rounded;
     }
 
-    toplevel_rounded_t *r = tl->rounded;
-    r->border_color[0] = color[0];
-    r->border_color[1] = color[1];
-    r->border_color[2] = color[2];
-    r->border_color[3] = color[3];
+    if (r) {
+      r->border_color[0] = color[0];
+      r->border_color[1] = color[1];
+      r->border_color[2] = color[2];
+      r->border_color[3] = color[3];
 
-    memcpy(r->gradient_colors, bt->gradient, bt->gradient_count * 4 * sizeof(float));
-    r->gradient_count = bt->gradient_count;
-    r->gradient_angle = bt->gradient_angle;
-    memcpy(r->gradient2_colors, bt->gradient2, bt->gradient2_count * 4 * sizeof(float));
-    r->gradient2_count = bt->gradient2_count;
-    r->gradient2_angle = bt->gradient2_angle;
-    r->gradient_lerp = bt->gradient_lerp;
-    r->border_dirty = true;
-    r->corner_mask_dirty = true;
+      memcpy(r->gradient_colors, bt->gradient, bt->gradient_count * 4 * sizeof(float));
+      r->gradient_count = bt->gradient_count;
+      r->gradient_angle = bt->gradient_angle;
+      memcpy(r->gradient2_colors, bt->gradient2, bt->gradient2_count * 4 * sizeof(float));
+      r->gradient2_count = bt->gradient2_count;
+      r->gradient2_angle = bt->gradient2_angle;
+      r->gradient_lerp = bt->gradient_lerp;
+      r->border_dirty = true;
+      r->corner_mask_dirty = true;
+    }
 
     static const float transparent[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     for (int i = 0; i < 4; i++)
@@ -1785,6 +1804,9 @@ void update_border_colors(struct wlr_scene_tree *border_tree, struct wlr_scene_r
   if (client->toplevel && client->toplevel->rounded &&
       client->toplevel->rounded->border_shader_node)
     wlr_scene_node_set_enabled(&client->toplevel->rounded->border_shader_node->node, false);
+  if (client->xwayland_view && client->xwayland_view->rounded &&
+      client->xwayland_view->rounded->border_shader_node)
+    wlr_scene_node_set_enabled(&client->xwayland_view->rounded->border_shader_node->node, false);
 
 fallback_rects:
   for (int i = 0; i < 4; i++)
