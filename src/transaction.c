@@ -92,12 +92,7 @@ static void copy_node_state(node_t *node, transaction_inst_t *instruction) {
     instruction->floating_rectangle = node->client->floating_rectangle;
     instruction->content_rect = node->pending.rectangle;
 
-    if (node->client->toplevel)
-      instruction->scene_tree = node->client->toplevel->scene_tree;
-    else if (node->client->xwayland_view)
-      instruction->scene_tree = node->client->xwayland_view->scene_tree;
-    else
-      instruction->scene_tree = NULL;
+    instruction->scene_tree = client_get_scene_tree(node->client);
   }
 }
 
@@ -206,10 +201,10 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
     if (node->client->toplevel) {
       if (node->client->toplevel->saved_surface_tree)
         toplevel_remove_saved_buffer(node->client->toplevel);
-      wlr_scene_node_set_enabled(&node->client->toplevel->scene_tree->node, false);
-    } else if (node->client->xwayland_view && node->client->xwayland_view->scene_tree) {
-      wlr_scene_node_set_enabled(&node->client->xwayland_view->scene_tree->node, false);
     }
+    struct wlr_scene_tree *st = client_get_scene_tree(node->client);
+    if (st)
+      wlr_scene_node_set_enabled(&st->node, false);
 
     return;
   }
@@ -241,13 +236,8 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
   struct wlr_scene_tree *scene_tree = NULL;
   bool configured = false;
 
-  if (node->client->toplevel) {
-    scene_tree = node->client->toplevel->scene_tree;
-    configured = node->client->toplevel->configured;
-  } else if (node->client->xwayland_view) {
-    scene_tree = node->client->xwayland_view->scene_tree;
-    configured = true;
-  }
+  scene_tree = client_get_scene_tree(node->client);
+  configured = node->client->toplevel ? node->client->toplevel->configured : true;
 
   if (!scene_tree) {
     wlr_log(WLR_ERROR, "Node %u has no scene tree (toplevel or xwayland_view)", node->id);
@@ -267,10 +257,12 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
   }
 
   if (effective_border_width(node->desktop) != 0) {
+    unsigned int bw = effective_border_width(node->desktop);
+    struct wlr_scene_tree *border_tree = client_border_tree(node->client);
+    struct wlr_scene_rect **border_rects = client_border_rects(node->client);
+
     if (node->client->toplevel) {
-      unsigned int bw = effective_border_width(node->desktop);
       struct toplevel_t *tl = node->client->toplevel;
-      // surface geometry differs from container in either dimension
       bool undersized = instruction->state != STATE_FLOATING && instruction->state != STATE_FULLSCREEN &&
         tl->geometry.width > 0 && tl->geometry.height > 0 &&
         ((int)tl->geometry.width < rect->width || (int)tl->geometry.height < rect->height ||
@@ -282,10 +274,6 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
         int center_y = (rect->height - (int)tl->geometry.height) / 2;
         int cx = center_x > 0 ? center_x : 0;
         int cy = center_y > 0 ? center_y : 0;
-        wlr_log(WLR_DEBUG, "arrange_node_geom: undersized node=%u geo=(%dx%d) rect=(%dx%d) center=(%d,%d)",
-          node->id, tl->geometry.width, tl->geometry.height,
-          rect->width, rect->height, cx, cy);
-        // use the smaller of surface geometry or container for border size
         geo = (struct wlr_box){
           0, 0,
           (int)tl->geometry.width < rect->width ? (int)tl->geometry.width : rect->width,
@@ -294,31 +282,27 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
         border_x = cx - (int)bw;
         border_y = cy - (int)bw;
       } else {
-        wlr_log(WLR_DEBUG, "arrange_node_geom: full-size node=%u geo=(%dx%d) rect=(%dx%d) undersized=%d",
-          node->id, tl->geometry.width, tl->geometry.height,
-          rect->width, rect->height, undersized);
         geo = (struct wlr_box){0, 0, rect->width, rect->height};
         border_x = -(int)bw;
         border_y = -(int)bw;
       }
-      update_borders(tl->border_tree, tl->border_rects, geo, bw);
-      wlr_scene_node_set_position(&tl->border_tree->node, border_x, border_y);
+      update_borders(border_tree, border_rects, geo, bw);
+      wlr_scene_node_set_position(&border_tree->node, border_x, border_y);
       update_border_colors(node->client);
-      if (tl->rounded && (node->client->border_radius > 0.0f || tl->rounded->gradient_count >= 2)) {
-        tl->rounded->border_dirty = true;
-        tl->rounded->corner_mask_dirty = true;
-        if (tl->rounded->border_shader_node) {
+      surface_rounded_t *rounded = client_get_rounded(node->client);
+      if (rounded && (node->client->border_radius > 0.0f || rounded->gradient_count >= 2)) {
+        rounded->border_dirty = true;
+        rounded->corner_mask_dirty = true;
+        if (rounded->border_shader_node) {
           int new_fw = geo.width + 2 * (int)bw;
           int new_fh = geo.height + 2 * (int)bw;
           if (new_fw > 0 && new_fh > 0)
-            wlr_scene_buffer_set_dest_size(tl->rounded->border_shader_node, new_fw, new_fh);
+            wlr_scene_buffer_set_dest_size(rounded->border_shader_node, new_fw, new_fh);
         }
       }
-    } else if (node->client->xwayland_view) {
-      unsigned int bw = effective_border_width(node->desktop);
+    } else if (border_tree) {
       const struct wlr_box geo = {0, 0, rect->width, rect->height};
-      update_borders(node->client->xwayland_view->border_tree,
-        node->client->xwayland_view->border_rects, geo, bw);
+      update_borders(border_tree, border_rects, geo, bw);
       update_border_colors(node->client);
     }
   }

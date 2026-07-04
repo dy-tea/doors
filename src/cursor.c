@@ -179,31 +179,27 @@ static void update_scene_positions(node_t *n, struct wlr_box rect, desktop_t *d)
       n->client->tiled_rectangle = r;
       n->client->committed_tiled_rectangle = r;
 
-      if (n->client->toplevel && n->client->toplevel->scene_tree) {
-        wlr_scene_node_set_position(&n->client->toplevel->scene_tree->node, r.x, r.y);
-        wlr_xdg_toplevel_set_size(n->client->toplevel->xdg_toplevel, r.width, r.height);
+      struct wlr_scene_tree *st = client_get_scene_tree(n->client);
+      if (st) {
+        wlr_scene_node_set_position(&st->node, r.x, r.y);
 
-        // update borders for toplevel
+        if (n->client->toplevel)
+          wlr_xdg_toplevel_set_size(n->client->toplevel->xdg_toplevel, r.width, r.height);
+        else if (n->client->xwayland_view)
+          wlr_xwayland_surface_configure(n->client->xwayland_view->xwayland_surface,
+            r.x, r.y, r.width, r.height);
+
         if (bw != 0) {
           const struct wlr_box geo = {0, 0, r.width, r.height};
-          update_borders(n->client->toplevel->border_tree, n->client->toplevel->border_rects, geo, bw);
+          update_borders(client_border_tree(n->client), client_border_rects(n->client), geo, bw);
           update_border_colors(n->client);
-          if (n->client->border_radius > 0.0f && n->client->toplevel->rounded) {
-            n->client->toplevel->rounded->border_dirty = true;
-            n->client->toplevel->rounded->corner_mask_dirty = true;
+          if (n->client->border_radius > 0.0f) {
+            surface_rounded_t *rounded = client_get_rounded(n->client);
+            if (rounded) {
+              rounded->border_dirty = true;
+              rounded->corner_mask_dirty = true;
+            }
           }
-        }
-      }
-      if (n->client->xwayland_view && n->client->xwayland_view->scene_tree) {
-        wlr_scene_node_set_position(&n->client->xwayland_view->scene_tree->node, r.x, r.y);
-        wlr_xwayland_surface_configure(n->client->xwayland_view->xwayland_surface,
-          r.x, r.y, r.width, r.height);
-
-        // update borders for xwayland
-        if (bw != 0) {
-          const struct wlr_box geo = {0, 0, r.width, r.height};
-          update_borders(n->client->xwayland_view->border_tree, n->client->xwayland_view->border_rects, geo, bw);
-          update_border_colors(n->client);
         }
       }
     }

@@ -1,7 +1,6 @@
 #include "render_unfocused.h"
 #include "server.h"
-#include "toplevel.h"
-#include "xwayland.h"
+#include "tree.h"
 #include <stdlib.h>
 #include <time.h>
 #include <wlr/types/wlr_scene.h>
@@ -20,24 +19,12 @@ static void send_frame_done_to_client(client_t *client) {
   struct timespec when;
   clock_gettime(CLOCK_MONOTONIC, &when);
 
-  struct wlr_scene_tree *tree = NULL;
-  if (client->toplevel)
-    tree = client->toplevel->content_tree;
-  else if (client->xwayland_view)
-    tree = client->xwayland_view->content_tree;
+  struct wlr_scene_tree *tree = client_get_content_tree(client);
   if (!tree) return;
 
   struct wlr_scene_node *node;
   wl_list_for_each(node, &tree->children, link)
     wlr_scene_node_for_each_buffer(node, toplevel_send_frame_done_interator, &when);
-}
-
-static struct wlr_scene_tree *client_scene_tree(client_t *client) {
-  if (client->toplevel)
-    return client->toplevel->scene_tree;
-  if (client->xwayland_view)
-    return client->xwayland_view->scene_tree;
-  return NULL;
 }
 
 static int handle_render_unfocused_timer(void *data) {
@@ -52,7 +39,7 @@ static int handle_render_unfocused_timer(void *data) {
       free(rfl);
       continue;
     }
-    struct wlr_scene_tree *st = client_scene_tree(rfl->client);
+    struct wlr_scene_tree *st = client_get_scene_tree(rfl->client);
     if (st && st->node.enabled)
       continue;
     send_frame_done_to_client(rfl->client);

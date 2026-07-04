@@ -1459,6 +1459,32 @@ struct wlr_scene_tree *client_get_scene_tree(client_t *client) {
   return NULL;
 }
 
+struct wlr_scene_tree *client_get_content_tree(client_t *client) {
+  if (!client) return NULL;
+  if (client->toplevel) return client->toplevel->content_tree;
+  if (client->xwayland_view) return client->xwayland_view->content_tree;
+  return NULL;
+}
+
+surface_rounded_t *client_get_rounded(client_t *client) {
+  if (!client) return NULL;
+  if (client->toplevel) return client->toplevel->rounded;
+  if (client->xwayland_view) return client->xwayland_view->rounded;
+  return NULL;
+}
+
+node_t *client_get_node(client_t *client) {
+  if (!client) return NULL;
+  if (client->toplevel) return client->toplevel->node;
+  if (client->xwayland_view) return client->xwayland_view->node;
+  return NULL;
+}
+
+output_t *client_get_output(client_t *client) {
+  node_t *n = client_get_node(client);
+  return n ? n->output : NULL;
+}
+
 struct wlr_scene_tree *client_border_tree(client_t *client) {
   if (!client) return NULL;
   if (client->toplevel) return client->toplevel->border_tree;
@@ -1609,11 +1635,7 @@ static void get_border_color(client_t *client, float *color) {
   }
 
   const char *color_str;
-  output_t *m = NULL;
-  if (client->toplevel && client->toplevel->node)
-    m = client->toplevel->node->output;
-  else if (client->xwayland_view && client->xwayland_view->node)
-    m = client->xwayland_view->node->output;
+  output_t *m = client_get_output(client);
   desktop_t *d = m ? m->desk : NULL;
 
   bool the_only_window = (mon_head == mon_tail) && d && d->root && d->root->client;
@@ -1629,9 +1651,7 @@ static void get_border_color(client_t *client, float *color) {
   }
 
   // check if this client's node has an active preselection
-  node_t *n = NULL;
-  if (client->toplevel) n = client->toplevel->node;
-  else if (client->xwayland_view) n = client->xwayland_view->node;
+  node_t *n = client_get_node(client);
   if (n && n->presel) {
     parse_color(presel_feedback_color, color);
     return;
@@ -1732,11 +1752,7 @@ void update_border_colors(client_t *client) {
   struct wlr_scene_rect **rects = client_border_rects(client);
 
   // determine which gradient set applies to this client
-  output_t *m = NULL;
-  if (client->toplevel && client->toplevel->node)
-    m = client->toplevel->node->output;
-  else if (client->xwayland_view && client->xwayland_view->node)
-    m = client->xwayland_view->node->output;
+  output_t *m = client_get_output(client);
   desktop_t *d = m ? m->desk : NULL;
   bool is_focused = (d && d->focus && d->focus->client == client);
   bool is_active  = (d && d->focus && d->focus->client != NULL);
@@ -1772,8 +1788,7 @@ void update_border_colors(client_t *client) {
     return;
   }
 
-  surface_rounded_t *rounded = client->toplevel ? client->toplevel->rounded :
-    client->xwayland_view ? client->xwayland_view->rounded : NULL;
+  surface_rounded_t *rounded = client_get_rounded(client);
   if (rounded && rounded->border_shader_node)
     wlr_scene_node_set_enabled(&rounded->border_shader_node->node, false);
 

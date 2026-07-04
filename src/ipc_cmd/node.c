@@ -387,13 +387,9 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
     n->client->floating_rectangle.x += dx;
     n->client->floating_rectangle.y += dy;
 
-    if (n->client->toplevel && n->client->toplevel->scene_tree) {
-      wlr_scene_node_set_position(&n->client->toplevel->scene_tree->node,
-        n->client->floating_rectangle.x, n->client->floating_rectangle.y);
-    } else if (n->client->xwayland_view && n->client->xwayland_view->scene_tree) {
-      wlr_scene_node_set_position(&n->client->xwayland_view->scene_tree->node,
-        n->client->floating_rectangle.x, n->client->floating_rectangle.y);
-    }
+    struct wlr_scene_tree *st = client_get_scene_tree(n->client);
+    if (st)
+      wlr_scene_node_set_position(&st->node, n->client->floating_rectangle.x, n->client->floating_rectangle.y);
 
     transaction_commit_dirty();
     send_success(client_fd, "moved\n");
@@ -478,17 +474,17 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
     if (n->client->floating_rectangle.height < 50)
       n->client->floating_rectangle.height = 50;
 
-    if (n->client->toplevel && n->client->toplevel->scene_tree) {
-      wlr_scene_node_set_position(&n->client->toplevel->scene_tree->node,
+    struct wlr_scene_tree *st = client_get_scene_tree(n->client);
+    if (st) {
+      wlr_scene_node_set_position(&st->node,
         n->client->floating_rectangle.x, n->client->floating_rectangle.y);
-      wlr_xdg_toplevel_set_size(n->client->toplevel->xdg_toplevel,
-        n->client->floating_rectangle.width, n->client->floating_rectangle.height);
-    } else if (n->client->xwayland_view && n->client->xwayland_view->scene_tree) {
-      wlr_scene_node_set_position(&n->client->xwayland_view->scene_tree->node,
-        n->client->floating_rectangle.x, n->client->floating_rectangle.y);
-      wlr_xwayland_surface_configure(n->client->xwayland_view->xwayland_surface,
-        n->client->floating_rectangle.x, n->client->floating_rectangle.y,
-        n->client->floating_rectangle.width, n->client->floating_rectangle.height);
+      if (n->client->toplevel)
+        wlr_xdg_toplevel_set_size(n->client->toplevel->xdg_toplevel,
+          n->client->floating_rectangle.width, n->client->floating_rectangle.height);
+      else if (n->client->xwayland_view)
+        wlr_xwayland_surface_configure(n->client->xwayland_view->xwayland_surface,
+          n->client->floating_rectangle.x, n->client->floating_rectangle.y,
+          n->client->floating_rectangle.width, n->client->floating_rectangle.height);
     }
 
     transaction_commit_dirty();

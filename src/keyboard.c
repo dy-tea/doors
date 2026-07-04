@@ -625,12 +625,9 @@ void toggle_floating(void) {
     remove_node(mon->desk, n);
     n->hidden = true;
 
-    if (n->client->toplevel) {
-      wlr_scene_node_set_position(&n->client->toplevel->scene_tree->node,
-        n->client->floating_rectangle.x, n->client->floating_rectangle.y);
-    } else if (n->client->xwayland_view)
-      wlr_scene_node_set_position(&n->client->xwayland_view->scene_tree->node,
-        n->client->floating_rectangle.x, n->client->floating_rectangle.y);
+    struct wlr_scene_tree *st = client_get_scene_tree(n->client);
+    if (st)
+      wlr_scene_node_set_position(&st->node, n->client->floating_rectangle.x, n->client->floating_rectangle.y);
 
     wlr_scene_node_reparent(&scene_tree->node, server.float_tree);
 

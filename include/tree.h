@@ -4,6 +4,8 @@
 #include "output.h"
 #include <wlr/types/wlr_scene.h>
 
+typedef struct surface_rounded_t surface_rounded_t;
+
 #define MIN_WIDTH 1
 #define MIN_HEIGHT 1
 
@@ -80,6 +82,10 @@ void print_tree(node_t *n, int depth);
 void validate_tree(const char *context, desktop_t *d);
 
 struct wlr_scene_tree *client_get_scene_tree(client_t *client);
+struct wlr_scene_tree *client_get_content_tree(client_t *client);
+node_t *client_get_node(client_t *client);
+output_t *client_get_output(client_t *client);
+surface_rounded_t *client_get_rounded(client_t *client);
 
 // Border helpers
 void create_borders(struct wlr_scene_tree *parent, struct wlr_scene_tree **border_tree,
