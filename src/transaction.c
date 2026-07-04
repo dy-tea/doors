@@ -303,7 +303,7 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
       }
       update_borders(tl->border_tree, tl->border_rects, geo, bw);
       wlr_scene_node_set_position(&tl->border_tree->node, border_x, border_y);
-      update_border_colors(tl->border_tree, tl->border_rects, node->client);
+      update_border_colors(node->client);
       if (tl->rounded && (node->client->border_radius > 0.0f || tl->rounded->gradient_count >= 2)) {
         tl->rounded->border_dirty = true;
         tl->rounded->corner_mask_dirty = true;
@@ -319,8 +319,7 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
       const struct wlr_box geo = {0, 0, rect->width, rect->height};
       update_borders(node->client->xwayland_view->border_tree,
         node->client->xwayland_view->border_rects, geo, bw);
-      update_border_colors(node->client->xwayland_view->border_tree,
-        node->client->xwayland_view->border_rects, node->client);
+      update_border_colors(node->client);
     }
   }
 

@@ -87,9 +87,11 @@ void create_borders(struct wlr_scene_tree *parent, struct wlr_scene_tree **borde
 void destroy_borders(struct wlr_scene_tree **border_tree, struct wlr_scene_rect *rects[4]);
 void update_borders(struct wlr_scene_tree *border_tree, struct wlr_scene_rect *rects[4],
   struct wlr_box geo, unsigned int bw);
-void update_border_colors(struct wlr_scene_tree *border_tree, struct wlr_scene_rect *rects[4],
-  client_t *client);
+void update_border_colors(client_t *client);
 void refresh_border_colors(void);
+
+struct wlr_scene_tree *client_border_tree(client_t *client);
+struct wlr_scene_rect **client_border_rects(client_t *client);
 
 // Misc helpers
 desktop_t *find_desktop_by_name_in_monitor(output_t *mon, const char *name);

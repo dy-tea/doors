@@ -187,7 +187,7 @@ static void update_scene_positions(node_t *n, struct wlr_box rect, desktop_t *d)
         if (bw != 0) {
           const struct wlr_box geo = {0, 0, r.width, r.height};
           update_borders(n->client->toplevel->border_tree, n->client->toplevel->border_rects, geo, bw);
-          update_border_colors(n->client->toplevel->border_tree, n->client->toplevel->border_rects, n->client);
+          update_border_colors(n->client);
           if (n->client->border_radius > 0.0f && n->client->toplevel->rounded) {
             n->client->toplevel->rounded->border_dirty = true;
             n->client->toplevel->rounded->corner_mask_dirty = true;
@@ -203,7 +203,7 @@ static void update_scene_positions(node_t *n, struct wlr_box rect, desktop_t *d)
         if (bw != 0) {
           const struct wlr_box geo = {0, 0, r.width, r.height};
           update_borders(n->client->xwayland_view->border_tree, n->client->xwayland_view->border_rects, geo, bw);
-          update_border_colors(n->client->xwayland_view->border_tree, n->client->xwayland_view->border_rects, n->client);
+          update_border_colors(n->client);
         }
       }
     }
@@ -389,7 +389,7 @@ static void process_cursor_resize(void) {
     if (bw != 0) {
       const struct wlr_box geo = {0, 0, new_width, new_height};
       update_borders(xwayland_view->border_tree, xwayland_view->border_rects, geo, bw);
-      update_border_colors(xwayland_view->border_tree, xwayland_view->border_rects, client);
+      update_border_colors(client);
     }
 
     return;
@@ -412,7 +412,7 @@ static void process_cursor_resize(void) {
   if (bw != 0) {
     const struct wlr_box geo = {0, 0, new_width, new_height};
     update_borders(toplevel->border_tree, toplevel->border_rects, geo, bw);
-    update_border_colors(toplevel->border_tree, toplevel->border_rects, client);
+    update_border_colors(client);
     if (client->border_radius > 0.0f && toplevel->rounded) {
       toplevel->rounded->border_dirty = true;
       toplevel->rounded->corner_mask_dirty = true;

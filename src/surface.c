@@ -4,6 +4,7 @@
 #include "toplevel.h"
 #include <pixman.h>
 #include <stdlib.h>
+#include <string.h>
 #include <wlr/types/wlr_buffer.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/util/log.h>
@@ -214,4 +215,27 @@ void surface_set_shadow(struct wlr_scene_tree *scene_tree, node_t *node,
     }
     (*shadow)->shadow_dirty = false;
   }
+}
+
+void surface_update_rounded(surface_rounded_t **rounded, float color[4], border_theme_t *bt) {
+  if (!*rounded) {
+    *rounded = calloc(1, sizeof(**rounded));
+    if (!*rounded) return;
+  }
+
+  surface_rounded_t *r = *rounded;
+  r->border_color[0] = color[0];
+  r->border_color[1] = color[1];
+  r->border_color[2] = color[2];
+  r->border_color[3] = color[3];
+
+  memcpy(r->gradient_colors, bt->gradient, bt->gradient_count * 4 * sizeof(float));
+  r->gradient_count = bt->gradient_count;
+  r->gradient_angle = bt->gradient_angle;
+  memcpy(r->gradient2_colors, bt->gradient2, bt->gradient2_count * 4 * sizeof(float));
+  r->gradient2_count = bt->gradient2_count;
+  r->gradient2_angle = bt->gradient2_angle;
+  r->gradient_lerp = bt->gradient_lerp;
+  r->border_dirty = true;
+  r->corner_mask_dirty = true;
 }

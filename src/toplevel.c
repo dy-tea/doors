@@ -304,7 +304,7 @@ void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
       struct wlr_box content_geo = {0, 0, border_w, border_h};
       update_borders(toplevel->border_tree, toplevel->border_rects, content_geo, bw);
       wlr_scene_node_set_position(&toplevel->border_tree->node, (int)x - (int)bw, (int)y - (int)bw);
-      update_border_colors(toplevel->border_tree, toplevel->border_rects, c);
+      update_border_colors(c);
       if (toplevel->rounded && toplevel->rounded->border_shader_node &&
           (c->border_radius > 0.0f || toplevel->rounded->gradient_count >= 2)) {
         toplevel->rounded->border_dirty = true;
@@ -317,7 +317,7 @@ void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
     } else if (container_rect) {
       struct wlr_box full_geo = {0, 0, container_rect->width, container_rect->height};
       update_borders(toplevel->border_tree, toplevel->border_rects, full_geo, bw);
-      update_border_colors(toplevel->border_tree, toplevel->border_rects, c);
+      update_border_colors(c);
       if (toplevel->rounded && toplevel->rounded->border_shader_node &&
           (c->border_radius > 0.0f || toplevel->rounded->gradient_count >= 2)) {
         toplevel->rounded->border_dirty = true;
@@ -1192,13 +1192,7 @@ void focus_toplevel(struct toplevel_t *toplevel) {
       for (node_t *node = first_extrema(d->root); node != NULL; node = next_leaf(node, d->root)) {
         if (node->client == NULL) continue;
 
-        if (node->client->toplevel) {
-          update_border_colors(node->client->toplevel->border_tree,
-          	node->client->toplevel->border_rects, node->client);
-        } else if (node->client->xwayland_view) {
-          update_border_colors(node->client->xwayland_view->border_tree,
-          	node->client->xwayland_view->border_rects, node->client);
-        }
+        update_border_colors(node->client);
       }
     }
   }
