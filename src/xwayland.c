@@ -616,9 +616,9 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	rule_apply_consequence(node, client, rule);
 
 	if (rule) {
-		if (rule->has_blur) xwayland_set_blur(xwayland_view, rule->blur);
-		if (rule->has_mica) xwayland_set_mica(xwayland_view, rule->mica);
-		if (rule->has_acrylic) xwayland_set_acrylic(xwayland_view, rule->acrylic);
+		if (rule->has_blur) xwayland_set_effect(xwayland_view, EFFECT_BLUR, rule->blur);
+		if (rule->has_mica) xwayland_set_effect(xwayland_view, EFFECT_MICA, rule->mica);
+		if (rule->has_acrylic) xwayland_set_effect(xwayland_view, EFFECT_ACRYLIC, rule->acrylic);
 		if (rule->has_border_radius) xwayland_set_border_radius(xwayland_view, rule->border_radius);
 		if (rule->has_shadow) xwayland_set_shadow(xwayland_view, rule->shadow);
 	}
@@ -728,16 +728,8 @@ static void handle_map(struct wl_listener *listener, void *data) {
 		xwayland_view->scene_tree->node.enabled, client->shown);
 }
 
-void xwayland_set_blur(xwayland_toplevel_t *xwayland_view, bool enabled) {
-  surface_set_blur(xwayland_view->scene_tree, xwayland_view->node, &xwayland_view->blur, enabled);
-}
-
-void xwayland_set_mica(xwayland_toplevel_t *xwayland_view, bool enabled) {
-  surface_set_mica(xwayland_view->scene_tree, xwayland_view->node, &xwayland_view->blur, enabled);
-}
-
-void xwayland_set_acrylic(xwayland_toplevel_t *xwayland_view, bool enabled) {
-  surface_set_acrylic(xwayland_view->scene_tree, xwayland_view->node, &xwayland_view->blur, enabled);
+void xwayland_set_effect(xwayland_toplevel_t *xwayland_view, surface_effect_t effect, bool enabled) {
+  surface_set_effect(xwayland_view->scene_tree, xwayland_view->node, &xwayland_view->blur, effect, enabled);
 }
 
 void xwayland_set_border_radius(xwayland_toplevel_t *xwayland_view, float radius) {

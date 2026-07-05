@@ -97,9 +97,7 @@ void toplevel_freeze_sibling_buffers(desktop_t *d, node_t *n);
 
 void handle_new_toplevel_capture_request(struct wl_listener *listener, void *data);
 
-void toplevel_set_blur(toplevel_t *tl, bool enabled);
-void toplevel_set_mica(toplevel_t *tl, bool enabled);
-void toplevel_set_acrylic(toplevel_t *tl, bool enabled);
+void toplevel_set_effect(toplevel_t *tl, surface_effect_t effect, bool enabled);
 void toplevel_set_border_radius(toplevel_t *tl, float radius);
 void toplevel_set_shadow(toplevel_t *tl, bool enabled);
 void toplevel_apply_decoration_mode(toplevel_t *tl);

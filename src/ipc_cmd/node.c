@@ -275,7 +275,7 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
       }
       bool new_blur = has_value ? set_value : !n->client->blur;
       n->client->blur = new_blur;
-      surface_client_set_blur(n->client, new_blur);
+      surface_client_set_effect(n->client, EFFECT_BLUR, new_blur);
       send_success(client_fd, "flag changed\n");
     } else if (strcmp(key, "mica") == 0) {
       if (!n->client) {
@@ -284,7 +284,7 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
       }
       bool new_val = has_value ? set_value : !n->client->mica;
       n->client->mica = new_val;
-      surface_client_set_mica(n->client, new_val);
+      surface_client_set_effect(n->client, EFFECT_MICA, new_val);
       send_success(client_fd, "flag changed\n");
     } else if (strcmp(key, "acrylic") == 0) {
       if (!n->client) {
@@ -293,7 +293,7 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
       }
       bool new_val = has_value ? set_value : !n->client->acrylic;
       n->client->acrylic = new_val;
-      surface_client_set_acrylic(n->client, new_val);
+      surface_client_set_effect(n->client, EFFECT_ACRYLIC, new_val);
       send_success(client_fd, "flag changed\n");
     } else if (strcmp(key, "shadow") == 0) {
       if (!n->client) {

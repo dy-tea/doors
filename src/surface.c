@@ -16,44 +16,34 @@ static bool corner_mask_no_input(struct wlr_scene_buffer *buffer, double *sx, do
   return false;
 }
 
-void surface_set_blur(struct wlr_scene_tree *scene_tree, node_t *node,
-    surface_blur_t **blur, bool enabled) {
-  if (!scene_tree) return;
+typedef struct {
+  struct wlr_scene_buffer **node;
+  struct wlr_buffer **buf;
+  GLuint *fbo;
+} effect_fields_t;
 
-  if (enabled) {
-    if (!*blur) {
-      *blur = calloc(1, sizeof(**blur));
-      if (!*blur) return;
-    }
-    if (!(*blur)->blur_node) {
-      (*blur)->blur_node = wlr_scene_buffer_create(scene_tree, NULL);
-      if ((*blur)->blur_node) {
-        wlr_scene_node_lower_to_bottom(&(*blur)->blur_node->node);
-        if (node && node->output) {
-          struct wlr_scene_output *so = wlr_scene_get_scene_output(server.scene,
-            node->output->wlr_output);
-          if (so) {
-            pixman_region32_union_rect(&so->damage_ring.current, &so->damage_ring.current,
-              0, 0, (unsigned int)node->output->width,
-              (unsigned int)node->output->height);
-            output_schedule_frame(node->output);
-          }
-        }
-      }
-    }
-  } else if (*blur && (*blur)->blur_node) {
-    wlr_scene_node_destroy(&(*blur)->blur_node->node);
-    (*blur)->blur_node = NULL;
-    if ((*blur)->blur_buf) {
-      wlr_buffer_unlock((*blur)->blur_buf);
-      (*blur)->blur_buf = NULL;
-      (*blur)->blur_buf_fbo = 0;
-    }
+static effect_fields_t get_effect_fields(surface_blur_t *b, surface_effect_t effect) {
+  effect_fields_t f = {0};
+  switch (effect) {
+  case EFFECT_BLUR:
+    f.node = &b->blur_node;
+    f.buf = &b->blur_buf;
+    f.fbo = &b->blur_buf_fbo;
+    break;
+  case EFFECT_MICA:
+    f.node = &b->mica_node;
+    break;
+  case EFFECT_ACRYLIC:
+    f.node = &b->acrylic_node;
+    f.buf = &b->acrylic_buf;
+    f.fbo = &b->acrylic_buf_fbo;
+    break;
   }
+  return f;
 }
 
-void surface_set_mica(struct wlr_scene_tree *scene_tree, node_t *node,
-    surface_blur_t **blur, bool enabled) {
+void surface_set_effect(struct wlr_scene_tree *scene_tree, node_t *node,
+    surface_blur_t **blur, surface_effect_t effect, bool enabled) {
   if (!scene_tree) return;
 
   if (enabled) {
@@ -62,10 +52,11 @@ void surface_set_mica(struct wlr_scene_tree *scene_tree, node_t *node,
       if (!*blur) return;
     }
 
-    if (!(*blur)->mica_node) {
-      (*blur)->mica_node = wlr_scene_buffer_create(scene_tree, NULL);
-      if ((*blur)->mica_node) {
-        wlr_scene_node_lower_to_bottom(&(*blur)->mica_node->node);
+    effect_fields_t f = get_effect_fields(*blur, effect);
+    if (!*f.node) {
+      *f.node = wlr_scene_buffer_create(scene_tree, NULL);
+      if (*f.node) {
+        wlr_scene_node_lower_to_bottom(&(*f.node)->node);
         if (node && node->output) {
           struct wlr_scene_output *so = wlr_scene_get_scene_output(server.scene,
             node->output->wlr_output);
@@ -78,47 +69,18 @@ void surface_set_mica(struct wlr_scene_tree *scene_tree, node_t *node,
         }
       }
     }
-  } else if (*blur && (*blur)->mica_node) {
-    wlr_scene_node_destroy(&(*blur)->mica_node->node);
-    (*blur)->mica_node = NULL;
-  }
-}
-
-void surface_set_acrylic(struct wlr_scene_tree *scene_tree, node_t *node,
-    surface_blur_t **blur, bool enabled) {
-  if (!scene_tree) return;
-
-  if (enabled) {
-    if (!*blur) {
-      *blur = calloc(1, sizeof(**blur));
-      if (!*blur) return;
+  } else if (*blur) {
+    effect_fields_t f = get_effect_fields(*blur, effect);
+    if (*f.node) {
+      wlr_scene_node_destroy(&(*f.node)->node);
+      *f.node = NULL;
     }
-
-    if (!(*blur)->acrylic_node) {
-      (*blur)->acrylic_node = wlr_scene_buffer_create(scene_tree, NULL);
-      if ((*blur)->acrylic_node) {
-        wlr_scene_node_lower_to_bottom(&(*blur)->acrylic_node->node);
-        if (node && node->output) {
-          struct wlr_scene_output *so = wlr_scene_get_scene_output(server.scene,
-            node->output->wlr_output);
-          if (so) {
-            pixman_region32_union_rect(&so->damage_ring.current, &so->damage_ring.current,
-              0, 0, (unsigned int)node->output->width,
-              (unsigned int)node->output->height);
-            output_schedule_frame(node->output);
-          }
-        }
-      }
+    if (f.buf && *f.buf) {
+      wlr_buffer_unlock(*f.buf);
+      *f.buf = NULL;
     }
-  } else if (*blur && (*blur)->acrylic_node) {
-    wlr_scene_node_destroy(&(*blur)->acrylic_node->node);
-    (*blur)->acrylic_node = NULL;
-
-    if ((*blur)->acrylic_buf) {
-      wlr_buffer_unlock((*blur)->acrylic_buf);
-      (*blur)->acrylic_buf = NULL;
-      (*blur)->acrylic_buf_fbo = 0;
-    }
+    if (f.fbo)
+      *f.fbo = 0;
   }
 }
 
@@ -240,25 +202,11 @@ void surface_update_rounded(surface_rounded_t **rounded, float color[4], border_
   r->corner_mask_dirty = true;
 }
 
-void surface_client_set_blur(client_t *client, bool enabled) {
+void surface_client_set_effect(client_t *client, surface_effect_t effect, bool enabled) {
   if (client->toplevel)
-    toplevel_set_blur(client->toplevel, enabled);
+    toplevel_set_effect(client->toplevel, effect, enabled);
   else if (client->xwayland_view)
-    xwayland_set_blur(client->xwayland_view, enabled);
-}
-
-void surface_client_set_mica(client_t *client, bool enabled) {
-  if (client->toplevel)
-    toplevel_set_mica(client->toplevel, enabled);
-  else if (client->xwayland_view)
-    xwayland_set_mica(client->xwayland_view, enabled);
-}
-
-void surface_client_set_acrylic(client_t *client, bool enabled) {
-  if (client->toplevel)
-    toplevel_set_acrylic(client->toplevel, enabled);
-  else if (client->xwayland_view)
-    xwayland_set_acrylic(client->xwayland_view, enabled);
+    xwayland_set_effect(client->xwayland_view, effect, enabled);
 }
 
 void surface_client_set_border_radius(client_t *client, float radius) {

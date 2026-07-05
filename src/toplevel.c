@@ -521,9 +521,9 @@ void toplevel_map(struct wl_listener *listener, void *data) {
   rule_apply_consequence(n, n->client, rule);
 
   if (rule) {
-    if (rule->has_blur) toplevel_set_blur(toplevel, rule->blur);
-    if (rule->has_mica) toplevel_set_mica(toplevel, rule->mica);
-    if (rule->has_acrylic) toplevel_set_acrylic(toplevel, rule->acrylic);
+    if (rule->has_blur) toplevel_set_effect(toplevel, EFFECT_BLUR, rule->blur);
+    if (rule->has_mica) toplevel_set_effect(toplevel, EFFECT_MICA, rule->mica);
+    if (rule->has_acrylic) toplevel_set_effect(toplevel, EFFECT_ACRYLIC, rule->acrylic);
     if (rule->has_border_radius) toplevel_set_border_radius(toplevel, rule->border_radius);
     if (rule->has_shadow) toplevel_set_shadow(toplevel, rule->shadow);
   }
@@ -865,20 +865,12 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
   // only update blur from protocol if it wasn't set by a rule
   if (toplevel->node && toplevel->node->client && !toplevel->node->client->blur_from_rule) {
     if (wants_blur != has_blur)
-      toplevel_set_blur(toplevel, wants_blur);
+      toplevel_set_effect(toplevel, EFFECT_BLUR, wants_blur);
   }
 }
 
-void toplevel_set_blur(toplevel_t *tl, bool enabled) {
-  surface_set_blur(tl->scene_tree, tl->node, &tl->blur, enabled);
-}
-
-void toplevel_set_mica(toplevel_t *tl, bool enabled) {
-  surface_set_mica(tl->scene_tree, tl->node, &tl->blur, enabled);
-}
-
-void toplevel_set_acrylic(toplevel_t *tl, bool enabled) {
-  surface_set_acrylic(tl->scene_tree, tl->node, &tl->blur, enabled);
+void toplevel_set_effect(toplevel_t *tl, surface_effect_t effect, bool enabled) {
+  surface_set_effect(tl->scene_tree, tl->node, &tl->blur, effect, enabled);
 }
 
 void toplevel_set_border_radius(toplevel_t *tl, float radius) {

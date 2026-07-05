@@ -50,12 +50,14 @@ typedef struct surface_shadow_t {
   bool shadow_geometry_dirty;
 } surface_shadow_t;
 
-void surface_set_blur(struct wlr_scene_tree *scene_tree, struct node_t *node,
-  struct surface_blur_t **blur, bool enabled);
-void surface_set_mica(struct wlr_scene_tree *scene_tree, struct node_t *node,
-  struct surface_blur_t **blur, bool enabled);
-void surface_set_acrylic(struct wlr_scene_tree *scene_tree, struct node_t *node,
-  struct surface_blur_t **blur, bool enabled);
+typedef enum {
+  EFFECT_BLUR,
+  EFFECT_MICA,
+  EFFECT_ACRYLIC,
+} surface_effect_t;
+
+void surface_set_effect(struct wlr_scene_tree *scene_tree, struct node_t *node,
+  struct surface_blur_t **blur, surface_effect_t effect, bool enabled);
 void surface_set_border_radius(struct wlr_scene_tree *scene_tree,
   struct wlr_scene_tree *content_tree, struct wlr_scene_tree *border_tree,
   struct node_t *node, struct surface_rounded_t **rounded,
@@ -66,8 +68,6 @@ void surface_set_shadow(struct wlr_scene_tree *scene_tree, struct node_t *node,
 void surface_update_rounded(struct surface_rounded_t **rounded,
   float color[4], border_theme_t *bt);
 
-void surface_client_set_blur(struct client_t *client, bool enabled);
-void surface_client_set_mica(struct client_t *client, bool enabled);
-void surface_client_set_acrylic(struct client_t *client, bool enabled);
+void surface_client_set_effect(struct client_t *client, surface_effect_t effect, bool enabled);
 void surface_client_set_border_radius(struct client_t *client, float radius);
 void surface_client_set_shadow(struct client_t *client, bool enabled);
