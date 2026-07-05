@@ -1,3 +1,4 @@
+#include "bezier.h"
 #include "config.h"
 #include "ipc.h"
 #include "ipc_cmd.h"
@@ -5,8 +6,10 @@
 #include "keyboard.h"
 #include "output.h"
 #include "server.h"
+#include "spring.h"
 #include "transaction.h"
 #include "tree.h"
+#include <stdlib.h>
 #include <string.h>
 
 void ipc_cmd_focus(char **args, int num, int client_fd) {
@@ -186,4 +189,33 @@ void ipc_cmd_send(char **args, int num, int client_fd) {
   } else {
     send_failure(client_fd, "send: unknown direction\n");
   }
+}
+
+void ipc_cmd_bezier(char **args, int num, int client_fd) {
+  if (num < 5) {
+    send_failure(client_fd, "usage: bezier <name> <p1x> <p1y> <p2x> <p2y>\n");
+    return;
+  }
+  double p1x = atof(args[1]), p1y = atof(args[2]);
+  double p2x = atof(args[3]), p2y = atof(args[4]);
+  if (bezier_add(args[0], p1x, p1y, p2x, p2y))
+    send_success(client_fd, "bezier curve added\n");
+  else
+    send_failure(client_fd, "failed to add bezier curve\n");
+}
+
+void ipc_cmd_spring(char **args, int num, int client_fd) {
+  if (num < 3) {
+    send_failure(client_fd, "usage: spring <name> <stiffness> <damping> [mass] [value_eps] [velocity_eps]\n");
+    return;
+  }
+  double stiffness = atof(args[1]);
+  double damping = atof(args[2]);
+  double mass = num >= 4 ? atof(args[3]) : 1.0;
+  double value_eps = num >= 5 ? atof(args[4]) : SPRING_EPSILON_DEFAULT;
+  double velocity_eps = num >= 6 ? atof(args[5]) : SPRING_EPSILON_DEFAULT;
+  if (spring_add(args[0], stiffness, damping, mass, value_eps, velocity_eps))
+    send_success(client_fd, "spring curve added\n");
+  else
+    send_failure(client_fd, "failed to add spring curve\n");
 }
