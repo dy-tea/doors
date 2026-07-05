@@ -77,6 +77,7 @@ typedef struct {
 typedef struct {
   double split_ratio;
   direction_t split_dir;
+  bool freed;
 } presel_t;
 
 typedef struct client_t {
@@ -84,6 +85,7 @@ typedef struct client_t {
   char title[MAXLEN];
   bool urgent;
   bool shown;
+  bool freed;
   client_state_t state;
   client_state_t last_state;
   stack_layer_t layer;
@@ -158,6 +160,7 @@ typedef struct node_t {
   size_t ntxnrefs;
   bool dirty;
   bool destroying;
+  bool freed;
 
   // current state
   struct {

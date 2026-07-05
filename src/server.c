@@ -740,6 +740,23 @@ void handle_output_power_set_mode(struct wl_listener *listener, void *data) {
   output_set_power(event->output, event->mode);
 }
 
+static void build_output_state_from_head(
+    struct wlr_output_configuration_head_v1 *head, struct wlr_output_state *state) {
+  wlr_output_state_init(state);
+  wlr_output_state_set_enabled(state, head->state.enabled);
+  if (head->state.mode) {
+    wlr_output_state_set_mode(state, head->state.mode);
+  } else if (head->state.custom_mode.width > 0) {
+    wlr_output_state_set_custom_mode(state,
+      head->state.custom_mode.width,
+      head->state.custom_mode.height,
+      head->state.custom_mode.refresh);
+  }
+  wlr_output_state_set_scale(state, head->state.scale);
+  wlr_output_state_set_transform(state, head->state.transform);
+  wlr_output_state_set_adaptive_sync_enabled(state, head->state.adaptive_sync_enabled);
+}
+
 static void apply_output_head_config(struct wlr_output_configuration_head_v1 *config_head) {
   struct wlr_output *output = config_head->state.output;
   if (!output) return;
@@ -747,22 +764,7 @@ static void apply_output_head_config(struct wlr_output_configuration_head_v1 *co
   output_t *out = output_from_wlr_output(output);
 
   struct wlr_output_state state;
-  wlr_output_state_init(&state);
-
-  wlr_output_state_set_enabled(&state, config_head->state.enabled);
-
-  if (config_head->state.mode) {
-    wlr_output_state_set_mode(&state, config_head->state.mode);
-  } else if (config_head->state.custom_mode.width > 0) {
-    wlr_output_state_set_custom_mode(&state,
-      config_head->state.custom_mode.width,
-      config_head->state.custom_mode.height,
-      config_head->state.custom_mode.refresh);
-  }
-
-  wlr_output_state_set_scale(&state, config_head->state.scale);
-  wlr_output_state_set_transform(&state, config_head->state.transform);
-  wlr_output_state_set_adaptive_sync_enabled(&state, config_head->state.adaptive_sync_enabled);
+  build_output_state_from_head(config_head, &state);
 
   wlr_output_commit_state(output, &state);
   wlr_output_state_finish(&state);
@@ -797,22 +799,7 @@ void handle_output_manager_test(struct wl_listener *listener, void *data) {
     if (!output) continue;
 
     struct wlr_output_state state;
-    wlr_output_state_init(&state);
-
-    wlr_output_state_set_enabled(&state, head->state.enabled);
-
-    if (head->state.mode) {
-      wlr_output_state_set_mode(&state, head->state.mode);
-    } else if (head->state.custom_mode.width > 0) {
-      wlr_output_state_set_custom_mode(&state,
-        head->state.custom_mode.width,
-        head->state.custom_mode.height,
-        head->state.custom_mode.refresh);
-    }
-
-    wlr_output_state_set_scale(&state, head->state.scale);
-    wlr_output_state_set_transform(&state, head->state.transform);
-    wlr_output_state_set_adaptive_sync_enabled(&state, head->state.adaptive_sync_enabled);
+    build_output_state_from_head(head, &state);
 
     if (!wlr_output_test_state(output, &state)) {
       wlr_output_configuration_v1_send_failed(config);

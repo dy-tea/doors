@@ -157,9 +157,7 @@ void free_node(node_t *n) {
   if (n->scratchpad)
     scratchpad_remove(n);
 
-  // deadbeef my beloved
-  static uintptr_t sentinel = 0xDEADBEEF;
-  if ((uintptr_t)n->client == sentinel || (uintptr_t)n->presel == sentinel) {
+  if (n->freed) {
     wlr_log(WLR_ERROR, "free_node: double-free detected on node %u!", n->id);
     return;
   }
@@ -168,14 +166,16 @@ void free_node(node_t *n) {
     tabs_destroy(n);
 
   if (n->client != NULL) {
+    n->client->freed = true;
     free(n->client);
-    n->client = (void *)sentinel;
   }
 
   if (n->presel != NULL) {
+    n->presel->freed = true;
     free(n->presel);
-    n->presel = (void *)sentinel;
   }
+
+  n->freed = true;
 
   free(n);
 }
@@ -306,7 +306,7 @@ void arrange(output_t *m, desktop_t *d, bool use_transaction) {
     fallthrough;
 	default:
 		if (!gapless_monocle || d->layout != LAYOUT_MONOCLE) {
-	    int wg = smart_gaps && visible_tiled_count(d) <= 1 ? 0 : d->window_gap;
+	    int wg = compute_window_gap(d);
 	    rect.x += wg;
 	    rect.y += wg;
 	    rect.width -= wg;
@@ -339,7 +339,7 @@ static void render_leaf(output_t *m, desktop_t *d, node_t *n,
     r = root_rect;
     slot = root_rect;
     use_centering = true;
-    int wg = gapless_monocle ? 0 : (smart_gaps && visible_tiled_count(d) <= 1 ? 0 : d->window_gap);
+    int wg = gapless_monocle ? 0 : compute_window_gap(d);
     int bleed = wg + 2 * bw;
 
     r.x += bw;
@@ -355,8 +355,7 @@ static void render_leaf(output_t *m, desktop_t *d, node_t *n,
     if (omit_window_gap)
       wg = 0;
     else
-      wg = (gapless_monocle && d->layout == LAYOUT_MONOCLE) ? 0 :
-        (smart_gaps && visible_tiled_count(d) <= 1 ? 0 : d->window_gap);
+      wg = (gapless_monocle && d->layout == LAYOUT_MONOCLE) ? 0 : compute_window_gap(d);
 
     int bleed = wg + 2 * bw;
     r.x += bw;
@@ -396,29 +395,24 @@ static void render_leaf(output_t *m, desktop_t *d, node_t *n,
 }
 
 static void validate_split_children(node_t *n) {
-  static uintptr_t sentinel = 0xDEADBEEF;
   bool first_valid = n->first_child != NULL &&
-    (uintptr_t)n->first_child > 0x400000 &&
-    (uintptr_t)n->first_child < 0x7fffffffffff &&
-    (uintptr_t)n->first_child->client != sentinel &&
+    !n->first_child->freed &&
     !n->first_child->destroying;
   bool second_valid = n->second_child != NULL &&
-    (uintptr_t)n->second_child > 0x400000 &&
-    (uintptr_t)n->second_child < 0x7fffffffffff &&
-    (uintptr_t)n->second_child->client != sentinel &&
+    !n->second_child->freed &&
     !n->second_child->destroying;
 
   if (n->first_child != NULL && !first_valid) {
     wlr_log(WLR_ERROR, "Node %u has invalid/destroying/freed first_child pointer %p (destroying=%d), nulling",
       n->id, (void*)n->first_child,
-      n->first_child && (uintptr_t)n->first_child->client != sentinel ? n->first_child->destroying : -1);
+      n->first_child && !n->first_child->freed ? n->first_child->destroying : -1);
     n->first_child = NULL;
   }
 
   if (n->second_child != NULL && !second_valid) {
     wlr_log(WLR_ERROR, "Node %u has invalid/destroying/freed second_child pointer %p (destroying=%d), nulling",
       n->id, (void*)n->second_child,
-      n->second_child && (uintptr_t)n->second_child->client != sentinel ? n->second_child->destroying : -1);
+      n->second_child && !n->second_child->freed ? n->second_child->destroying : -1);
     n->second_child = NULL;
   }
 }
@@ -572,7 +566,7 @@ void apply_layout(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect,
     if (show_deco) {
       int bar_h = tab_bar_height();
 
-      int wg = smart_gaps && visible_tiled_count(d) <= 1 ? 0 : d->window_gap;
+      int wg = compute_window_gap(d);
       struct wlr_box bar_rect = {
         .x = rect.x,
         .y = rect.y,

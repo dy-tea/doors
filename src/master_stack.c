@@ -184,7 +184,7 @@ void master_stack_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
   int n = collect_tiled_nodes(d, &nodes);
   if (n == 0) return;
 
-  int wg = smart_gaps && visible_tiled_count(d) <= 1 ? 0 : d->window_gap;
+  int wg = compute_window_gap(d);
 
   struct wlr_box rect = available;
   rect.x += wg;

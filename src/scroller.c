@@ -194,7 +194,7 @@ void scroller_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
   wlr_log(WLR_DEBUG, "scroller_arrange: found %d tiled nodes", n);
   if (n == 0) return;
 
-  int wg = smart_gaps && visible_tiled_count(d) <= 1 ? 0 : d->window_gap;
+  int wg = compute_window_gap(d);
   int gappih = wg;
   int gappoh = wg;
   int gappov = wg;

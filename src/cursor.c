@@ -168,8 +168,7 @@ static void update_scene_positions(node_t *n, struct wlr_box rect, desktop_t *d)
       // apply window gap and border width to leaf nodes
       struct wlr_box r = rect;
       unsigned int bw = effective_border_width(d);
-      int wg = (gapless_monocle && d->layout == LAYOUT_MONOCLE) ? 0 :
-        (smart_gaps && visible_tiled_count(d) <= 1 ? 0 : d->window_gap);
+      int wg = (gapless_monocle && d->layout == LAYOUT_MONOCLE) ? 0 : compute_window_gap(d);
       int bleed = wg + 2 * bw;
       r.x += bw;
       r.y += bw;
