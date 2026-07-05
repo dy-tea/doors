@@ -89,6 +89,23 @@ static void scroller_arrange_stack(node_t *head_node, struct wlr_box base_geom, 
     r.width = (r.width > (int)(2 * bw)) ? r.width - 2 * bw : 0;
     r.height = (r.height > (int)(2 * bw)) ? r.height - 2 * bw : 0;
 
+    // clamp to constraints and center within slot
+    if ((int)head_node->constraints.min_width > MIN_WIDTH &&
+        r.width < (int)head_node->constraints.min_width &&
+        base_geom.width > 0) {
+      r.x = base_geom.x + (base_geom.width - (int)head_node->constraints.min_width) / 2;
+      r.width = head_node->constraints.min_width;
+    }
+    if ((int)head_node->constraints.min_height > MIN_HEIGHT &&
+        r.height < (int)head_node->constraints.min_height &&
+        base_geom.height > 0) {
+      r.y = base_geom.y + (base_geom.height - (int)head_node->constraints.min_height) / 2;
+      r.height = head_node->constraints.min_height;
+    }
+
+    if (r.width < MIN_WIDTH) r.width = MIN_WIDTH;
+    if (r.height < MIN_HEIGHT) r.height = MIN_HEIGHT;
+
     head->tiled_rectangle = r;
 
     wlr_log(WLR_DEBUG, "scroller_arrange_stack: setting node %u geom=(%d,%d %dx%d)",
@@ -126,8 +143,10 @@ static void scroller_arrange_stack(node_t *head_node, struct wlr_box base_geom, 
     r.width = (r.width > (int)(2 * bw)) ? r.width - 2 * bw : 0;
     r.height = (r.height > (int)(2 * bw)) ? r.height - 2 * bw : 0;
 
-    c->tiled_rectangle = r;
+    if (r.width < MIN_WIDTH) r.width = MIN_WIDTH;
+    if (r.height < MIN_HEIGHT) r.height = MIN_HEIGHT;
 
+    // find the node for centering
     node_t *stack_node = (c == head) ? head_node : NULL;
     if (!stack_node) {
       for (node_t *n = first_extrema(head_node->output->desk->root); n; n = next_leaf(n, head_node->output->desk->root)) {
@@ -137,6 +156,24 @@ static void scroller_arrange_stack(node_t *head_node, struct wlr_box base_geom, 
         }
       }
     }
+
+    // clamp to constraints and center within slot
+    if (stack_node) {
+      if ((int)stack_node->constraints.min_width > MIN_WIDTH &&
+          r.width < (int)stack_node->constraints.min_width &&
+          geom.width > 0) {
+        r.x = geom.x + (geom.width - (int)stack_node->constraints.min_width) / 2;
+        r.width = stack_node->constraints.min_width;
+      }
+      if ((int)stack_node->constraints.min_height > MIN_HEIGHT &&
+          r.height < (int)stack_node->constraints.min_height &&
+          geom.height > 0) {
+        r.y = geom.y + (geom.height - (int)stack_node->constraints.min_height) / 2;
+        r.height = stack_node->constraints.min_height;
+      }
+    }
+
+    c->tiled_rectangle = r;
 
     if (stack_node) {
       node_set_pending_rectangle(stack_node, geom);

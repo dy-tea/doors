@@ -434,6 +434,11 @@ void toplevel_map(struct wl_listener *listener, void *data) {
   n->client->toplevel = toplevel;
   toplevel->node = n;
 
+  // populate constraints from xdg_toplevel protocol state
+  struct wlr_xdg_toplevel_state *toplevel_state = &toplevel->xdg_toplevel->current;
+  if (toplevel_state->min_width > 0) n->constraints.min_width = toplevel_state->min_width;
+  if (toplevel_state->min_height > 0) n->constraints.min_height = toplevel_state->min_height;
+
   // set initial app_id and title
   const char *app_id = toplevel->xdg_toplevel->app_id;
   const char *title = toplevel->xdg_toplevel->title;
@@ -778,6 +783,26 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
   }
 
   if (toplevel->mapped && toplevel->xdg_toplevel->base->surface->mapped) {
+    // update constraints
+    if (toplevel->node) {
+      struct wlr_xdg_toplevel_state *state = &toplevel->xdg_toplevel->current;
+      bool constraints_changed = false;
+      if (state->min_width > 0 && (uint16_t)state->min_width != toplevel->node->constraints.min_width) {
+        toplevel->node->constraints.min_width = state->min_width;
+        constraints_changed = true;
+      }
+      if (state->min_height > 0 && (uint16_t)state->min_height != toplevel->node->constraints.min_height) {
+        toplevel->node->constraints.min_height = state->min_height;
+        constraints_changed = true;
+      }
+      if (constraints_changed && toplevel->node->output && toplevel->node->desktop) {
+        wlr_log(WLR_DEBUG, "toplevel_commit: node %u constraints updated to %dx%d",
+          toplevel->node->id, toplevel->node->constraints.min_width,
+          toplevel->node->constraints.min_height);
+        arrange(toplevel->node->output, toplevel->node->desktop, true);
+      }
+    }
+
     struct wlr_box *new_geo = &xdg_surface->geometry;
     bool new_size = new_geo->width != toplevel->geometry.width ||
       new_geo->height != toplevel->geometry.height ||

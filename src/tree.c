@@ -328,12 +328,17 @@ static void render_leaf(output_t *m, desktop_t *d, node_t *n,
   unsigned int bw = effective_border_width(d);
 
   struct wlr_box r;
+  struct wlr_box slot = {0};
+  bool use_centering = false;
+
   if (IS_FLOATING(n->client)) {
     r = n->client->floating_rectangle;
   } else if (n->client->state == STATE_FULLSCREEN) {
     r = m->rectangle;
   } else if (d->layout == LAYOUT_MONOCLE && IS_TILED(n->client) && !omit_window_gap) {
     r = root_rect;
+    slot = root_rect;
+    use_centering = true;
     int wg = gapless_monocle ? 0 : (smart_gaps && visible_tiled_count(d) <= 1 ? 0 : d->window_gap);
     int bleed = wg + 2 * bw;
 
@@ -343,6 +348,8 @@ static void render_leaf(output_t *m, desktop_t *d, node_t *n,
     r.height = (bleed < r.height ? r.height - bleed : 0);
   } else {
     r = rect;
+    slot = rect;
+    use_centering = true;
 
     int wg;
     if (omit_window_gap)
@@ -365,6 +372,25 @@ static void render_leaf(output_t *m, desktop_t *d, node_t *n,
     if (r.height > n->client->floating_rectangle.height)
       r.height = n->client->floating_rectangle.height;
   }
+
+  // clamp up to constraints and center within the tile slot
+  if (use_centering) {
+    if ((int)n->constraints.min_width > MIN_WIDTH &&
+        r.width < (int)n->constraints.min_width &&
+        slot.width > 0) {
+      r.x = slot.x + (slot.width - (int)n->constraints.min_width) / 2;
+      r.width = n->constraints.min_width;
+    }
+    if ((int)n->constraints.min_height > MIN_HEIGHT &&
+        r.height < (int)n->constraints.min_height &&
+        slot.height > 0) {
+      r.y = slot.y + (slot.height - (int)n->constraints.min_height) / 2;
+      r.height = n->constraints.min_height;
+    }
+  }
+
+  if (r.width < MIN_WIDTH) r.width = MIN_WIDTH;
+  if (r.height < MIN_HEIGHT) r.height = MIN_HEIGHT;
 
   n->client->tiled_rectangle = r;
 }
@@ -429,6 +455,30 @@ static bool repair_split_node(node_t *n, desktop_t *d, output_t *m,
   return false;
 }
 
+static void split_dimension(int total, double split_ratio,
+    uint16_t first_min, uint16_t second_min,
+    int *first_out, int *second_out, int *offset_out) {
+  int fence = (int)(split_ratio * total);
+
+  if (first_min + second_min <= total) {
+    if (fence < first_min)
+      fence = first_min;
+    else if (fence > total - second_min)
+      fence = total - second_min;
+  } else if (total >= 2) {
+    fence = total / 2;
+  } else if (total == 1) {
+    fence = 1;
+  } else {
+    fence = 0;
+  }
+
+  *first_out = fence;
+  *offset_out += fence;
+  *second_out = total - fence;
+  if (*second_out < 0) *second_out = 0;
+}
+
 static void compute_split_rects(node_t *n, desktop_t *d, struct wlr_box rect,
     struct wlr_box *first_rect, struct wlr_box *second_rect) {
   bool first_fullscreen = n->first_child && n->first_child->client && n->first_child->client->state == STATE_FULLSCREEN;
@@ -439,56 +489,34 @@ static void compute_split_rects(node_t *n, desktop_t *d, struct wlr_box rect,
   if (d->layout == LAYOUT_MONOCLE) {
     *first_rect = rect;
     *second_rect = rect;
-  } else if (n->split_type == TYPE_VERTICAL) {
-    if ((first_hidden || first_fullscreen) && n->second_child && !(second_hidden || second_fullscreen)) {
-      *first_rect = (struct wlr_box){0, 0, 0, 0};
-      *second_rect = rect;
-    } else if ((second_hidden || second_fullscreen) && n->first_child && !(first_hidden || first_fullscreen)) {
-      *first_rect = rect;
-      *second_rect = (struct wlr_box){0, 0, 0, 0};
-    } else {
-      *first_rect = rect;
-      *second_rect = rect;
+    return;
+  }
 
-      int fence = (int)(n->split_ratio * rect.width);
-      uint16_t first_min = n->first_child ? n->first_child->constraints.min_width : 0;
-      uint16_t second_min = n->second_child ? n->second_child->constraints.min_width : 0;
-      if (first_min + second_min <= rect.width) {
-        if (fence < first_min)
-          fence = first_min;
-        else if (fence > rect.width - second_min)
-          fence = rect.width - second_min;
-      }
+  if ((first_hidden || first_fullscreen) && n->second_child && !(second_hidden || second_fullscreen)) {
+    *first_rect = (struct wlr_box){0, 0, 0, 0};
+    *second_rect = rect;
+    return;
+  }
 
-      first_rect->width = fence;
-      second_rect->x += fence;
-      second_rect->width = rect.width - fence;
-    }
+  if ((second_hidden || second_fullscreen) && n->first_child && !(first_hidden || first_fullscreen)) {
+    *first_rect = rect;
+    *second_rect = (struct wlr_box){0, 0, 0, 0};
+    return;
+  }
+
+  *first_rect = rect;
+  *second_rect = rect;
+
+  if (n->split_type == TYPE_VERTICAL) {
+    split_dimension(rect.width, n->split_ratio,
+      n->first_child ? n->first_child->constraints.min_width : 0,
+      n->second_child ? n->second_child->constraints.min_width : 0,
+      &first_rect->width, &second_rect->width, &second_rect->x);
   } else {
-    if ((first_hidden || first_fullscreen) && n->second_child && !(second_hidden || second_fullscreen)) {
-      *first_rect = (struct wlr_box){0, 0, 0, 0};
-      *second_rect = rect;
-    } else if ((second_hidden || second_fullscreen) && n->first_child && !(first_hidden || first_fullscreen)) {
-      *first_rect = rect;
-      *second_rect = (struct wlr_box){0, 0, 0, 0};
-    } else {
-      *first_rect = rect;
-      *second_rect = rect;
-
-      int fence = (int)(n->split_ratio * rect.height);
-      uint16_t first_min = n->first_child ? n->first_child->constraints.min_height : 0;
-      uint16_t second_min = n->second_child ? n->second_child->constraints.min_height : 0;
-      if (first_min + second_min <= rect.height) {
-        if (fence < first_min)
-          fence = first_min;
-        else if (fence > rect.height - second_min)
-          fence = rect.height - second_min;
-      }
-
-      first_rect->height = fence;
-      second_rect->y += fence;
-      second_rect->height = rect.height - fence;
-    }
+    split_dimension(rect.height, n->split_ratio,
+      n->first_child ? n->first_child->constraints.min_height : 0,
+      n->second_child ? n->second_child->constraints.min_height : 0,
+      &first_rect->height, &second_rect->height, &second_rect->y);
   }
 }
 

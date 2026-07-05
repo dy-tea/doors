@@ -50,11 +50,31 @@ static void set_node_geom(node_t *n, struct wlr_box geom, output_t *m, desktop_t
   r.width = (r.width > (int)(2 * bw)) ? r.width - 2 * bw : 0;
   r.height = (r.height > (int)(2 * bw)) ? r.height - 2 * bw : 0;
 
+  if (r.width < MIN_WIDTH) r.width = MIN_WIDTH;
+  if (r.height < MIN_HEIGHT) r.height = MIN_HEIGHT;
+
   if (n->client->state == STATE_PSEUDO_TILED) {
     if (r.width > n->client->floating_rectangle.width)
       r.width = n->client->floating_rectangle.width;
     if (r.height > n->client->floating_rectangle.height)
       r.height = n->client->floating_rectangle.height;
+
+    if (r.width < MIN_WIDTH) r.width = MIN_WIDTH;
+    if (r.height < MIN_HEIGHT) r.height = MIN_HEIGHT;
+  }
+
+  // clamp to constraints and center within tile slot
+  if ((int)n->constraints.min_width > MIN_WIDTH &&
+      r.width < (int)n->constraints.min_width &&
+      geom.width > 0) {
+    r.x = geom.x + (geom.width - (int)n->constraints.min_width) / 2;
+    r.width = n->constraints.min_width;
+  }
+  if ((int)n->constraints.min_height > MIN_HEIGHT &&
+      r.height < (int)n->constraints.min_height &&
+      geom.height > 0) {
+    r.y = geom.y + (geom.height - (int)n->constraints.min_height) / 2;
+    r.height = n->constraints.min_height;
   }
 
   n->client->tiled_rectangle = r;
@@ -63,19 +83,94 @@ static void set_node_geom(node_t *n, struct wlr_box geom, output_t *m, desktop_t
   node_set_dirty(n);
 }
 
-static void distribute_area(struct wlr_box area, struct wlr_box *out, int count, int gap, bool vertical) {
-  int *total_size = vertical ? &area.height : &area.width;
+static void distribute_area(struct wlr_box area, struct wlr_box *out, node_t **nodes,
+    int offset, int count, int gap, bool vertical) {
+  if (count <= 0) return;
+
+  // build list of min sizes for this group
+  int16_t mins[count];
+  bool fixed[count];
+  int remaining = count;
   int total_gap = (count - 1) * gap;
-  int unit = (*total_size - total_gap) / count;
+  int *total_size = vertical ? &area.height : &area.width;
+  int avail = *total_size - total_gap;
 
   for (int i = 0; i < count; i++) {
+    mins[i] = vertical ?
+      (int16_t)nodes[offset + i]->constraints.min_height :
+      (int16_t)nodes[offset + i]->constraints.min_width;
+    fixed[i] = false;
+  }
+
+  // fix to minimum and redistribute the remainder
+  int iter = 0;
+  bool changed = true;
+  while (changed && remaining > 0 && iter < count) {
+    changed = false;
+    iter++;
+    int share = (avail) / remaining;
+    if (share < 1 && avail > 0) share = 1;
+
+    for (int i = 0; i < count; i++) {
+      if (fixed[i]) continue;
+      if (mins[i] > MIN_WIDTH && mins[i] > share && avail > 0) {
+        avail -= mins[i];
+        fixed[i] = true;
+        remaining--;
+        out[i] = area;
+
+        if (vertical) out[i].height = mins[i];
+        else out[i].width = mins[i];
+
+        changed = true;
+      }
+    }
+  }
+
+  // place all tiles
+  int cursor = vertical ? area.y : area.x;
+  for (int i = 0; i < count; i++) {
     out[i] = area;
-    if (vertical) {
-      out[i].y = area.y + i * (unit + gap);
-      out[i].height = (i == count - 1) ? area.y + area.height - out[i].y : unit;
+    if (fixed[i]) {
+      if (vertical) {
+        out[i].y = cursor;
+        out[i].height = mins[i];
+        cursor += mins[i] + gap;
+      } else {
+        out[i].x = cursor;
+        out[i].width = mins[i];
+        cursor += mins[i] + gap;
+      }
     } else {
-      out[i].x = area.x + i * (unit + gap);
-      out[i].width = (i == count - 1) ? area.x + area.width - out[i].x : unit;
+      int unit = remaining > 0 ? avail / remaining : 0;
+      if (unit < 1 && avail > 0) unit = 1;
+      int remaining_after = 0;
+
+      for (int j = i + 1; j < count; j++)
+        if (!fixed[j])
+        	remaining_after++;
+
+      if ((i == count - 1) || remaining_after == 0) {
+        if (vertical) {
+          out[i].y = cursor;
+          out[i].height = area.y + area.height - cursor;
+        } else {
+          out[i].x = cursor;
+          out[i].width = area.x + area.width - cursor;
+        }
+      } else {
+        if (vertical) {
+          out[i].y = cursor;
+          out[i].height = unit;
+          cursor += unit + gap;
+        } else {
+          out[i].x = cursor;
+          out[i].width = unit;
+          cursor += unit + gap;
+        }
+        avail -= unit;
+        remaining--;
+      }
     }
   }
 }
@@ -195,11 +290,11 @@ void master_stack_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
     free(nodes);
     return;
   }
-  distribute_area(master_area, geoms, mc, wg, master_vertical);
+  distribute_area(master_area, geoms, nodes, 0, mc, wg, master_vertical);
   for (int i = 0; i < mc; i++)
     set_node_geom(nodes[i], geoms[i], m, d);
 
-  distribute_area(stack_area, geoms, sc, wg, master_stack_layout == STACK_VERTICAL);
+  distribute_area(stack_area, geoms, nodes, mc, sc, wg, master_stack_layout == STACK_VERTICAL);
   for (int i = 0; i < sc; i++)
     set_node_geom(nodes[mc + i], geoms[i], m, d);
 

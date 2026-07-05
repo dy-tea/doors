@@ -568,6 +568,13 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	xwayland_view->node = node;
 	node->output = mon;
 
+	// populate constraints from xwayland size hints
+	xcb_size_hints_t *size_hints = xsurface->size_hints;
+	if (size_hints != NULL) {
+		if (size_hints->min_width > 0) node->constraints.min_width = size_hints->min_width;
+		if (size_hints->min_height > 0) node->constraints.min_height = size_hints->min_height;
+	}
+
 	const char *app_id = xsurface->class;
 	const char *title = xsurface->title;
 
