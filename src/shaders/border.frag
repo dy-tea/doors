@@ -2,7 +2,7 @@ precision highp float;
 uniform vec2 resolution;
 uniform float border_radius;
 uniform float border_width_px;
-uniform float niri_scale;
+uniform float scale;
 
 uniform vec4 gradient_colors[10];
 uniform int gradient_count;
@@ -42,7 +42,7 @@ float rounding_alpha(vec2 coords, vec2 size, float radius) {
   if (!in_corner) return 1.0;
 
   float dist = distance(coords, center);
-  float t = clamp((dist - r) * niri_scale + 0.5, 0.0, 1.0);
+  float t = clamp((dist - r) * scale + 0.5, 0.0, 1.0);
   return 1.0 - t * t * (3.0 - 2.0 * t);
 }
 

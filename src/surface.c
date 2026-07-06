@@ -19,7 +19,7 @@ static bool corner_mask_no_input(struct wlr_scene_buffer *buffer, double *sx, do
 typedef struct {
   struct wlr_scene_buffer **node;
   struct wlr_buffer **buf;
-  GLuint *fbo;
+  uint64_t *native;
 } effect_fields_t;
 
 static effect_fields_t get_effect_fields(surface_blur_t *b, surface_effect_t effect) {
@@ -28,7 +28,7 @@ static effect_fields_t get_effect_fields(surface_blur_t *b, surface_effect_t eff
   case EFFECT_BLUR:
     f.node = &b->blur_node;
     f.buf = &b->blur_buf;
-    f.fbo = &b->blur_buf_fbo;
+    f.native = b->blur_native;
     break;
   case EFFECT_MICA:
     f.node = &b->mica_node;
@@ -36,7 +36,7 @@ static effect_fields_t get_effect_fields(surface_blur_t *b, surface_effect_t eff
   case EFFECT_ACRYLIC:
     f.node = &b->acrylic_node;
     f.buf = &b->acrylic_buf;
-    f.fbo = &b->acrylic_buf_fbo;
+    f.native = b->acrylic_native;
     break;
   }
   return f;
@@ -79,8 +79,8 @@ void surface_set_effect(struct wlr_scene_tree *scene_tree, node_t *node,
       wlr_buffer_unlock(*f.buf);
       *f.buf = NULL;
     }
-    if (f.fbo)
-      *f.fbo = 0;
+    if (f.native)
+      f.native[0] = f.native[1] = 0;
   }
 }
 
@@ -125,7 +125,7 @@ void surface_set_border_radius(struct wlr_scene_tree *scene_tree,
       if ((*rounded)->corner_mask_buf) {
         wlr_buffer_unlock((*rounded)->corner_mask_buf);
         (*rounded)->corner_mask_buf = NULL;
-        (*rounded)->corner_mask_buf_fbo = 0;
+        (*rounded)->corner_mask_native[0] = (*rounded)->corner_mask_native[1] = 0;
       }
     }
 
@@ -138,7 +138,7 @@ void surface_set_border_radius(struct wlr_scene_tree *scene_tree,
         if ((*rounded)->border_shader_buf) {
           wlr_buffer_unlock((*rounded)->border_shader_buf);
           (*rounded)->border_shader_buf = NULL;
-          (*rounded)->border_shader_buf_fbo = 0;
+          (*rounded)->border_shader_native[0] = (*rounded)->border_shader_native[1] = 0;
           (*rounded)->border_shader_buf_w = 0;
           (*rounded)->border_shader_buf_h = 0;
         }
@@ -173,7 +173,7 @@ void surface_set_shadow(struct wlr_scene_tree *scene_tree, node_t *node,
     if ((*shadow)->shadow_buf) {
       wlr_buffer_unlock((*shadow)->shadow_buf);
       (*shadow)->shadow_buf = NULL;
-      (*shadow)->shadow_buf_fbo = 0;
+      (*shadow)->shadow_native[0] = (*shadow)->shadow_native[1] = 0;
     }
     (*shadow)->shadow_dirty = false;
   }

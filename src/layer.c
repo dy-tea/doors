@@ -56,7 +56,7 @@ void layer_surface_set_blur(layer_surface_t *ls, bool enabled) {
     if (ls->blur_buf) {
       wlr_buffer_unlock(ls->blur_buf);
       ls->blur_buf = NULL;
-      ls->blur_buf_fbo = 0;
+      ls->blur_native[0] = ls->blur_native[1] = 0;
     }
   }
 }

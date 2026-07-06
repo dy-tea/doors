@@ -5,7 +5,7 @@ uniform vec2 win_pos_uv;
 uniform vec2 win_size_uv;
 uniform vec2 win_size_px;
 uniform float border_radius_px;
-uniform float niri_scale;
+uniform float scale;
 varying vec2 v_uv;
 
 float rounding_alpha(vec2 coords, vec2 size, float radius) {
@@ -31,7 +31,7 @@ float rounding_alpha(vec2 coords, vec2 size, float radius) {
   if (!in_corner) return 1.0;
 
   float dist = distance(coords, center);
-  float t = clamp((dist - radius) * niri_scale + 0.5, 0.0, 1.0);
+  float t = clamp((dist - radius) * scale + 0.5, 0.0, 1.0);
   return 1.0 - t * t * (3.0 - 2.0 * t);
 }
 

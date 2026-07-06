@@ -1,8 +1,8 @@
 #pragma once
 
 #include "types.h"
-#include <GLES2/gl2.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 struct wlr_scene_tree;
 
@@ -12,15 +12,15 @@ typedef struct surface_blur_t {
   struct wlr_scene_buffer *acrylic_node;
   bool blur_scene_hidden;
   struct wlr_buffer *blur_buf;
-  GLuint blur_buf_fbo;
+  uint64_t blur_native[2];
   struct wlr_buffer *acrylic_buf;
-  GLuint acrylic_buf_fbo;
+  uint64_t acrylic_native[2];
 } surface_blur_t;
 
 typedef struct surface_rounded_t {
   struct wlr_scene_buffer *border_shader_node;
   struct wlr_buffer *border_shader_buf;
-  GLuint border_shader_buf_fbo;
+  uint64_t border_shader_native[2];
   int border_shader_buf_w;
   int border_shader_buf_h;
   bool border_dirty;
@@ -37,13 +37,13 @@ typedef struct surface_rounded_t {
 
   struct wlr_scene_buffer *corner_mask_node;
   struct wlr_buffer *corner_mask_buf;
-  GLuint corner_mask_buf_fbo;
+  uint64_t corner_mask_native[2];
 } surface_rounded_t;
 
 typedef struct surface_shadow_t {
   struct wlr_scene_buffer *shadow_node;
   struct wlr_buffer *shadow_buf;
-  GLuint shadow_buf_fbo;
+  uint64_t shadow_native[2];
   int shadow_buf_w;
   int shadow_buf_h;
   bool shadow_dirty;

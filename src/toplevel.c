@@ -926,7 +926,7 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
     if (toplevel->blur->blur_buf) {
       wlr_buffer_unlock(toplevel->blur->blur_buf);
       toplevel->blur->blur_buf = NULL;
-      toplevel->blur->blur_buf_fbo = 0;
+      toplevel->blur->blur_native[0] = toplevel->blur->blur_native[1] = 0;
     }
 
     if (toplevel->blur->mica_node) {
@@ -942,7 +942,7 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
     if (toplevel->blur->acrylic_buf) {
       wlr_buffer_unlock(toplevel->blur->acrylic_buf);
       toplevel->blur->acrylic_buf = NULL;
-      toplevel->blur->acrylic_buf_fbo = 0;
+      toplevel->blur->acrylic_native[0] = toplevel->blur->acrylic_native[1] = 0;
     }
 
     free(toplevel->blur);
@@ -955,7 +955,7 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
     if (toplevel->rounded->border_shader_buf) {
       wlr_buffer_unlock(toplevel->rounded->border_shader_buf);
       toplevel->rounded->border_shader_buf = NULL;
-      toplevel->rounded->border_shader_buf_fbo = 0;
+      toplevel->rounded->border_shader_native[0] = toplevel->rounded->border_shader_native[1] = 0;
       toplevel->rounded->border_shader_buf_w = 0;
       toplevel->rounded->border_shader_buf_h = 0;
     }
@@ -969,7 +969,7 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
     if (toplevel->rounded->corner_mask_buf) {
       wlr_buffer_unlock(toplevel->rounded->corner_mask_buf);
       toplevel->rounded->corner_mask_buf = NULL;
-      toplevel->rounded->corner_mask_buf_fbo = 0;
+      toplevel->rounded->corner_mask_native[0] = toplevel->rounded->corner_mask_native[1] = 0;
     }
 
     free(toplevel->rounded);
@@ -984,7 +984,7 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
     if (toplevel->shadow->shadow_buf) {
       wlr_buffer_unlock(toplevel->shadow->shadow_buf);
       toplevel->shadow->shadow_buf = NULL;
-      toplevel->shadow->shadow_buf_fbo = 0;
+      toplevel->shadow->shadow_native[0] = toplevel->shadow->shadow_native[1] = 0;
     }
     free(toplevel->shadow);
     toplevel->shadow = NULL;

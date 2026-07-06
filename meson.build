@@ -87,6 +87,8 @@ executable(
 		'src' / 'copy_capture.c',
 		'src' / 'cursor.c',
 		'src' / 'effects.c',
+		'src' / 'effects_gles2.c',
+		'src' / 'effects_vk.c',
 		'src' / 'gesture.c',
 		'src' / 'idle.c',
 		'src' / 'ipc.c',

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <GLES2/gl2.h>
+#include "effects_backend.h"
 #include <stdbool.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/util/box.h>
@@ -11,15 +11,6 @@ struct wlr_buffer;
 struct wlr_backend;
 struct wlr_output;
 struct wlr_scene_buffer;
-
-enum blur_algorithm {
-  BLUR_ALGORITHM_NONE,
-  BLUR_ALGORITHM_KAWASE,
-  BLUR_ALGORITHM_GAUSSIAN,
-  BLUR_ALGORITHM_BOX,
-  BLUR_ALGORITHM_REFRACTION,
-  BLUR_ALGORITHM_LENS_REFRACTION,
-};
 
 extern bool blur_enabled;
 extern enum blur_algorithm blur_algorithm;
@@ -56,20 +47,14 @@ typedef struct effects_output_t {
   int width, height;
   int blur_w, blur_h;
 
-  GLuint fbo[2];
-  GLuint tex[2];
-
-  GLuint staging_tex;  // full-res staging texture for renderbuffer->texture copy
-
-  GLuint screen_fbo;  /* full-res intermediate for screen shader */
-  GLuint screen_tex;
+  be_output_state_t be_state;
 
   struct wlr_buffer *mica_buf;
-  GLuint mica_buf_fbo;
+  uint64_t mica_native[2];
   bool mica_dirty;
 
   struct wlr_buffer *screen_shader_buf;
-  GLuint screen_shader_buf_fbo;
+  uint64_t screen_shader_native[2];
   struct wlr_scene_buffer *screen_shader_node;
 
   struct wlr_backend *capture_backend;
@@ -80,70 +65,8 @@ typedef struct effects_output_t {
 
 typedef struct effects_state_t {
   bool available;
-
-  GLuint prog_kawase;
-  GLuint prog_gauss_h;
-  GLuint prog_gauss_v;
-  GLuint prog_box_h;
-  GLuint prog_box_v;
-  GLuint prog_blit;
-  GLuint prog_mica_tint;
-  GLuint prog_acrylic_tint;
-  GLuint prog_refraction;
-  GLuint prog_ext_blit;
-  GLuint prog_border;
-  GLuint prog_corner_mask;
-  GLuint prog_shadow;
-
-  struct {
-    GLint tex, halfpixel, offset, noise_strength, vibrancy, vibrancy_darkness, brightness, contrast;
-  } u_kawase;
-  struct {
-    GLint tex, texel_size, radius, vibrancy, vibrancy_darkness, brightness, contrast;
-  } u_gauss;
-  struct {
-    GLint tex, texel_size, radius, vibrancy, vibrancy_darkness, brightness, contrast;
-  } u_box;
-  struct {
-    GLint tex;
-  } u_blit;
-  struct {
-    GLint tex, tint, tint_strength;
-  } u_mica;
-  struct {
-    GLint tex, tint, tint_strength, noise_strength, resolution, light_anchor;
-  } u_acrylic;
-  struct {
-    GLint tex;
-    GLint offset;
-    GLint halfpixel;
-    GLint refraction_rect_size;
-    GLint refraction_edge_size_pixels;
-    GLint refraction_corner_radius_pixels;
-    GLint refraction_strength;
-    GLint refraction_normal_pow;
-    GLint refraction_RGB_fringing;
-    GLint refraction_texture_repeat_mode;
-    GLint refraction_mode;
-  } u_refraction;
-  struct {
-    GLint tex;
-  } u_ext_blit;
-  struct {
-    GLint resolution, border_radius, border_width_px, border_color, scale;
-    GLint gradient_colors, gradient_count, gradient_angle;
-    GLint gradient2_colors, gradient2_count, gradient2_angle;
-    GLint gradient_lerp;
-  } u_border;
-  struct {
-    GLint tex, win_pos_uv, win_size_uv, win_size_px, border_radius_px, scale;
-  } u_corner_mask;
-  struct {
-    GLint resolution, shadow_size, shadow_color, border_radius, inner_size, hole_pos, hole_size;
-  } u_shadow;
-
-  GLuint vbo;
-  GLint attr_pos;
+  const effects_backend_t *backend;
+  void *backend_data;
 } effects_state_t;
 
 extern effects_state_t effects_state;

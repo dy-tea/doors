@@ -1,7 +1,7 @@
 #pragma once
 
-#include <GLES2/gl2.h>
 #include <pixman.h>
+#include <stdint.h>
 #include <wayland-server.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_scene.h>
@@ -19,9 +19,9 @@ typedef struct layer_surface_t {
 
   struct wlr_scene_buffer *blur_node;
   struct wlr_buffer *blur_buf;
-  GLuint blur_buf_fbo;
+  uint64_t blur_native[2];
   bool blur_scene_hidden;
-  pixman_region32_t blur_region;  // blur region in surface-local coordinates
+  pixman_region32_t blur_region;
   int blur_region_offset_x, blur_region_offset_y;
   int blur_region_width, blur_region_height;
 
