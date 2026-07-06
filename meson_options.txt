@@ -1,0 +1,1 @@
+option('SYSTEMD', type: 'boolean', value: false, description: 'Install systemd unit files')

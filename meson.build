@@ -156,3 +156,7 @@ executable(
 )
 
 install_data('doors.desktop', install_dir: '/usr/share/wayland-sessions')
+
+if get_option('SYSTEMD')
+	install_data('arch' / 'doors-session.target', install_dir: '/usr/lib/systemd/user')
+endif
