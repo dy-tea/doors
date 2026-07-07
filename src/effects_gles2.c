@@ -871,9 +871,9 @@ static bool gles2_render_border(struct be_border_params *p,
   glClear(GL_COLOR_BUFFER_BIT);
   glUseProgram(g->prog_border);
 
-  glUniform2f(g->u_border.resolution, (float)p->buf_w, (float)p->buf_h);
+  glUniform2f(g->u_border.resolution, p->res_w, p->res_h);
   glUniform1f(g->u_border.border_radius, p->border_radius);
-  glUniform1f(g->u_border.border_width_px, p->border_width_px * p->scale);
+  glUniform1f(g->u_border.border_width_px, p->border_width_px);
   glUniform1f(g->u_border.scale, p->scale);
   glUniform4fv(g->u_border.border_color, 1, p->border_color);
 
