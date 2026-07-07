@@ -29,6 +29,8 @@ libs = [
 	dependency('egl'),
 	dependency('cairo'),
 	dependency('pangocairo'),
+	dependency('vulkan'),
+	dependency('shaderc'),
 	wayland_protos,
 ]
 

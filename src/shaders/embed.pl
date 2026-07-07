@@ -4,12 +4,14 @@ use File::Basename;
 use File::Spec;
 
 my $var = shift // 'data';
+my $include_subdir = shift;  # optional subdir for include resolution
 
 my $content = '';
 $content .= $_ while (<STDIN>);
 
 my $script_dir = dirname(File::Spec->rel2abs($0));
 my $shader_dir = $script_dir;
+$shader_dir = "$script_dir/$include_subdir" if (defined $include_subdir);
 
 my %processed = ();
 

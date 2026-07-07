@@ -22,19 +22,25 @@
 #include <wlr/types/wlr_buffer.h>
 #include <wlr/types/wlr_damage_ring.h>
 #include <wlr/util/log.h>
+#include <wlr/config.h>
 
-#include "grayscale_frag_src.h"
-#include "invert_frag_src.h"
-#include "sepia_frag_src.h"
-#include "nightlight_frag_src.h"
+#include "gl_grayscale_frag_src.h"
+#include "gl_invert_frag_src.h"
+#include "gl_sepia_frag_src.h"
+#include "gl_nightlight_frag_src.h"
 
 // private wlroots functions
-extern bool wlr_renderer_is_gles2(const struct wlr_renderer *wlr_renderer);
-extern bool wlr_renderer_is_vk(const struct wlr_renderer *wlr_renderer);
 extern bool wlr_renderer_is_pixman(const struct wlr_renderer *wlr_renderer);
 
+#ifdef WLR_HAS_GLES2_RENDERER
+extern bool wlr_renderer_is_gles2(const struct wlr_renderer *wlr_renderer);
 extern const effects_backend_t gles2_backend;
+#endif
+
+#ifdef WLR_HAS_VULKAN_RENDERER
+extern bool wlr_renderer_is_vk(const struct wlr_renderer *wlr_renderer);
 extern const effects_backend_t vk_backend;
+#endif
 
 enum blur_algorithm blur_algorithm = BLUR_ALGORITHM_KAWASE;
 
@@ -194,17 +200,27 @@ bool effects_init(void) {
   char *renderer_name;
 
   // renderer selector
+  bool renderer_found = false;
+#ifdef WLR_HAS_GLES2_RENDERER
   if (wlr_renderer_is_gles2(server.renderer)) {
     effects_state.backend = &gles2_backend;
     renderer_name = "gles2";
-  } else if (wlr_renderer_is_vk(server.renderer)) {
+    renderer_found = true;
+  }
+#endif
+#ifdef WLR_HAS_VULKAN_RENDERER
+  if (!renderer_found && wlr_renderer_is_vk(server.renderer)) {
     effects_state.backend = &vk_backend;
     renderer_name = "vk";
-  } else if (wlr_renderer_is_pixman(server.renderer)) {
-    wlr_log(WLR_INFO, "effects: pixman renderer detected - blur disabled");
-    return false;
-  } else {
-  	wlr_log(WLR_INFO, "effects: unknown renderer detected - blur disabled");
+    renderer_found = true;
+  }
+#endif
+  if (!renderer_found) {
+    if (wlr_renderer_is_pixman(server.renderer)) {
+      wlr_log(WLR_INFO, "effects: pixman renderer detected - blur disabled");
+      return false;
+    }
+    wlr_log(WLR_INFO, "effects: unknown renderer detected - blur disabled");
     return false;
   }
 
@@ -1913,13 +1929,13 @@ bool screen_shader_set(const char *name) {
 
   const char *frag_src = NULL;
   if (strcmp(name, "grayscale") == 0) {
-    frag_src = grayscale_frag_src;
+    frag_src = gl_grayscale_frag_src;
   } else if (strcmp(name, "invert") == 0) {
-    frag_src = invert_frag_src;
+    frag_src = gl_invert_frag_src;
   } else if (strcmp(name, "sepia") == 0) {
-    frag_src = sepia_frag_src;
+    frag_src = gl_sepia_frag_src;
   } else if (strcmp(name, "nightlight") == 0) {
-    frag_src = nightlight_frag_src;
+    frag_src = gl_nightlight_frag_src;
   }
 
   if (!frag_src) return false;

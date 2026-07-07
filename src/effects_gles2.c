@@ -12,28 +12,29 @@
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/types/wlr_buffer.h>
 #include <wlr/util/log.h>
+#include <wlr/config.h>
 
-// wlr_renderer_get_render_formats() unstable API declaration
+#ifdef WLR_HAS_GLES2_RENDERER
 const struct wlr_drm_format_set *wlr_renderer_get_render_formats(struct wlr_renderer *renderer);
 
-#include "effect_tex_vert_src.h"
-#include "blit_frag_src.h"
-#include "ext_blit_frag_src.h"
-#include "border_frag_src.h"
-#include "border_corner_mask_frag_src.h"
-#include "blur_kawase_frag_src.h"
-#include "blur_box_h_frag_src.h"
-#include "blur_box_v_frag_src.h"
-#include "blur_gauss_h_frag_src.h"
-#include "blur_gauss_v_frag_src.h"
-#include "blur_mica_frag_src.h"
-#include "blur_acrylic_frag_src.h"
-#include "blur_refraction_frag_src.h"
-#include "grayscale_frag_src.h"
-#include "invert_frag_src.h"
-#include "nightlight_frag_src.h"
-#include "sepia_frag_src.h"
-#include "shadow_frag_src.h"
+#include "gl_effect_tex_vert_src.h"
+#include "gl_blit_frag_src.h"
+#include "gl_ext_blit_frag_src.h"
+#include "gl_border_frag_src.h"
+#include "gl_border_corner_mask_frag_src.h"
+#include "gl_blur_kawase_frag_src.h"
+#include "gl_blur_box_h_frag_src.h"
+#include "gl_blur_box_v_frag_src.h"
+#include "gl_blur_gauss_h_frag_src.h"
+#include "gl_blur_gauss_v_frag_src.h"
+#include "gl_blur_mica_frag_src.h"
+#include "gl_blur_acrylic_frag_src.h"
+#include "gl_blur_refraction_frag_src.h"
+#include "gl_grayscale_frag_src.h"
+#include "gl_invert_frag_src.h"
+#include "gl_nightlight_frag_src.h"
+#include "gl_sepia_frag_src.h"
+#include "gl_shadow_frag_src.h"
 
 struct gles2_data {
   EGLDisplay egl_display;
@@ -141,7 +142,7 @@ static GLuint compile_shader(GLenum type, const char *src) {
 }
 
 static GLuint link_program(const char *frag_src) {
-  GLuint vert = compile_shader(GL_VERTEX_SHADER, effect_tex_vert_src);
+  GLuint vert = compile_shader(GL_VERTEX_SHADER, gl_effect_tex_vert_src);
   GLuint frag = compile_shader(GL_FRAGMENT_SHADER, frag_src);
   if (!vert || !frag) {
     glDeleteShader(vert);
@@ -415,19 +416,19 @@ static bool gles2_init(struct wlr_renderer *r, struct wlr_allocator *a) {
     return false;
   }
 
-  g->prog_kawase = link_program(blur_kawase_frag_src);
-  g->prog_gauss_h = link_program(blur_gauss_h_frag_src);
-  g->prog_gauss_v = link_program(blur_gauss_v_frag_src);
-  g->prog_box_h = link_program(blur_box_h_frag_src);
-  g->prog_box_v = link_program(blur_box_v_frag_src);
-  g->prog_blit = link_program(blit_frag_src);
-  g->prog_mica_tint = link_program(blur_mica_frag_src);
-  g->prog_acrylic_tint = link_program(blur_acrylic_frag_src);
-  g->prog_refraction = link_program(blur_refraction_frag_src);
-  g->prog_ext_blit = link_program(ext_blit_frag_src);
-  g->prog_border = link_program(border_frag_src);
-  g->prog_corner_mask = link_program(border_corner_mask_frag_src);
-  g->prog_shadow = link_program(shadow_frag_src);
+  g->prog_kawase = link_program(gl_blur_kawase_frag_src);
+  g->prog_gauss_h = link_program(gl_blur_gauss_h_frag_src);
+  g->prog_gauss_v = link_program(gl_blur_gauss_v_frag_src);
+  g->prog_box_h = link_program(gl_blur_box_h_frag_src);
+  g->prog_box_v = link_program(gl_blur_box_v_frag_src);
+  g->prog_blit = link_program(gl_blit_frag_src);
+  g->prog_mica_tint = link_program(gl_blur_mica_frag_src);
+  g->prog_acrylic_tint = link_program(gl_blur_acrylic_frag_src);
+  g->prog_refraction = link_program(gl_blur_refraction_frag_src);
+  g->prog_ext_blit = link_program(gl_ext_blit_frag_src);
+  g->prog_border = link_program(gl_border_frag_src);
+  g->prog_corner_mask = link_program(gl_border_corner_mask_frag_src);
+  g->prog_shadow = link_program(gl_shadow_frag_src);
 
   if (!g->prog_kawase || !g->prog_gauss_h || !g->prog_gauss_v ||
       !g->prog_box_h || !g->prog_box_v || !g->prog_blit ||
@@ -1084,3 +1085,5 @@ const effects_backend_t gles2_backend = {
   .compile_screen_shader = gles2_compile_screen_shader,
   .destroy_screen_shader = gles2_destroy_screen_shader,
 };
+
+#endif

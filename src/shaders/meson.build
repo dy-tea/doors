@@ -1,6 +1,7 @@
 embed = find_program('./embed.pl', native: true)
 
-shaders = [
+# GLES2
+gles_shaders = [
 	'effect_tex.vert',
 
 	'blit.frag',
@@ -30,13 +31,29 @@ shaders = [
 	'sepia.frag',
 ]
 
-foreach shader : shaders
-	output = shader.underscorify() + '_src.h'
-	var = shader.underscorify() + '_src'
+foreach shader : gles_shaders
+	output = 'gl_' + shader.underscorify() + '_src.h'
+	var = 'gl_' + shader.underscorify() + '_src'
 	shader_headers += custom_target(
 		output,
-		command: [embed, var],
-		input: shader,
+		command: [embed, var, 'gles2'],
+		input: 'gles2' / shader,
+		output: output,
+		feed: true,
+		capture: true,
+	)
+endforeach
+
+# Vulkan
+vk_shaders = []
+
+foreach shader : vk_shaders
+	output = 'vk_' + shader.underscorify() + '_src.h'
+	var = 'vk_' + shader.underscorify() + '_src'
+	shader_headers += custom_target(
+		output,
+		command: [embed, var, 'vulkan'],
+		input: 'vulkan' / shader,
 		output: output,
 		feed: true,
 		capture: true,

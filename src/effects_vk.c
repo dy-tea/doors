@@ -1,5 +1,8 @@
 #include "effects_backend.h"
+#include <wlr/config.h>
 #include <wlr/util/log.h>
+
+#ifdef WLR_HAS_VULKAN_RENDERER
 
 static bool vk_init(struct wlr_renderer *r, struct wlr_allocator *a) {
   (void)r;
@@ -183,3 +186,5 @@ const effects_backend_t vk_backend = {
   .compile_screen_shader = vk_compile_screen_shader,
   .destroy_screen_shader = vk_destroy_screen_shader,
 };
+
+#endif
