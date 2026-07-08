@@ -1,6 +1,7 @@
 #include "animation.h"
 #include "copy_capture.h"
 #include "config.h"
+#include "effects_backend.h"
 #include "ipc.h"
 #include "input_method.h"
 #include "launcher.h"
@@ -1265,8 +1266,7 @@ static void xwayland_view_destroy(xwayland_toplevel_t *xwayland_view) {
 			xwayland_view->blur->blur_node = NULL;
 		}
 		if (xwayland_view->blur->blur_buf) {
-			wlr_buffer_unlock(xwayland_view->blur->blur_buf);
-			xwayland_view->blur->blur_buf = NULL;
+			effects_destroy_buffer(&xwayland_view->blur->blur_buf, xwayland_view->blur->blur_native);
 		}
 		if (xwayland_view->blur->mica_node) {
 			wlr_scene_node_destroy(&xwayland_view->blur->mica_node->node);
@@ -1277,8 +1277,7 @@ static void xwayland_view_destroy(xwayland_toplevel_t *xwayland_view) {
 			xwayland_view->blur->acrylic_node = NULL;
 		}
 		if (xwayland_view->blur->acrylic_buf) {
-			wlr_buffer_unlock(xwayland_view->blur->acrylic_buf);
-			xwayland_view->blur->acrylic_buf = NULL;
+			effects_destroy_buffer(&xwayland_view->blur->acrylic_buf, xwayland_view->blur->acrylic_native);
 		}
 		free(xwayland_view->blur);
 		xwayland_view->blur = NULL;
@@ -1290,8 +1289,7 @@ static void xwayland_view_destroy(xwayland_toplevel_t *xwayland_view) {
 			xwayland_view->shadow->shadow_node = NULL;
 		}
 		if (xwayland_view->shadow->shadow_buf) {
-			wlr_buffer_unlock(xwayland_view->shadow->shadow_buf);
-			xwayland_view->shadow->shadow_buf = NULL;
+			effects_destroy_buffer(&xwayland_view->shadow->shadow_buf, xwayland_view->shadow->shadow_native);
 		}
 		free(xwayland_view->shadow);
 		xwayland_view->shadow = NULL;
@@ -1303,16 +1301,14 @@ static void xwayland_view_destroy(xwayland_toplevel_t *xwayland_view) {
 			xwayland_view->rounded->corner_mask_node = NULL;
 		}
 		if (xwayland_view->rounded->corner_mask_buf) {
-			wlr_buffer_unlock(xwayland_view->rounded->corner_mask_buf);
-			xwayland_view->rounded->corner_mask_buf = NULL;
+			effects_destroy_buffer(&xwayland_view->rounded->corner_mask_buf, xwayland_view->rounded->corner_mask_native);
 		}
 		if (xwayland_view->rounded->border_shader_node) {
 			wlr_scene_node_destroy(&xwayland_view->rounded->border_shader_node->node);
 			xwayland_view->rounded->border_shader_node = NULL;
 		}
 		if (xwayland_view->rounded->border_shader_buf) {
-			wlr_buffer_unlock(xwayland_view->rounded->border_shader_buf);
-			xwayland_view->rounded->border_shader_buf = NULL;
+			effects_destroy_buffer(&xwayland_view->rounded->border_shader_buf, xwayland_view->rounded->border_shader_native);
 		}
 		free(xwayland_view->rounded);
 		xwayland_view->rounded = NULL;

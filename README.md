@@ -18,6 +18,8 @@ Ensure you have the following dependencies installed:
 - egl
 - cairo
 - pangocairo
+- shaderc
+- vulkan
 
 Build with meson:
 ```
@@ -35,6 +37,12 @@ doors -c ./examples/
 
 The **doorsrc** is a bash file that is run at startup, and can be used to configure settings and launch applications (like an **.xinitrc**).
 
-Use `doorsctl env set <name> <value>` in `doorsrc` to update the compositor's environment. Applications launched later by Doors, including hotkey commands, inherit these values. `export` only updates the `doorsrc` shell and its children.
+Use `doorsctl env set <name> <value>` in `doorsrc` to update the compositor's environment. Applications launched later by Doors, including hotkey commands, inherit these values.
 
 The **doorshkrc** is a config file for your hotkeys, and is reloaded on every save. It uses a config format similar to [sxhkd](https://github.com/baskerville/sxhkd) and can execute compositor binds by calling the `doorsctl` command.
+
+### Packages
+
+If you would like to install as a package, an arch PKGBUILD for the git version is available under the [arch](arch) directory, which is maintained by me.
+
+There is also a nix flake maintained by [anispwn](https://github.com/anispwyn).

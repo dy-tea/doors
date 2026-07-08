@@ -186,36 +186,30 @@ static bool ensure_sized_buf(struct wlr_buffer **buf_out, uint64_t native[2],
   if (*buf_out && *w_stored == w && *h_stored == h)
     return native[0] != 0;
 
-  if (*buf_out) {
-    wlr_buffer_unlock(*buf_out);
-    *buf_out = NULL;
-    native[0] = native[1] = 0;
-  }
+  if (*buf_out)
+    effects_destroy_buffer(buf_out, native);
 
   return ensure_output_buf(buf_out, native, w, h);
 }
 
 bool effects_init(void) {
   effects_state = (effects_state_t){0};
-  char *renderer_name;
+  char *renderer_name = NULL;
 
   // renderer selector
-  bool renderer_found = false;
 #ifdef WLR_HAS_GLES2_RENDERER
   if (wlr_renderer_is_gles2(server.renderer)) {
     effects_state.backend = &gles2_backend;
     renderer_name = "gles2";
-    renderer_found = true;
   }
 #endif
 #ifdef WLR_HAS_VULKAN_RENDERER
-  if (!renderer_found && wlr_renderer_is_vk(server.renderer)) {
+  if (renderer_name == NULL && wlr_renderer_is_vk(server.renderer)) {
     effects_state.backend = &vk_backend;
     renderer_name = "vk";
-    renderer_found = true;
   }
 #endif
-  if (!renderer_found) {
+  if (renderer_name == NULL) {
     if (wlr_renderer_is_pixman(server.renderer)) {
       wlr_log(WLR_INFO, "effects: pixman renderer detected - blur disabled");
       return false;
@@ -290,16 +284,8 @@ void effects_output_fini(effects_output_t *ctx) {
   if (!ctx) return;
   if (effects_state.available)
     effects_state.backend->output_fini(&ctx->be_state);
-  if (ctx->mica_buf) {
-    wlr_buffer_unlock(ctx->mica_buf);
-    ctx->mica_buf = NULL;
-    ctx->mica_native[0] = ctx->mica_native[1] = 0;
-  }
-  if (ctx->screen_shader_buf) {
-    wlr_buffer_unlock(ctx->screen_shader_buf);
-    ctx->screen_shader_buf = NULL;
-    ctx->screen_shader_native[0] = ctx->screen_shader_native[1] = 0;
-  }
+  effects_destroy_buffer(&ctx->mica_buf, ctx->mica_native);
+  effects_destroy_buffer(&ctx->screen_shader_buf, ctx->screen_shader_native);
   if (ctx->screen_shader_node) {
     wlr_scene_node_destroy(&ctx->screen_shader_node->node);
     ctx->screen_shader_node = NULL;
@@ -326,45 +312,21 @@ void effects_output_resize(effects_output_t *ctx, int width, int height,
   ctx->blur_h = new_bh;
   wlr_output_state_set_custom_mode(&ctx->capture_state, width, height, 0);
 
-  if (ctx->mica_buf) {
-    wlr_buffer_unlock(ctx->mica_buf);
-    ctx->mica_buf = NULL;
-    ctx->mica_native[0] = ctx->mica_native[1] = 0;
-  }
-  if (ctx->screen_shader_buf) {
-    wlr_buffer_unlock(ctx->screen_shader_buf);
-    ctx->screen_shader_buf = NULL;
-    ctx->screen_shader_native[0] = ctx->screen_shader_native[1] = 0;
-  }
+  effects_destroy_buffer(&ctx->mica_buf, ctx->mica_native);
+  effects_destroy_buffer(&ctx->screen_shader_buf, ctx->screen_shader_native);
 
   // free per-toplevel blur/acrylic buffers since output dimensions changed
   toplevel_t *tl;
   wl_list_for_each(tl, &server.toplevels, link) {
     if (tl->blur) {
-      if (tl->blur->blur_buf) {
-        wlr_buffer_unlock(tl->blur->blur_buf);
-        tl->blur->blur_buf = NULL;
-        tl->blur->blur_native[0] = tl->blur->blur_native[1] = 0;
-      }
-      if (tl->blur->acrylic_buf) {
-        wlr_buffer_unlock(tl->blur->acrylic_buf);
-        tl->blur->acrylic_buf = NULL;
-        tl->blur->acrylic_native[0] = tl->blur->acrylic_native[1] = 0;
-      }
+      effects_destroy_buffer(&tl->blur->blur_buf, tl->blur->blur_native);
+      effects_destroy_buffer(&tl->blur->acrylic_buf, tl->blur->acrylic_native);
     }
     if (tl->rounded) {
-      if (tl->rounded->corner_mask_buf) {
-        wlr_buffer_unlock(tl->rounded->corner_mask_buf);
-        tl->rounded->corner_mask_buf = NULL;
-        tl->rounded->corner_mask_native[0] = tl->rounded->corner_mask_native[1] = 0;
-      }
-      if (tl->rounded->border_shader_buf) {
-        wlr_buffer_unlock(tl->rounded->border_shader_buf);
-        tl->rounded->border_shader_buf = NULL;
-        tl->rounded->border_shader_native[0] = tl->rounded->border_shader_native[1] = 0;
-        tl->rounded->border_shader_buf_w = 0;
-        tl->rounded->border_shader_buf_h = 0;
-      }
+      effects_destroy_buffer(&tl->rounded->corner_mask_buf, tl->rounded->corner_mask_native);
+      effects_destroy_buffer(&tl->rounded->border_shader_buf, tl->rounded->border_shader_native);
+      tl->rounded->border_shader_buf_w = 0;
+      tl->rounded->border_shader_buf_h = 0;
       tl->rounded->border_dirty = true;
       tl->rounded->corner_mask_dirty = true;
     }
@@ -374,13 +336,8 @@ void effects_output_resize(effects_output_t *ctx, int width, int height,
   if (output) {
     for (int i = 0; i < 4; i++) {
       layer_surface_t *ls;
-      wl_list_for_each(ls, &output->layers[i], link) {
-        if (ls->blur_buf) {
-          wlr_buffer_unlock(ls->blur_buf);
-          ls->blur_buf = NULL;
-          ls->blur_native[0] = ls->blur_native[1] = 0;
-        }
-      }
+      wl_list_for_each(ls, &output->layers[i], link)
+        effects_destroy_buffer(&ls->blur_buf, ls->blur_native);
     }
   }
 
@@ -690,8 +647,8 @@ static bool rebuild_live_blur(output_t *output,
     if (c && c->border_radius > 0.0f && c->state != STATE_FULLSCREEN) {
       struct wlr_box content_r = get_client_rect(tl);
       float ow = (float)w, oh = (float)h;
-      float win_u  = (float)(content_r.x - output->lx) / ow;
-      float win_v  = 1.0f - (float)(content_r.y - output->ly + content_r.height) / oh;
+      float win_u = (float)(content_r.x - output->lx) / ow;
+      float win_v = (float)(content_r.y - output->ly) / oh;
       float win_sw = (float)content_r.width  / ow;
       float win_sh = (float)content_r.height / oh;
       int bw_i = (c->state == STATE_FULLSCREEN) ? 0 : border_width;
@@ -993,8 +950,8 @@ static bool rebuild_live_acrylic(output_t *output,
     if (c && c->border_radius > 0.0f && c->state != STATE_FULLSCREEN) {
       struct wlr_box content_r = get_client_rect(tl);
       float ow = (float)w, oh = (float)h;
-      float win_u = (float)(content_r.x - output->lx) / ow;
-      float win_v = (float)(content_r.y - output->ly) / oh;
+	  float win_u = (float)(content_r.x - output->lx) / ow;
+	  float win_v = (float)(content_r.y - output->ly) / oh;
       float win_sw = (float)content_r.width  / ow;
       float win_sh = (float)content_r.height / oh;
       int bw_i = (c->state == STATE_FULLSCREEN) ? 0 : border_width;
@@ -1549,17 +1506,11 @@ void effects_evict_buffers(void) {
       if (tl->blur->mica_node && !mica_enabled)
         wlr_scene_buffer_set_buffer(tl->blur->mica_node, NULL);
 
-     	// memory eviction
-      if (tl->blur->blur_buf && !visible) {
-        wlr_buffer_unlock(tl->blur->blur_buf);
-        tl->blur->blur_buf = NULL;
-        tl->blur->blur_native[0] = tl->blur->blur_native[1] = 0;
-      }
-      if (tl->blur->acrylic_buf && !visible) {
-        wlr_buffer_unlock(tl->blur->acrylic_buf);
-        tl->blur->acrylic_buf = NULL;
-        tl->blur->acrylic_native[0] = tl->blur->acrylic_native[1] = 0;
-      }
+      // memory eviction
+      if (tl->blur->blur_buf && !visible)
+        effects_destroy_buffer(&tl->blur->blur_buf, tl->blur->blur_native);
+      if (tl->blur->acrylic_buf && !visible)
+        effects_destroy_buffer(&tl->blur->acrylic_buf, tl->blur->acrylic_native);
     }
 
     // only evict from hidden toplevels
@@ -1567,16 +1518,12 @@ void effects_evict_buffers(void) {
       if (tl->rounded->corner_mask_buf && !visible) {
         if (tl->rounded->corner_mask_node)
           wlr_scene_buffer_set_buffer(tl->rounded->corner_mask_node, NULL);
-        wlr_buffer_unlock(tl->rounded->corner_mask_buf);
-        tl->rounded->corner_mask_buf = NULL;
-        tl->rounded->corner_mask_native[0] = tl->rounded->corner_mask_native[1] = 0;
+        effects_destroy_buffer(&tl->rounded->corner_mask_buf, tl->rounded->corner_mask_native);
       }
       if (tl->rounded->border_shader_buf && !visible) {
         if (tl->rounded->border_shader_node)
           wlr_scene_buffer_set_buffer(tl->rounded->border_shader_node, NULL);
-        wlr_buffer_unlock(tl->rounded->border_shader_buf);
-        tl->rounded->border_shader_buf = NULL;
-        tl->rounded->border_shader_native[0] = tl->rounded->border_shader_native[1] = 0;
+        effects_destroy_buffer(&tl->rounded->border_shader_buf, tl->rounded->border_shader_native);
         tl->rounded->border_shader_buf_w = 0;
         tl->rounded->border_shader_buf_h = 0;
       }

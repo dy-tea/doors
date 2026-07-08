@@ -923,11 +923,8 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
       toplevel->blur->blur_node = NULL;
     }
 
-    if (toplevel->blur->blur_buf) {
-      wlr_buffer_unlock(toplevel->blur->blur_buf);
-      toplevel->blur->blur_buf = NULL;
-      toplevel->blur->blur_native[0] = toplevel->blur->blur_native[1] = 0;
-    }
+    if (toplevel->blur->blur_buf)
+      effects_destroy_buffer(&toplevel->blur->blur_buf, toplevel->blur->blur_native);
 
     if (toplevel->blur->mica_node) {
       wlr_scene_node_destroy(&toplevel->blur->mica_node->node);
@@ -939,11 +936,8 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
       toplevel->blur->acrylic_node = NULL;
     }
 
-    if (toplevel->blur->acrylic_buf) {
-      wlr_buffer_unlock(toplevel->blur->acrylic_buf);
-      toplevel->blur->acrylic_buf = NULL;
-      toplevel->blur->acrylic_native[0] = toplevel->blur->acrylic_native[1] = 0;
-    }
+    if (toplevel->blur->acrylic_buf)
+      effects_destroy_buffer(&toplevel->blur->acrylic_buf, toplevel->blur->acrylic_native);
 
     free(toplevel->blur);
     toplevel->blur = NULL;
@@ -953,9 +947,7 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
     // border_shader_node lives inside border_tree which destroy_borders will free,
     // but we still need to release the backing buffer
     if (toplevel->rounded->border_shader_buf) {
-      wlr_buffer_unlock(toplevel->rounded->border_shader_buf);
-      toplevel->rounded->border_shader_buf = NULL;
-      toplevel->rounded->border_shader_native[0] = toplevel->rounded->border_shader_native[1] = 0;
+      effects_destroy_buffer(&toplevel->rounded->border_shader_buf, toplevel->rounded->border_shader_native);
       toplevel->rounded->border_shader_buf_w = 0;
       toplevel->rounded->border_shader_buf_h = 0;
     }
@@ -967,9 +959,7 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
     }
 
     if (toplevel->rounded->corner_mask_buf) {
-      wlr_buffer_unlock(toplevel->rounded->corner_mask_buf);
-      toplevel->rounded->corner_mask_buf = NULL;
-      toplevel->rounded->corner_mask_native[0] = toplevel->rounded->corner_mask_native[1] = 0;
+      effects_destroy_buffer(&toplevel->rounded->corner_mask_buf, toplevel->rounded->corner_mask_native);
     }
 
     free(toplevel->rounded);
@@ -982,9 +972,7 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
       toplevel->shadow->shadow_node = NULL;
     }
     if (toplevel->shadow->shadow_buf) {
-      wlr_buffer_unlock(toplevel->shadow->shadow_buf);
-      toplevel->shadow->shadow_buf = NULL;
-      toplevel->shadow->shadow_native[0] = toplevel->shadow->shadow_native[1] = 0;
+      effects_destroy_buffer(&toplevel->shadow->shadow_buf, toplevel->shadow->shadow_native);
     }
     free(toplevel->shadow);
     toplevel->shadow = NULL;

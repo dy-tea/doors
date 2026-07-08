@@ -3,8 +3,7 @@
 #include <pixman.h>
 #include <stdbool.h>
 #include <stdint.h>
-
-struct wlr_buffer;
+#include <wlr/types/wlr_buffer.h>
 struct wlr_renderer;
 struct wlr_allocator;
 struct wlr_scene;
@@ -173,3 +172,12 @@ typedef struct effects_backend_t {
 } effects_backend_t;
 
 extern const effects_backend_t *effects_backend;
+
+static inline void effects_destroy_buffer(struct wlr_buffer **buf, uint64_t *native) {
+  if (!*buf) return;
+  if (effects_backend && native)
+    effects_backend->destroy_buffer(*buf, native);
+  else
+    wlr_buffer_unlock(*buf);
+  *buf = NULL;
+}

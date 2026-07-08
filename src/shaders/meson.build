@@ -45,7 +45,28 @@ foreach shader : gles_shaders
 endforeach
 
 # Vulkan
-vk_shaders = []
+vk_shaders = [
+	'effect_tex.vert',
+
+	'blit.frag',
+
+	# Border
+	'border.frag',
+	'border_corner_mask.frag',
+
+	# Window blur
+	'blur_kawase.frag',
+	'blur_box_h.frag',
+	'blur_box_v.frag',
+	'blur_gauss_h.frag',
+	'blur_gauss_v.frag',
+	'blur_mica.frag',
+	'blur_acrylic.frag',
+	'blur_refraction.frag',
+
+	# Shadows
+	'shadow.frag',
+]
 
 foreach shader : vk_shaders
 	output = 'vk_' + shader.underscorify() + '_src.h'

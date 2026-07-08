@@ -1,4 +1,5 @@
 #include "surface.h"
+#include "effects_backend.h"
 #include "output.h"
 #include "server.h"
 #include "toplevel.h"
@@ -75,12 +76,8 @@ void surface_set_effect(struct wlr_scene_tree *scene_tree, node_t *node,
       wlr_scene_node_destroy(&(*f.node)->node);
       *f.node = NULL;
     }
-    if (f.buf && *f.buf) {
-      wlr_buffer_unlock(*f.buf);
-      *f.buf = NULL;
-    }
-    if (f.native)
-      f.native[0] = f.native[1] = 0;
+    if (f.buf && *f.buf)
+      effects_destroy_buffer(f.buf, f.native);
   }
 }
 
@@ -123,9 +120,7 @@ void surface_set_border_radius(struct wlr_scene_tree *scene_tree,
       (*rounded)->corner_mask_node = NULL;
 
       if ((*rounded)->corner_mask_buf) {
-        wlr_buffer_unlock((*rounded)->corner_mask_buf);
-        (*rounded)->corner_mask_buf = NULL;
-        (*rounded)->corner_mask_native[0] = (*rounded)->corner_mask_native[1] = 0;
+        effects_destroy_buffer(&(*rounded)->corner_mask_buf, (*rounded)->corner_mask_native);
       }
     }
 
@@ -136,9 +131,7 @@ void surface_set_border_radius(struct wlr_scene_tree *scene_tree,
         (*rounded)->border_shader_node = NULL;
 
         if ((*rounded)->border_shader_buf) {
-          wlr_buffer_unlock((*rounded)->border_shader_buf);
-          (*rounded)->border_shader_buf = NULL;
-          (*rounded)->border_shader_native[0] = (*rounded)->border_shader_native[1] = 0;
+          effects_destroy_buffer(&(*rounded)->border_shader_buf, (*rounded)->border_shader_native);
           (*rounded)->border_shader_buf_w = 0;
           (*rounded)->border_shader_buf_h = 0;
         }
@@ -171,9 +164,7 @@ void surface_set_shadow(struct wlr_scene_tree *scene_tree, node_t *node,
       (*shadow)->shadow_node = NULL;
     }
     if ((*shadow)->shadow_buf) {
-      wlr_buffer_unlock((*shadow)->shadow_buf);
-      (*shadow)->shadow_buf = NULL;
-      (*shadow)->shadow_native[0] = (*shadow)->shadow_native[1] = 0;
+      effects_destroy_buffer(&(*shadow)->shadow_buf, (*shadow)->shadow_native);
     }
     (*shadow)->shadow_dirty = false;
   }

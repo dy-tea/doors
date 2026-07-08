@@ -54,9 +54,7 @@ void layer_surface_set_blur(layer_surface_t *ls, bool enabled) {
     ls->blur_region_width = 0;
     ls->blur_region_height = 0;
     if (ls->blur_buf) {
-      wlr_buffer_unlock(ls->blur_buf);
-      ls->blur_buf = NULL;
-      ls->blur_native[0] = ls->blur_native[1] = 0;
+      effects_destroy_buffer(&ls->blur_buf, ls->blur_native);
     }
   }
 }
@@ -104,10 +102,8 @@ static void layer_surface_destroy(struct wl_listener *listener, void *data) {
 
   pixman_region32_fini(&layer->blur_region);
 
-  if (layer->blur_buf) {
-    wlr_buffer_unlock(layer->blur_buf);
-    layer->blur_buf = NULL;
-  }
+  if (layer->blur_buf)
+    effects_destroy_buffer(&layer->blur_buf, layer->blur_native);
 
   arrange_layers(layer->output);
   free(layer);
