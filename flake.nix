@@ -31,6 +31,8 @@
         cairo
         pango.dev
         wayland-scanner
+        vulkan-loader
+        shaderc.dev
         # include <drm_fourcc.h>
         libdrm.dev
       ];
