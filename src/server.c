@@ -38,6 +38,7 @@
 #include <wlr/util/box.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_drm.h>
+#include <wlr/types/wlr_drm_lease_v1.h>
 #include <wlr/types/wlr_data_device.h>
 #include <wlr/types/wlr_linux_dmabuf_v1.h>
 #include <wlr/types/wlr_export_dmabuf_v1.h>
@@ -95,7 +96,7 @@ void handle_output_power_set_mode(struct wl_listener *listener, void *data);
 void handle_output_manager_apply(struct wl_listener *listener, void *data);
 void handle_output_manager_test(struct wl_listener *listener, void *data);
 
-void handle_drm_lease_request(struct wl_listener *listener, void *data);
+static void handle_drm_lease_request(struct wl_listener *listener, void *data);
 static void handle_ring_system_bell(struct wl_listener *listener, void *data);
 void xdg_toplevel_tag_manager_v1_handle_set_tag(struct wl_listener *listener, void *data);
 void xdg_dialog_handle_new(struct wl_listener *listener, void *data);
@@ -514,10 +515,10 @@ void server_init(void) {
 
   // drm lease
 #if WLR_HAS_DRM_BACKEND
-	server.drm_lease_manager = wlr_drm_lease_manager_create(server.wl_display, server.backend);
+	server.drm_lease_manager = wlr_drm_lease_v1_manager_create(server.wl_display, server.backend);
 	if (server.drm_lease_manager) {
-		server.new_drm_lease.notify = handle_new_drm_lease;
-		wl_signal_add(&server.drm_lease_manager->events.new_lease, &server.new_drm_lease);
+		server.drm_lease_request.notify = handle_drm_lease_request;
+		wl_signal_add(&server.drm_lease_manager->events.request, &server.drm_lease_request);
 	} else {
 		wlr_log(WLR_ERROR, "failed to create drm lease manager");
 	}
@@ -958,8 +959,7 @@ void server_fini(void) {
   wl_list_remove(&server.xdg_dialog_new_dialog.link);
 
 #ifdef WLR_HAS_DRM_BACKEND
-	if (server.drm_lease_manager)
-		wl_list_remove(&server.drm_lease_request.link);
+	if (server.drm_lease_manager) wl_list_remove(&server.drm_lease_request.link);
 #endif
 
   wlr_backend_destroy(server.backend);
@@ -980,6 +980,7 @@ void server_fini(void) {
 
   wl_display_destroy(server.wl_display);
 }
+
 static int handle_system_bell_timer(void *data) {
 	(void)data;
 	server.system_bell_timer = NULL;
@@ -1001,6 +1002,7 @@ static void handle_ring_system_bell(struct wl_listener *listener, void *data) {
 
 #if WLR_HAS_DRM_BACKEND
 static void handle_drm_lease_request(struct wl_listener *listener, void *data) {
+	(void)listener;
 	struct wlr_drm_lease_request_v1 *req = data;
 	struct wlr_drm_lease_v1 *lease = wlr_drm_lease_request_v1_grant(req);
 	if (!lease) {

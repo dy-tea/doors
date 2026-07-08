@@ -9,17 +9,18 @@
 #include "xwayland.h"
 #include <wayland-protocols/color-management-v1-enum.h>
 #include <wayland-server.h>
-#include <wlr/types/wlr_ext_background_effect_v1.h>
-#include <wlr/types/wlr_content_type_v1.h>
+#include <wlr/config.h>
 #include <wlr/util/edges.h>
+#include <wlr/types/wlr_content_type_v1.h>
+#include <wlr/types/wlr_ext_background_effect_v1.h>
 #include <wlr/types/wlr_ext_workspace_v1.h>
+#include <wlr/types/wlr_keyboard_shortcuts_inhibit_v1.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_output_power_management_v1.h>
 #include <wlr/types/wlr_output_management_v1.h>
 #include <wlr/types/wlr_pointer_gestures_v1.h>
-#include <wlr/types/wlr_keyboard_shortcuts_inhibit_v1.h>
-#include <wlr/types/wlr_tearing_control_v1.h>
 #include <wlr/types/wlr_security_context_v1.h>
+#include <wlr/types/wlr_tearing_control_v1.h>
 #include <wlr/types/wlr_tablet_v2.h>
 #include <wlr/types/wlr_xdg_activation_v1.h>
 #include <xkbcommon/xkbcommon.h>
@@ -174,8 +175,8 @@ typedef struct server_t {
   struct wlr_ext_foreign_toplevel_image_capture_source_manager_v1 *foreign_toplevel_image_capture_source_manager;
   struct wl_listener new_toplevel_capture_request;
 
-  struct wlr_drm_lease_manager *drm_lease_manager;
-  struct wl_listener new_drm_lease;
+  struct wlr_drm_lease_v1_manager *drm_lease_manager;
+  struct wl_listener drm_lease_request;
 
   // input method support
   struct wlr_input_method_manager_v2 *input_method_manager;
