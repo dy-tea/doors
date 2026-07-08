@@ -215,6 +215,7 @@ extern bool pointer_follows_focus;
 extern bool record_history;
 extern bool click_to_focus;
 extern bool allow_tearing;
+extern bool auto_float_dialogs;
 extern decoration_mode_t decoration_mode;
 extern bool enable_animations;
 extern workspace_anim_direction_t workspace_anim_direction;

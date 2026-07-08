@@ -257,6 +257,12 @@ Can be overridden per-window via window rules (see below).
 Per-output tearing is configured separately via `doorsctl output <name> tearing on|off`. Default: false.
 
 ```
+doorsctl config auto_float_dialogs true|false
+```
+
+When true, windows that advertise themselves as dialogs via the `xdg-dialog-v1` protocol are automatically floated when they open. This applies to both modal and non-modal dialogs. Window rules with an explicit `state` still take priority. Default: false.
+
+```
 doorsctl config minimize_to_scratchpad true|false
 ```
 

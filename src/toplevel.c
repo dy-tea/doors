@@ -388,6 +388,15 @@ void xdg_toplevel_tag_manager_v1_handle_set_tag(struct wl_listener *listener, vo
   transaction_commit_dirty();
 }
 
+void xdg_dialog_handle_new(struct wl_listener *listener, void *data) {
+  (void)listener;
+  struct wlr_xdg_dialog_v1 *dialog = data;
+  toplevel_t *toplevel = dialog->xdg_toplevel->base->data;
+  if (!toplevel) return;
+
+  toplevel->is_dialog = true;
+}
+
 void toplevel_map(struct wl_listener *listener, void *data) {
 	(void)data;
   toplevel_t *toplevel = wl_container_of(listener, toplevel, map);
@@ -588,6 +597,23 @@ void toplevel_map(struct wl_listener *listener, void *data) {
       .height = base_rect.height
     };
     n->client->state = STATE_PSEUDO_TILED;
+  } else if (auto_float_dialogs && toplevel->is_dialog) {
+    wlr_scene_node_reparent(&toplevel->scene_tree->node, server.float_tree);
+    struct wlr_box mon_rect = target_output->rectangle;
+    struct wlr_box base_rect = n->client->toplevel->xdg_toplevel->base->geometry;
+    n->client->floating_rectangle = (struct wlr_box){
+      .x = mon_rect.x + (mon_rect.width - base_rect.width) / 2,
+      .y = mon_rect.y + (mon_rect.height - base_rect.height) / 2,
+      .width = base_rect.width,
+      .height = base_rect.height
+    };
+    wlr_scene_node_set_position(&toplevel->scene_tree->node,
+      n->client->floating_rectangle.x, n->client->floating_rectangle.y);
+    n->client->last_state = STATE_TILED;
+    n->client->state = STATE_FLOATING;
+    n->hidden = true;
+    n->client->shown = true;
+    wlr_scene_node_set_enabled(&toplevel->scene_tree->node, true);
   }
 
   // notify wlr_foreign_toplevel clients about the output association

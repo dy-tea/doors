@@ -35,6 +35,7 @@ bool pointer_follows_focus = false;
 bool record_history = true;
 bool click_to_focus = false;
 bool allow_tearing = false;
+bool auto_float_dialogs = false;
 decoration_mode_t decoration_mode = DECORATION_ALWAYS;
 bool enable_animations = false;
 workspace_anim_direction_t workspace_anim_direction = WORKSPACE_ANIM_VERTICAL;

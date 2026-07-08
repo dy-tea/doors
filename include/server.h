@@ -227,6 +227,9 @@ typedef struct server_t {
 
   // xdg toplevel tag
   struct wl_listener xdg_toplevel_tag_manager_v1_set_tag;
+
+  // xdg dialog
+  struct wl_listener xdg_dialog_new_dialog;
 } server_t;
 
 extern struct server_t server;

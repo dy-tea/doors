@@ -98,6 +98,7 @@ void handle_output_manager_test(struct wl_listener *listener, void *data);
 void handle_drm_lease_request(struct wl_listener *listener, void *data);
 static void handle_ring_system_bell(struct wl_listener *listener, void *data);
 void xdg_toplevel_tag_manager_v1_handle_set_tag(struct wl_listener *listener, void *data);
+void xdg_dialog_handle_new(struct wl_listener *listener, void *data);
 
 static bool is_privileged(const struct wl_global *global) {
 	return
@@ -279,6 +280,15 @@ void server_init(void) {
   }
   server.xdg_toplevel_tag_manager_v1_set_tag.notify = xdg_toplevel_tag_manager_v1_handle_set_tag;
   wl_signal_add(&xdg_toplevel_tag_manager_v1->events.set_tag, &server.xdg_toplevel_tag_manager_v1_set_tag);
+
+  // xdg dialog
+  struct wlr_xdg_wm_dialog_v1 *xdg_wm_dialog = wlr_xdg_wm_dialog_v1_create(server.wl_display, 1);
+  if (!xdg_wm_dialog) {
+    wlr_log(WLR_ERROR, "Failed to create xdg wm dialog");
+    exit(EXIT_FAILURE);
+  }
+  server.xdg_dialog_new_dialog.notify = xdg_dialog_handle_new;
+  wl_signal_add(&xdg_wm_dialog->events.new_dialog, &server.xdg_dialog_new_dialog);
 
   // xdg decoration
   server.xdg_decoration_manager = wlr_xdg_decoration_manager_v1_create(server.wl_display, 2);
@@ -945,6 +955,7 @@ void server_fini(void) {
   wl_list_remove(&server.ring_system_bell.link);
 
   wl_list_remove(&server.xdg_toplevel_tag_manager_v1_set_tag.link);
+  wl_list_remove(&server.xdg_dialog_new_dialog.link);
 
 #ifdef WLR_HAS_DRM_BACKEND
 	if (server.drm_lease_manager)

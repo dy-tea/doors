@@ -7,6 +7,7 @@
 #include <wlr/types/wlr_ext_foreign_toplevel_list_v1.h>
 #include <wlr/types/wlr_foreign_toplevel_management_v1.h>
 #include <wlr/types/wlr_tearing_control_v1.h>
+#include <wlr/types/wlr_xdg_dialog_v1.h>
 
 
 typedef struct toplevel_t {
@@ -26,6 +27,7 @@ typedef struct toplevel_t {
 
   char *foreign_identifier;
   char *tag;
+  bool is_dialog;
 
   struct wlr_ext_image_capture_source_v1 *image_capture_source;
   struct wlr_scene_surface *image_capture_surface;

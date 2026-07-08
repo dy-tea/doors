@@ -486,6 +486,8 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
     ipc_handle_bool(args, num, client_fd, &record_history, IPC_FLAG_NONE);
   } else if (streq("allow_tearing", *args)) {
     ipc_handle_bool(args, num, client_fd, &allow_tearing, IPC_FLAG_COMMIT);
+  } else if (streq("auto_float_dialogs", *args)) {
+    ipc_handle_bool(args, num, client_fd, &auto_float_dialogs, IPC_FLAG_NONE);
   } else if (streq("blur_enabled", *args)) {
     ipc_handle_bool(args, num, client_fd, &blur_enabled, IPC_FLAG_NONE);
   } else if (streq("blur_algorithm", *args)) {
