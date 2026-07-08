@@ -331,7 +331,7 @@ static void vk_destroy_fbo(struct vk_fbo *fbo) {
 }
 
 static void vk_draw_full(VkPipeline pipe, VkImage src_img, VkFramebuffer dst_fb, int w, int h,
-		const void *pc_data, size_t pc_size) {
+		const void *pc_data, size_t pc_size, const VkRect2D *scissor, uint32_t n_scissor) {
   VkCommandBufferBeginInfo bi = {
     .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
     .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
@@ -389,17 +389,24 @@ static void vk_draw_full(VkPipeline pipe, VkImage src_img, VkFramebuffer dst_fb,
     .clearValueCount = 1, .pClearValues = &(VkClearValue){{{0,0,0,0}}},
   };
   VkViewport vp = {0, (float)h, (float)w, -(float)h, 0, 1};
-  VkRect2D sc = {{0, 0}, {w, h}};
+  VkRect2D full_sc = {{0, 0}, {(uint32_t)w, (uint32_t)h}};
   vkCmdBeginRenderPass(vk->frame_cb, &rp, VK_SUBPASS_CONTENTS_INLINE);
   vkCmdSetViewport(vk->frame_cb, 0, 1, &vp);
-  vkCmdSetScissor(vk->frame_cb, 0, 1, &sc);
   vkCmdBindDescriptorSets(vk->frame_cb, VK_PIPELINE_BIND_POINT_GRAPHICS,
     vk->pipe_layout, 0, 1, &ds, 0, NULL);
   if (pc_data && pc_size)
     vkCmdPushConstants(vk->frame_cb, vk->pipe_layout,
       VK_SHADER_STAGE_FRAGMENT_BIT, 0, pc_size, pc_data);
   vkCmdBindPipeline(vk->frame_cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
-  vkCmdDraw(vk->frame_cb, 4, 1, 0, 0);
+  if (scissor && n_scissor > 0) {
+    for (uint32_t i = 0; i < n_scissor; i++) {
+      vkCmdSetScissor(vk->frame_cb, 0, 1, &scissor[i]);
+      vkCmdDraw(vk->frame_cb, 4, 1, 0, 0);
+    }
+  } else {
+    vkCmdSetScissor(vk->frame_cb, 0, 1, &full_sc);
+    vkCmdDraw(vk->frame_cb, 4, 1, 0, 0);
+  }
   vkCmdEndRenderPass(vk->frame_cb);
 
   vkDestroyImageView(vk->device, tmp_view, NULL);
@@ -537,7 +544,7 @@ static void vk_draw_full_no_tex(VkPipeline pipe, VkFramebuffer dst_fb,
 }
 
 static void vk_blit_to_fb(VkImage src_img, VkFramebuffer dst_fb, int w, int h) {
-  vk_draw_full(vk->pipe_blit, src_img, dst_fb, w, h, NULL, 0);
+  vk_draw_full(vk->pipe_blit, src_img, dst_fb, w, h, NULL, 0, NULL, 0);
 }
 
 static struct vk_fbo *vk_fbo_of(uint64_t h) { return (struct vk_fbo *)(intptr_t)h; }
@@ -1069,10 +1076,24 @@ static void vk_frame_end(void) {}
 
 static bool vk_blit(uint64_t src_tex, uint64_t dst_fbo, int w, int h,
   const pixman_box32_t *scissor, int n_scissor) {
-  (void)scissor; (void)n_scissor;
   struct vk_fbo *dst = vk_fbo_of(dst_fbo);
   if (!dst) return false;
-  vk_draw_full(vk->pipe_blit, vk_img_of(src_tex), dst->fb, w, h, NULL, 0);
+
+  if (scissor && n_scissor > 0) {
+    VkRect2D rects[n_scissor];
+    for (int i = 0; i < n_scissor; i++) {
+      rects[i].offset = (VkOffset2D){ scissor[i].x1, scissor[i].y1 };
+      rects[i].extent = (VkExtent2D){
+        (uint32_t)(scissor[i].x2 - scissor[i].x1),
+        (uint32_t)(scissor[i].y2 - scissor[i].y1),
+      };
+    }
+    vk_draw_full(vk->pipe_blit, vk_img_of(src_tex), dst->fb, w, h,
+      NULL, 0, rects, (uint32_t)n_scissor);
+  } else {
+    vk_draw_full(vk->pipe_blit, vk_img_of(src_tex), dst->fb, w, h,
+      NULL, 0, NULL, 0);
+  }
   return true;
 }
 
@@ -1099,8 +1120,8 @@ static bool vk_blur(be_output_state_t *state, uint64_t src_handle,
       pc.gauss.vd = p->vibrancy_darkness;
       pc.gauss.br = p->brightness;
       pc.gauss.cont = p->contrast;
-      vk_draw_full(vk->pipe_gauss_h, current, fbo0->fb, src_w, src_h, &pc, 128);
-      vk_draw_full(vk->pipe_gauss_v, tex0, fbo1->fb, src_w, src_h, &pc, 128);
+      vk_draw_full(vk->pipe_gauss_h, current, fbo0->fb, src_w, src_h, &pc, 128, NULL, 0);
+      vk_draw_full(vk->pipe_gauss_v, tex0, fbo1->fb, src_w, src_h, &pc, 128, NULL, 0);
       current = tex1;
     } else if (p->algorithm == BLUR_ALGORITHM_BOX) {
       union vk_push_data pc = {{{0}}};
@@ -1112,8 +1133,8 @@ static bool vk_blur(be_output_state_t *state, uint64_t src_handle,
       pc.gauss.vd = p->vibrancy_darkness;
       pc.gauss.br = p->brightness;
       pc.gauss.cont = p->contrast;
-      vk_draw_full(vk->pipe_box_h, current, fbo0->fb, src_w, src_h, &pc, 128);
-      vk_draw_full(vk->pipe_box_v, tex0, fbo1->fb, src_w, src_h, &pc, 128);
+      vk_draw_full(vk->pipe_box_h, current, fbo0->fb, src_w, src_h, &pc, 128, NULL, 0);
+      vk_draw_full(vk->pipe_box_v, tex0, fbo1->fb, src_w, src_h, &pc, 128, NULL, 0);
       current = tex1;
     } else if (p->algorithm == BLUR_ALGORITHM_REFRACTION || p->algorithm == BLUR_ALGORITHM_LENS_REFRACTION) {
       int mode = (p->algorithm == BLUR_ALGORITHM_LENS_REFRACTION) ? 1 : 0;
@@ -1146,7 +1167,7 @@ static bool vk_blur(be_output_state_t *state, uint64_t src_handle,
       pc.refraction.rf = fringing;
       pc.refraction.rm = p->refraction_texture_repeat_mode;
       pc.refraction.mode = mode;
-      vk_draw_full(vk->pipe_refraction, current, dfbo->fb, src_w, src_h, &pc, 128);
+      vk_draw_full(vk->pipe_refraction, current, dfbo->fb, src_w, src_h, &pc, 128, NULL, 0);
       current = dimg;
     } else {
       struct vk_fbo *dfbo = (i & 1) ? fbo1 : fbo0;
@@ -1160,7 +1181,7 @@ static bool vk_blur(be_output_state_t *state, uint64_t src_handle,
       pc.kawase.vd = p->vibrancy_darkness;
       pc.kawase.br = p->brightness;
       pc.kawase.cont = p->contrast;
-      vk_draw_full(vk->pipe_kawase, current, dfbo->fb, src_w, src_h, &pc, 128);
+      vk_draw_full(vk->pipe_kawase, current, dfbo->fb, src_w, src_h, &pc, 128, NULL, 0);
       current = dimg;
     }
   }
@@ -1177,7 +1198,7 @@ static bool vk_apply_mica_tint(be_output_state_t *state,
   struct { float tint[4]; float strength; } pc;
   memcpy(pc.tint, tint, 16);
   pc.strength = tint_strength;
-  vk_draw_full(vk->pipe_mica, vk_img_of(bg_handle), dst->fb, w, h, &pc, sizeof(pc));
+  vk_draw_full(vk->pipe_mica, vk_img_of(bg_handle), dst->fb, w, h, &pc, sizeof(pc), NULL, 0);
   return true;
 }
 
@@ -1200,7 +1221,7 @@ static bool vk_apply_acrylic(be_output_state_t *state,
       pc.off = p->blur_radius * (float)(i + 1);
       struct vk_fbo *dfbo = (i & 1) ? fbo1 : fbo0;
       VkImage dimg = (i & 1) ? tex1 : tex0;
-      vk_draw_full(vk->pipe_kawase, current, dfbo->fb, blur_w, blur_h, &pc, sizeof(pc));
+      vk_draw_full(vk->pipe_kawase, current, dfbo->fb, blur_w, blur_h, &pc, sizeof(pc), NULL, 0);
       current = dimg;
     }
     blurred = (p->blur_passes & 1) ? tex1 : tex0;
@@ -1212,7 +1233,7 @@ static bool vk_apply_acrylic(be_output_state_t *state,
   memcpy(pc.tint, p->tint, 16); pc.strength = p->tint_strength; pc.noise = p->noise_strength;
   pc.res[0] = p->res_w; pc.res[1] = p->res_h;
   pc.anchor[0] = p->light_anchor_x; pc.anchor[1] = p->light_anchor_y;
-  vk_draw_full(vk->pipe_acrylic, blurred, dst->fb, w, h, &pc, sizeof(pc));
+  vk_draw_full(vk->pipe_acrylic, blurred, dst->fb, w, h, &pc, sizeof(pc), NULL, 0);
   return true;
 }
 
@@ -1282,7 +1303,7 @@ static bool vk_apply_screen_shader(uint64_t src_tex, uint64_t dst_fbo,
   pc.res[0] = (float)w;
   pc.res[1] = (float)h;
   pc.time = p->time;
-  vk_draw_full(vk->screen_shader_pipe, vk_img_of(src_tex), dst->fb, w, h, &pc, sizeof(pc));
+  vk_draw_full(vk->screen_shader_pipe, vk_img_of(src_tex), dst->fb, w, h, &pc, sizeof(pc), NULL, 0);
   return true;
 }
 
