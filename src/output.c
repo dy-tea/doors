@@ -27,6 +27,25 @@
 
 static void handle_output_destroy(struct wl_listener *listener, void *data);
 
+bool output_supports_hdr(output_t *output, const char **unsupported_reason_ptr) {
+  const char *unsupported_reason = NULL;
+  if (!(output->wlr_output->supported_primaries & WLR_COLOR_NAMED_PRIMARIES_BT2020)) {
+    unsupported_reason = "BT2020 primaries not supported by output";
+  } else if (!(output->wlr_output->supported_transfer_functions & WLR_COLOR_TRANSFER_FUNCTION_ST2084_PQ)) {
+    unsupported_reason = "PQ transfer function not supported by output";
+  } else if (!server.renderer->features.output_color_transform) {
+    unsupported_reason = "renderer doesn't support output color transforms";
+  }
+  if (unsupported_reason_ptr != NULL) {
+    *unsupported_reason_ptr = unsupported_reason;
+  }
+  return unsupported_reason == NULL;
+}
+
+static bool output_is_hdr_active(output_t *output) {
+  return output->wlr_output->image_description != NULL;
+}
+
 static enum wlr_scale_filter_mode get_scale_filter(output_t *output, struct wlr_scene_buffer *buffer) {
 	if (buffer->dst_width > 0 && buffer->dst_height > 0 && (
 			buffer->dst_width < buffer->WLR_PRIVATE.buffer_width ||
@@ -244,9 +263,11 @@ static void output_repaint(output_t *output) {
 		}
 	}
 
-	if (!wlr_output_commit_state(output->wlr_output, &pending))
-		wlr_log(WLR_ERROR, "Failed to commit output state");
-	wlr_output_state_finish(&pending);
+  if (!wlr_output_commit_state(output->wlr_output, &pending))
+    wlr_log(WLR_ERROR, "Failed to commit output state");
+  wlr_output_state_finish(&pending);
+
+  output->hdr = output_is_hdr_active(output);
 
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	wlr_scene_output_send_frame_done(scene_output, &now);

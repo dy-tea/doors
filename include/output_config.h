@@ -69,6 +69,7 @@ struct output_config {
   struct wlr_color_transform *color_transform;
   int allow_tearing;
   int max_render_time;
+  bool hdr_enabled;
 };
 
 struct output_config *output_config_create(const char *name);

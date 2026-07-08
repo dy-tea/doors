@@ -44,6 +44,7 @@ struct output_config *output_config_create(const char *name) {
   oc->subpixel = OUTPUT_CONFIG_SUBPIXEL_AUTO;
   oc->allow_tearing = -1;
   oc->max_render_time = -1;
+  oc->hdr_enabled = false;
 
   return oc;
 }
@@ -208,6 +209,24 @@ void output_config_apply(struct output_config *oc) {
     if (oc->render_bit_depth == OUTPUT_CONFIG_RENDER_BIT_DEPTH_10)
       render_format = DRM_FORMAT_XRGB2101010;
     wlr_output_state_set_render_format(&state, render_format);
+  }
+
+  // HDR setup
+  if (oc->hdr_enabled) {
+    bool has_color_profile = oc->color_transform != NULL;
+    if (has_color_profile) {
+      wlr_log(WLR_ERROR, "Cannot enable HDR on output %s: output has a color profile set", oc->name);
+    } else if (output && !output_supports_hdr(output, NULL)) {
+      wlr_log(WLR_ERROR, "Cannot enable HDR on output %s: output does not support HDR", oc->name);
+    } else {
+      const struct wlr_output_image_description image_desc = {
+        .primaries = WLR_COLOR_NAMED_PRIMARIES_BT2020,
+        .transfer_function = WLR_COLOR_TRANSFER_FUNCTION_ST2084_PQ,
+      };
+      wlr_output_state_set_image_description(&state, &image_desc);
+    }
+  } else if (!oc->hdr_enabled) {
+    wlr_output_state_set_image_description(&state, NULL);
   }
 
   wlr_output_commit_state(wlr_output, &state);

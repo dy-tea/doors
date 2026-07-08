@@ -81,6 +81,8 @@ void ipc_cmd_output(char **args, int num, int client_fd) {
         "    \"scale\": %.6g,\n"
         "    \"phys_width\": %d,\n"
         "    \"phys_height\": %d,\n"
+        "    \"hdr\": %s,\n"
+        "    \"allow_tearing\": %s,\n"
         "    \"enabled\": %s\n"
         "  }",
         wo->name ? wo->name : "",
@@ -91,6 +93,8 @@ void ipc_cmd_output(char **args, int num, int client_fd) {
         wo->width, wo->height, wo->refresh / 1000.0f,
         wo->scale,
         wo->phys_width, wo->phys_height,
+        output->hdr ? "true" : "false",
+        output->allow_tearing ? "true" : "false",
         wo->enabled ? "true" : "false");
     }
     offset += snprintf(buf + offset, sizeof(buf) - offset, "\n]\n");
@@ -412,6 +416,25 @@ void ipc_cmd_output(char **args, int num, int client_fd) {
     oc->color_transform = new_transform;
     output_config_apply(oc);
     send_success(client_fd, "output color_profile set\n");
+  } else if (streq("hdr", subcmd)) {
+    if (num < 2) {
+      send_failure(client_fd, "output hdr: missing state (on/off)\n");
+      return;
+    }
+    args++;
+    num--;
+
+    if (streq("on", *args) || streq("enable", *args) || streq("true", *args)) {
+      oc->hdr_enabled = 1;
+    } else if (streq("off", *args) || streq("disable", *args) || streq("false", *args)) {
+      oc->hdr_enabled = 0;
+    } else {
+      send_failure(client_fd, "output hdr: invalid state (on/off)\n");
+      return;
+    }
+
+    output_config_apply(oc);
+    send_success(client_fd, "output hdr set\n");
   } else if (streq("tearing", subcmd)) {
     if (num < 2) {
       send_failure(client_fd, "output tearing: missing state\n");

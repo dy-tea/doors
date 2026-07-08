@@ -766,6 +766,7 @@ doorsctl output <name> adaptive_sync on|off                   # Set adaptive syn
 doorsctl output <name> render_bit_depth 8|10                  # Set bits per pixel to be rendered on output (if supported by renderer)
 doorsctl output <name> color_profile gamma22|srgb             # Set color profile
 doorsctl output <name> color_profile icc /path/to/profile.icc # Set icc color profile
+doorsctl output <name> hdr on|off                             # Enable/disable HDR on output (requires Vulkan renderer, PQ/BT.2020 display support)
 doorsctl output <name> tearing on|off                         # Set output to tear (no buffering)
 doorsctl output <name> max_render_time off|<ms>               # Set output max render time
 doorsctl output <name> focus                                  # Focus output
@@ -787,6 +788,7 @@ doorsctl output <name> reorder-desktops <names...>            # Reorder desktops
 - `refresh` - current refresh rate
 - `scale` - current scale factor
 - `phys_width` / `phys_height` - physical display size in millimeters
+- `hdr` enables High Dynamic Range output on the display. Vulkan renderer and PQ/BT.2020 display support are required.
 - `enabled` - whether the output is currently active
 
 `color_profile` controls the color transform applied to the output:

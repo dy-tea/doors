@@ -535,7 +535,7 @@ void server_init(void) {
 		enum wp_color_manager_v1_primaries *primaries =
 			wlr_color_manager_v1_primaries_list_from_renderer(server.renderer, &primaries_len);
 		struct wlr_color_manager_v1 *cm = wlr_color_manager_v1_create(
-				server.wl_display, 1, &(struct wlr_color_manager_v1_options){
+				server.wl_display, 2, &(struct wlr_color_manager_v1_options){
 			.features = {
 				.parametric = true,
 				.set_mastering_display_primaries = true,
@@ -547,6 +547,8 @@ void server_init(void) {
 			.primaries = primaries,
 			.primaries_len = primaries_len,
 		});
+		free(transfer_functions);
+		free(primaries);
 		wlr_scene_set_color_manager_v1(server.scene, cm);
 	}
 

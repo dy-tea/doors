@@ -50,6 +50,7 @@ typedef struct output_t {
   enum wl_output_subpixel detected_subpixel;
 
   struct wlr_color_transform *color_transform;
+  bool hdr;
   effects_output_t *effects;
 
   char name[64]; // SMALEN
@@ -79,3 +80,4 @@ void output_get_identifier(char *identifier, size_t len, output_t *output);
 void output_update_scale(output_t *output, float scale);
 output_t *output_get_valid(void);
 void output_schedule_frame(output_t *output);
+bool output_supports_hdr(output_t *output, const char **unsupported_reason_ptr);
