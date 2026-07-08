@@ -1119,6 +1119,16 @@ static bool blur_render_shadow(toplevel_t *tl) {
   if (c->state == STATE_FULLSCREEN) return false;
 
   struct wlr_box client_r = get_client_rect(tl);
+  double progress = 1.0;
+  struct wlr_box anim_from, anim_to;
+  if (animation_get_toplevel_resize_progress(tl, &progress, &anim_from, &anim_to)) {
+    client_r.x = (int)(anim_from.x + (anim_to.x - anim_from.x) * progress);
+    client_r.y = (int)(anim_from.y + (anim_to.y - anim_from.y) * progress);
+    client_r.width = (int)(anim_from.width + (anim_to.width - anim_from.width) * progress);
+    client_r.height = (int)(anim_from.height + (anim_to.height - anim_from.height) * progress);
+    if (client_r.width < 1) client_r.width = 1;
+    if (client_r.height < 1) client_r.height = 1;
+  }
   if (client_r.width <= 0 || client_r.height <= 0) return false;
 
   int size = (int)shadow_size;
