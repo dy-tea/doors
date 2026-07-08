@@ -4,6 +4,7 @@
 #include "server.h"
 #include "toplevel.h"
 #include <wlr/types/wlr_pointer.h>
+#include <wlr/types/wlr_touch.h>
 
 struct seat_t;
 
@@ -12,6 +13,15 @@ typedef struct pointer_t {
 	struct wlr_pointer *wlr_pointer;
 	struct wl_list link;
 } pointer_t;
+
+typedef struct touch_t {
+	struct wlr_touch *wlr_touch;
+	struct wl_listener down;
+	struct wl_listener up;
+	struct wl_listener motion;
+	struct wl_listener frame;
+	struct wl_list link;
+} touch_t;
 
 typedef struct cursor_constraint_t {
 	struct wlr_pointer_constraint_v1 *constraint;

@@ -2,7 +2,6 @@
 
 #include "gesture.h"
 #include "input_method.h"
-#include "seat.h"
 #include "launcher.h"
 #include "lock.h"
 #include "toplevel.h"
@@ -121,6 +120,8 @@ typedef struct server_t {
   struct wl_listener new_input;
   struct wl_list keyboards;
   struct wl_list pointers;
+  struct wl_list touches;
+  int num_touches;
   struct wl_list keyboard_groups;
   struct wl_list physical_keyboards;
 

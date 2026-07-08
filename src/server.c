@@ -17,6 +17,7 @@
 #include "scratchpad.h"
 #include "screencopy.h"
 #include "server.h"
+#include "seat.h"
 #include "spring.h"
 #include "toplevel.h"
 #include "transaction.h"
@@ -445,6 +446,7 @@ void server_init(void) {
   wl_list_init(&server.seats);
   wl_list_init(&server.keyboards);
   wl_list_init(&server.pointers);
+  wl_list_init(&server.touches);
   wl_list_init(&server.keyboard_groups);
   wl_list_init(&server.physical_keyboards);
 
