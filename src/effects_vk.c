@@ -1541,7 +1541,10 @@ static bool vk_apply_screen_shader(uint64_t src_tex, uint64_t dst_fbo,
     .commandBufferCount = 1,
   };
   VkCommandBuffer cb;
-  if (vkAllocateCommandBuffers(vk->device, &cai, &cb) != VK_SUCCESS) { vk_destroy_fbo(&tmp); return false; }
+  if (vkAllocateCommandBuffers(vk->device, &cai, &cb) != VK_SUCCESS) {
+  	vk_destroy_fbo(&tmp);
+   return false;
+  }
   VkCommandBufferBeginInfo bi = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
   vkBeginCommandBuffer(cb, &bi);
 
@@ -1553,7 +1556,7 @@ static bool vk_apply_screen_shader(uint64_t src_tex, uint64_t dst_fbo,
 
   VkImageBlit blit = {
   	.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
-   	.srcOffsets = {{0, h, 0}, {w, 0, 1}},
+   	.srcOffsets = {{0, 0, 0}, {w, h, 1}},
     .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
     .dstOffsets = {{0, 0, 0}, {w, h, 1}}
   };
