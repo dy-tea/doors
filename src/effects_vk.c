@@ -1626,7 +1626,8 @@ static bool vk_apply_screen_shader(uint64_t src_tex, uint64_t dst_fbo,
   };
   vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 2, b);
 
-  VkImageBlit blit = {.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, .srcOffsets = {{0, h, 0}, {w, 0, 1}}, .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, .dstOffsets = {{0, 0, 0}, {w, h, 1}}};
+  bool ss_flip = (vk->vendor_id == 0x1002); // AMD needs flip when blitting from viewport-flipped fbo (can we stop now?)
+  VkImageBlit blit = {.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, .srcOffsets = {{0, ss_flip ? h : 0, 0}, {w, ss_flip ? 0 : h, 1}}, .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, .dstOffsets = {{0, 0, 0}, {w, h, 1}}};
   vkCmdBlitImage(cb, tmp.img.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst->img.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
 
   VkImageMemoryBarrier b2[2] = {
