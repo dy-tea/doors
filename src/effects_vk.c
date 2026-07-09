@@ -435,97 +435,6 @@ static void vk_draw_full(VkPipeline pipe, VkImage src_img, VkFramebuffer dst_fb,
   vkQueueWaitIdle(vk->queue);
 }
 
-static void vk_draw_overlay(VkPipeline pipe, VkImage src_img, VkImage dst_img,
-    VkFramebuffer dst_fb, int w, int h, const void *pc_data, size_t pc_size) {
-  VkCommandBufferBeginInfo bi = {
-    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-    .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-  };
-  if (vkBeginCommandBuffer(vk->frame_cb, &bi) != VK_SUCCESS) return;
-
-  VkImageMemoryBarrier barriers[2] = {
-    {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-      .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-      .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .image = src_img,
-      .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-      .srcAccessMask = 0, .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-    },
-    {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-      .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-      .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .image = dst_img,
-      .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-      .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
-      .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-    },
-  };
-  vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 2, barriers);
-
-  VkImageView tmp_view;
-  VkImageViewCreateInfo vci = {
-    .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-    .image = src_img, .viewType = VK_IMAGE_VIEW_TYPE_2D, .format = vk->vk_fmt,
-    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-  };
-  if (vkCreateImageView(vk->device, &vci, NULL, &tmp_view) != VK_SUCCESS) {
-    vkEndCommandBuffer(vk->frame_cb);
-    return;
-  }
-
-  VkDescriptorSetAllocateInfo dsai = {
-    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-    .descriptorPool = vk->desc_pool, .descriptorSetCount = 1,
-    .pSetLayouts = &vk->ds_layout,
-  };
-  VkDescriptorSet ds;
-  vkResetDescriptorPool(vk->device, vk->desc_pool, 0);
-  vkAllocateDescriptorSets(vk->device, &dsai, &ds);
-
-  VkDescriptorImageInfo dii = {
-    .sampler = vk->sampler, .imageView = tmp_view,
-    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-  };
-  VkWriteDescriptorSet write = {
-    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    .dstSet = ds, .dstBinding = 0, .descriptorCount = 1,
-    .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &dii,
-  };
-  vkUpdateDescriptorSets(vk->device, 1, &write, 0, NULL);
-
-  VkRenderPassBeginInfo rp = {
-    .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-    .renderPass = vk->overlay_render_pass, .framebuffer = dst_fb,
-    .renderArea = {{0, 0}, {w, h}},
-    .clearValueCount = 0, .pClearValues = NULL,
-  };
-  VkViewport vp = {0, (float)h, (float)w, -(float)h, 0, 1};
-  VkRect2D sc = {{0, 0}, {w, h}};
-  vkCmdBeginRenderPass(vk->frame_cb, &rp, VK_SUBPASS_CONTENTS_INLINE);
-  vkCmdSetViewport(vk->frame_cb, 0, 1, &vp);
-  vkCmdSetScissor(vk->frame_cb, 0, 1, &sc);
-  vkCmdBindDescriptorSets(vk->frame_cb, VK_PIPELINE_BIND_POINT_GRAPHICS,
-    vk->pipe_layout, 0, 1, &ds, 0, NULL);
-  if (pc_data && pc_size)
-    vkCmdPushConstants(vk->frame_cb, vk->pipe_layout,
-      VK_SHADER_STAGE_FRAGMENT_BIT, 0, pc_size, pc_data);
-  vkCmdBindPipeline(vk->frame_cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
-  vkCmdDraw(vk->frame_cb, 4, 1, 0, 0);
-  vkCmdEndRenderPass(vk->frame_cb);
-
-  vkDestroyImageView(vk->device, tmp_view, NULL);
-  vkEndCommandBuffer(vk->frame_cb);
-
-  VkSubmitInfo si = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .commandBufferCount = 1, .pCommandBuffers = &vk->frame_cb};
-  vkQueueSubmit(vk->queue, 1, &si, VK_NULL_HANDLE);
-  vkQueueWaitIdle(vk->queue);
-}
-
 static void vk_draw_full_no_tex(VkPipeline pipe, VkImage dst_img, VkFramebuffer dst_fb,
   int w, int h, bool clear, const void *pc_data, size_t pc_size,
   VkPipelineLayout layout, VkDescriptorSet ds) {
@@ -1468,6 +1377,7 @@ static bool vk_render_border(struct be_border_params *p, uint64_t dst_fbo) {
 
 static bool vk_apply_corner_mask(be_output_state_t *state, uint64_t dst_fbo,
     int dst_w, int dst_h, uint64_t bg_tex, struct be_corner_mask_params *p) {
+	(void)state;
   struct vk_fbo *dst = vk_fbo_of(dst_fbo);
   if (!dst) return false;
 
