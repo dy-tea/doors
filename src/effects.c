@@ -643,6 +643,29 @@ static bool rebuild_live_blur(output_t *output,
     // blit blurred to dest with full-screen quad (no scissor needed at this stage)
     effects_backend->blit(blurred, tl->blur->blur_native[0], w, h, NULL, 0);
 
+    client_t *c = tl->node->client;
+    if (effects_state.backend != &vk_backend && c && c->border_radius > 0.0f && c->state != STATE_FULLSCREEN) {
+      struct wlr_box content_r = get_client_rect(tl);
+      float ow = (float)w, oh = (float)h;
+      float win_u = (float)(content_r.x - output->lx) / ow;
+      float win_v = (float)(content_r.y - output->ly) / oh;
+      float win_sw = (float)content_r.width  / ow;
+      float win_sh = (float)content_r.height / oh;
+      int bw_i = (c->state == STATE_FULLSCREEN) ? 0 : border_width;
+      float inner_r = (c->border_radius > (float)bw_i) ? c->border_radius - (float)bw_i : 0.0f;
+
+      struct be_corner_mask_params params = {
+        .win_u = win_u, .win_v = win_v,
+        .win_sw = win_sw, .win_sh = win_sh,
+        .win_size_px_w = (float)content_r.width,
+        .win_size_px_h = (float)content_r.height,
+        .border_radius_px = inner_r,
+        .scale = output->wlr_output->scale,
+        .pre_blit = true,
+      };
+      effects_backend->apply_corner_mask(&ctx->be_state, tl->blur->blur_native[0], w, h, blurred, &params);
+    }
+
     any = true;
   }
   return any;
