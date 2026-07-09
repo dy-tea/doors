@@ -1595,15 +1595,53 @@ static bool vk_apply_corner_mask(be_output_state_t *state, uint64_t dst_fbo,
 
 static bool vk_apply_screen_shader(uint64_t src_tex, uint64_t dst_fbo,
     int w, int h, struct be_screen_shader_params *p) {
-    (void)p;
   if (!vk->screen_shader_pipe) return false;
   struct vk_fbo *dst = vk_fbo_of(dst_fbo);
   if (!dst) return false;
+  struct vk_fbo tmp;
+  if (!vk_create_fbo(w, h, vk->vk_fmt, &tmp)) return false;
+  VkImage src_img = vk_img_of(src_tex);
+
   struct { float res[2]; float time; } pc;
-  pc.res[0] = (float)w;
-  pc.res[1] = (float)h;
+  pc.res[0] = (float)w; pc.res[1] = (float)h;
   pc.time = p->time;
-  vk_draw_full(vk->screen_shader_pipe, vk_img_of(src_tex), dst->fb, w, h, dst->img.image, &pc, sizeof(pc), NULL, 0);
+
+  // render screen shader to temp FBO
+  vk_draw_full(vk->screen_shader_pipe, src_img, tmp.fb, w, h, tmp.img.image, &pc, sizeof(pc), NULL, 0);
+
+  // blit temp -> dst via transfer
+  VkCommandBufferAllocateInfo cai = {
+    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+    .commandPool = vk->cmd_pool, .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+    .commandBufferCount = 1,
+  };
+  VkCommandBuffer cb;
+  if (vkAllocateCommandBuffers(vk->device, &cai, &cb) != VK_SUCCESS) { vk_destroy_fbo(&tmp); return false; }
+  VkCommandBufferBeginInfo bi = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
+  vkBeginCommandBuffer(cb, &bi);
+
+  VkImageMemoryBarrier b[2] = {
+    {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, .image = tmp.img.image, .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1}, .srcAccessMask = VK_ACCESS_SHADER_READ_BIT, .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT},
+    {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, .image = dst->img.image, .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1}, .srcAccessMask = VK_ACCESS_SHADER_READ_BIT, .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT},
+  };
+  vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 2, b);
+
+  VkImageBlit blit = {.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, .srcOffsets = {{0, h, 0}, {w, 0, 1}}, .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, .dstOffsets = {{0, 0, 0}, {w, h, 1}}};
+  vkCmdBlitImage(cb, tmp.img.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst->img.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+
+  VkImageMemoryBarrier b2[2] = {
+    {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, .image = tmp.img.image, .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1}, .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT, .dstAccessMask = VK_ACCESS_SHADER_READ_BIT},
+    {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, .image = dst->img.image, .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1}, .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT, .dstAccessMask = VK_ACCESS_SHADER_READ_BIT},
+  };
+  vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 2, b2);
+
+  vkEndCommandBuffer(cb);
+  VkSubmitInfo si = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .commandBufferCount = 1, .pCommandBuffers = &cb};
+  vkQueueSubmit(vk->queue, 1, &si, VK_NULL_HANDLE);
+  vkQueueWaitIdle(vk->queue);
+  vkFreeCommandBuffers(vk->device, vk->cmd_pool, 1, &cb);
+
+  vk_destroy_fbo(&tmp);
   return true;
 }
 
