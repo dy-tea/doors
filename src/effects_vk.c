@@ -129,6 +129,7 @@ struct vk_data {
   struct wlr_renderer *wlr_renderer;
   struct wlr_allocator *allocator;
   int blur_w, blur_h;
+  uint32_t vendor_id;
 };
 
 static struct vk_data *vk = NULL;
@@ -596,6 +597,10 @@ static bool vk_init(struct wlr_renderer *r, struct wlr_allocator *a) {
   vk->device = wlr_vk_renderer_get_device(r);
   vk->queue_family = wlr_vk_renderer_get_queue_family(r);
   vkGetDeviceQueue(vk->device, vk->queue_family, 0, &vk->queue);
+  VkPhysicalDeviceProperties props;
+  vkGetPhysicalDeviceProperties(vk->phys_dev, &props);
+  vk->vendor_id = props.vendorID;
+  wlr_log(WLR_INFO, "vk: GPU vendor=0x%x device=0x%x name=%s", props.vendorID, props.deviceID, props.deviceName);
 
   const struct wlr_drm_format_set *fmts = wlr_renderer_get_render_formats(r);
   vk->render_fmt = fmts ? wlr_drm_format_set_get(fmts, DRM_FORMAT_ARGB8888) : NULL;
@@ -1672,9 +1677,10 @@ static bool vk_capture_readback(struct wlr_buffer *capture_buffer,
   int capture_w = src_w > 0 ? src_w : dst_w;
   int capture_h = src_h > 0 ? src_h : dst_h;
   wlr_log(WLR_INFO, "vk: capture blit src=%dx%d dst=%dx%d", capture_w, capture_h, dst_w, dst_h);
+  bool flip_y = (vk->vendor_id == 0x8086); // Intel needs Y flip for capture source (why tf?)
   VkImageBlit region = {
     .srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
-    .srcOffsets = {{0, 0, 0}, {capture_w, capture_h, 1}},
+    .srcOffsets = {{0, flip_y ? capture_h : 0, 0}, {capture_w, flip_y ? 0 : capture_h, 1}},
     .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
     .dstOffsets = {{0, 0, 0}, {dst_w, dst_h, 1}},
   };
