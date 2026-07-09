@@ -177,12 +177,12 @@ int log_init(const char *log_file_path) {
 		snprintf(log_path, sizeof(log_path), "%s", log_file_path);
 
 		// extract dir from path
-		strcpy(log_dir, log_file_path);
+		snprintf(log_dir, sizeof(log_dir), "%s", log_file_path);
 		char *last_slash = strrchr(log_dir, '/');
 		if (last_slash)
 			*last_slash = '\0';
 		else
-			strcpy(log_dir, ".");
+			snprintf(log_dir, sizeof(log_dir), ".");
 	} else {
 		const char *home = getenv("HOME");
 		if (!home) {
