@@ -406,7 +406,7 @@ static void vk_draw_full(VkPipeline pipe, VkImage src_img, VkFramebuffer dst_fb,
     .renderArea = {{0, 0}, {w, h}},
     .clearValueCount = 1, .pClearValues = &(VkClearValue){{{0,0,0,0}}},
   };
-  VkViewport vp = {0, (float)h, (float)w, -(float)h, 0, 1};
+  VkViewport vp = {0, 0, (float)w, (float)h, 0, 1};
   VkRect2D full_sc = {{0, 0}, {(uint32_t)w, (uint32_t)h}};
   vkCmdBeginRenderPass(vk->frame_cb, &rp, VK_SUBPASS_CONTENTS_INLINE);
   vkCmdSetViewport(vk->frame_cb, 0, 1, &vp);
@@ -468,7 +468,7 @@ static void vk_draw_full_no_tex(VkPipeline pipe, VkImage dst_img, VkFramebuffer 
     .clearValueCount = clear ? 1 : 0,
     .pClearValues = clear ? &(VkClearValue){{{0,0,0,0}}} : NULL,
   };
-  VkViewport vp = {0, (float)h, (float)w, -(float)h, 0, 1};
+  VkViewport vp = {0, 0, (float)w, (float)h, 0, 1};
   VkRect2D sc = {{0, 0}, {w, h}};
   vkCmdBeginRenderPass(vk->frame_cb, &rp, VK_SUBPASS_CONTENTS_INLINE);
   vkCmdSetViewport(vk->frame_cb, 0, 1, &vp);
@@ -515,7 +515,13 @@ static bool vk_init(struct wlr_renderer *r, struct wlr_allocator *a) {
   vk->render_fmt = fmts ? wlr_drm_format_set_get(fmts, DRM_FORMAT_ARGB8888) : NULL;
   if (!vk->render_fmt)
     vk->render_fmt = fmts ? wlr_drm_format_set_get(fmts, DRM_FORMAT_XRGB8888) : NULL;
-  if (!vk->render_fmt) { wlr_log(WLR_ERROR, "vk: no render format"); free(vk); vk = NULL; return false; }
+
+  if (!vk->render_fmt) {
+  	wlr_log(WLR_ERROR, "vk: no render format");
+   	free(vk);
+    vk = NULL;
+    return false;
+  }
 
   vk->vk_fmt = VK_FORMAT_B8G8R8A8_UNORM; // DRM_FORMAT_ARGB8888 LE
 
@@ -1088,10 +1094,6 @@ static bool vk_blit(uint64_t src_tex, uint64_t dst_fbo, int w, int h,
 
   for (int i = 0; i < n_regions; i++) {
     int x1 = 0, y1 = 0, x2 = w, y2 = h;
-    if (scissor) {
-      x1 = scissor[i].x1; y1 = scissor[i].y1;
-      x2 = scissor[i].x2; y2 = scissor[i].y2;
-    }
     VkImageBlit region = {
       .srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
       .srcOffsets = {{(int32_t)(x1 * sx), (int32_t)(y1 * sy), 0}, {(int32_t)(x2 * sx), (int32_t)(y2 * sy), 1}},
@@ -1349,7 +1351,10 @@ static bool vk_render_border(struct be_border_params *p, uint64_t dst_fbo) {
 
   VkCommandBufferAllocateInfo cai = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, .commandPool = vk->cmd_pool, .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY, .commandBufferCount = 1};
   VkCommandBuffer cb;
-  if (vkAllocateCommandBuffers(vk->device, &cai, &cb) != VK_SUCCESS) { vk_destroy_fbo(&tmp); return false; }
+  if (vkAllocateCommandBuffers(vk->device, &cai, &cb) != VK_SUCCESS) {
+  	vk_destroy_fbo(&tmp);
+   	return false;
+  }
   VkCommandBufferBeginInfo bi = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
   vkBeginCommandBuffer(cb, &bi);
 
@@ -1439,7 +1444,12 @@ static bool vk_apply_corner_mask(be_output_state_t *state, uint64_t dst_fbo,
     vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 2, b);
   }
   {
-    VkImageBlit blit = {.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, .srcOffsets = {{0, 0, 0}, {dst_w, dst_h, 1}}, .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, .dstOffsets = {{0, 0, 0}, {dst_w, dst_h, 1}}};
+    VkImageBlit blit = {
+    	.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+     	.srcOffsets = {{0, 0, 0}, {dst_w, dst_h, 1}},
+      .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+      .dstOffsets = {{0, 0, 0}, {dst_w, dst_h, 1}}
+    };
     vkCmdBlitImage(cb, dst->img.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, tmp.img.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
   }
   // transition: tmp -> COLOR_ATTACHMENT, dst -> SHADER_READ_ONLY
@@ -1480,7 +1490,12 @@ static bool vk_apply_corner_mask(be_output_state_t *state, uint64_t dst_fbo,
     vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 2, b);
   }
   {
-    VkImageBlit blit = {.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, .srcOffsets = {{0, 0, 0}, {dst_w, dst_h, 1}}, .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, .dstOffsets = {{0, 0, 0}, {dst_w, dst_h, 1}}};
+    VkImageBlit blit = {
+    	.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+    	.srcOffsets = {{0, 0, 0}, {dst_w, dst_h, 1}},
+    	.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+    	.dstOffsets = {{0, 0, 0}, {dst_w, dst_h, 1}}
+    };
     vkCmdBlitImage(cb, tmp.img.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst->img.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
   }
   // transition both back to SHADER_READ_ONLY
@@ -1536,8 +1551,12 @@ static bool vk_apply_screen_shader(uint64_t src_tex, uint64_t dst_fbo,
   };
   vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 2, b);
 
-  bool ss_flip = (vk->vendor_id == 0x1002); // AMD needs flip when blitting from viewport-flipped fbo (can we stop now?)
-  VkImageBlit blit = {.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, .srcOffsets = {{0, ss_flip ? h : 0, 0}, {w, ss_flip ? 0 : h, 1}}, .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, .dstOffsets = {{0, 0, 0}, {w, h, 1}}};
+  VkImageBlit blit = {
+  	.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+   	.srcOffsets = {{0, h, 0}, {w, 0, 1}},
+    .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+    .dstOffsets = {{0, 0, 0}, {w, h, 1}}
+  };
   vkCmdBlitImage(cb, tmp.img.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst->img.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
 
   VkImageMemoryBarrier b2[2] = {
@@ -1626,10 +1645,9 @@ static bool vk_capture_readback(struct wlr_buffer *capture_buffer,
   int capture_w = src_w > 0 ? src_w : dst_w;
   int capture_h = src_h > 0 ? src_h : dst_h;
   wlr_log(WLR_INFO, "vk: capture blit src=%dx%d dst=%dx%d", capture_w, capture_h, dst_w, dst_h);
-  bool flip_y = (vk->vendor_id == 0x8086); // Intel needs Y flip for capture source (why tf?)
   VkImageBlit region = {
     .srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
-    .srcOffsets = {{0, flip_y ? capture_h : 0, 0}, {capture_w, flip_y ? 0 : capture_h, 1}},
+    .srcOffsets = {{0, 0, 0}, {capture_w, capture_h, 1}},
     .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
     .dstOffsets = {{0, 0, 0}, {dst_w, dst_h, 1}},
   };
