@@ -156,7 +156,7 @@ typedef struct effects_backend_t {
 
   bool (*render_border)(struct be_border_params *p, uint64_t dst_fbo);
 
-  bool (*apply_corner_mask)(uint64_t dst_fbo, int dst_w, int dst_h,
+  bool (*apply_corner_mask)(be_output_state_t *state, uint64_t dst_fbo, int dst_w, int dst_h,
     uint64_t bg_tex, struct be_corner_mask_params *p);
 
   bool (*apply_screen_shader)(uint64_t src_tex, uint64_t dst_fbo,

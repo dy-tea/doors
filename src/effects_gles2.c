@@ -3,8 +3,11 @@
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
+#include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
+
 #include <wlr/render/gles2.h>
 #include <wlr/render/allocator.h>
 #include <wlr/render/drm_format_set.h>
@@ -583,15 +586,8 @@ static bool gles2_output_init(be_output_state_t *state, int width, int height,
   state->pong.height = blur_h;
 
   // Staging texture (no FBO needed)
-  glGenTextures(1, (GLuint *)&state->staging.native_handle[1]);
-  glBindTexture(GL_TEXTURE_2D, (GLuint)state->staging.native_handle[1]);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glBindTexture(GL_TEXTURE_2D, 0);
-  state->staging.native_handle[0] = 0; // no FBO
+  create_fbo(width, height, (GLuint *)&state->staging.native_handle[0],
+    (GLuint *)&state->staging.native_handle[1]);
   state->staging.width = width;
   state->staging.height = height;
 
@@ -614,11 +610,8 @@ static void gles2_output_fini(be_output_state_t *state) {
       (GLuint *)&state->pong.native_handle[1]);
   destroy_fbo((GLuint *)&state->screen_shader.native_handle[0],
       (GLuint *)&state->screen_shader.native_handle[1]);
-  if (state->staging.native_handle[1]) {
-    GLuint tex = (GLuint)state->staging.native_handle[1];
-    glDeleteTextures(1, &tex);
-    state->staging.native_handle[1] = 0;
-  }
+  destroy_fbo((GLuint *)&state->staging.native_handle[0],
+      (GLuint *)&state->staging.native_handle[1]);
   egl_unset_current();
 }
 
@@ -631,11 +624,8 @@ static void gles2_output_resize(be_output_state_t *state, int width, int height,
       (GLuint *)&state->pong.native_handle[1]);
   destroy_fbo((GLuint *)&state->screen_shader.native_handle[0],
       (GLuint *)&state->screen_shader.native_handle[1]);
-  if (state->staging.native_handle[1]) {
-    GLuint tex = (GLuint)state->staging.native_handle[1];
-    glDeleteTextures(1, &tex);
-    state->staging.native_handle[1] = 0;
-  }
+	destroy_fbo((GLuint *)&state->staging.native_handle[0],
+	    (GLuint *)&state->staging.native_handle[1]);
   create_fbo(blur_w, blur_h, (GLuint *)&state->ping.native_handle[0],
       (GLuint *)&state->ping.native_handle[1]);
   create_fbo(blur_w, blur_h, (GLuint *)&state->pong.native_handle[0],
@@ -645,14 +635,8 @@ static void gles2_output_resize(be_output_state_t *state, int width, int height,
   state->pong.width = blur_w;
   state->pong.height = blur_h;
 
-  glGenTextures(1, (GLuint *)&state->staging.native_handle[1]);
-  glBindTexture(GL_TEXTURE_2D, (GLuint)state->staging.native_handle[1]);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glBindTexture(GL_TEXTURE_2D, 0);
+  create_fbo(width, height, (GLuint *)&state->staging.native_handle[0],
+    (GLuint *)&state->staging.native_handle[1]);
   state->staging.width = width;
   state->staging.height = height;
 
@@ -899,8 +883,9 @@ static bool gles2_render_border(struct be_border_params *p,
   return true;
 }
 
-static bool gles2_apply_corner_mask(uint64_t dst_fbo, int dst_w, int dst_h,
+static bool gles2_apply_corner_mask(be_output_state_t *state, uint64_t dst_fbo, int dst_w, int dst_h,
     uint64_t bg_tex, struct be_corner_mask_params *p) {
+  (void)state;
   if (!g->prog_corner_mask) return false;
 
   glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)dst_fbo);
@@ -1012,13 +997,25 @@ static bool gles2_capture_readback(struct wlr_buffer *capture_buffer,
       result_tex = (GLuint)state->screen_shader.native_handle[1];
   } else if (attach_type == GL_RENDERBUFFER) {
     GLuint staging_tex = (GLuint)state->staging.native_handle[1];
+
     glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
-    glBindTexture(GL_TEXTURE_2D, staging_tex);
-    glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, src_w, src_h);
-    glBindTexture(GL_TEXTURE_2D, 0);
+    int bpp = 4;
+    size_t buf_size = (size_t)src_w * src_h * bpp;
+    uint8_t *pixels = (uint8_t *)malloc(buf_size);
+    if (pixels) {
+      glReadPixels(0, 0, src_w, src_h, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+      glBindTexture(GL_TEXTURE_2D, staging_tex);
+      glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, src_w, src_h, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      free(pixels);
+    } else {
+      glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, src_w, src_h);
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)dst_fbo);
     glDisable(GL_BLEND);
     glDisable(GL_SCISSOR_TEST);
-    glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)dst_fbo);
     glViewport(0, 0, dst_w, dst_h);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, staging_tex);
