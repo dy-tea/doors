@@ -103,6 +103,10 @@ typedef struct client_t {
   struct client_t *next_in_stack;
   struct client_t *prev_in_stack;
 
+  // Master-stack layout properties
+  uint64_t master_stack_order;
+  bool master_stack_master;
+
   // Resize state for scroller
   float old_scroller_proportion;
   float old_stack_proportion;
@@ -192,6 +196,7 @@ typedef struct desktop_t {
   struct desktop_t *next;
   padding_t padding;
   int window_gap;
+  int master_stack_count;
   struct output_t *output;
   uint32_t fullscreen_recreate_pending_window_id;
 } desktop_t;

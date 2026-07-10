@@ -1069,14 +1069,18 @@ void execute_bind(bind_t b) {
       toggle_master_stack();
       break;
     case BIND_MASTER_STACK_INC:
-      master_stack_increment();
-      if (mon && mon->desk && mon->desk->layout == LAYOUT_MASTER_STACK)
-        arrange(mon, mon->desk, true);
+      if (mon && mon->desk) {
+        master_stack_increment(mon->desk);
+        if (mon->desk->layout == LAYOUT_MASTER_STACK)
+          arrange(mon, mon->desk, true);
+      }
       break;
     case BIND_MASTER_STACK_DEC:
-      master_stack_decrement();
-      if (mon && mon->desk && mon->desk->layout == LAYOUT_MASTER_STACK)
-        arrange(mon, mon->desk, true);
+      if (mon && mon->desk) {
+        master_stack_decrement(mon->desk);
+        if (mon->desk->layout == LAYOUT_MASTER_STACK)
+          arrange(mon, mon->desk, true);
+      }
       break;
     case BIND_MASTER_STACK_FLIP:
       master_stack_flip_orientation();

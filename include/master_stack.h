@@ -8,9 +8,10 @@ typedef struct output_t output_t;
 
 typedef enum {
   MASTER_LEFT,
-  MASTER_RIGHT,
   MASTER_TOP,
+  MASTER_RIGHT,
   MASTER_BOTTOM,
+  MASTER_CENTER,
 } master_area_orientation_t;
 
 typedef enum {
@@ -18,15 +19,15 @@ typedef enum {
   STACK_HORIZONTAL,
 } stack_layout_t;
 
-extern int master_stack_count;
 extern float master_stack_ratio;
 extern master_area_orientation_t master_stack_orientation;
 extern stack_layout_t master_stack_layout;
 
-void master_stack_arrange(struct output_t *m, desktop_t *d, struct wlr_box available);
+void master_stack_arrange(struct output_t *m, desktop_t *d,
+                          struct wlr_box available);
 
 int master_stack_collect(desktop_t *d, node_t ***out_nodes);
-int master_stack_find_index(const desktop_t *d, const node_t *n);
+int master_stack_find_index(desktop_t *d, const node_t *n);
 
 bool master_stack_focus_south(desktop_t *d);
 bool master_stack_focus_north(desktop_t *d);
@@ -38,9 +39,12 @@ bool master_stack_swap_north(output_t *m, desktop_t *d);
 bool master_stack_swap_east(output_t *m, desktop_t *d);
 bool master_stack_swap_west(output_t *m, desktop_t *d);
 
-void master_stack_increment(void);
-void master_stack_decrement(void);
-void master_stack_set_count(int count);
+bool master_stack_increment(desktop_t *d);
+bool master_stack_decrement(desktop_t *d);
+bool master_stack_promote(desktop_t *d);
+bool master_stack_demote(desktop_t *d);
+void master_stack_set_count(desktop_t *d, int count);
+void master_stack_set_orientation(master_area_orientation_t orientation);
 void master_stack_flip_orientation(void);
 void master_stack_cycle_orientation(void);
 void master_stack_cycle_stack_layout(void);

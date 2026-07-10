@@ -6,6 +6,7 @@
 #include "scroller.h"
 #include "server.h"
 #include "tree.h"
+#include <limits.h>
 #include <stdlib.h>
 
 void ipc_cmd_scroller(char **args, int num, int client_fd) {
@@ -150,18 +151,58 @@ void ipc_cmd_master_stack(char **args, int num, int client_fd) {
     master_stack_cycle_orientation();
     arrange(mon, desk, true);
     send_success(client_fd, "orientation cycled\n");
+  } else if (streq("orientation", *args)) {
+    if (num < 2) {
+      send_failure(client_fd, "master_stack orientation: missing orientation\n");
+      return;
+    }
+
+    master_area_orientation_t orientation;
+    if (streq("left", args[1]))
+      orientation = MASTER_LEFT;
+    else if (streq("right", args[1]))
+      orientation = MASTER_RIGHT;
+    else if (streq("top", args[1]))
+      orientation = MASTER_TOP;
+    else if (streq("bottom", args[1]) || streq("down", args[1]))
+      orientation = MASTER_BOTTOM;
+    else if (streq("center", args[1]))
+      orientation = MASTER_CENTER;
+    else {
+      send_failure(client_fd,
+        "master_stack orientation: expected left, right, center, top, or bottom\n");
+      return;
+    }
+
+    master_stack_set_orientation(orientation);
+    arrange(mon, desk, true);
+    send_success(client_fd, "orientation set\n");
   } else if (streq("cycle_stack_layout", *args)) {
     master_stack_cycle_stack_layout();
     arrange(mon, desk, true);
     send_success(client_fd, "stack layout cycled\n");
   } else if (streq("inc", *args)) {
-    master_stack_increment();
+    master_stack_increment(desk);
     arrange(mon, desk, true);
-    send_success(client_fd, "master count increased\n");
+    send_success(client_fd, "master added\n");
   } else if (streq("dec", *args)) {
-    master_stack_decrement();
+    master_stack_decrement(desk);
     arrange(mon, desk, true);
-    send_success(client_fd, "master count decreased\n");
+    send_success(client_fd, "master removed\n");
+  } else if (streq("promote", *args)) {
+    if (!master_stack_promote(desk)) {
+      send_failure(client_fd, "master_stack promote: focus a secondary tiled window\n");
+      return;
+    }
+    arrange(mon, desk, true);
+    send_success(client_fd, "focused window promoted\n");
+  } else if (streq("demote", *args)) {
+    if (!master_stack_demote(desk)) {
+      send_failure(client_fd, "master_stack demote: focus a master tiled window\n");
+      return;
+    }
+    arrange(mon, desk, true);
+    send_success(client_fd, "focused window demoted\n");
   } else if (streq("flip", *args)) {
     master_stack_flip_orientation();
     arrange(mon, desk, true);
@@ -171,7 +212,13 @@ void ipc_cmd_master_stack(char **args, int num, int client_fd) {
       send_failure(client_fd, "master_stack set_count: missing count\n");
       return;
     }
-    master_stack_set_count(atoi(args[1]));
+    char *end = NULL;
+    long count = strtol(args[1], &end, 10);
+    if (!end || *end != '\0' || count < 0 || count > INT_MAX) {
+      send_failure(client_fd, "master_stack set_count: count must be a non-negative integer\n");
+      return;
+    }
+    master_stack_set_count(desk, (int)count);
     arrange(mon, desk, true);
     send_success(client_fd, "master count set\n");
   } else if (streq("set_ratio", *args)) {
