@@ -526,6 +526,7 @@ doorsctl desktop --focus <name>        # Focus named desktop
 doorsctl desktop --focus next          # Focus next desktop
 doorsctl desktop --focus prev          # Focus previous desktop
 doorsctl desktop --layout tiled        # Toggle tiled layout on desktop
+doorsctl desktop --layout tiled --all  # Set tiled layout on every desktop
 doorsctl desktop --layout monocle      # Toggle monocle layout on desktop
 doorsctl desktop --layout scroller     # Toggle scroller layout on desktop
 doorsctl desktop --layout master_stack # Toggle master-stack layout on desktop

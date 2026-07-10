@@ -82,27 +82,39 @@ void ipc_cmd_desktop(char **args, int num, int client_fd) {
       return;
     }
     args++;
+    num--;
+    layout_t layout;
     if (streq("tiled", *args)) {
-      desk->layout = LAYOUT_TILED;
+      layout = LAYOUT_TILED;
     } else if (streq("monocle", *args)) {
-      desk->layout = LAYOUT_MONOCLE;
+      layout = LAYOUT_MONOCLE;
     } else if (streq("scroller", *args)) {
-      desk->layout = LAYOUT_SCROLLER;
+      layout = LAYOUT_SCROLLER;
     } else if (streq("master_stack", *args)) {
-      desk->layout = LAYOUT_MASTER_STACK;
+      layout = LAYOUT_MASTER_STACK;
     } else {
       send_failure(client_fd, "desktop -l: unknown layout\n");
       return;
     }
-    if (desk->root != NULL) {
+
+    if (num > 1 && streq("--all", args[1])) {
+      for (output_t *m = mon_head; m != NULL; m = m->next) {
+        for (desktop_t *d = m->desk_head; d != NULL; d = d->next) {
+          d->layout = layout;
+          arrange(m, d, true);
+          // extreme hack
+          ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name,
+            layout_to_char(d->layout));
+        }
+      }
+    } else {
+      desk->layout = layout;
       arrange(mon, desk, true);
       if (desk->focus != NULL)
         focus_node(mon, desk, desk->focus);
-    } else {
-      transaction_commit_dirty();
+      ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", desk->name,
+        layout_to_char(desk->layout));
     }
-    ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", desk->name,
-      layout_to_char(desk->layout));
     send_success(client_fd, "layout changed\n");
   } else if (streq("-n", *args) || streq("--rename", *args)) {
     if (num < 2) {
