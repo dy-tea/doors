@@ -113,6 +113,7 @@ doorsctl config decoration_mode none|tabs|always|csd
 
 Controls how window decorations (titlebars, borders) are displayed:
 
+//TODO: rewrite description for none and tabs
 - **none**: All windows render without decorations by signaling them to enter fullscreen mode. Tab bars are also hidden. Provides a clean, minimal interface.
 
 - **tabs**: Tab bars are shown in tabbed layouts, but clients are kept in fullscreen mode to hide client-side decorations. No CSD is visible anywhere.
@@ -120,6 +121,8 @@ Controls how window decorations (titlebars, borders) are displayed:
 - **always** (default): Decorations are always visible. In tabbed layouts, server-side tab bars replace client decorations. Outside tabbed layouts, clients use their own CSD.
 
 - **csd**: Client-side decorations are always shown, even in tabbed layouts. Tab bars are hidden and every window draws its own decorations.
+
+Clients that do not support `xdg-decoration` keep their own client-side decorations in `none` and `tabs` modes.
 
 ```
 doorsctl config edge_scroller_pointer_focus true|false

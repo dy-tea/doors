@@ -80,24 +80,17 @@ static void handle_foreign_close_request(struct wl_listener *listener, void *dat
 static void handle_foreign_destroy(struct wl_listener *listener, void *data);
 static void handle_outputs_update(struct wl_listener *listener, void *data);
 
-static void toplevel_apply_disable_decorations(toplevel_t *toplevel) {
-  if (!toplevel || !toplevel->xdg_toplevel) return;
-
-  // if decorations are disabled or tabs-only, request fullscreen to hide client-side decorations
-  if (decoration_mode == DECORATION_NONE || decoration_mode == DECORATION_TABS)
-    wlr_xdg_toplevel_set_fullscreen(toplevel->xdg_toplevel, true);
-}
-
 static bool toplevel_should_use_server_decorations(toplevel_t *tl) {
   if (!tl || !tl->node) return false;
 
   switch (decoration_mode) {
   case DECORATION_NONE:
   case DECORATION_TABS:
-  case DECORATION_CSD:
-    return false;
+    return true;
   case DECORATION_ALWAYS:
     return tabbed_ancestor(tl->node) != NULL;
+  case DECORATION_CSD:
+    return false;
   }
   return false;
 }
@@ -650,8 +643,6 @@ void toplevel_map(struct wl_listener *listener, void *data) {
   if (rule && rule->state == STATE_FULLSCREEN)
     enter_fullscreen(target_output, target_desktop, n);
 
-  toplevel_apply_disable_decorations(toplevel);
-
   toplevel->wants_fade = true;
   arrange(target_output, target_desktop, true);
 
@@ -660,7 +651,7 @@ void toplevel_map(struct wl_listener *listener, void *data) {
     n->client && n->client->title[0] ? n->client->title : "?",
     n->id);
 
-  // tabbed ancestors force SSD, otherwise allow CSD
+  // apply the configured xdg-decoration policy
   toplevel_apply_decoration_mode(toplevel);
 
   if (!n->client->block_out_from_screenshare) {
@@ -1073,7 +1064,6 @@ void toplevel_request_maximize(struct wl_listener *listener, void *data) {
 
   toplevel->client_maximized = requested_maximized;
   toggle_monocle();
-  toplevel_apply_disable_decorations(toplevel);
 }
 
 void toplevel_request_fullscreen(struct wl_listener *listener, void *data) {
@@ -1107,8 +1097,6 @@ void toplevel_request_fullscreen(struct wl_listener *listener, void *data) {
 
   wlr_xdg_toplevel_set_fullscreen(toplevel->xdg_toplevel, requested_fullscreen);
   update_foreign_toplevel_state(toplevel);
-
-  toplevel_apply_disable_decorations(toplevel);
 }
 
 void toplevel_request_minimize(struct wl_listener *listener, void *data) {
@@ -1544,16 +1532,7 @@ static void handle_decoration_destroy(struct wl_listener *listener, void *data) 
 static void handle_decoration_request_mode(struct wl_listener *listener, void *data) {
   (void)data;
   toplevel_t *tl = wl_container_of(listener, tl, decoration_request_mode);
-  if (!tl || !tl->xdg_decoration || !tl->xdg_toplevel || !tl->xdg_toplevel->base ||
-    !tl->xdg_toplevel->base->initialized || !tl->node) return;
-
-  enum wlr_xdg_toplevel_decoration_v1_mode mode = WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
-  if (decoration_mode == DECORATION_ALWAYS)
-    mode = tabbed_ancestor(tl->node) != NULL
-      ? WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
-      : WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
-
-  wlr_xdg_toplevel_decoration_v1_set_mode(tl->xdg_decoration, mode);
+  toplevel_apply_decoration_mode(tl);
 }
 
 void handle_new_xdg_decoration(struct wl_listener *listener, void *data) {
@@ -1572,15 +1551,8 @@ void handle_new_xdg_decoration(struct wl_listener *listener, void *data) {
   tl->decoration_request_mode.notify = handle_decoration_request_mode;
   wl_signal_add(&deco->events.request_mode, &tl->decoration_request_mode);
 
-  if (xdg_surface->initialized && tl->node) {
-    enum wlr_xdg_toplevel_decoration_v1_mode mode = WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
-    if (decoration_mode == DECORATION_ALWAYS)
-	    mode = tabbed_ancestor(tl->node) != NULL
-	      ? WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
-	      : WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
-
-    wlr_xdg_toplevel_decoration_v1_set_mode(deco, mode);
-  }
+  if (xdg_surface->initialized && tl->node)
+    toplevel_apply_decoration_mode(tl);
 }
 
 bool toplevel_can_tear(struct toplevel_t *toplevel) {

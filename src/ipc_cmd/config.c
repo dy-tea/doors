@@ -127,6 +127,11 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
         return;
       }
       tabs_rebuild_all();
+
+      // refresh decor
+      toplevel_t *tl;
+      wl_list_for_each(tl, &server.toplevels, link) toplevel_apply_decoration_mode(tl);
+
       transaction_commit_dirty();
       send_success(client_fd, "decoration_mode set\n");
     } else {
