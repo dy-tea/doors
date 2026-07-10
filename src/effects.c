@@ -670,7 +670,7 @@ static bool rebuild_live_blur(output_t *output, pixman_region32_t *damage, uint6
 			    .win_size_px_h = (float)content_r.height,
 			    .border_radius_px = inner_r,
 			    .scale = output->wlr_output->scale,
-			    .pre_blit = true,
+			    .pre_blit = false,
 			};
 			effects_backend->apply_corner_mask(&ctx->be_state, tl->blur->blur_native[0], w, h, blurred, &params);
 		}

@@ -328,6 +328,10 @@ static void box_pass(
 	if (g->u_box.contrast >= 0)
 		glUniform1f(g->u_box.contrast, p->contrast);
 	draw_quad();
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
 	glBindFramebuffer(GL_FRAMEBUFFER, pong_fbo);
 	glBindTexture(GL_TEXTURE_2D, ping_tex);
 	glUseProgram(g->prog_box_v);
@@ -367,6 +371,9 @@ static void gaussian_pass(
 	if (g->u_gauss.contrast >= 0)
 		glUniform1f(g->u_gauss.contrast, p->contrast);
 	draw_quad();
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, pong_fbo);
 	glBindTexture(GL_TEXTURE_2D, ping_tex);
@@ -720,6 +727,7 @@ static bool gles2_blur(be_output_state_t *state, uint64_t src_handle, int src_w,
 
 	glDisable(GL_BLEND);
 	glDisable(GL_SCISSOR_TEST);
+	glFlush();
 
 	int ping = 0;
 	GLuint current = (GLuint)src_handle;
@@ -783,6 +791,7 @@ static bool gles2_apply_acrylic(
 		GLuint current = (GLuint)bg_handle;
 		for (int i = 0; i < p->blur_passes; i++) {
 			blur_pass(current, fbo0, blur_w, blur_h, i, &(struct be_blur_params){.radius = p->blur_radius});
+			glFlush();
 			current = tex0;
 			ping ^= 1;
 			fbo0 = ping ? (GLuint)state->pong.native_handle[0] : (GLuint)state->ping.native_handle[0];
@@ -971,6 +980,7 @@ static bool gles2_capture_readback(struct wlr_buffer *capture_buffer, be_output_
 		draw_quad();
 		glBindTexture(GL_TEXTURE_EXTERNAL_OES, 0);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glFlush();
 		result_tex = (GLuint)state->pong.native_handle[1];
 		if (dst_fbo == state->screen_shader.native_handle[0])
 			result_tex = (GLuint)state->screen_shader.native_handle[1];
@@ -986,6 +996,7 @@ static bool gles2_capture_readback(struct wlr_buffer *capture_buffer, be_output_
 		draw_quad();
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glFlush();
 		result_tex = (GLuint)state->pong.native_handle[1];
 		if (dst_fbo == state->screen_shader.native_handle[0])
 			result_tex = (GLuint)state->screen_shader.native_handle[1];
@@ -1018,6 +1029,7 @@ static bool gles2_capture_readback(struct wlr_buffer *capture_buffer, be_output_
 		draw_quad();
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glFlush();
 		result_tex = (GLuint)state->pong.native_handle[1];
 		if (dst_fbo == state->screen_shader.native_handle[0])
 			result_tex = (GLuint)state->screen_shader.native_handle[1];
