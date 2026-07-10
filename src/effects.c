@@ -189,7 +189,12 @@ static bool ensure_sized_buf(
 	if (*buf_out)
 		effects_destroy_buffer(buf_out, native);
 
-	return ensure_output_buf(buf_out, native, w, h);
+	if (!ensure_output_buf(buf_out, native, w, h))
+		return false;
+
+	*w_stored = w;
+	*h_stored = h;
+	return true;
 }
 
 bool effects_init(void) {
