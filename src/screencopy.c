@@ -1,10 +1,12 @@
+#include "screencopy.h"
+
 #include "output.h"
 #include "server.h"
-#include "screencopy.h"
 #include "toplevel.h"
 #include "types.h"
 #include "wlr-screencopy-unstable-v1-protocol.h"
 #include "xwayland.h"
+
 #include <assert.h>
 #include <drm_fourcc.h>
 #include <stdlib.h>
@@ -59,8 +61,7 @@ typedef struct screencopy_mgr_t {
 static const struct zwlr_screencopy_frame_v1_interface frame_impl;
 
 static screencopy_frame_t *frame_from_resource(struct wl_resource *resource) {
-	assert(wl_resource_instance_of(resource,
-		&zwlr_screencopy_frame_v1_interface, &frame_impl));
+	assert(wl_resource_instance_of(resource, &zwlr_screencopy_frame_v1_interface, &frame_impl));
 	return wl_resource_get_user_data(resource);
 }
 
@@ -89,14 +90,12 @@ static void frame_send_ready(screencopy_frame_t *frame, struct timespec *when) {
 	time_t tv_sec = when->tv_sec;
 	uint32_t tv_sec_hi = (sizeof(tv_sec) > 4) ? tv_sec >> 32 : 0;
 	uint32_t tv_sec_lo = tv_sec & 0xFFFFFFFF;
-	zwlr_screencopy_frame_v1_send_ready(frame->resource,
-		tv_sec_hi, tv_sec_lo, when->tv_nsec);
+	zwlr_screencopy_frame_v1_send_ready(frame->resource, tv_sec_hi, tv_sec_lo, when->tv_nsec);
 }
 
-static void block_out_window(toplevel_t *tl,
-		struct wlr_render_pass *pass, struct wlr_output *output) {
+static void block_out_window(toplevel_t *tl, struct wlr_render_pass *pass, struct wlr_output *output) {
 	if (!tl->node || !tl->node->client) {
-		wlr_log(WLR_DEBUG, "block_out: no node/client for toplevel %p", (void*)tl);
+		wlr_log(WLR_DEBUG, "block_out: no node/client for toplevel %p", (void *)tl);
 		return;
 	}
 
@@ -112,7 +111,7 @@ static void block_out_window(toplevel_t *tl,
 
 	output_t *o = output_from_wlr_output(output);
 	if (!o) {
-		wlr_log(WLR_DEBUG, "block_out: no output_t for wlr_output %p", (void*)output);
+		wlr_log(WLR_DEBUG, "block_out: no output_t for wlr_output %p", (void *)output);
 		return;
 	}
 
@@ -143,16 +142,16 @@ static void block_out_window(toplevel_t *tl,
 	int buf_w = (win_rect.width + 2 * bw) * scale;
 	int buf_h = (win_rect.height + 2 * bw) * scale;
 
-	wlr_log(WLR_DEBUG, "block_out_window: x=%d y=%d w=%d h=%d"
-		" bw=%d scale=%f buf_x=%d buf_y=%d buf_w=%d buf_h=%d",
-		win_rect.x, win_rect.y, win_rect.width, win_rect.height,
-		bw, scale, buf_x, buf_y, buf_w, buf_h);
+	wlr_log(WLR_DEBUG,
+	    "block_out_window: x=%d y=%d w=%d h=%d"
+	    " bw=%d scale=%f buf_x=%d buf_y=%d buf_w=%d buf_h=%d",
+	    win_rect.x, win_rect.y, win_rect.width, win_rect.height, bw, scale, buf_x, buf_y, buf_w, buf_h);
 
 	struct wlr_box block_box = {
-		.x = buf_x,
-		.y = buf_y,
-		.width = buf_w,
-		.height = buf_h,
+	    .x = buf_x,
+	    .y = buf_y,
+	    .width = buf_w,
+	    .height = buf_h,
 	};
 
 	enum wl_output_transform transform = wlr_output_transform_invert(output->transform);
@@ -162,22 +161,28 @@ static void block_out_window(toplevel_t *tl,
 		return;
 	}
 
-	wlr_render_pass_add_rect(pass, &(struct wlr_render_rect_options){
-		.box = block_box,
-		.color = { 0, 0, 0, 1 },
-		.blend_mode = WLR_RENDER_BLEND_MODE_NONE,
-	});
+	wlr_render_pass_add_rect(pass,
+	    &(struct wlr_render_rect_options){
+	        .box = block_box,
+	        .color = {0, 0, 0, 1},
+	        .blend_mode = WLR_RENDER_BLEND_MODE_NONE,
+	    });
 }
 
-static void block_out_xwayland_window(xwayland_toplevel_t *view, struct wlr_render_pass *pass, struct wlr_output *output) {
-	if (!view->node || !view->node->client) return;
+static void block_out_xwayland_window(
+    xwayland_toplevel_t *view, struct wlr_render_pass *pass, struct wlr_output *output) {
+	if (!view->node || !view->node->client)
+		return;
 
 	client_t *c = view->node->client;
-	if (!c->block_out_from_screenshare) return;
-	if (!c->shown && c->state != STATE_FULLSCREEN) return;
+	if (!c->block_out_from_screenshare)
+		return;
+	if (!c->shown && c->state != STATE_FULLSCREEN)
+		return;
 
 	output_t *o = output_from_wlr_output(output);
-	if (!o) return;
+	if (!o)
+		return;
 
 	struct wlr_box win_rect = {0};
 	switch (c->state) {
@@ -193,7 +198,8 @@ static void block_out_xwayland_window(xwayland_toplevel_t *view, struct wlr_rend
 		break;
 	}
 
-	if (win_rect.width == 0 || win_rect.height == 0) return;
+	if (win_rect.width == 0 || win_rect.height == 0)
+		return;
 
 	int abs_x, abs_y;
 	wlr_scene_node_coords(&view->scene_tree->node, &abs_x, &abs_y);
@@ -205,8 +211,10 @@ static void block_out_xwayland_window(xwayland_toplevel_t *view, struct wlr_rend
 	int buf_h = (win_rect.height + 2 * bw) * output->scale;
 
 	struct wlr_box block_box = {
-		.x = buf_x, .y = buf_y,
-		.width = buf_w, .height = buf_h,
+	    .x = buf_x,
+	    .y = buf_y,
+	    .width = buf_w,
+	    .height = buf_h,
 	};
 
 	enum wl_output_transform transform = wlr_output_transform_invert(output->transform);
@@ -216,23 +224,20 @@ static void block_out_xwayland_window(xwayland_toplevel_t *view, struct wlr_rend
 		return;
 	}
 
-	wlr_render_pass_add_rect(pass, &(struct wlr_render_rect_options){
-		.box = block_box,
-		.color = { 0, 0, 0, 1 },
-		.blend_mode = WLR_RENDER_BLEND_MODE_NONE,
-	});
+	wlr_render_pass_add_rect(pass,
+	    &(struct wlr_render_rect_options){
+	        .box = block_box,
+	        .color = {0, 0, 0, 1},
+	        .blend_mode = WLR_RENDER_BLEND_MODE_NONE,
+	    });
 }
 
 static void block_out_windows(struct wlr_render_pass *pass, struct wlr_output *output) {
 	toplevel_t *tl;
-	wl_list_for_each(tl, &server.toplevels, link) {
-		block_out_window(tl, pass, output);
-	}
+	wl_list_for_each(tl, &server.toplevels, link) { block_out_window(tl, pass, output); }
 
 	xwayland_toplevel_t *xw;
-	wl_list_for_each(xw, &server.xwayland.views, link) {
-		block_out_xwayland_window(xw, pass, output);
-	}
+	wl_list_for_each(xw, &server.xwayland.views, link) { block_out_xwayland_window(xw, pass, output); }
 }
 
 static void frame_handle_output_commit(struct wl_listener *listener, void *data) {
@@ -240,17 +245,19 @@ static void frame_handle_output_commit(struct wl_listener *listener, void *data)
 	struct wlr_output_event_commit *event = data;
 	struct wlr_output *output = frame->output;
 
-	if ((event->state->committed & WLR_OUTPUT_STATE_ENABLED) && !output->enabled) goto err;
-	if (!(event->state->committed & WLR_OUTPUT_STATE_BUFFER)) return;
-	if (!frame->buffer) return;
+	if ((event->state->committed & WLR_OUTPUT_STATE_ENABLED) && !output->enabled)
+		goto err;
+	if (!(event->state->committed & WLR_OUTPUT_STATE_BUFFER))
+		return;
+	if (!frame->buffer)
+		return;
 
 	wl_list_remove(&frame->output_commit.link);
 	wl_list_init(&frame->output_commit.link);
 
 	struct wlr_buffer *src_buffer = event->state->buffer;
-	if (frame->box.x < 0 || frame->box.y < 0 ||
-			frame->box.x + frame->box.width > src_buffer->width ||
-			frame->box.y + frame->box.height > src_buffer->height) {
+	if (frame->box.x < 0 || frame->box.y < 0 || frame->box.x + frame->box.width > src_buffer->width
+	    || frame->box.y + frame->box.height > src_buffer->height) {
 		goto err;
 	}
 
@@ -260,27 +267,29 @@ static void frame_handle_output_commit(struct wl_listener *listener, void *data)
 		goto err;
 	}
 
-	struct wlr_render_pass *pass = wlr_renderer_begin_buffer_pass(
-		output->renderer, frame->buffer, NULL);
+	struct wlr_render_pass *pass = wlr_renderer_begin_buffer_pass(output->renderer, frame->buffer, NULL);
 	if (!pass) {
 		wlr_texture_destroy(texture);
 		goto err;
 	}
 
-	wlr_render_pass_add_texture(pass, &(struct wlr_render_texture_options){
-		.texture = texture,
-		.blend_mode = WLR_RENDER_BLEND_MODE_NONE,
-		.dst_box = {
-			.width = frame->box.width,
-			.height = frame->box.height,
-		},
-		.src_box = {
-			.x = frame->box.x,
-			.y = frame->box.y,
-			.width = frame->box.width,
-			.height = frame->box.height,
-		},
-	});
+	wlr_render_pass_add_texture(pass,
+	    &(struct wlr_render_texture_options){
+	        .texture = texture,
+	        .blend_mode = WLR_RENDER_BLEND_MODE_NONE,
+	        .dst_box =
+	            {
+	                .width = frame->box.width,
+	                .height = frame->box.height,
+	            },
+	        .src_box =
+	            {
+	                .x = frame->box.x,
+	                .y = frame->box.y,
+	                .width = frame->box.width,
+	                .height = frame->box.height,
+	            },
+	    });
 
 	wlr_log(WLR_DEBUG, "screencopy: calling block_out_windows before submit");
 	block_out_windows(pass, output);
@@ -312,9 +321,8 @@ static void frame_handle_output_destroy(struct wl_listener *listener, void *data
 	frame_destroy(frame);
 }
 
-static void frame_handle_copy(struct wl_client *wl_client,
-		struct wl_resource *frame_resource,
-		struct wl_resource *buffer_resource) {
+static void frame_handle_copy(
+    struct wl_client *wl_client, struct wl_resource *frame_resource, struct wl_resource *buffer_resource) {
 	(void)wl_client;
 	screencopy_frame_t *frame = frame_from_resource(frame_resource);
 	if (frame == NULL)
@@ -330,23 +338,17 @@ static void frame_handle_copy(struct wl_client *wl_client,
 
 	struct wlr_buffer *buffer = wlr_buffer_try_from_resource(buffer_resource);
 	if (buffer == NULL) {
-		wl_resource_post_error(frame->resource,
-			ZWLR_SCREENCOPY_FRAME_V1_ERROR_INVALID_BUFFER,
-			"invalid buffer");
+		wl_resource_post_error(frame->resource, ZWLR_SCREENCOPY_FRAME_V1_ERROR_INVALID_BUFFER, "invalid buffer");
 		return;
 	}
 
 	if (buffer->width != frame->box.width || buffer->height != frame->box.height) {
-		wl_resource_post_error(frame->resource,
-			ZWLR_SCREENCOPY_FRAME_V1_ERROR_INVALID_BUFFER,
-			"invalid buffer dimensions");
+		wl_resource_post_error(frame->resource, ZWLR_SCREENCOPY_FRAME_V1_ERROR_INVALID_BUFFER, "invalid buffer dimensions");
 		return;
 	}
 
 	if (frame->buffer != NULL) {
-		wl_resource_post_error(frame->resource,
-			ZWLR_SCREENCOPY_FRAME_V1_ERROR_ALREADY_USED,
-			"frame already used");
+		wl_resource_post_error(frame->resource, ZWLR_SCREENCOPY_FRAME_V1_ERROR_ALREADY_USED, "frame already used");
 		return;
 	}
 
@@ -358,31 +360,22 @@ static void frame_handle_copy(struct wl_client *wl_client,
 	if (wlr_buffer_get_dmabuf(buffer, &dmabuf)) {
 		cap = WLR_BUFFER_CAP_DMABUF;
 		if (dmabuf.format != frame->dmabuf_format) {
-			wl_resource_post_error(frame->resource,
-				ZWLR_SCREENCOPY_FRAME_V1_ERROR_INVALID_BUFFER,
-				"invalid buffer format");
+			wl_resource_post_error(frame->resource, ZWLR_SCREENCOPY_FRAME_V1_ERROR_INVALID_BUFFER, "invalid buffer format");
 			return;
 		}
-	} else if (wlr_buffer_begin_data_ptr_access(buffer,
-			WLR_BUFFER_DATA_PTR_ACCESS_WRITE, &data, &format, &stride)) {
+	} else if (wlr_buffer_begin_data_ptr_access(buffer, WLR_BUFFER_DATA_PTR_ACCESS_WRITE, &data, &format, &stride)) {
 		wlr_buffer_end_data_ptr_access(buffer);
 		cap = WLR_BUFFER_CAP_DATA_PTR;
 		if (format != frame->shm_format) {
-			wl_resource_post_error(frame->resource,
-				ZWLR_SCREENCOPY_FRAME_V1_ERROR_INVALID_BUFFER,
-				"invalid buffer format");
+			wl_resource_post_error(frame->resource, ZWLR_SCREENCOPY_FRAME_V1_ERROR_INVALID_BUFFER, "invalid buffer format");
 			return;
 		}
 		if (stride != (size_t)frame->shm_stride) {
-			wl_resource_post_error(frame->resource,
-				ZWLR_SCREENCOPY_FRAME_V1_ERROR_INVALID_BUFFER,
-				"invalid buffer stride");
+			wl_resource_post_error(frame->resource, ZWLR_SCREENCOPY_FRAME_V1_ERROR_INVALID_BUFFER, "invalid buffer stride");
 			return;
 		}
 	} else {
-		wl_resource_post_error(frame->resource,
-			ZWLR_SCREENCOPY_FRAME_V1_ERROR_INVALID_BUFFER,
-			"unsupported buffer type");
+		wl_resource_post_error(frame->resource, ZWLR_SCREENCOPY_FRAME_V1_ERROR_INVALID_BUFFER, "unsupported buffer type");
 		return;
 	}
 
@@ -401,8 +394,8 @@ static void frame_handle_copy(struct wl_client *wl_client,
 	}
 }
 
-static void frame_handle_copy_with_damage(struct wl_client *wl_client, struct wl_resource *frame_resource,
-		struct wl_resource *buffer_resource) {
+static void frame_handle_copy_with_damage(
+    struct wl_client *wl_client, struct wl_resource *frame_resource, struct wl_resource *buffer_resource) {
 	screencopy_frame_t *frame = frame_from_resource(frame_resource);
 	if (frame == NULL)
 		return;
@@ -416,9 +409,9 @@ static void frame_handle_destroy(struct wl_client *wl_client, struct wl_resource
 }
 
 static const struct zwlr_screencopy_frame_v1_interface frame_impl = {
-	.copy = frame_handle_copy,
-	.destroy = frame_handle_destroy,
-	.copy_with_damage = frame_handle_copy_with_damage,
+    .copy = frame_handle_copy,
+    .destroy = frame_handle_destroy,
+    .copy_with_damage = frame_handle_copy_with_damage,
 };
 
 static void frame_handle_resource_destroy(struct wl_resource *frame_resource) {
@@ -426,9 +419,8 @@ static void frame_handle_resource_destroy(struct wl_resource *frame_resource) {
 	frame_destroy(frame);
 }
 
-static void capture_output(struct wl_client *wl_client, screencopy_mgr_t *manager,
-		uint32_t version, uint32_t id, int32_t overlay_cursor, struct wlr_output *output,
-		const struct wlr_box *box) {
+static void capture_output(struct wl_client *wl_client, screencopy_mgr_t *manager, uint32_t version, uint32_t id,
+    int32_t overlay_cursor, struct wlr_output *output, const struct wlr_box *box) {
 	screencopy_frame_t *frame = calloc(1, sizeof(*frame));
 	if (frame == NULL) {
 		wl_client_post_no_memory(wl_client);
@@ -437,15 +429,13 @@ static void capture_output(struct wl_client *wl_client, screencopy_mgr_t *manage
 	frame->output = output;
 	frame->overlay_cursor = !!overlay_cursor;
 
-	frame->resource = wl_resource_create(wl_client, &zwlr_screencopy_frame_v1_interface,
-		version, id);
+	frame->resource = wl_resource_create(wl_client, &zwlr_screencopy_frame_v1_interface, version, id);
 	if (frame->resource == NULL) {
 		free(frame);
 		wl_client_post_no_memory(wl_client);
 		return;
 	}
-	wl_resource_set_implementation(frame->resource, &frame_impl, frame,
-		frame_handle_resource_destroy);
+	wl_resource_set_implementation(frame->resource, &frame_impl, frame, frame_handle_resource_destroy);
 
 	if (output == NULL || !output->enabled) {
 		wl_resource_set_user_data(frame->resource, NULL);
@@ -485,8 +475,7 @@ static void capture_output(struct wl_client *wl_client, screencopy_mgr_t *manage
 		goto error;
 	}
 
-	if (output->allocator &&
-			(output->allocator->buffer_caps & WLR_BUFFER_CAP_DMABUF))
+	if (output->allocator && (output->allocator->buffer_caps & WLR_BUFFER_CAP_DMABUF))
 		frame->dmabuf_format = output->render_format;
 	else
 		frame->dmabuf_format = DRM_FORMAT_INVALID;
@@ -499,8 +488,7 @@ static void capture_output(struct wl_client *wl_client, screencopy_mgr_t *manage
 		int ow, oh;
 		wlr_output_effective_resolution(output, &ow, &oh);
 		buffer_box = *box;
-		wlr_box_transform(&buffer_box, &buffer_box,
-			wlr_output_transform_invert(output->transform), ow, oh);
+		wlr_box_transform(&buffer_box, &buffer_box, wlr_output_transform_invert(output->transform), ow, oh);
 		buffer_box.x *= output->scale;
 		buffer_box.y *= output->scale;
 		buffer_box.width *= output->scale;
@@ -512,22 +500,30 @@ static void capture_output(struct wl_client *wl_client, screencopy_mgr_t *manage
 
 	uint32_t shm_format;
 	switch (frame->shm_format) {
-	case DRM_FORMAT_ARGB8888: shm_format = WL_SHM_FORMAT_ARGB8888; break;
-	case DRM_FORMAT_XRGB8888: shm_format = WL_SHM_FORMAT_XRGB8888; break;
-	case DRM_FORMAT_ABGR8888: shm_format = WL_SHM_FORMAT_ABGR8888; break;
-	case DRM_FORMAT_XBGR8888: shm_format = WL_SHM_FORMAT_XBGR8888; break;
-	default: shm_format = WL_SHM_FORMAT_XRGB8888; break;
+	case DRM_FORMAT_ARGB8888:
+		shm_format = WL_SHM_FORMAT_ARGB8888;
+		break;
+	case DRM_FORMAT_XRGB8888:
+		shm_format = WL_SHM_FORMAT_XRGB8888;
+		break;
+	case DRM_FORMAT_ABGR8888:
+		shm_format = WL_SHM_FORMAT_ABGR8888;
+		break;
+	case DRM_FORMAT_XBGR8888:
+		shm_format = WL_SHM_FORMAT_XBGR8888;
+		break;
+	default:
+		shm_format = WL_SHM_FORMAT_XRGB8888;
+		break;
 	}
 
-	zwlr_screencopy_frame_v1_send_buffer(frame->resource,
-		shm_format,
-		buffer_box.width, buffer_box.height, frame->shm_stride);
+	zwlr_screencopy_frame_v1_send_buffer(
+	    frame->resource, shm_format, buffer_box.width, buffer_box.height, frame->shm_stride);
 
 	if (version >= 3) {
 		if (frame->dmabuf_format != DRM_FORMAT_INVALID) {
 			zwlr_screencopy_frame_v1_send_linux_dmabuf(
-				frame->resource, frame->dmabuf_format,
-				buffer_box.width, buffer_box.height);
+			    frame->resource, frame->dmabuf_format, buffer_box.width, buffer_box.height);
 		}
 		zwlr_screencopy_frame_v1_send_buffer_done(frame->resource);
 	}
@@ -539,9 +535,8 @@ error:
 	frame_destroy(frame);
 }
 
-static void manager_handle_capture_output(struct wl_client *wl_client,
-		struct wl_resource *manager_resource, uint32_t id,
-		int32_t overlay_cursor, struct wl_resource *output_resource) {
+static void manager_handle_capture_output(struct wl_client *wl_client, struct wl_resource *manager_resource,
+    uint32_t id, int32_t overlay_cursor, struct wl_resource *output_resource) {
 	uint32_t version = wl_resource_get_version(manager_resource);
 	struct wlr_output *output = wlr_output_from_resource(output_resource);
 	screencopy_mgr_t *manager = wl_resource_get_user_data(manager_resource);
@@ -549,15 +544,17 @@ static void manager_handle_capture_output(struct wl_client *wl_client,
 	capture_output(wl_client, manager, version, id, overlay_cursor, output, NULL);
 }
 
-static void manager_handle_capture_output_region(struct wl_client *wl_client,
-		struct wl_resource *manager_resource, uint32_t id,
-		int32_t overlay_cursor, struct wl_resource *output_resource,
-		int32_t x, int32_t y, int32_t width, int32_t height) {
+static void manager_handle_capture_output_region(struct wl_client *wl_client, struct wl_resource *manager_resource,
+    uint32_t id, int32_t overlay_cursor, struct wl_resource *output_resource, int32_t x, int32_t y, int32_t width,
+    int32_t height) {
 	uint32_t version = wl_resource_get_version(manager_resource);
 	struct wlr_output *output = wlr_output_from_resource(output_resource);
 
 	struct wlr_box box = {
-		.x = x, .y = y, .width = width, .height = height,
+	    .x = x,
+	    .y = y,
+	    .width = width,
+	    .height = height,
 	};
 
 	screencopy_mgr_t *manager = wl_resource_get_user_data(manager_resource);
@@ -565,23 +562,21 @@ static void manager_handle_capture_output_region(struct wl_client *wl_client,
 	capture_output(wl_client, manager, version, id, overlay_cursor, output, &box);
 }
 
-static void manager_handle_destroy(struct wl_client *wl_client,	struct wl_resource *manager_resource) {
+static void manager_handle_destroy(struct wl_client *wl_client, struct wl_resource *manager_resource) {
 	(void)wl_client;
 	wl_resource_destroy(manager_resource);
 }
 
 static const struct zwlr_screencopy_manager_v1_interface manager_impl = {
-	.capture_output = manager_handle_capture_output,
-	.capture_output_region = manager_handle_capture_output_region,
-	.destroy = manager_handle_destroy,
+    .capture_output = manager_handle_capture_output,
+    .capture_output_region = manager_handle_capture_output_region,
+    .destroy = manager_handle_destroy,
 };
 
-static void manager_bind(struct wl_client *wl_client, void *data,
-		uint32_t version, uint32_t id) {
-	 screencopy_mgr_t *manager = data;
+static void manager_bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id) {
+	screencopy_mgr_t *manager = data;
 
-	struct wl_resource *resource = wl_resource_create(wl_client,
-		&zwlr_screencopy_manager_v1_interface, version, id);
+	struct wl_resource *resource = wl_resource_create(wl_client, &zwlr_screencopy_manager_v1_interface, version, id);
 	if (resource == NULL) {
 		wl_client_post_no_memory(wl_client);
 		return;
@@ -601,11 +596,11 @@ static screencopy_mgr_t *screencopy_manager = NULL;
 
 void screencopy_init(void) {
 	screencopy_manager = calloc(1, sizeof(*screencopy_manager));
-	if (!screencopy_manager) return;
+	if (!screencopy_manager)
+		return;
 
-	screencopy_manager->global = wl_global_create(server.wl_display,
-		&zwlr_screencopy_manager_v1_interface, SCREENCOPY_MANAGER_VERSION,
-		screencopy_manager, manager_bind);
+	screencopy_manager->global = wl_global_create(server.wl_display, &zwlr_screencopy_manager_v1_interface,
+	    SCREENCOPY_MANAGER_VERSION, screencopy_manager, manager_bind);
 	if (!screencopy_manager->global) {
 		free(screencopy_manager);
 		screencopy_manager = NULL;
@@ -620,11 +615,11 @@ void screencopy_init(void) {
 }
 
 void screencopy_fini(void) {
-	if (!screencopy_manager) return;
+	if (!screencopy_manager)
+		return;
 
 	screencopy_frame_t *frame, *tmp;
-	wl_list_for_each_safe(frame, tmp, &screencopy_manager->frames, link)
-		frame_destroy(frame);
+	wl_list_for_each_safe(frame, tmp, &screencopy_manager->frames, link) frame_destroy(frame);
 
 	wl_list_remove(&screencopy_manager->display_destroy.link);
 	wl_global_destroy(screencopy_manager->global);
@@ -632,6 +627,4 @@ void screencopy_fini(void) {
 	screencopy_manager = NULL;
 }
 
-struct wl_global *screencopy_get_global(void) {
-	return screencopy_manager ? screencopy_manager->global : NULL;
-}
+struct wl_global *screencopy_get_global(void) { return screencopy_manager ? screencopy_manager->global : NULL; }

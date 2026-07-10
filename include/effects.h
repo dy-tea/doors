@@ -1,6 +1,7 @@
 #pragma once
 
 #include "effects_backend.h"
+
 #include <stdbool.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/util/box.h>
@@ -44,29 +45,29 @@ extern int refraction_texture_repeat_mode;
 extern float refraction_offset;
 
 typedef struct effects_output_t {
-  int width, height;
-  int blur_w, blur_h;
+	int width, height;
+	int blur_w, blur_h;
 
-  be_output_state_t be_state;
+	be_output_state_t be_state;
 
-  struct wlr_buffer *mica_buf;
-  uint64_t mica_native[2];
-  bool mica_dirty;
+	struct wlr_buffer *mica_buf;
+	uint64_t mica_native[2];
+	bool mica_dirty;
 
-  struct wlr_buffer *screen_shader_buf;
-  uint64_t screen_shader_native[2];
-  struct wlr_scene_buffer *screen_shader_node;
+	struct wlr_buffer *screen_shader_buf;
+	uint64_t screen_shader_native[2];
+	struct wlr_scene_buffer *screen_shader_node;
 
-  struct wlr_backend *capture_backend;
-  struct wlr_output *capture_output;
-  struct wlr_scene_output *capture_scene_output;
-  struct wlr_output_state capture_state;
+	struct wlr_backend *capture_backend;
+	struct wlr_output *capture_output;
+	struct wlr_scene_output *capture_scene_output;
+	struct wlr_output_state capture_state;
 } effects_output_t;
 
 typedef struct effects_state_t {
-  bool available;
-  const effects_backend_t *backend;
-  void *backend_data;
+	bool available;
+	const effects_backend_t *backend;
+	void *backend_data;
 } effects_state_t;
 
 extern effects_state_t effects_state;

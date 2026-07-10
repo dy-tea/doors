@@ -12,36 +12,36 @@ struct node_t;
 struct toplevel_t;
 
 typedef struct transaction_inst_t {
-  struct transaction_t *transaction;
-  struct node_t *node;
-  struct wl_list link;  // transaction_t::instructions
+	struct transaction_t *transaction;
+	struct node_t *node;
+	struct wl_list link; // transaction_t::instructions
 
-  // saved state
-  struct wlr_box rectangle;
-  double split_ratio;
-  int split_type;  // split_type_t
-  bool hidden;
+	// saved state
+	struct wlr_box rectangle;
+	double split_ratio;
+	int split_type; // split_type_t
+	bool hidden;
 
-  int state;  // client_state_t
-  struct wlr_box tiled_rectangle;
-  struct wlr_box floating_rectangle;
-  struct wlr_box content_rect;
-  struct wlr_box previous_tiled_rectangle;
-  uint32_t serial;
-  bool waiting;
-  bool server_request;
-  bool require_geometry_match;
+	int state; // client_state_t
+	struct wlr_box tiled_rectangle;
+	struct wlr_box floating_rectangle;
+	struct wlr_box content_rect;
+	struct wlr_box previous_tiled_rectangle;
+	uint32_t serial;
+	bool waiting;
+	bool server_request;
+	bool require_geometry_match;
 
-  // scene tree snapshot during alive state
-  struct wlr_scene_tree *scene_tree;
+	// scene tree snapshot during alive state
+	struct wlr_scene_tree *scene_tree;
 } transaction_inst_t;
 
 typedef struct transaction_t {
-  struct wl_event_source *timer;
-  struct wl_list instructions;
-  size_t num_waiting;
-  size_t num_configures;
-  struct timespec commit_time;
+	struct wl_event_source *timer;
+	struct wl_list instructions;
+	size_t num_waiting;
+	size_t num_configures;
+	struct timespec commit_time;
 } transaction_t;
 
 /**
@@ -62,8 +62,7 @@ void transaction_commit_dirty_client(void);
  *
  * Returns true if this instruction was found and marked ready.
  */
-bool transaction_notify_view_ready_by_serial(struct toplevel_t *toplevel,
-                                              uint32_t serial);
+bool transaction_notify_view_ready_by_serial(struct toplevel_t *toplevel, uint32_t serial);
 
 /**
  * Notify the transaction system that a view is ready for the new layout,
@@ -72,8 +71,7 @@ bool transaction_notify_view_ready_by_serial(struct toplevel_t *toplevel,
  * This can be used as a fallback for clients that don't properly track serials.
  * Returns true if this instruction was found and marked ready.
  */
-bool transaction_notify_view_ready_by_geometry(struct toplevel_t *toplevel,
-                                                int x, int y, int width, int height);
+bool transaction_notify_view_ready_by_geometry(struct toplevel_t *toplevel, int x, int y, int width, int height);
 
 /**
  * Initialize the transaction system.

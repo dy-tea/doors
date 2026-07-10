@@ -11,65 +11,65 @@ struct wlr_output;
 #define MAXLEN 256
 
 enum output_config_enable {
-  OUTPUT_CONFIG_ENABLE_AUTO = -1,
-  OUTPUT_CONFIG_DISABLE = 0,
-  OUTPUT_CONFIG_ENABLE = 1,
+	OUTPUT_CONFIG_ENABLE_AUTO = -1,
+	OUTPUT_CONFIG_DISABLE = 0,
+	OUTPUT_CONFIG_ENABLE = 1,
 };
 
 enum output_config_dpms {
-  OUTPUT_CONFIG_DPMS_AUTO = 0,
-  OUTPUT_CONFIG_DPMS_ON = 1,
-  OUTPUT_CONFIG_DPMS_OFF = 2,
+	OUTPUT_CONFIG_DPMS_AUTO = 0,
+	OUTPUT_CONFIG_DPMS_ON = 1,
+	OUTPUT_CONFIG_DPMS_OFF = 2,
 };
 
 enum output_config_scale_filter {
-  OUTPUT_CONFIG_SCALE_FILTER_AUTO = 0,
-  OUTPUT_CONFIG_SCALE_FILTER_LINEAR = 1,
-  OUTPUT_CONFIG_SCALE_FILTER_NEAREST = 2,
+	OUTPUT_CONFIG_SCALE_FILTER_AUTO = 0,
+	OUTPUT_CONFIG_SCALE_FILTER_LINEAR = 1,
+	OUTPUT_CONFIG_SCALE_FILTER_NEAREST = 2,
 };
 
 enum output_config_adaptive_sync {
-  OUTPUT_CONFIG_ADAPTIVE_SYNC_AUTO = 0,
-  OUTPUT_CONFIG_ADAPTIVE_SYNC_DISABLED = 1,
-  OUTPUT_CONFIG_ADAPTIVE_SYNC_ENABLED = 2,
+	OUTPUT_CONFIG_ADAPTIVE_SYNC_AUTO = 0,
+	OUTPUT_CONFIG_ADAPTIVE_SYNC_DISABLED = 1,
+	OUTPUT_CONFIG_ADAPTIVE_SYNC_ENABLED = 2,
 };
 
 enum output_config_render_bit_depth {
-  OUTPUT_CONFIG_RENDER_BIT_DEPTH_AUTO = 0,
-  OUTPUT_CONFIG_RENDER_BIT_DEPTH_8 = 8,
-  OUTPUT_CONFIG_RENDER_BIT_DEPTH_10 = 10,
+	OUTPUT_CONFIG_RENDER_BIT_DEPTH_AUTO = 0,
+	OUTPUT_CONFIG_RENDER_BIT_DEPTH_8 = 8,
+	OUTPUT_CONFIG_RENDER_BIT_DEPTH_10 = 10,
 };
 
 enum output_config_subpixel {
-  OUTPUT_CONFIG_SUBPIXEL_AUTO = 0,
-  OUTPUT_CONFIG_SUBPIXEL_UNKNOWN = 1,
-  OUTPUT_CONFIG_SUBPIXEL_NONE = 2,
-  OUTPUT_CONFIG_SUBPIXEL_HORIZONTAL_RGB = 3,
-  OUTPUT_CONFIG_SUBPIXEL_HORIZONTAL_BGR = 4,
-  OUTPUT_CONFIG_SUBPIXEL_VERTICAL_RGB = 5,
-  OUTPUT_CONFIG_SUBPIXEL_VERTICAL_BGR = 6,
+	OUTPUT_CONFIG_SUBPIXEL_AUTO = 0,
+	OUTPUT_CONFIG_SUBPIXEL_UNKNOWN = 1,
+	OUTPUT_CONFIG_SUBPIXEL_NONE = 2,
+	OUTPUT_CONFIG_SUBPIXEL_HORIZONTAL_RGB = 3,
+	OUTPUT_CONFIG_SUBPIXEL_HORIZONTAL_BGR = 4,
+	OUTPUT_CONFIG_SUBPIXEL_VERTICAL_RGB = 5,
+	OUTPUT_CONFIG_SUBPIXEL_VERTICAL_BGR = 6,
 };
 
 struct output_config {
-  struct wl_list link;
-  char *name;
-  int enable;
-  int x, y;
-  int width, height;
-  float refresh_rate;
-  float scale;
-  int transform;
-  char *background;
-  char *background_option;
-  enum output_config_dpms dpms_state;
-  enum output_config_scale_filter scale_filter;
-  enum output_config_adaptive_sync adaptive_sync;
-  enum output_config_render_bit_depth render_bit_depth;
-  enum output_config_subpixel subpixel;
-  struct wlr_color_transform *color_transform;
-  int allow_tearing;
-  int max_render_time;
-  bool hdr_enabled;
+	struct wl_list link;
+	char *name;
+	int enable;
+	int x, y;
+	int width, height;
+	float refresh_rate;
+	float scale;
+	int transform;
+	char *background;
+	char *background_option;
+	enum output_config_dpms dpms_state;
+	enum output_config_scale_filter scale_filter;
+	enum output_config_adaptive_sync adaptive_sync;
+	enum output_config_render_bit_depth render_bit_depth;
+	enum output_config_subpixel subpixel;
+	struct wlr_color_transform *color_transform;
+	int allow_tearing;
+	int max_render_time;
+	bool hdr_enabled;
 };
 
 struct output_config *output_config_create(const char *name);

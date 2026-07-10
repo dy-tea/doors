@@ -3,6 +3,7 @@
 #include "gesture.h"
 #include "server.h"
 #include "toplevel.h"
+
 #include <wlr/types/wlr_pointer.h>
 #include <wlr/types/wlr_touch.h>
 

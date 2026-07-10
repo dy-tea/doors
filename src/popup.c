@@ -1,8 +1,10 @@
+#include "popup.h"
+
 #include "layer.h"
 #include "output.h"
-#include "popup.h"
 #include "server.h"
 #include "toplevel.h"
+
 #include <stdlib.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_output_layout.h>
@@ -10,99 +12,102 @@
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
 
-static void create_xdg_popup(struct wlr_xdg_popup *xdg_popup,
-	struct wlr_scene_tree *parent_tree, struct wlr_scene_tree *image_capture_parent_tree);
+static void create_xdg_popup(struct wlr_xdg_popup *xdg_popup, struct wlr_scene_tree *parent_tree,
+    struct wlr_scene_tree *image_capture_parent_tree);
 
 void popup_unconstrain(popup_t *popup) {
 	int lx, ly;
-  wlr_scene_node_coords(&popup->parent_tree->node.parent->node, &lx, &ly);
+	wlr_scene_node_coords(&popup->parent_tree->node.parent->node, &lx, &ly);
 
-  struct wlr_output *wlr_output = wlr_output_layout_output_at(server.output_layout, lx, ly);
-  if (wlr_output == NULL) return;
+	struct wlr_output *wlr_output = wlr_output_layout_output_at(server.output_layout, lx, ly);
+	if (wlr_output == NULL)
+		return;
 
-  output_t *output = wlr_output->data;
-  if (output == NULL) return;
+	output_t *output = wlr_output->data;
+	if (output == NULL)
+		return;
 
-  struct wlr_box box = {
-    output->rectangle.x - lx,
-    output->rectangle.y - ly,
-    output->rectangle.width,
-    output->rectangle.height,
-  };
+	struct wlr_box box = {
+	    output->rectangle.x - lx,
+	    output->rectangle.y - ly,
+	    output->rectangle.width,
+	    output->rectangle.height,
+	};
 
-  // unconstrain the popup from the relative box
-  wlr_xdg_popup_unconstrain_from_box(popup->xdg_popup, &box);
+	// unconstrain the popup from the relative box
+	wlr_xdg_popup_unconstrain_from_box(popup->xdg_popup, &box);
 }
 
 void popup_new_popup(struct wl_listener *listener, void *data) {
-  popup_t *popup = wl_container_of(listener, popup, new_popup);
-  create_xdg_popup(data, popup->parent_tree, popup->image_capture_tree);
+	popup_t *popup = wl_container_of(listener, popup, new_popup);
+	create_xdg_popup(data, popup->parent_tree, popup->image_capture_tree);
 }
 
 void popup_commit(struct wl_listener *listener, void *data) {
 	(void)data;
-  struct popup_t *popup = wl_container_of(listener, popup, commit);
+	struct popup_t *popup = wl_container_of(listener, popup, commit);
 
-  if (!popup->xdg_popup->base->initial_commit) return;
+	if (!popup->xdg_popup->base->initial_commit)
+		return;
 
-  popup_unconstrain(popup);
+	popup_unconstrain(popup);
 }
 
 void popup_reposition(struct wl_listener *listener, void *data) {
 	(void)data;
-  popup_t *popup = wl_container_of(listener, popup, reposition);
-  popup_unconstrain(popup);
+	popup_t *popup = wl_container_of(listener, popup, reposition);
+	popup_unconstrain(popup);
 }
 
 void popup_destroy(struct wl_listener *listener, void *data) {
 	(void)data;
-  popup_t *popup = wl_container_of(listener, popup, destroy);
+	popup_t *popup = wl_container_of(listener, popup, destroy);
 
-  wl_list_remove(&popup->commit.link);
-  wl_list_remove(&popup->reposition.link);
-  wl_list_remove(&popup->new_popup.link);
-  wl_list_remove(&popup->destroy.link);
+	wl_list_remove(&popup->commit.link);
+	wl_list_remove(&popup->reposition.link);
+	wl_list_remove(&popup->new_popup.link);
+	wl_list_remove(&popup->destroy.link);
 
-  free(popup);
+	free(popup);
 }
 
-static void create_xdg_popup(struct wlr_xdg_popup *xdg_popup,
-	struct wlr_scene_tree *parent_tree, struct wlr_scene_tree *image_capture_parent_tree) {
-  popup_t *popup = calloc(1, sizeof(*popup));
-  if (!popup) {
-    wlr_log(WLR_ERROR, "allocation failed");
-    return;
-  }
-  popup->xdg_popup = xdg_popup;
-  popup->parent_tree = wlr_scene_xdg_surface_create(parent_tree, xdg_popup->base);
-  xdg_popup->base->data = popup->parent_tree;
+static void create_xdg_popup(struct wlr_xdg_popup *xdg_popup, struct wlr_scene_tree *parent_tree,
+    struct wlr_scene_tree *image_capture_parent_tree) {
+	popup_t *popup = calloc(1, sizeof(*popup));
+	if (!popup) {
+		wlr_log(WLR_ERROR, "allocation failed");
+		return;
+	}
+	popup->xdg_popup = xdg_popup;
+	popup->parent_tree = wlr_scene_xdg_surface_create(parent_tree, xdg_popup->base);
+	xdg_popup->base->data = popup->parent_tree;
 
-  if (image_capture_parent_tree != NULL) {
-  	popup->image_capture_tree = wlr_scene_tree_create(image_capture_parent_tree);
-    wlr_scene_surface_create(popup->image_capture_tree, xdg_popup->base->surface);
-  }
+	if (image_capture_parent_tree != NULL) {
+		popup->image_capture_tree = wlr_scene_tree_create(image_capture_parent_tree);
+		wlr_scene_surface_create(popup->image_capture_tree, xdg_popup->base->surface);
+	}
 
-  popup->commit.notify = popup_commit;
-  wl_signal_add(&xdg_popup->base->surface->events.commit, &popup->commit);
+	popup->commit.notify = popup_commit;
+	wl_signal_add(&xdg_popup->base->surface->events.commit, &popup->commit);
 
-  popup->new_popup.notify = popup_new_popup;
-  wl_signal_add(&xdg_popup->base->events.new_popup, &popup->new_popup);
+	popup->new_popup.notify = popup_new_popup;
+	wl_signal_add(&xdg_popup->base->events.new_popup, &popup->new_popup);
 
-  popup->reposition.notify = popup_reposition;
-  wl_signal_add(&xdg_popup->events.reposition, &popup->reposition);
+	popup->reposition.notify = popup_reposition;
+	wl_signal_add(&xdg_popup->events.reposition, &popup->reposition);
 
-  popup->destroy.notify = popup_destroy;
-  wl_signal_add(&xdg_popup->events.destroy, &popup->destroy);
+	popup->destroy.notify = popup_destroy;
+	wl_signal_add(&xdg_popup->events.destroy, &popup->destroy);
 }
 
 void handle_new_xdg_popup(struct wl_listener *listener, void *data) {
 	struct wlr_xdg_popup *xdg_popup = data;
 	toplevel_t *toplevel = wl_container_of(listener, toplevel, new_xdg_popup);
-  create_xdg_popup(xdg_popup, toplevel->scene_tree, toplevel->image_capture_tree);
+	create_xdg_popup(xdg_popup, toplevel->scene_tree, toplevel->image_capture_tree);
 }
 
 void handle_new_layer_popup(struct wl_listener *listener, void *data) {
-  struct wlr_xdg_popup *xdg_popup = data;
-  layer_surface_t *layer = wl_container_of(listener, layer, new_popup);
-  create_xdg_popup(xdg_popup, layer->scene_tree, NULL);
+	struct wlr_xdg_popup *xdg_popup = data;
+	layer_surface_t *layer = wl_container_of(listener, layer, new_popup);
+	create_xdg_popup(xdg_popup, layer->scene_tree, NULL);
 }

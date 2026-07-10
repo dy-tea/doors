@@ -7,11 +7,13 @@
 #define BEZIER_BAKED_POINTS 256
 
 typedef struct bezier_curve_t {
-  struct wl_list link;
-  char name[64];
-  double p1x, p1y, p2x, p2y;
+	struct wl_list link;
+	char name[64];
+	double p1x, p1y, p2x, p2y;
 
-  struct { float x, y; } baked[BEZIER_BAKED_POINTS];
+	struct {
+		float x, y;
+	} baked[BEZIER_BAKED_POINTS];
 } bezier_curve_t;
 
 void bezier_init(void);

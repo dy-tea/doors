@@ -1,10 +1,11 @@
 #pragma once
 
 #include "types.h"
-#include <wayland-server.h>
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <time.h>
+#include <wayland-server.h>
 #include <wlr/render/color.h>
 #include <wlr/util/box.h>
 
@@ -18,54 +19,54 @@ enum scale_filter_mode {
 };
 
 typedef struct output_t {
-  struct wlr_output *wlr_output;
-  struct wlr_box usable_area;
-  struct wlr_scene_tree *layer_bg;
-  struct wlr_scene_tree *layer_bottom;
-  struct wlr_scene_tree *layer_top;
-  struct wlr_scene_tree *layer_overlay;
-  struct wl_list layers[4];
-  struct wl_listener frame;
-  struct wl_listener request_state;
-  struct wl_listener destroy;
-  struct wl_listener present;
-  struct wl_event_source *repaint_timer;
+	struct wlr_output *wlr_output;
+	struct wlr_box usable_area;
+	struct wlr_scene_tree *layer_bg;
+	struct wlr_scene_tree *layer_bottom;
+	struct wlr_scene_tree *layer_top;
+	struct wlr_scene_tree *layer_overlay;
+	struct wl_list layers[4];
+	struct wl_listener frame;
+	struct wl_listener request_state;
+	struct wl_listener destroy;
+	struct wl_listener present;
+	struct wl_event_source *repaint_timer;
 
-  struct wlr_session_lock_surface_v1 *lock_surface;
-  struct wl_listener destroy_lock_surface;
-  struct wl_listener map_lock_surface;
+	struct wlr_session_lock_surface_v1 *lock_surface;
+	struct wl_listener destroy_lock_surface;
+	struct wl_listener map_lock_surface;
 
-  bool enabled;
-  bool allow_tearing;
-  bool frame_scheduled;
-  int lx, ly;
-  int width, height;
+	bool enabled;
+	bool allow_tearing;
+	bool frame_scheduled;
+	int lx, ly;
+	int width, height;
 
-  struct timespec last_presentation;
-  uint64_t refresh_nsec;
-  int max_render_time;
+	struct timespec last_presentation;
+	uint64_t refresh_nsec;
+	int max_render_time;
 
-  enum scale_filter_mode scale_filter_mode;
-  enum scale_filter_mode applied_scale_filter;
-  enum wl_output_subpixel detected_subpixel;
+	enum scale_filter_mode scale_filter_mode;
+	enum scale_filter_mode applied_scale_filter;
+	enum wl_output_subpixel detected_subpixel;
 
-  struct wlr_color_transform *color_transform;
-  bool hdr;
-  effects_output_t *effects;
+	struct wlr_color_transform *color_transform;
+	bool hdr;
+	effects_output_t *effects;
 
-  char name[64]; // SMALEN
-  uint32_t id;
-  bool wired;
-  padding_t padding;
-  unsigned int sticky_count;
+	char name[64]; // SMALEN
+	uint32_t id;
+	bool wired;
+	padding_t padding;
+	unsigned int sticky_count;
 
-  struct wlr_box rectangle;
-  desktop_t *desk;
-  desktop_t *last_desk;
-  desktop_t *desk_head;
-  desktop_t *desk_tail;
-  struct output_t *prev;
-  struct output_t *next;
+	struct wlr_box rectangle;
+	desktop_t *desk;
+	desktop_t *last_desk;
+	desktop_t *desk_head;
+	desktop_t *desk_tail;
+	struct output_t *prev;
+	struct output_t *next;
 } output_t;
 
 void handle_new_output(struct wl_listener *listener, void *data);

@@ -7,230 +7,231 @@
 #include "toplevel.h"
 #include "types.h"
 #include "xwayland.h"
+
 #include <wayland-protocols/color-management-v1-enum.h>
 #include <wayland-server.h>
 #include <wlr/config.h>
-#include <wlr/util/edges.h>
 #include <wlr/types/wlr_content_type_v1.h>
 #include <wlr/types/wlr_ext_background_effect_v1.h>
 #include <wlr/types/wlr_ext_workspace_v1.h>
 #include <wlr/types/wlr_keyboard_shortcuts_inhibit_v1.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
-#include <wlr/types/wlr_output_power_management_v1.h>
 #include <wlr/types/wlr_output_management_v1.h>
+#include <wlr/types/wlr_output_power_management_v1.h>
 #include <wlr/types/wlr_pointer_gestures_v1.h>
 #include <wlr/types/wlr_security_context_v1.h>
-#include <wlr/types/wlr_tearing_control_v1.h>
 #include <wlr/types/wlr_tablet_v2.h>
+#include <wlr/types/wlr_tearing_control_v1.h>
 #include <wlr/types/wlr_xdg_activation_v1.h>
+#include <wlr/util/edges.h>
 #include <xkbcommon/xkbcommon.h>
 
 enum cursor_mode {
-  CURSOR_PASSTHROUGH,
-  CURSOR_MOVE,
-  CURSOR_RESIZE,
-  CURSOR_TILING_DRAG,
+	CURSOR_PASSTHROUGH,
+	CURSOR_MOVE,
+	CURSOR_RESIZE,
+	CURSOR_TILING_DRAG,
 };
 
 typedef struct output_t output_t;
 
 typedef struct server_t {
-  struct wl_display *wl_display;
-  struct wlr_backend *backend;
-  struct wlr_session *session;
-  struct wlr_renderer *renderer;
-  struct wlr_allocator *allocator;
-  struct wlr_compositor *compositor;
-  struct wlr_scene *scene;
-  struct wlr_scene_output_layout *scene_layout;
+	struct wl_display *wl_display;
+	struct wlr_backend *backend;
+	struct wlr_session *session;
+	struct wlr_renderer *renderer;
+	struct wlr_allocator *allocator;
+	struct wlr_compositor *compositor;
+	struct wlr_scene *scene;
+	struct wlr_scene_output_layout *scene_layout;
 
-  struct wlr_linux_dmabuf_v1 *linux_dmabuf;
+	struct wlr_linux_dmabuf_v1 *linux_dmabuf;
 
-  struct wlr_scene_tree *bg_tree;
-  struct wlr_scene_tree *bot_tree;
-  struct wlr_scene_tree *tile_tree;
-  struct wlr_scene_tree *float_tree;
-  struct wlr_scene_tree *top_tree;
-  struct wlr_scene_tree *full_tree;
-  struct wlr_scene_tree *over_tree;
-  struct wlr_scene_tree *shader_tree;
-  struct wlr_scene_tree *drag_tree;
-  struct wlr_scene_tree *lock_tree;
+	struct wlr_scene_tree *bg_tree;
+	struct wlr_scene_tree *bot_tree;
+	struct wlr_scene_tree *tile_tree;
+	struct wlr_scene_tree *float_tree;
+	struct wlr_scene_tree *top_tree;
+	struct wlr_scene_tree *full_tree;
+	struct wlr_scene_tree *over_tree;
+	struct wlr_scene_tree *shader_tree;
+	struct wlr_scene_tree *drag_tree;
+	struct wlr_scene_tree *lock_tree;
 
-  struct wlr_xdg_shell *xdg_shell;
-  struct wlr_xdg_activation_v1 *xdg_activation_v1;
-  struct wl_listener xdg_activation_request_activate;
-  struct wl_listener xdg_activation_new_token;
-  struct wl_list pending_launcher_ctxs;
-  struct wlr_layer_shell_v1 *layer_shell;
-  struct wl_listener new_layer_surface;
-  struct wl_listener new_xdg_toplevel;
-  struct wl_list toplevels;
+	struct wlr_xdg_shell *xdg_shell;
+	struct wlr_xdg_activation_v1 *xdg_activation_v1;
+	struct wl_listener xdg_activation_request_activate;
+	struct wl_listener xdg_activation_new_token;
+	struct wl_list pending_launcher_ctxs;
+	struct wlr_layer_shell_v1 *layer_shell;
+	struct wl_listener new_layer_surface;
+	struct wl_listener new_xdg_toplevel;
+	struct wl_list toplevels;
 
-  struct wlr_xdg_decoration_manager_v1 *xdg_decoration_manager;
-  struct wl_listener new_xdg_decoration;
+	struct wlr_xdg_decoration_manager_v1 *xdg_decoration_manager;
+	struct wl_listener new_xdg_decoration;
 
-  struct wlr_cursor *cursor;
-  struct wlr_xcursor_manager *cursor_mgr;
-  struct wl_listener cursor_motion;
-  struct wl_listener cursor_motion_absolute;
-  struct wl_listener cursor_button;
-  struct wl_listener cursor_axis;
-  struct wl_listener cursor_frame;
+	struct wlr_cursor *cursor;
+	struct wlr_xcursor_manager *cursor_mgr;
+	struct wl_listener cursor_motion;
+	struct wl_listener cursor_motion_absolute;
+	struct wl_listener cursor_button;
+	struct wl_listener cursor_axis;
+	struct wl_listener cursor_frame;
 
-  struct wl_listener cursor_tablet_tool_axis;
-  struct wl_listener cursor_tablet_tool_proximity;
-  struct wl_listener cursor_tablet_tool_tip;
-  struct wl_listener cursor_tablet_tool_button;
+	struct wl_listener cursor_tablet_tool_axis;
+	struct wl_listener cursor_tablet_tool_proximity;
+	struct wl_listener cursor_tablet_tool_tip;
+	struct wl_listener cursor_tablet_tool_button;
 
-  struct wlr_pointer_constraints_v1 *pointer_constraints;
-  struct wlr_pointer_constraint_v1 *active_pointer_constraint;
-  bool cursor_requires_warp;
-  pixman_region32_t pointer_confine;
-  struct wl_listener new_pointer_constraint;
-  struct wl_listener pointer_constraint_commit;
+	struct wlr_pointer_constraints_v1 *pointer_constraints;
+	struct wlr_pointer_constraint_v1 *active_pointer_constraint;
+	bool cursor_requires_warp;
+	pixman_region32_t pointer_confine;
+	struct wl_listener new_pointer_constraint;
+	struct wl_listener pointer_constraint_commit;
 
-  struct wlr_cursor_shape_manager_v1 *cursor_shape_manager;
-  struct wl_listener cursor_request_set_shape;
+	struct wlr_cursor_shape_manager_v1 *cursor_shape_manager;
+	struct wl_listener cursor_request_set_shape;
 
-  struct wlr_pointer_gestures_v1 *pointer_gestures;
-  gesture_tracker_t gesture_tracker;
-  struct wl_listener hold_begin;
-  struct wl_listener hold_end;
-  struct wl_listener pinch_begin;
-  struct wl_listener pinch_update;
-  struct wl_listener pinch_end;
-  struct wl_listener swipe_begin;
-  struct wl_listener swipe_update;
-  struct wl_listener swipe_end;
+	struct wlr_pointer_gestures_v1 *pointer_gestures;
+	gesture_tracker_t gesture_tracker;
+	struct wl_listener hold_begin;
+	struct wl_listener hold_end;
+	struct wl_listener pinch_begin;
+	struct wl_listener pinch_update;
+	struct wl_listener pinch_end;
+	struct wl_listener swipe_begin;
+	struct wl_listener swipe_update;
+	struct wl_listener swipe_end;
 
-  struct wlr_relative_pointer_manager_v1 *relative_pointer_manager;
-  struct wlr_idle_notifier_v1 *idle_notifier;
+	struct wlr_relative_pointer_manager_v1 *relative_pointer_manager;
+	struct wlr_idle_notifier_v1 *idle_notifier;
 
-  struct wlr_virtual_pointer_manager_v1 *virtual_pointer_manager;
-  struct wl_listener new_virtual_pointer;
+	struct wlr_virtual_pointer_manager_v1 *virtual_pointer_manager;
+	struct wl_listener new_virtual_pointer;
 
-  struct wlr_pointer_warp_v1 *pointer_warp_manager;
-  struct wl_listener pointer_warp;
+	struct wlr_pointer_warp_v1 *pointer_warp_manager;
+	struct wl_listener pointer_warp;
 
-  struct wlr_virtual_keyboard_manager_v1 *virtual_keyboard_manager;
-  struct wl_listener new_virtual_keyboard;
+	struct wlr_virtual_keyboard_manager_v1 *virtual_keyboard_manager;
+	struct wl_listener new_virtual_keyboard;
 
-  struct wlr_seat *seat;
-  struct wl_list seats;
-  struct wl_listener new_input;
-  struct wl_list keyboards;
-  struct wl_list pointers;
-  struct wl_list touches;
-  int num_touches;
-  struct wl_list keyboard_groups;
-  struct wl_list physical_keyboards;
+	struct wlr_seat *seat;
+	struct wl_list seats;
+	struct wl_listener new_input;
+	struct wl_list keyboards;
+	struct wl_list pointers;
+	struct wl_list touches;
+	int num_touches;
+	struct wl_list keyboard_groups;
+	struct wl_list physical_keyboards;
 
-  struct wlr_output_layout *output_layout;
-  struct wl_listener new_output;
+	struct wlr_output_layout *output_layout;
+	struct wl_listener new_output;
 
-  struct wlr_output_power_manager_v1 *output_power_manager;
-  struct wl_listener output_power_set_mode;
+	struct wlr_output_power_manager_v1 *output_power_manager;
+	struct wl_listener output_power_set_mode;
 
-  struct wlr_output_manager_v1 *output_manager;
-  struct wl_listener output_manager_apply;
-  struct wl_listener output_manager_test;
+	struct wlr_output_manager_v1 *output_manager;
+	struct wl_listener output_manager_apply;
+	struct wl_listener output_manager_test;
 
-  struct wlr_tearing_control_manager_v1 *tearing_control_v1;
-  struct wl_listener tearing_control_new_object;
-  struct wl_list tearing_controllers;
+	struct wlr_tearing_control_manager_v1 *tearing_control_v1;
+	struct wl_listener tearing_control_new_object;
+	struct wl_list tearing_controllers;
 
-  struct wlr_keyboard_shortcuts_inhibit_manager_v1 *keyboard_shortcuts_inhibit_manager;
-  struct wl_listener keyboard_shortcuts_inhibit_new_inhibitor;
+	struct wlr_keyboard_shortcuts_inhibit_manager_v1 *keyboard_shortcuts_inhibit_manager;
+	struct wl_listener keyboard_shortcuts_inhibit_new_inhibitor;
 
-  struct wlr_session_lock_manager_v1 *session_lock_manager;
-  struct wl_listener new_session_lock;
-  struct wlr_scene_rect *lock_background;
-  struct wlr_session_lock_v1 *current_session_lock;
-  bool locked;
+	struct wlr_session_lock_manager_v1 *session_lock_manager;
+	struct wl_listener new_session_lock;
+	struct wlr_scene_rect *lock_background;
+	struct wlr_session_lock_v1 *current_session_lock;
+	bool locked;
 
-  struct wlr_xdg_system_bell_v1 *xdg_system_bell;
-  struct wl_listener ring_system_bell;
-  struct wl_event_source *system_bell_timer;
+	struct wlr_xdg_system_bell_v1 *xdg_system_bell;
+	struct wl_listener ring_system_bell;
+	struct wl_event_source *system_bell_timer;
 
-  struct wlr_idle_inhibit_manager_v1 *idle_inhibit_manager;
-  struct wl_listener new_idle_inhibitor;
+	struct wlr_idle_inhibit_manager_v1 *idle_inhibit_manager;
+	struct wl_listener new_idle_inhibitor;
 
-  struct wlr_content_type_manager_v1 *content_type_manager;
+	struct wlr_content_type_manager_v1 *content_type_manager;
 
-  // headless/virtual output backend
-  struct wlr_backend *headless_backend;
-  unsigned int headless_output_counter;
+	// headless/virtual output backend
+	struct wlr_backend *headless_backend;
+	unsigned int headless_output_counter;
 
-  struct wlr_security_context_manager_v1 *security_context_manager_v1;
+	struct wlr_security_context_manager_v1 *security_context_manager_v1;
 
-  struct wlr_data_control_manager_v1 *data_control_manager;
-  struct wlr_ext_data_control_manager_v1 *ext_data_control_manager;
-  struct wlr_export_dmabuf_manager_v1 *export_dmabuf_manager;
-  struct wlr_gamma_control_manager_v1 *gamma_control_manager;
-  struct wlr_xdg_output_manager_v1 *xdg_output_manager;
+	struct wlr_data_control_manager_v1 *data_control_manager;
+	struct wlr_ext_data_control_manager_v1 *ext_data_control_manager;
+	struct wlr_export_dmabuf_manager_v1 *export_dmabuf_manager;
+	struct wlr_gamma_control_manager_v1 *gamma_control_manager;
+	struct wlr_xdg_output_manager_v1 *xdg_output_manager;
 
-  struct wlr_ext_foreign_toplevel_list_v1 *foreign_toplevel_list;
-  struct wlr_foreign_toplevel_manager_v1 *foreign_toplevel_manager;
-  struct wlr_ext_foreign_toplevel_image_capture_source_manager_v1 *foreign_toplevel_image_capture_source_manager;
-  struct wl_listener new_toplevel_capture_request;
+	struct wlr_ext_foreign_toplevel_list_v1 *foreign_toplevel_list;
+	struct wlr_foreign_toplevel_manager_v1 *foreign_toplevel_manager;
+	struct wlr_ext_foreign_toplevel_image_capture_source_manager_v1 *foreign_toplevel_image_capture_source_manager;
+	struct wl_listener new_toplevel_capture_request;
 
-  struct wlr_drm_lease_v1_manager *drm_lease_manager;
-  struct wl_listener drm_lease_request;
+	struct wlr_drm_lease_v1_manager *drm_lease_manager;
+	struct wl_listener drm_lease_request;
 
-  // input method support
-  struct wlr_input_method_manager_v2 *input_method_manager;
-  struct wlr_text_input_manager_v3 *text_input_manager;
-  struct ime_relay_t *input_method_relay;
+	// input method support
+	struct wlr_input_method_manager_v2 *input_method_manager;
+	struct wlr_text_input_manager_v3 *text_input_manager;
+	struct ime_relay_t *input_method_relay;
 
-  struct wlr_tablet_manager_v2 *tablet_v2;
+	struct wlr_tablet_manager_v2 *tablet_v2;
 
-  struct wl_event_source *ipc_event_source;
+	struct wl_event_source *ipc_event_source;
 
-  // cursor state
-  enum cursor_mode cursor_mode;
-  toplevel_t *grabbed_toplevel;
-  xwayland_toplevel_t *grabbed_xwayland_view;
-  xwayland_toplevel_t *last_focused_xwayland_view;
-  double grab_x, grab_y;
-  struct wlr_box grab_geobox;
-  uint32_t resize_edges;
-  uint32_t cursor_buttons;
-  bool focus_from_click;
+	// cursor state
+	enum cursor_mode cursor_mode;
+	toplevel_t *grabbed_toplevel;
+	xwayland_toplevel_t *grabbed_xwayland_view;
+	xwayland_toplevel_t *last_focused_xwayland_view;
+	double grab_x, grab_y;
+	struct wlr_box grab_geobox;
+	uint32_t resize_edges;
+	uint32_t cursor_buttons;
+	bool focus_from_click;
 
-  // tiled resize state
-  struct node_t *tiled_resize_node;
-  struct node_t *tiled_resize_parent_vertical;
-  struct node_t *tiled_resize_parent_horizontal;
-  double tiled_resize_initial_ratio_v;
-  double tiled_resize_initial_ratio_h;
+	// tiled resize state
+	struct node_t *tiled_resize_node;
+	struct node_t *tiled_resize_parent_vertical;
+	struct node_t *tiled_resize_parent_horizontal;
+	double tiled_resize_initial_ratio_v;
+	double tiled_resize_initial_ratio_h;
 
-  // tiling drag state
-  struct node_t *tiling_drag_node;
-  double tiling_drag_grab_x, tiling_drag_grab_y;
-  struct node_t *tiling_drag_target_node;
-  enum wlr_edges tiling_drag_target_edge;
-  struct wlr_scene_rect *tiling_drag_indicator;
-  bool tiling_drag_threshold_reached;
+	// tiling drag state
+	struct node_t *tiling_drag_node;
+	double tiling_drag_grab_x, tiling_drag_grab_y;
+	struct node_t *tiling_drag_target_node;
+	enum wlr_edges tiling_drag_target_edge;
+	struct wlr_scene_rect *tiling_drag_indicator;
+	bool tiling_drag_threshold_reached;
 
-  output_t *focused_output;
+	output_t *focused_output;
 
-  // workspace tracking
-  struct wlr_ext_workspace_manager_v1 *workspace_manager;
-  struct wl_listener workspace_commit;
+	// workspace tracking
+	struct wlr_ext_workspace_manager_v1 *workspace_manager;
+	struct wl_listener workspace_commit;
 
-  struct wlr_ext_background_effect_manager_v1 *bg_effect_manager;
+	struct wlr_ext_background_effect_manager_v1 *bg_effect_manager;
 
-  // xwayland
-  xwayland_t xwayland;
-  struct wl_listener xwayland_surface;
-  struct wl_listener xwayland_ready;
+	// xwayland
+	xwayland_t xwayland;
+	struct wl_listener xwayland_surface;
+	struct wl_listener xwayland_ready;
 
-  // xdg toplevel tag
-  struct wl_listener xdg_toplevel_tag_manager_v1_set_tag;
+	// xdg toplevel tag
+	struct wl_listener xdg_toplevel_tag_manager_v1_set_tag;
 
-  // xdg dialog
-  struct wl_listener xdg_dialog_new_dialog;
+	// xdg dialog
+	struct wl_listener xdg_dialog_new_dialog;
 } server_t;
 
 extern struct server_t server;

@@ -8,30 +8,30 @@
 struct seat_t;
 
 typedef struct keyboard_t {
-  struct seat_t *seat;
-  struct wl_list all_link;
-  struct wl_list active_link;
-  struct wlr_keyboard *wlr_keyboard;
+	struct seat_t *seat;
+	struct wl_list all_link;
+	struct wl_list active_link;
+	struct wlr_keyboard *wlr_keyboard;
 
-  struct wl_listener modifiers;
-  struct wl_listener key;
-  struct wl_listener destroy;
+	struct wl_listener modifiers;
+	struct wl_listener key;
+	struct wl_listener destroy;
 
-  struct keyboard_group_t *group;
-  bool is_representative;
+	struct keyboard_group_t *group;
+	bool is_representative;
 
-  int repeat_rate;
-  int repeat_delay;
+	int repeat_rate;
+	int repeat_delay;
 } keyboard_t;
 
 typedef struct keyboard_group_t {
-  struct wlr_keyboard_group *wlr_group;
-  keyboard_t *representative;
-  struct wl_list link;
-  struct wl_listener keyboard_key;
-  struct wl_listener keyboard_modifiers;
-  struct wl_listener enter;
-  struct wl_listener leave;
+	struct wlr_keyboard_group *wlr_group;
+	keyboard_t *representative;
+	struct wl_list link;
+	struct wl_listener keyboard_key;
+	struct wl_listener keyboard_modifiers;
+	struct wl_listener enter;
+	struct wl_listener leave;
 } keyboard_group_t;
 
 // keyboard lifecycle
@@ -78,7 +78,6 @@ void send_all_to_desktop(int desktop_index);
 void set_tiled_layout(void);
 void toggle_monocle(void);
 void toggle_master_stack(void);
-
 
 // layout
 void rotate_clockwise(void);

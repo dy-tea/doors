@@ -1,4 +1,5 @@
 #include "gesture.h"
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -75,12 +76,14 @@ static enum gesture_direction gesture_parse_direction(const char *dir_str) {
 }
 
 char *gesture_parse(const char *input, gesture_t *output) {
-	if (!input || !output) return "invalid input";
+	if (!input || !output)
+		return "invalid input";
 
 	memset(output, 0, sizeof(gesture_t));
 
 	char *input_copy = strdup(input);
-	if (!input_copy) return "memory allocation failed";
+	if (!input_copy)
+		return "memory allocation failed";
 
 	char *saveptr = NULL;
 	char *token = strtok_r(input_copy, ":", &saveptr);
@@ -141,7 +144,8 @@ char *gesture_parse(const char *input, gesture_t *output) {
 }
 
 char *gesture_to_string(const gesture_t *gesture) {
-	if (!gesture) return strdup("");
+	if (!gesture)
+		return strdup("");
 
 	char buf[256] = {0};
 	snprintf(buf, sizeof(buf), "%s", gesture_type_string(gesture->type));
@@ -192,46 +196,56 @@ char *gesture_to_string(const gesture_t *gesture) {
 }
 
 bool gesture_check(const gesture_t *target, enum gesture_type type, uint8_t fingers) {
-	if (!target || target->type != type) return false;
-	if (target->fingers != GESTURE_FINGERS_ANY && target->fingers != fingers) return false;
+	if (!target || target->type != type)
+		return false;
+	if (target->fingers != GESTURE_FINGERS_ANY && target->fingers != fingers)
+		return false;
 
 	return true;
 }
 
 bool gesture_match(const gesture_t *target, const gesture_t *to_match, bool exact) {
-	if (!target || !to_match) return false;
-	if (target->type != to_match->type) return false;
-	if (target->fingers != GESTURE_FINGERS_ANY && target->fingers != to_match->fingers) return false;
+	if (!target || !to_match)
+		return false;
+	if (target->type != to_match->type)
+		return false;
+	if (target->fingers != GESTURE_FINGERS_ANY && target->fingers != to_match->fingers)
+		return false;
 
-	if (exact) return target->directions == to_match->directions;
+	if (exact)
+		return target->directions == to_match->directions;
 
 	return (target->directions & to_match->directions) != 0;
 }
 
 bool gesture_equal(const gesture_t *a, const gesture_t *b) {
-	if (!a || !b) return false;
+	if (!a || !b)
+		return false;
 
-	return a->type == b->type && a->fingers == b->fingers &&
-		a->directions == b->directions;
+	return a->type == b->type && a->fingers == b->fingers && a->directions == b->directions;
 }
 
 int8_t gesture_compare(const gesture_t *a, const gesture_t *b) {
-	if (!a || !b) return -1;
-	if (a->type != b->type) return -1;
+	if (!a || !b)
+		return -1;
+	if (a->type != b->type)
+		return -1;
 
-	if (a->fingers != b->fingers) return (a->fingers > b->fingers) ? 1 : -1;
+	if (a->fingers != b->fingers)
+		return (a->fingers > b->fingers) ? 1 : -1;
 
 	int a_bits = __builtin_popcount(a->directions);
 	int b_bits = __builtin_popcount(b->directions);
 
-	if (a_bits == b_bits) return 0;
+	if (a_bits == b_bits)
+		return 0;
 
 	return (a_bits > b_bits) ? 1 : -1;
 }
 
-void gesture_tracker_begin(gesture_tracker_t *tracker, enum gesture_type type,
-		uint8_t fingers) {
-	if (!tracker) return;
+void gesture_tracker_begin(gesture_tracker_t *tracker, enum gesture_type type, uint8_t fingers) {
+	if (!tracker)
+		return;
 
 	tracker->type = type;
 	tracker->fingers = fingers;
@@ -242,24 +256,28 @@ void gesture_tracker_begin(gesture_tracker_t *tracker, enum gesture_type type,
 }
 
 bool gesture_tracker_check(gesture_tracker_t *tracker, enum gesture_type type) {
-	if (!tracker) return false;
+	if (!tracker)
+		return false;
 
 	return tracker->type == type && tracker->fingers > 0;
 }
 
-void gesture_tracker_update(gesture_tracker_t *tracker, double dx,
-		double dy, double scale, double rotation) {
-	if (!tracker) return;
+void gesture_tracker_update(gesture_tracker_t *tracker, double dx, double dy, double scale, double rotation) {
+	if (!tracker)
+		return;
 
 	tracker->dx += dx;
 	tracker->dy += dy;
 
-	if (!isnan(scale)) tracker->scale = scale;
-	if (!isnan(rotation)) tracker->rotation = rotation;
+	if (!isnan(scale))
+		tracker->scale = scale;
+	if (!isnan(rotation))
+		tracker->rotation = rotation;
 }
 
 void gesture_tracker_cancel(gesture_tracker_t *tracker) {
-	if (!tracker) return;
+	if (!tracker)
+		return;
 
 	tracker->type = GESTURE_TYPE_NONE;
 	tracker->fingers = 0;
@@ -270,7 +288,8 @@ void gesture_tracker_cancel(gesture_tracker_t *tracker) {
 }
 
 void gesture_tracker_end(gesture_tracker_t *tracker) {
-	if (!tracker) return;
+	if (!tracker)
+		return;
 
 	tracker->type = GESTURE_TYPE_NONE;
 	tracker->fingers = 0;

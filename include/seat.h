@@ -1,24 +1,25 @@
 #pragma once
 
 #include "input_method.h"
+
 #include <wayland-server.h>
 #include <wlr/types/wlr_seat.h>
 
 typedef struct seat_t {
-  struct wlr_seat *wlr_seat;
-  ime_relay_t *input_method_relay;
+	struct wlr_seat *wlr_seat;
+	ime_relay_t *input_method_relay;
 
-  struct wl_listener request_cursor;
-  struct wl_listener pointer_focus_change;
-  struct wl_listener request_set_selection;
-  struct wl_listener request_start_drag;
-  struct wl_listener start_drag;
+	struct wl_listener request_cursor;
+	struct wl_listener pointer_focus_change;
+	struct wl_listener request_set_selection;
+	struct wl_listener request_start_drag;
+	struct wl_listener start_drag;
 
-  struct wl_list tablets; // tablet_t.link
-  struct wl_list tablet_pads; // tablet_pad_t.link
+	struct wl_list tablets;     // tablet_t.link
+	struct wl_list tablet_pads; // tablet_pad_t.link
 
-  char name[32];
-  struct wl_list link;
+	char name[32];
+	struct wl_list link;
 } seat_t;
 
 seat_t *seat_create(const char *name);

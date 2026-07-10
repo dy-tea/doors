@@ -1,7 +1,8 @@
 #pragma once
 
-#include "types.h"
 #include "surface.h"
+#include "types.h"
+
 #include <wayland-server-core.h>
 #include <wayland-server.h>
 #include <wlr/types/wlr_ext_foreign_toplevel_list_v1.h>
@@ -9,75 +10,74 @@
 #include <wlr/types/wlr_tearing_control_v1.h>
 #include <wlr/types/wlr_xdg_dialog_v1.h>
 
-
 typedef struct toplevel_t {
-  struct wl_list link;
-  struct wlr_xdg_toplevel *xdg_toplevel;
-  struct wlr_scene_tree *scene_tree;      // Parent container
-  struct wlr_scene_tree *content_tree;    // XDG surface content
-  struct wlr_scene_tree *saved_surface_tree;  // Saved buffer snapshot
-  struct wlr_scene_buffer *output_handler;  // For tracking output enter/leave events
+	struct wl_list link;
+	struct wlr_xdg_toplevel *xdg_toplevel;
+	struct wlr_scene_tree *scene_tree;         // Parent container
+	struct wlr_scene_tree *content_tree;       // XDG surface content
+	struct wlr_scene_tree *saved_surface_tree; // Saved buffer snapshot
+	struct wlr_scene_buffer *output_handler;   // For tracking output enter/leave events
 
-  surface_blur_t *blur;
-  surface_rounded_t *rounded;
-  surface_shadow_t *shadow;
+	surface_blur_t *blur;
+	surface_rounded_t *rounded;
+	surface_shadow_t *shadow;
 
-  struct wlr_ext_foreign_toplevel_handle_v1 *ext_foreign_toplevel;
-  struct wlr_foreign_toplevel_handle_v1 *foreign_toplevel;
+	struct wlr_ext_foreign_toplevel_handle_v1 *ext_foreign_toplevel;
+	struct wlr_foreign_toplevel_handle_v1 *foreign_toplevel;
 
-  char *foreign_identifier;
-  char *tag;
-  bool is_dialog;
+	char *foreign_identifier;
+	char *tag;
+	bool is_dialog;
 
-  struct wlr_ext_image_capture_source_v1 *image_capture_source;
-  struct wlr_scene_surface *image_capture_surface;
-  struct wlr_scene *image_capture;
-  struct wlr_scene_tree *image_capture_tree;
-  void *capture_renderer;
+	struct wlr_ext_image_capture_source_v1 *image_capture_source;
+	struct wlr_scene_surface *image_capture_surface;
+	struct wlr_scene *image_capture;
+	struct wlr_scene_tree *image_capture_tree;
+	void *capture_renderer;
 
-  struct wlr_scene_tree *border_tree;
-  struct wlr_scene_rect *border_rects[4];
+	struct wlr_scene_tree *border_tree;
+	struct wlr_scene_rect *border_rects[4];
 
-  node_t *node;
+	node_t *node;
 
-  struct wlr_box geometry;
-  struct wlr_box last_requested;
+	struct wlr_box geometry;
+	struct wlr_box last_requested;
 
-  bool mapped;
-  bool configured;
-  bool wants_fade;
-  bool client_maximized;
+	bool mapped;
+	bool configured;
+	bool wants_fade;
+	bool client_maximized;
 
-  int max_render_time;
+	int max_render_time;
 
-  // tearing control
-  enum wp_tearing_control_v1_presentation_hint tearing_hint;
+	// tearing control
+	enum wp_tearing_control_v1_presentation_hint tearing_hint;
 
-  // xdg-decoration
-  struct wlr_xdg_toplevel_decoration_v1 *xdg_decoration;
-  struct wl_listener decoration_destroy;
-  struct wl_listener decoration_request_mode;
+	// xdg-decoration
+	struct wlr_xdg_toplevel_decoration_v1 *xdg_decoration;
+	struct wl_listener decoration_destroy;
+	struct wl_listener decoration_request_mode;
 
-  // listeners
-  struct wl_listener map;
-  struct wl_listener unmap;
-  struct wl_listener commit;
-  struct wl_listener destroy;
-  struct wl_listener request_move;
-  struct wl_listener request_resize;
-  struct wl_listener request_maximize;
-  struct wl_listener request_fullscreen;
-  struct wl_listener request_minimize;
-  struct wl_listener set_title;
-  struct wl_listener set_app_id;
-  struct wl_listener new_xdg_popup;
-  struct wl_listener outputs_update;
+	// listeners
+	struct wl_listener map;
+	struct wl_listener unmap;
+	struct wl_listener commit;
+	struct wl_listener destroy;
+	struct wl_listener request_move;
+	struct wl_listener request_resize;
+	struct wl_listener request_maximize;
+	struct wl_listener request_fullscreen;
+	struct wl_listener request_minimize;
+	struct wl_listener set_title;
+	struct wl_listener set_app_id;
+	struct wl_listener new_xdg_popup;
+	struct wl_listener outputs_update;
 
-  // foreign toplevel listeners
-  struct wl_listener foreign_activate_request;
-  struct wl_listener foreign_fullscreen_request;
-  struct wl_listener foreign_close_request;
-  struct wl_listener foreign_destroy;
+	// foreign toplevel listeners
+	struct wl_listener foreign_activate_request;
+	struct wl_listener foreign_fullscreen_request;
+	struct wl_listener foreign_close_request;
+	struct wl_listener foreign_destroy;
 } toplevel_t;
 
 void handle_new_xdg_toplevel(struct wl_listener *listener, void *data);
@@ -106,5 +106,4 @@ void toplevel_apply_decoration_mode(toplevel_t *tl);
 
 bool toplevel_can_tear(toplevel_t *toplevel);
 
-void toplevel_send_frame_done_interator(struct wlr_scene_buffer *scene_buffer,
-  int x, int y, void *data);
+void toplevel_send_frame_done_interator(struct wlr_scene_buffer *scene_buffer, int x, int y, void *data);

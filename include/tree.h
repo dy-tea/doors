@@ -1,7 +1,8 @@
 #pragma once
 
-#include "types.h"
 #include "output.h"
+#include "types.h"
+
 #include <wlr/types/wlr_scene.h>
 
 typedef struct surface_rounded_t surface_rounded_t;
@@ -88,20 +89,20 @@ output_t *client_get_output(client_t *client);
 surface_rounded_t *client_get_rounded(client_t *client);
 
 typedef struct {
-  output_t *output;
-  desktop_t *desk;
-  bool is_focused;
-  bool is_active;
+	output_t *output;
+	desktop_t *desk;
+	bool is_focused;
+	bool is_active;
 } border_state_t;
 
 border_state_t get_border_state(client_t *client);
 
 // Border helpers
-void create_borders(struct wlr_scene_tree *parent, struct wlr_scene_tree **border_tree,
- struct wlr_scene_rect *rects[4]);
+void create_borders(
+    struct wlr_scene_tree *parent, struct wlr_scene_tree **border_tree, struct wlr_scene_rect *rects[4]);
 void destroy_borders(struct wlr_scene_tree **border_tree, struct wlr_scene_rect *rects[4]);
-void update_borders(struct wlr_scene_tree *border_tree, struct wlr_scene_rect *rects[4],
-  struct wlr_box geo, unsigned int bw);
+void update_borders(
+    struct wlr_scene_tree *border_tree, struct wlr_scene_rect *rects[4], struct wlr_box geo, unsigned int bw);
 void update_border_colors(client_t *client);
 void refresh_border_colors(void);
 
@@ -118,12 +119,13 @@ output_t *find_output_by_name(const char *name);
 #define IS_RECEPTACLE(n) ((n) != NULL && (n)->client == NULL && is_leaf(n))
 
 static inline int effective_border_width(desktop_t *d) {
-  if (smart_borders && d && visible_tiled_count(d) <= 1) return 0;
-  return border_width;
+	if (smart_borders && d && visible_tiled_count(d) <= 1)
+		return 0;
+	return border_width;
 }
 
 static inline int compute_window_gap(desktop_t *d) {
-  if (smart_gaps && visible_tiled_count(d) <= 1)
-    return 0;
-  return d->window_gap;
+	if (smart_gaps && visible_tiled_count(d) <= 1)
+		return 0;
+	return d->window_gap;
 }

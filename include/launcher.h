@@ -4,14 +4,14 @@
 #include <wlr/types/wlr_xdg_activation_v1.h>
 
 typedef struct {
-  pid_t pid;
-  char *desktop_name;
-  struct wlr_xdg_activation_token_v1 *token;
-  struct wl_listener token_destroy;
-  struct wl_listener seat_destroy;
-  bool activated;
-  bool had_focused_surface;
-  struct wl_list link;
+	pid_t pid;
+	char *desktop_name;
+	struct wlr_xdg_activation_token_v1 *token;
+	struct wl_listener token_destroy;
+	struct wl_listener seat_destroy;
+	bool activated;
+	bool had_focused_surface;
+	struct wl_list link;
 } launcher_ctx_t;
 
 launcher_ctx_t *launcher_ctx_find_pid(pid_t pid);

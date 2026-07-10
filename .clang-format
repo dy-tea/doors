@@ -1,0 +1,52 @@
+---
+Language: C
+BasedOnStyle: LLVM
+
+Cpp11BracedListStyle: true
+
+# Brackets
+BreakBeforeBraces: Attach
+
+# Indentation
+UseTab: ForIndentation
+TabWidth: 2
+IndentWidth: 2
+ContinuationIndentWidth: 4
+
+# Line Length
+ColumnLimit: 120
+
+# Spacing
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyParentheses: false
+SpacesInCStyleCastParentheses: false
+
+# Alignment
+AlignOperands: DontAlign
+AlignAfterOpenBracket: DontAlign
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+
+# Pointer and Reference Alignment
+PointerAlignment: Right
+
+# Function parameters
+AllowAllParametersOfDeclarationOnNextLine: true
+BinPackParameters: true
+
+# Operators
+BreakBeforeBinaryOperators: NonAssignment
+
+# Penalties to encourage line breaking at appropriate points
+PenaltyBreakAssignment: 120
+PenaltyBreakBeforeFirstCallParameter: 120
+
+# Include ordering
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^".*"'
+    Priority: 1
+  - Regex: '^<.*>'
+    Priority: 2
+SortIncludes: CaseInsensitive
+---

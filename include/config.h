@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gesture.h"
+
 #include <stdint.h>
 #include <wayland-server.h>
 #include <xkbcommon/xkbcommon.h>
@@ -13,86 +14,86 @@
 typedef struct submap submap_t;
 
 typedef enum {
-  BIND_NONE = 0,
-  BIND_QUIT,
-  BIND_ENTER_SUBMAP,
-  BIND_EXIT_SUBMAP,
-  BIND_NODE_FOCUS,
-  BIND_NODE_CLOSE,
-  BIND_NODE_STATE_TILED,
-  BIND_NODE_STATE_FLOATING,
-  BIND_NODE_STATE_FULLSCREEN,
-  BIND_NODE_TO_DESKTOP,
-  BIND_DESKTOP_FOCUS,
-  BIND_DESKTOP_LAYOUT_TILED,
-  BIND_DESKTOP_LAYOUT_MONOCLE,
-  BIND_FOCUS_WEST,
-  BIND_FOCUS_SOUTH,
-  BIND_FOCUS_NORTH,
-  BIND_FOCUS_EAST,
-  BIND_SWAP_WEST,
-  BIND_SWAP_SOUTH,
-  BIND_SWAP_NORTH,
-  BIND_SWAP_EAST,
-  BIND_PRESEL_WEST,
-  BIND_PRESEL_SOUTH,
-  BIND_PRESEL_NORTH,
-  BIND_PRESEL_EAST,
-  BIND_PRESEL_CANCEL,
-  BIND_TOGGLE_FLOATING,
-  BIND_TOGGLE_FULLSCREEN,
-  BIND_TOGGLE_PSEUDO_TILED,
-  BIND_TOGGLE_MONOCLE,
-  BIND_TOGGLE_MASTER_STACK,
-  BIND_DESKTOP_LAYOUT_MASTER_STACK,
-  BIND_MASTER_STACK_INC,
-  BIND_MASTER_STACK_DEC,
-  BIND_MASTER_STACK_FLIP,
-  BIND_MASTER_STACK_CYCLE_ORIENTATION,
-  BIND_MASTER_STACK_CYCLE_STACK_LAYOUT,
-  BIND_ROTATE_CW,
-  BIND_ROTATE_CCW,
-  BIND_FLIP_HORIZONTAL,
-  BIND_FLIP_VERTICAL,
-  BIND_DESKTOP_NEXT,
-  BIND_DESKTOP_PREV,
-  BIND_DESKTOP_LAST,
-  BIND_SEND_TO_DESKTOP_NEXT,
-  BIND_SEND_TO_DESKTOP_PREV,
-  BIND_SEND_TO_DESKTOP_1,
-  BIND_SEND_TO_DESKTOP_2,
-  BIND_SEND_TO_DESKTOP_3,
-  BIND_SEND_TO_DESKTOP_4,
-  BIND_SEND_TO_DESKTOP_5,
-  BIND_SEND_TO_DESKTOP_6,
-  BIND_SEND_TO_DESKTOP_7,
-  BIND_SEND_TO_DESKTOP_8,
-  BIND_SEND_TO_DESKTOP_9,
-  BIND_SEND_TO_DESKTOP_10,
-  BIND_DESKTOP_1,
-  BIND_DESKTOP_2,
-  BIND_DESKTOP_3,
-  BIND_DESKTOP_4,
-  BIND_DESKTOP_5,
-  BIND_DESKTOP_6,
-  BIND_DESKTOP_7,
-  BIND_DESKTOP_8,
-  BIND_DESKTOP_9,
-  BIND_DESKTOP_10,
-  BIND_RESIZE_LEFT,
-  BIND_RESIZE_RIGHT,
-  BIND_RESIZE_UP,
-  BIND_RESIZE_DOWN,
-  BIND_INTERACTIVE_MOVE,
-  BIND_INTERACTIVE_RESIZE,
-  BIND_TILING_DRAG,
-  BIND_EXTERNAL,
+	BIND_NONE = 0,
+	BIND_QUIT,
+	BIND_ENTER_SUBMAP,
+	BIND_EXIT_SUBMAP,
+	BIND_NODE_FOCUS,
+	BIND_NODE_CLOSE,
+	BIND_NODE_STATE_TILED,
+	BIND_NODE_STATE_FLOATING,
+	BIND_NODE_STATE_FULLSCREEN,
+	BIND_NODE_TO_DESKTOP,
+	BIND_DESKTOP_FOCUS,
+	BIND_DESKTOP_LAYOUT_TILED,
+	BIND_DESKTOP_LAYOUT_MONOCLE,
+	BIND_FOCUS_WEST,
+	BIND_FOCUS_SOUTH,
+	BIND_FOCUS_NORTH,
+	BIND_FOCUS_EAST,
+	BIND_SWAP_WEST,
+	BIND_SWAP_SOUTH,
+	BIND_SWAP_NORTH,
+	BIND_SWAP_EAST,
+	BIND_PRESEL_WEST,
+	BIND_PRESEL_SOUTH,
+	BIND_PRESEL_NORTH,
+	BIND_PRESEL_EAST,
+	BIND_PRESEL_CANCEL,
+	BIND_TOGGLE_FLOATING,
+	BIND_TOGGLE_FULLSCREEN,
+	BIND_TOGGLE_PSEUDO_TILED,
+	BIND_TOGGLE_MONOCLE,
+	BIND_TOGGLE_MASTER_STACK,
+	BIND_DESKTOP_LAYOUT_MASTER_STACK,
+	BIND_MASTER_STACK_INC,
+	BIND_MASTER_STACK_DEC,
+	BIND_MASTER_STACK_FLIP,
+	BIND_MASTER_STACK_CYCLE_ORIENTATION,
+	BIND_MASTER_STACK_CYCLE_STACK_LAYOUT,
+	BIND_ROTATE_CW,
+	BIND_ROTATE_CCW,
+	BIND_FLIP_HORIZONTAL,
+	BIND_FLIP_VERTICAL,
+	BIND_DESKTOP_NEXT,
+	BIND_DESKTOP_PREV,
+	BIND_DESKTOP_LAST,
+	BIND_SEND_TO_DESKTOP_NEXT,
+	BIND_SEND_TO_DESKTOP_PREV,
+	BIND_SEND_TO_DESKTOP_1,
+	BIND_SEND_TO_DESKTOP_2,
+	BIND_SEND_TO_DESKTOP_3,
+	BIND_SEND_TO_DESKTOP_4,
+	BIND_SEND_TO_DESKTOP_5,
+	BIND_SEND_TO_DESKTOP_6,
+	BIND_SEND_TO_DESKTOP_7,
+	BIND_SEND_TO_DESKTOP_8,
+	BIND_SEND_TO_DESKTOP_9,
+	BIND_SEND_TO_DESKTOP_10,
+	BIND_DESKTOP_1,
+	BIND_DESKTOP_2,
+	BIND_DESKTOP_3,
+	BIND_DESKTOP_4,
+	BIND_DESKTOP_5,
+	BIND_DESKTOP_6,
+	BIND_DESKTOP_7,
+	BIND_DESKTOP_8,
+	BIND_DESKTOP_9,
+	BIND_DESKTOP_10,
+	BIND_RESIZE_LEFT,
+	BIND_RESIZE_RIGHT,
+	BIND_RESIZE_UP,
+	BIND_RESIZE_DOWN,
+	BIND_INTERACTIVE_MOVE,
+	BIND_INTERACTIVE_RESIZE,
+	BIND_TILING_DRAG,
+	BIND_EXTERNAL,
 } bind_action_t;
 
 typedef enum {
-  KEYBOARD_GROUP_DEFAULT,
-  KEYBOARD_GROUP_NONE,
-  KEYBOARD_GROUP_SMART,
+	KEYBOARD_GROUP_DEFAULT,
+	KEYBOARD_GROUP_NONE,
+	KEYBOARD_GROUP_SMART,
 } keyboard_grouping_t;
 
 typedef struct {
@@ -103,40 +104,40 @@ typedef struct {
 } bind_t;
 
 typedef struct {
-  uint32_t modifiers;
-  xkb_keysym_t keysym;
-  uint32_t keycode;
-  bool use_keycode;
-  bind_action_t action;
-  int desktop_index;
-  char submap_name[MAXLEN];
-  char external_cmd[MAXLEN];
+	uint32_t modifiers;
+	xkb_keysym_t keysym;
+	uint32_t keycode;
+	bool use_keycode;
+	bind_action_t action;
+	int desktop_index;
+	char submap_name[MAXLEN];
+	char external_cmd[MAXLEN];
 } keybind_t;
 
 typedef struct {
-  enum gesture_type type;
-  uint8_t fingers;
-  uint32_t directions;
-  char *input;
-  bind_action_t action;
-  int desktop_index;
-  char external_cmd[MAXLEN];
+	enum gesture_type type;
+	uint8_t fingers;
+	uint32_t directions;
+	char *input;
+	bind_action_t action;
+	int desktop_index;
+	char external_cmd[MAXLEN];
 } gesturebind_t;
 
 typedef struct {
-  enum hotcorner corner;
-  int corner_x;
-  int corner_y;
-  bind_action_t action;
-  int desktop_index;
-  char external_cmd[MAXLEN];
+	enum hotcorner corner;
+	int corner_x;
+	int corner_y;
+	bind_action_t action;
+	int desktop_index;
+	char external_cmd[MAXLEN];
 } hotcornerbind_t;
 
 struct submap {
-  char name[MAXLEN];
-  keybind_t keybinds[MAX_KEYBINDS];
-  size_t num_keybinds;
-  submap_t *parent;
+	char name[MAXLEN];
+	keybind_t keybinds[MAX_KEYBINDS];
+	size_t num_keybinds;
+	submap_t *parent;
 };
 
 extern keybind_t keybinds[MAX_KEYBINDS];

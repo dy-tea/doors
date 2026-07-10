@@ -1,10 +1,11 @@
 #pragma once
 
-#include "types.h"
 #include "surface.h"
+#include "types.h"
+
 #include <wayland-server-core.h>
-#include <wlr/xwayland.h>
 #include <wlr/util/box.h>
+#include <wlr/xwayland.h>
 #include <xcb/xproto.h>
 
 struct server_t;
@@ -38,14 +39,14 @@ typedef struct xwayland_toplevel_t {
 	struct wlr_scene_tree *content_tree;
 	struct wlr_scene_buffer *output_handler;
 
-  struct wlr_scene_tree *border_tree;
-  struct wlr_scene_rect *border_rects[4];
+	struct wlr_scene_tree *border_tree;
+	struct wlr_scene_rect *border_rects[4];
 
-  surface_blur_t *blur;
-  surface_rounded_t *rounded;
-  surface_shadow_t *shadow;
+	surface_blur_t *blur;
+	surface_rounded_t *rounded;
+	surface_shadow_t *shadow;
 
-  bool mapped;
+	bool mapped;
 	struct wlr_box geometry;
 
 	struct wlr_ext_foreign_toplevel_handle_v1 *ext_foreign_toplevel;
@@ -71,8 +72,8 @@ typedef struct xwayland_toplevel_t {
 	struct wl_listener set_title;
 	struct wl_listener set_class;
 	struct wl_listener set_hints;
-  struct wl_listener set_window_type;
-  struct wl_listener set_startup_id;
+	struct wl_listener set_window_type;
+	struct wl_listener set_startup_id;
 	struct wl_listener associate;
 	struct wl_listener dissociate;
 	struct wl_listener override_redirect;

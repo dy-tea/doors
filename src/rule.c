@@ -1,6 +1,8 @@
 #include "rule.h"
+
 #include "scroller.h"
 #include "types.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,244 +12,263 @@ rule_t *rule_head = NULL;
 rule_t *rule_tail = NULL;
 
 void rule_init(void) {
-  rule_head = NULL;
-  rule_tail = NULL;
+	rule_head = NULL;
+	rule_tail = NULL;
 }
 
 void rule_fini(void) {
-  rule_t *r = rule_head;
-  while (r != NULL) {
-    rule_t *next = r->next;
-    free(r);
-    r = next;
-  }
-  rule_head = NULL;
-  rule_tail = NULL;
+	rule_t *r = rule_head;
+	while (r != NULL) {
+		rule_t *next = r->next;
+		free(r);
+		r = next;
+	}
+	rule_head = NULL;
+	rule_tail = NULL;
 }
 
 rule_t *make_rule(void) {
-  rule_t *r = calloc(1, sizeof(rule_t));
-  if (r) {
-    r->match.app_id[0] = '\0';
-    r->match.title[0] = '\0';
-    r->match.tag[0] = '\0';
-    r->match.one_shot = false;
-  }
-  return r;
+	rule_t *r = calloc(1, sizeof(rule_t));
+	if (r) {
+		r->match.app_id[0] = '\0';
+		r->match.title[0] = '\0';
+		r->match.tag[0] = '\0';
+		r->match.one_shot = false;
+	}
+	return r;
 }
 
 void add_rule(rule_t *r) {
-  if (rule_tail == NULL) {
-    rule_head = rule_tail = r;
-  } else {
-    rule_tail->next = r;
-    rule_tail = r;
-  }
+	if (rule_tail == NULL) {
+		rule_head = rule_tail = r;
+	} else {
+		rule_tail->next = r;
+		rule_tail = r;
+	}
 }
 
 void remove_rule(rule_t *r) {
-  if (r == NULL) return;
+	if (r == NULL)
+		return;
 
-  rule_t *prev = NULL;
-  rule_t *cur = rule_head;
-  while (cur && cur != r) {
-    prev = cur;
-    cur = cur->next;
-  }
-  if (cur == NULL) return;
+	rule_t *prev = NULL;
+	rule_t *cur = rule_head;
+	while (cur && cur != r) {
+		prev = cur;
+		cur = cur->next;
+	}
+	if (cur == NULL)
+		return;
 
-  if (prev)
-    prev->next = r->next;
-  else
-    rule_head = r->next;
+	if (prev)
+		prev->next = r->next;
+	else
+		rule_head = r->next;
 
-  if (r == rule_tail)
-    rule_tail = prev;
+	if (r == rule_tail)
+		rule_tail = prev;
 
-  free(r);
+	free(r);
 }
 
 bool remove_rule_by_index(int idx) {
-  rule_t *prev = NULL;
-  rule_t *cur = rule_head;
-  for (int i = 0; cur != NULL && i < idx; prev = cur, cur = cur->next, ++i)
-    ;
+	rule_t *prev = NULL;
+	rule_t *cur = rule_head;
+	for (int i = 0; cur != NULL && i < idx; prev = cur, cur = cur->next, ++i)
+		;
 
-  if (cur == NULL) return false;
+	if (cur == NULL)
+		return false;
 
-  if (prev)
-    prev->next = cur->next;
-  else
-    rule_head = cur->next;
+	if (prev)
+		prev->next = cur->next;
+	else
+		rule_head = cur->next;
 
-  if (cur == rule_tail)
-    rule_tail = prev;
+	if (cur == rule_tail)
+		rule_tail = prev;
 
-  free(cur);
-  return true;
+	free(cur);
+	return true;
 }
 
 void list_rules(char *buf, size_t buf_size) {
-  size_t offset = 0;
-  int idx = 0;
+	size_t offset = 0;
+	int idx = 0;
 
-  rule_t *r = rule_head;
-  while (r != NULL) {
-    offset += snprintf(buf + offset, buf_size - offset, "%d: ", idx);
+	rule_t *r = rule_head;
+	while (r != NULL) {
+		offset += snprintf(buf + offset, buf_size - offset, "%d: ", idx);
 
-    if (r->match.app_id[0] != '\0')
-      offset += snprintf(buf + offset, buf_size - offset, "app_id=%s ", r->match.app_id);
-    if (r->match.title[0] != '\0')
-      offset += snprintf(buf + offset, buf_size - offset, "title=%s ", r->match.title);
-    if (r->match.tag[0] != '\0')
-      offset += snprintf(buf + offset, buf_size - offset, "tag=%s ", r->match.tag);
+		if (r->match.app_id[0] != '\0')
+			offset += snprintf(buf + offset, buf_size - offset, "app_id=%s ", r->match.app_id);
+		if (r->match.title[0] != '\0')
+			offset += snprintf(buf + offset, buf_size - offset, "title=%s ", r->match.title);
+		if (r->match.tag[0] != '\0')
+			offset += snprintf(buf + offset, buf_size - offset, "tag=%s ", r->match.tag);
 
-    if (r->match.one_shot)
-      offset += snprintf(buf + offset, buf_size - offset, "one_shot ");
+		if (r->match.one_shot)
+			offset += snprintf(buf + offset, buf_size - offset, "one_shot ");
 
-    offset += snprintf(buf + offset, buf_size - offset, "-> ");
+		offset += snprintf(buf + offset, buf_size - offset, "-> ");
 
-    if (r->consequence.has_desktop)
-      offset += snprintf(buf + offset, buf_size - offset, "desktop=%s ", r->consequence.desktop);
-    if (r->consequence.has_monitor)
-      offset += snprintf(buf + offset, buf_size - offset, "monitor=%s ", r->consequence.monitor);
-    if (r->consequence.has_state) {
-      const char *state_str = "unknown";
-      switch (r->consequence.state) {
-        case STATE_TILED: state_str = "tiled"; break;
-        case STATE_FLOATING: state_str = "floating"; break;
-        case STATE_FULLSCREEN: state_str = "fullscreen"; break;
-        case STATE_PSEUDO_TILED: state_str = "pseudo_tiled"; break;
-      }
-      offset += snprintf(buf + offset, buf_size - offset, "state=%s ", state_str);
-    }
-    if (r->consequence.has_follow)
-      offset += snprintf(buf + offset, buf_size - offset, "follow=%s ", r->consequence.follow ? "on" : "off");
-    if (r->consequence.has_focus)
-      offset += snprintf(buf + offset, buf_size - offset, "focus=%s ", r->consequence.focus ? "on" : "off");
-    if (r->consequence.has_manage)
-      offset += snprintf(buf + offset, buf_size - offset, "manage=%s ", r->consequence.manage ? "on" : "off");
-    if (r->consequence.has_locked)
-      offset += snprintf(buf + offset, buf_size - offset, "locked=%s ", r->consequence.locked ? "on" : "off");
-    if (r->consequence.has_hidden)
-      offset += snprintf(buf + offset, buf_size - offset, "hidden=%s ", r->consequence.hidden ? "on" : "off");
-    if (r->consequence.has_sticky)
-      offset += snprintf(buf + offset, buf_size - offset, "sticky=%s ", r->consequence.sticky ? "on" : "off");
-    if (r->consequence.has_scroller_proportion)
-      offset += snprintf(buf + offset, buf_size - offset, "scroller_proportion=%.2f ", r->consequence.scroller_proportion);
-    if (r->consequence.has_scroller_proportion_single)
-      offset += snprintf(buf + offset, buf_size - offset, "scroller_proportion_single=%.2f ", r->consequence.scroller_proportion_single);
-    if (r->consequence.has_blur)
-      offset += snprintf(buf + offset, buf_size - offset, "blur=%s ", r->consequence.blur ? "on" : "off");
-    if (r->consequence.has_mica)
-      offset += snprintf(buf + offset, buf_size - offset, "mica=%s ", r->consequence.mica ? "on" : "off");
-    if (r->consequence.has_acrylic)
-      offset += snprintf(buf + offset, buf_size - offset, "acrylic=%s ", r->consequence.acrylic ? "on" : "off");
-    if (r->consequence.has_border_radius)
-      offset += snprintf(buf + offset, buf_size - offset, "border_radius=%.1f ", r->consequence.border_radius);
-    if (r->consequence.has_shadow)
-      offset += snprintf(buf + offset, buf_size - offset, "shadow=%s ", r->consequence.shadow ? "on" : "off");
-    if (r->consequence.has_block_out_from_screenshare)
-      offset += snprintf(buf + offset, buf_size - offset, "block_out_from_screenshare=%s ",
-        r->consequence.block_out_from_screenshare ? "on" : "off");
-    if (r->consequence.has_allow_tearing)
-      offset += snprintf(buf + offset, buf_size - offset, "allow_tearing=%s ",
-        r->consequence.allow_tearing ? "on" : "off");
-    if (r->consequence.has_shortcuts_inhibitor)
-      offset += snprintf(buf + offset, buf_size - offset, "shortcuts_inhibitor=%s ",
-        r->consequence.shortcuts_inhibitor ? "on" : "off");
-    if (r->consequence.has_render_unfocused)
-      offset += snprintf(buf + offset, buf_size - offset, "render_unfocused=%s ",
-        r->consequence.render_unfocused ? "on" : "off");
+		if (r->consequence.has_desktop)
+			offset += snprintf(buf + offset, buf_size - offset, "desktop=%s ", r->consequence.desktop);
+		if (r->consequence.has_monitor)
+			offset += snprintf(buf + offset, buf_size - offset, "monitor=%s ", r->consequence.monitor);
+		if (r->consequence.has_state) {
+			const char *state_str = "unknown";
+			switch (r->consequence.state) {
+			case STATE_TILED:
+				state_str = "tiled";
+				break;
+			case STATE_FLOATING:
+				state_str = "floating";
+				break;
+			case STATE_FULLSCREEN:
+				state_str = "fullscreen";
+				break;
+			case STATE_PSEUDO_TILED:
+				state_str = "pseudo_tiled";
+				break;
+			}
+			offset += snprintf(buf + offset, buf_size - offset, "state=%s ", state_str);
+		}
+		if (r->consequence.has_follow)
+			offset += snprintf(buf + offset, buf_size - offset, "follow=%s ", r->consequence.follow ? "on" : "off");
+		if (r->consequence.has_focus)
+			offset += snprintf(buf + offset, buf_size - offset, "focus=%s ", r->consequence.focus ? "on" : "off");
+		if (r->consequence.has_manage)
+			offset += snprintf(buf + offset, buf_size - offset, "manage=%s ", r->consequence.manage ? "on" : "off");
+		if (r->consequence.has_locked)
+			offset += snprintf(buf + offset, buf_size - offset, "locked=%s ", r->consequence.locked ? "on" : "off");
+		if (r->consequence.has_hidden)
+			offset += snprintf(buf + offset, buf_size - offset, "hidden=%s ", r->consequence.hidden ? "on" : "off");
+		if (r->consequence.has_sticky)
+			offset += snprintf(buf + offset, buf_size - offset, "sticky=%s ", r->consequence.sticky ? "on" : "off");
+		if (r->consequence.has_scroller_proportion)
+			offset += snprintf(
+			    buf + offset, buf_size - offset, "scroller_proportion=%.2f ", r->consequence.scroller_proportion);
+		if (r->consequence.has_scroller_proportion_single)
+			offset += snprintf(buf + offset, buf_size - offset, "scroller_proportion_single=%.2f ",
+			    r->consequence.scroller_proportion_single);
+		if (r->consequence.has_blur)
+			offset += snprintf(buf + offset, buf_size - offset, "blur=%s ", r->consequence.blur ? "on" : "off");
+		if (r->consequence.has_mica)
+			offset += snprintf(buf + offset, buf_size - offset, "mica=%s ", r->consequence.mica ? "on" : "off");
+		if (r->consequence.has_acrylic)
+			offset += snprintf(buf + offset, buf_size - offset, "acrylic=%s ", r->consequence.acrylic ? "on" : "off");
+		if (r->consequence.has_border_radius)
+			offset += snprintf(buf + offset, buf_size - offset, "border_radius=%.1f ", r->consequence.border_radius);
+		if (r->consequence.has_shadow)
+			offset += snprintf(buf + offset, buf_size - offset, "shadow=%s ", r->consequence.shadow ? "on" : "off");
+		if (r->consequence.has_block_out_from_screenshare)
+			offset += snprintf(buf + offset, buf_size - offset, "block_out_from_screenshare=%s ",
+			    r->consequence.block_out_from_screenshare ? "on" : "off");
+		if (r->consequence.has_allow_tearing)
+			offset += snprintf(
+			    buf + offset, buf_size - offset, "allow_tearing=%s ", r->consequence.allow_tearing ? "on" : "off");
+		if (r->consequence.has_shortcuts_inhibitor)
+			offset += snprintf(buf + offset, buf_size - offset, "shortcuts_inhibitor=%s ",
+			    r->consequence.shortcuts_inhibitor ? "on" : "off");
+		if (r->consequence.has_render_unfocused)
+			offset += snprintf(
+			    buf + offset, buf_size - offset, "render_unfocused=%s ", r->consequence.render_unfocused ? "on" : "off");
 
-    offset += snprintf(buf + offset, buf_size - offset, "\n");
+		offset += snprintf(buf + offset, buf_size - offset, "\n");
 
-    r = r->next;
-    idx++;
-  }
+		r = r->next;
+		idx++;
+	}
 
-  if (idx == 0) {
-    snprintf(buf, buf_size, "No rules defined\n");
-  }
+	if (idx == 0) {
+		snprintf(buf, buf_size, "No rules defined\n");
+	}
 }
 
 static bool match_string(const char *pattern, const char *value) {
-  if (pattern == NULL || pattern[0] == '\0') return true;
-  if (value == NULL || value[0] == '\0') return false;
-  return strcmp(pattern, value) == 0;
+	if (pattern == NULL || pattern[0] == '\0')
+		return true;
+	if (value == NULL || value[0] == '\0')
+		return false;
+	return strcmp(pattern, value) == 0;
 }
 
 rule_consequence_t *find_matching_rule(const char *app_id, const char *title, const char *tag) {
-  rule_t *r = rule_head;
-  rule_t *matched = NULL;
+	rule_t *r = rule_head;
+	rule_t *matched = NULL;
 
-  while (r != NULL) {
-    bool app_id_matches = match_string(r->match.app_id, app_id);
-    bool title_matches = match_string(r->match.title, title);
-    bool tag_matches = match_string(r->match.tag, tag);
+	while (r != NULL) {
+		bool app_id_matches = match_string(r->match.app_id, app_id);
+		bool title_matches = match_string(r->match.title, title);
+		bool tag_matches = match_string(r->match.tag, tag);
 
-    if (app_id_matches && title_matches && tag_matches) {
-      matched = r;
-      break;
-    }
-    r = r->next;
-  }
+		if (app_id_matches && title_matches && tag_matches) {
+			matched = r;
+			break;
+		}
+		r = r->next;
+	}
 
-  if (matched == NULL) return NULL;
+	if (matched == NULL)
+		return NULL;
 
-  if (matched->match.one_shot)
-    remove_rule(matched);
+	if (matched->match.one_shot)
+		remove_rule(matched);
 
-  return &matched->consequence;
+	return &matched->consequence;
 }
 
 void rule_apply_consequence(node_t *node, client_t *client, const rule_consequence_t *rule) {
-  if (!rule) return;
+	if (!rule)
+		return;
 
-  if (rule->has_state)
-    client->state = rule->state;
+	if (rule->has_state)
+		client->state = rule->state;
 
-  if (rule->has_hidden) node->hidden = rule->hidden;
-  if (rule->has_sticky) node->sticky = rule->sticky;
-  if (rule->has_locked) node->locked = rule->locked;
+	if (rule->has_hidden)
+		node->hidden = rule->hidden;
+	if (rule->has_sticky)
+		node->sticky = rule->sticky;
+	if (rule->has_locked)
+		node->locked = rule->locked;
 
-  if (rule->has_scroller_proportion || rule->has_scroller_proportion_single)
-    scroller_apply_client_rules(client,
-      rule->has_scroller_proportion ? rule->scroller_proportion : 0.0f,
-      rule->has_scroller_proportion_single ? rule->scroller_proportion_single : 0.0f);
+	if (rule->has_scroller_proportion || rule->has_scroller_proportion_single)
+		scroller_apply_client_rules(client, rule->has_scroller_proportion ? rule->scroller_proportion : 0.0f,
+		    rule->has_scroller_proportion_single ? rule->scroller_proportion_single : 0.0f);
 
-  if (rule->has_block_out_from_screenshare)
-    client->block_out_from_screenshare = rule->block_out_from_screenshare;
+	if (rule->has_block_out_from_screenshare)
+		client->block_out_from_screenshare = rule->block_out_from_screenshare;
 
-  if (rule->has_allow_tearing) {
-    client->allow_tearing = rule->allow_tearing;
-    client->allow_tearing_from_rule = true;
-  }
+	if (rule->has_allow_tearing) {
+		client->allow_tearing = rule->allow_tearing;
+		client->allow_tearing_from_rule = true;
+	}
 
-  if (rule->has_render_unfocused) {
-    client->render_unfocused = rule->render_unfocused;
-    client->render_unfocused_from_rule = true;
-  }
+	if (rule->has_render_unfocused) {
+		client->render_unfocused = rule->render_unfocused;
+		client->render_unfocused_from_rule = true;
+	}
 
-  if (rule->has_blur) {
-    client->blur = rule->blur;
-    client->blur_from_rule = true;
-  }
+	if (rule->has_blur) {
+		client->blur = rule->blur;
+		client->blur_from_rule = true;
+	}
 
-  if (rule->has_mica)
-    client->mica = rule->mica;
+	if (rule->has_mica)
+		client->mica = rule->mica;
 
-  if (rule->has_acrylic)
-    client->acrylic = rule->acrylic;
+	if (rule->has_acrylic)
+		client->acrylic = rule->acrylic;
 
-  if (rule->has_border_radius)
-    client->border_radius = rule->border_radius;
+	if (rule->has_border_radius)
+		client->border_radius = rule->border_radius;
 
-  if (rule->has_shadow) {
-    client->shadow = rule->shadow;
-    client->shadow_size = shadow_size;
-    client->shadow_offset_x = shadow_offset_x;
-    client->shadow_offset_y = shadow_offset_y;
-    memcpy(client->shadow_color, shadow_color, sizeof(shadow_color));
-  }
+	if (rule->has_shadow) {
+		client->shadow = rule->shadow;
+		client->shadow_size = shadow_size;
+		client->shadow_offset_x = shadow_offset_x;
+		client->shadow_offset_y = shadow_offset_y;
+		memcpy(client->shadow_color, shadow_color, sizeof(shadow_color));
+	}
 }

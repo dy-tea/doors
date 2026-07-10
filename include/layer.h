@@ -9,27 +9,27 @@
 typedef struct output_t output_t;
 
 typedef struct layer_surface_t {
-  struct wl_list link;
-  struct wlr_layer_surface_v1 *layer_surface;
-  struct wlr_scene_tree *scene_tree;
-  struct wlr_scene_layer_surface_v1 *scene_layer;
-  struct wlr_scene_tree *saved_tree;
-  output_t *output;
-  bool mapped;
+	struct wl_list link;
+	struct wlr_layer_surface_v1 *layer_surface;
+	struct wlr_scene_tree *scene_tree;
+	struct wlr_scene_layer_surface_v1 *scene_layer;
+	struct wlr_scene_tree *saved_tree;
+	output_t *output;
+	bool mapped;
 
-  struct wlr_scene_buffer *blur_node;
-  struct wlr_buffer *blur_buf;
-  uint64_t blur_native[2];
-  bool blur_scene_hidden;
-  pixman_region32_t blur_region;
-  int blur_region_offset_x, blur_region_offset_y;
-  int blur_region_width, blur_region_height;
+	struct wlr_scene_buffer *blur_node;
+	struct wlr_buffer *blur_buf;
+	uint64_t blur_native[2];
+	bool blur_scene_hidden;
+	pixman_region32_t blur_region;
+	int blur_region_offset_x, blur_region_offset_y;
+	int blur_region_width, blur_region_height;
 
-  struct wl_listener new_popup;
-  struct wl_listener destroy;
-  struct wl_listener map;
-  struct wl_listener unmap;
-  struct wl_listener surface_commit;
+	struct wl_listener new_popup;
+	struct wl_listener destroy;
+	struct wl_listener map;
+	struct wl_listener unmap;
+	struct wl_listener surface_commit;
 } layer_surface_t;
 
 void handle_new_layer_surface(struct wl_listener *listener, void *data);

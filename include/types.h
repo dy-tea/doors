@@ -21,22 +21,18 @@ struct output_t *output_at(double x, double y);
 // enums
 typedef enum { TYPE_HORIZONTAL, TYPE_VERTICAL, TYPE_TABBED } split_type_t;
 
-typedef enum {
-  SCHEME_LONGEST_SIDE,
-  SCHEME_ALTERNATE,
-  SCHEME_SPIRAL
-} automatic_scheme_t;
+typedef enum { SCHEME_LONGEST_SIDE, SCHEME_ALTERNATE, SCHEME_SPIRAL } automatic_scheme_t;
 
-typedef enum {
-  STATE_TILED,
-  STATE_PSEUDO_TILED,
-  STATE_FLOATING,
-  STATE_FULLSCREEN
-} client_state_t;
+typedef enum { STATE_TILED, STATE_PSEUDO_TILED, STATE_FLOATING, STATE_FULLSCREEN } client_state_t;
 
 typedef enum { DECORATION_NONE, DECORATION_TABS, DECORATION_ALWAYS, DECORATION_CSD } decoration_mode_t;
 
-typedef enum { FOCUS_ON_ACTIVATE_FOCUS, FOCUS_ON_ACTIVATE_NONE, FOCUS_ON_ACTIVATE_SMART, FOCUS_ON_ACTIVATE_URGENT } focus_on_activate_mode_t;
+typedef enum {
+	FOCUS_ON_ACTIVATE_FOCUS,
+	FOCUS_ON_ACTIVATE_NONE,
+	FOCUS_ON_ACTIVATE_SMART,
+	FOCUS_ON_ACTIVATE_URGENT
+} focus_on_activate_mode_t;
 typedef enum { FOLLOWS_NO, FOLLOWS_YES, FOLLOWS_ALWAYS } focus_follows_mouse_mode_t;
 
 typedef enum { LAYER_BELOW, LAYER_NORMAL, LAYER_ABOVE } stack_layer_t;
@@ -45,10 +41,14 @@ typedef enum { LAYOUT_TILED, LAYOUT_MONOCLE, LAYOUT_SCROLLER, LAYOUT_MASTER_STAC
 
 static inline char layout_to_char(layout_t l) {
 	switch (l) {
-	case LAYOUT_TILED: return 'T';
-	case LAYOUT_MONOCLE: return 'M';
-	case LAYOUT_SCROLLER: return 'S';
-	case LAYOUT_MASTER_STACK: return 'K';
+	case LAYOUT_TILED:
+		return 'T';
+	case LAYOUT_MONOCLE:
+		return 'M';
+	case LAYOUT_SCROLLER:
+		return 'S';
+	case LAYOUT_MASTER_STACK:
+		return 'K';
 	}
 	return 0;
 }
@@ -63,148 +63,148 @@ typedef enum { WORKSPACE_ANIM_VERTICAL, WORKSPACE_ANIM_HORIZONTAL } workspace_an
 
 // structures
 typedef struct {
-  int top;
-  int right;
-  int bottom;
-  int left;
+	int top;
+	int right;
+	int bottom;
+	int left;
 } padding_t;
 
 typedef struct {
-  uint16_t min_width;
-  uint16_t min_height;
+	uint16_t min_width;
+	uint16_t min_height;
 } constraints_t;
 
 typedef struct {
-  double split_ratio;
-  direction_t split_dir;
-  bool freed;
+	double split_ratio;
+	direction_t split_dir;
+	bool freed;
 } presel_t;
 
 typedef struct client_t {
-  char app_id[MAXLEN];
-  char title[MAXLEN];
-  bool urgent;
-  bool shown;
-  bool freed;
-  client_state_t state;
-  client_state_t last_state;
-  stack_layer_t layer;
-  stack_layer_t last_layer;
-  struct wlr_box floating_rectangle;
-  struct wlr_box tiled_rectangle;
-  struct wlr_box committed_tiled_rectangle;
-  struct toplevel_t *toplevel;
-  struct xwayland_toplevel_t *xwayland_view;
+	char app_id[MAXLEN];
+	char title[MAXLEN];
+	bool urgent;
+	bool shown;
+	bool freed;
+	client_state_t state;
+	client_state_t last_state;
+	stack_layer_t layer;
+	stack_layer_t last_layer;
+	struct wlr_box floating_rectangle;
+	struct wlr_box tiled_rectangle;
+	struct wlr_box committed_tiled_rectangle;
+	struct toplevel_t *toplevel;
+	struct xwayland_toplevel_t *xwayland_view;
 
-  // Scroller layout properties
-  float scroller_proportion;
-  float scroller_proportion_single;
-  float stack_proportion;
-  struct client_t *next_in_stack;
-  struct client_t *prev_in_stack;
+	// Scroller layout properties
+	float scroller_proportion;
+	float scroller_proportion_single;
+	float stack_proportion;
+	struct client_t *next_in_stack;
+	struct client_t *prev_in_stack;
 
-  // Master-stack layout properties
-  uint64_t master_stack_order;
-  bool master_stack_master;
+	// Master-stack layout properties
+	uint64_t master_stack_order;
+	bool master_stack_master;
 
-  // Resize state for scroller
-  float old_scroller_proportion;
-  float old_stack_proportion;
-  bool cursor_in_left_half;
-  bool cursor_in_upper_half;
+	// Resize state for scroller
+	float old_scroller_proportion;
+	float old_stack_proportion;
+	bool cursor_in_left_half;
+	bool cursor_in_upper_half;
 
-  // Visual effects
-  bool blur;
-  bool blur_from_rule;
-  bool mica;
-  bool acrylic;
-  float border_radius;
-  bool shadow;
-  float shadow_size;
-  float shadow_offset_x;
-  float shadow_offset_y;
-  float shadow_color[4];
+	// Visual effects
+	bool blur;
+	bool blur_from_rule;
+	bool mica;
+	bool acrylic;
+	float border_radius;
+	bool shadow;
+	float shadow_size;
+	float shadow_offset_x;
+	float shadow_offset_y;
+	float shadow_color[4];
 
-  // Screenshare privacy
-  bool block_out_from_screenshare;
+	// Screenshare privacy
+	bool block_out_from_screenshare;
 
-  // Tearing
-  bool allow_tearing;
-  bool allow_tearing_from_rule;
+	// Tearing
+	bool allow_tearing;
+	bool allow_tearing_from_rule;
 
-  // Render-unfocused
-  bool render_unfocused;
-  bool render_unfocused_from_rule;
+	// Render-unfocused
+	bool render_unfocused;
+	bool render_unfocused_from_rule;
 } client_t;
 
 typedef struct node_t {
-  uint32_t id;
-  split_type_t split_type;
-  double split_ratio;
-  presel_t *presel;
-  struct wlr_box rectangle;
-  constraints_t constraints;
-  bool vacant;
-  bool hidden;
-  bool sticky;
-  bool scratchpad;
-  bool private_node;
-  bool locked;
-  bool marked;
-  struct node_t *first_child;
-  struct node_t *second_child;
-  struct node_t *parent;
-  client_t *client;
-  struct output_t *output;
-  struct desktop_t *desktop;
+	uint32_t id;
+	split_type_t split_type;
+	double split_ratio;
+	presel_t *presel;
+	struct wlr_box rectangle;
+	constraints_t constraints;
+	bool vacant;
+	bool hidden;
+	bool sticky;
+	bool scratchpad;
+	bool private_node;
+	bool locked;
+	bool marked;
+	struct node_t *first_child;
+	struct node_t *second_child;
+	struct node_t *parent;
+	client_t *client;
+	struct output_t *output;
+	struct desktop_t *desktop;
 
-  // transaction support
-  struct transaction_inst_t *instruction;
-  struct transaction_inst_t *pending_inst;
-  size_t ntxnrefs;
-  bool dirty;
-  bool destroying;
-  bool freed;
+	// transaction support
+	struct transaction_inst_t *instruction;
+	struct transaction_inst_t *pending_inst;
+	size_t ntxnrefs;
+	bool dirty;
+	bool destroying;
+	bool freed;
 
-  // current state
-  struct {
-    struct wlr_box rectangle;
-    double split_ratio;
-    split_type_t split_type;
-    bool hidden;
-  } current;
+	// current state
+	struct {
+		struct wlr_box rectangle;
+		double split_ratio;
+		split_type_t split_type;
+		bool hidden;
+	} current;
 
-  // pending state
-  struct {
-    struct wlr_box rectangle;
-    double split_ratio;
-    split_type_t split_type;
-    bool hidden;
-  } pending;
+	// pending state
+	struct {
+		struct wlr_box rectangle;
+		double split_ratio;
+		split_type_t split_type;
+		bool hidden;
+	} pending;
 
-  struct tab_bar_t *tab_bar;
+	struct tab_bar_t *tab_bar;
 } node_t;
 
 typedef struct desktop_t {
-  char name[SMALEN];
-  uint32_t id;
-  layout_t layout;
-  layout_t user_layout;
-  node_t *root;
-  node_t *focus;
-  struct desktop_t *prev;
-  struct desktop_t *next;
-  padding_t padding;
-  int window_gap;
-  int master_stack_count;
-  struct output_t *output;
-  uint32_t fullscreen_recreate_pending_window_id;
+	char name[SMALEN];
+	uint32_t id;
+	layout_t layout;
+	layout_t user_layout;
+	node_t *root;
+	node_t *focus;
+	struct desktop_t *prev;
+	struct desktop_t *next;
+	padding_t padding;
+	int window_gap;
+	int master_stack_count;
+	struct output_t *output;
+	uint32_t fullscreen_recreate_pending_window_id;
 } desktop_t;
 
 typedef struct {
-  struct output_t *output;
-  desktop_t *desktop;
-  node_t *node;
+	struct output_t *output;
+	desktop_t *desktop;
+	node_t *node;
 } coordinates_t;
 
 // global settings
@@ -262,13 +262,13 @@ extern char tiling_drag_indicator_color[16];
 // border gradient theme
 #define BORDER_GRADIENT_MAX_STOPS 10
 typedef struct {
-  float gradient[BORDER_GRADIENT_MAX_STOPS * 4];
-  int gradient_count;
-  float gradient_angle;
-  float gradient2[BORDER_GRADIENT_MAX_STOPS * 4];
-  int gradient2_count;
-  float gradient2_angle;
-  float gradient_lerp;
+	float gradient[BORDER_GRADIENT_MAX_STOPS * 4];
+	int gradient_count;
+	float gradient_angle;
+	float gradient2[BORDER_GRADIENT_MAX_STOPS * 4];
+	int gradient2_count;
+	float gradient2_angle;
+	float gradient_lerp;
 } border_theme_t;
 
 extern border_theme_t normal_border_theme;
