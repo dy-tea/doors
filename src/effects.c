@@ -391,61 +391,6 @@ static bool compute_src_box(
 }
 
 // capture scene with all blur/mica/acrylic toplevel scene trees hidden
-static uint64_t capture_bg_shared(output_t *output, effects_output_t *ctx) {
-	int w = output->width, h = output->height;
-	if (!ctx->capture_output || !ctx->capture_scene_output)
-		return 0;
-	if (w <= 0 || h <= 0)
-		return 0;
-
-	wlr_scene_output_set_position(ctx->capture_scene_output, output->lx, output->ly);
-
-	wlr_scene_node_set_enabled(&server.top_tree->node, false);
-	wlr_scene_node_set_enabled(&server.full_tree->node, false);
-	wlr_scene_node_set_enabled(&server.over_tree->node, false);
-	wlr_scene_node_set_enabled(&server.lock_tree->node, false);
-
-	toplevel_t *tl;
-	wl_list_for_each(tl, &server.toplevels, link) {
-		if (!tl->blur)
-			continue;
-		if ((tl->blur->blur_node || tl->blur->mica_node || tl->blur->acrylic_node) && tl->scene_tree
-		    && tl->scene_tree->node.enabled) {
-			wlr_scene_node_set_enabled(&tl->scene_tree->node, false);
-			tl->blur->blur_scene_hidden = true;
-		}
-	}
-
-	wlr_damage_ring_add_whole(&ctx->capture_scene_output->damage_ring);
-
-	bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &ctx->capture_state, NULL);
-
-	wl_list_for_each(tl, &server.toplevels, link) if (tl->blur && tl->blur->blur_scene_hidden) {
-		wlr_scene_node_set_enabled(&tl->scene_tree->node, true);
-		tl->blur->blur_scene_hidden = false;
-	}
-
-	wlr_scene_node_set_enabled(&server.top_tree->node, true);
-	wlr_scene_node_set_enabled(&server.full_tree->node, true);
-	wlr_scene_node_set_enabled(&server.over_tree->node, true);
-	wlr_scene_node_set_enabled(&server.lock_tree->node, true);
-
-	wlr_scene_output_set_position(ctx->capture_scene_output, -0x7fff, -0x7fff);
-
-	if (!ok || !ctx->capture_state.buffer) {
-		wlr_buffer_unlock(ctx->capture_state.buffer);
-		ctx->capture_state.buffer = NULL;
-		return 0;
-	}
-
-	uint64_t result;
-	effects_backend->capture_readback(ctx->capture_state.buffer, &ctx->be_state, ctx->be_state.pong.native_handle[0],
-	    ctx->blur_w, ctx->blur_h, w, h, &result);
-	wlr_buffer_unlock(ctx->capture_state.buffer);
-	ctx->capture_state.buffer = NULL;
-	return result;
-}
-
 static uint64_t capture_bg_to_tex1(
     output_t *output, effects_output_t *ctx, bool mica_only, struct wlr_scene_node *hide_node, bool *hide_flag) {
 	int w = output->width, h = output->height;
@@ -656,7 +601,7 @@ static bool rebuild_live_blur(output_t *output, pixman_region32_t *damage, uint6
 		effects_backend->blit(blurred, tl->blur->blur_native[0], w, h, NULL, 0);
 
 		client_t *c = tl->node->client;
-		if (effects_state.backend != &vk_backend && c && c->border_radius > 0.0f && c->state != STATE_FULLSCREEN) {
+		if (c && c->border_radius > 0.0f && c->state != STATE_FULLSCREEN) {
 			struct wlr_box content_r = get_client_rect(tl);
 			float ow = (float)w, oh = (float)h;
 			float win_u = (float)(content_r.x - output->lx) / ow;
@@ -1769,42 +1714,6 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 		}
 	}
 
-	// shared background capture for toplevel blur/acrylic
-	uint64_t shared_capture = 0;
-	uint64_t shared_blurred = 0;
-	{
-		bool any_toplevel_effect = false;
-		if (bg_damaged) {
-			toplevel_t *tl;
-			wl_list_for_each(tl, &server.toplevels, link) {
-				if (!tl->blur || !tl->node || !tl->node->client || !tl->node->client->shown)
-					continue;
-				if (tl->node->output != output)
-					continue;
-				if (tl->blur->blur_node || tl->blur->acrylic_node) {
-					any_toplevel_effect = true;
-					break;
-				}
-			}
-		}
-		if (any_toplevel_effect) {
-			shared_capture = capture_bg_shared(output, ctx);
-			if (shared_capture && blur_enabled) {
-				struct be_blur_params bp = {
-				    .algorithm = blur_algorithm,
-				    .passes = blur_passes,
-				    .radius = blur_radius,
-				    .vibrancy = blur_vibrancy,
-				    .vibrancy_darkness = blur_vibrancy_darkness,
-				    .noise_strength = blur_noise_strength,
-				    .brightness = blur_brightness,
-				    .contrast = blur_contrast,
-				};
-				effects_backend->blur(&ctx->be_state, shared_capture, ctx->blur_w, ctx->blur_h, &bp, &shared_blurred);
-			}
-		}
-	}
-
 	// toplevel blur
 	if (blur_enabled) {
 		bool any_blur = false;
@@ -1817,7 +1726,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 			}
 		}
 		if (any_blur) {
-			rebuild_live_blur(output, &scene_output->damage_ring.current, shared_blurred);
+			rebuild_live_blur(output, &scene_output->damage_ring.current, 0);
 			push_blur_to_toplevels(output);
 		}
 	}
@@ -1900,7 +1809,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 			}
 		}
 		if (any_acrylic) {
-			rebuild_live_acrylic(output, &scene_output->damage_ring.current, shared_capture);
+			rebuild_live_acrylic(output, &scene_output->damage_ring.current, 0);
 			push_acrylic_to_toplevels(output);
 		}
 	}

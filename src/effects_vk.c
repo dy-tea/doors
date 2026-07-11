@@ -173,6 +173,7 @@ struct vk_data {
 	VkPipeline pipe_shadow;
 	VkPipeline pipe_border;
 	VkPipeline pipe_corner_mask;
+	VkPipeline pipe_corner_mask_clear;
 	VkShaderModule screen_shader_module;
 	VkPipeline screen_shader_pipe;
 
@@ -202,6 +203,8 @@ struct vk_data {
 	int n_deferred_views[2];
 	struct vk_fbo *deferred_fbos[2][16];
 	int n_deferred_fbos[2];
+	struct wlr_texture *deferred_texs[2][16];
+	int n_deferred_texs[2];
 
 #define VK_VIEW_CACHE_SIZE 16
 	VkImage cached_images[2][VK_VIEW_CACHE_SIZE];
@@ -478,6 +481,14 @@ static void vk_defer_fbo(struct vk_fbo *fbo) {
 		vk_destroy_fbo(fbo);
 		free(fbo);
 	}
+}
+
+static void vk_defer_tex(struct wlr_texture *tex) {
+	int s = vk->frame_slot;
+	if (vk->n_deferred_texs[s] < 16)
+		vk->deferred_texs[s][vk->n_deferred_texs[s]++] = tex;
+	else
+		wlr_texture_destroy(tex);
 }
 
 static void vk_draw_full(VkPipeline pipe, VkImage src_img, VkFramebuffer dst_fb, int w, int h, VkImage dst_img,
@@ -835,8 +846,9 @@ static bool vk_init(struct wlr_renderer *r, struct wlr_allocator *a) {
 	vk->pipe_shadow = vk_create_pipe(vk->frag_shadow, false, false);
 	vk->pipe_border = vk_create_pipe(vk->frag_border, true, false);
 	vk->pipe_corner_mask = vk_create_pipe(vk->frag_corner_mask, false, true);
+	vk->pipe_corner_mask_clear = vk_create_pipe(vk->frag_corner_mask, false, false);
 
-	if (!vk->pipe_blit || !vk->pipe_kawase || !vk->pipe_corner_mask) {
+	if (!vk->pipe_blit || !vk->pipe_kawase || !vk->pipe_corner_mask || !vk->pipe_corner_mask_clear) {
 		wlr_log(WLR_ERROR, "vk: pipelines failed to create");
 		return false;
 	}
@@ -1078,6 +1090,8 @@ static bool vk_init(struct wlr_renderer *r, struct wlr_allocator *a) {
 	vk->n_deferred_views[1] = 0;
 	vk->n_deferred_fbos[0] = 0;
 	vk->n_deferred_fbos[1] = 0;
+	vk->n_deferred_texs[0] = 0;
+	vk->n_deferred_texs[1] = 0;
 	vk->n_cached_views[0] = 0;
 	vk->n_cached_views[1] = 0;
 
@@ -1122,6 +1136,7 @@ static void vk_fini(void) {
 	DESTROY_PIPE(vk->pipe_shadow);
 	DESTROY_PIPE(vk->pipe_border);
 	DESTROY_PIPE(vk->pipe_corner_mask);
+	DESTROY_PIPE(vk->pipe_corner_mask_clear);
 	DESTROY_MOD(vk->vert_module);
 	DESTROY_MOD(vk->frag_blit);
 	DESTROY_MOD(vk->frag_kawase);
@@ -1180,6 +1195,8 @@ static void vk_fini(void) {
 			vk_destroy_fbo(vk->deferred_fbos[i][j]);
 			free(vk->deferred_fbos[i][j]);
 		}
+		for (int j = 0; j < vk->n_deferred_texs[i]; j++)
+			wlr_texture_destroy(vk->deferred_texs[i][j]);
 		for (int j = 0; j < vk->n_cached_views[i]; j++)
 			vkDestroyImageView(vk->device, vk->cached_views[i][j], NULL);
 	}
@@ -1374,7 +1391,8 @@ static void vk_destroy_buffer(struct wlr_buffer *buf, uint64_t native[2]) {
 }
 
 static void vk_frame_begin(void) {
-	if (!vk) return;
+	if (!vk)
+		return;
 
 	vk->frame_slot = (vk->frame_slot + 1) % 2;
 	int s = vk->frame_slot;
@@ -1395,6 +1413,10 @@ static void vk_frame_begin(void) {
 	}
 	vk->n_deferred_fbos[s] = 0;
 
+	for (int i = 0; i < vk->n_deferred_texs[s]; i++)
+		wlr_texture_destroy(vk->deferred_texs[s][i]);
+	vk->n_deferred_texs[s] = 0;
+
 	vk->frame_cb = vk->frame_cb_bufs[s];
 	vk->desc_pool = vk->desc_pool_bufs[s];
 	vk->frame_dirty = false;
@@ -1409,7 +1431,8 @@ static void vk_frame_begin(void) {
 }
 
 static void vk_frame_end(void) {
-	if (!vk) return;
+	if (!vk)
+		return;
 	int s = vk->frame_slot;
 
 	vkEndCommandBuffer(vk->frame_cb);
@@ -1451,8 +1474,8 @@ static bool vk_blit(uint64_t src_tex, uint64_t dst_fbo, int w, int h, const pixm
 	    .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
 	    .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
 	};
-	vkCmdPipelineBarrier(
-	    vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &src_barrier);
+	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL,
+	    0, NULL, 1, &src_barrier);
 
 	VkImageMemoryBarrier dst_barrier = {
 	    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -1465,8 +1488,8 @@ static bool vk_blit(uint64_t src_tex, uint64_t dst_fbo, int w, int h, const pixm
 	    .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
 	    .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
 	};
-	vkCmdPipelineBarrier(
-	    vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &dst_barrier);
+	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL,
+	    0, NULL, 1, &dst_barrier);
 
 	for (int i = 0; i < n_regions; i++) {
 		int x1 = scissor ? scissor[i].x1 : 0;
@@ -1494,8 +1517,8 @@ static bool vk_blit(uint64_t src_tex, uint64_t dst_fbo, int w, int h, const pixm
 	    .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
 	    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
 	};
-	vkCmdPipelineBarrier(
-	    vk->frame_cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &src_barrier2);
+	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL,
+	    0, NULL, 1, &src_barrier2);
 
 	VkImageMemoryBarrier dst_barrier2 = {
 	    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -1508,8 +1531,8 @@ static bool vk_blit(uint64_t src_tex, uint64_t dst_fbo, int w, int h, const pixm
 	    .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
 	    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
 	};
-	vkCmdPipelineBarrier(
-	    vk->frame_cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &dst_barrier2);
+	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL,
+	    0, NULL, 1, &dst_barrier2);
 
 	wlr_log(WLR_INFO, "vk: blit via vkCmdBlitImage regions=%d w=%d h=%d", n_regions, w, h);
 	return true;
@@ -1716,8 +1739,8 @@ static bool vk_render_shadow(struct be_shadow_params *p, uint64_t dst_fbo) {
 		free(tmp);
 		return false;
 	}
-	vk_draw_full_no_tex(
-	    vk->pipe_shadow, tmp->img.image, tmp->fb, p->buf_w, p->buf_h, true, &pc, sizeof(pc), vk->pipe_layout, vk->dummy_ds);
+	vk_draw_full_no_tex(vk->pipe_shadow, tmp->img.image, tmp->fb, p->buf_w, p->buf_h, true, &pc, sizeof(pc),
+	    vk->pipe_layout, vk->dummy_ds);
 
 	VkImageMemoryBarrier src_b = {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 	    .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -1728,8 +1751,8 @@ static bool vk_render_shadow(struct be_shadow_params *p, uint64_t dst_fbo) {
 	    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
 	    .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
 	    .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT};
-	vkCmdPipelineBarrier(
-	    vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &src_b);
+	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL,
+	    0, NULL, 1, &src_b);
 
 	VkImageMemoryBarrier dst_to = {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 	    .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -1740,8 +1763,8 @@ static bool vk_render_shadow(struct be_shadow_params *p, uint64_t dst_fbo) {
 	    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
 	    .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
 	    .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT};
-	vkCmdPipelineBarrier(
-	    vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &dst_to);
+	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL,
+	    0, NULL, 1, &dst_to);
 
 	VkImageBlit blit = {.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
 	    .srcOffsets = {{0, 0, 0}, {p->buf_w, p->buf_h, 1}},
@@ -1759,8 +1782,8 @@ static bool vk_render_shadow(struct be_shadow_params *p, uint64_t dst_fbo) {
 	    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
 	    .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
 	    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT};
-	vkCmdPipelineBarrier(
-	    vk->frame_cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &dst_back);
+	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL,
+	    0, NULL, 1, &dst_back);
 
 	vk_defer_fbo(tmp);
 	return true;
@@ -1817,8 +1840,8 @@ static bool vk_render_border(struct be_border_params *p, uint64_t dst_fbo) {
 	    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
 	    .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
 	    .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT};
-	vkCmdPipelineBarrier(
-	    vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &src_to);
+	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL,
+	    0, NULL, 1, &src_to);
 
 	VkImageMemoryBarrier dst_to = {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 	    .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -1829,8 +1852,8 @@ static bool vk_render_border(struct be_border_params *p, uint64_t dst_fbo) {
 	    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
 	    .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
 	    .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT};
-	vkCmdPipelineBarrier(
-	    vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &dst_to);
+	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL,
+	    0, NULL, 1, &dst_to);
 
 	VkImageBlit blit = {.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
 	    .srcOffsets = {{0, 0, 0}, {p->buf_w, p->buf_h, 1}},
@@ -1848,8 +1871,8 @@ static bool vk_render_border(struct be_border_params *p, uint64_t dst_fbo) {
 	    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
 	    .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
 	    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT};
-	vkCmdPipelineBarrier(
-	    vk->frame_cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &dst_back);
+	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL,
+	    0, NULL, 1, &dst_back);
 
 	vk_defer_fbo(tmp);
 	return true;
@@ -1863,11 +1886,6 @@ static bool vk_apply_corner_mask(be_output_state_t *state, uint64_t dst_fbo, int
 	if (!dst)
 		return false;
 
-	struct vk_fbo *tmp = calloc(1, sizeof(*tmp));
-	if (!tmp || !vk_create_fbo(dst_w, dst_h, vk->vk_fmt, tmp)) {
-		free(tmp);
-		return false;
-	}
 	VkImage src_img = vk_img_of(bg_tex);
 
 	VkImageViewCreateInfo vci = {
@@ -1878,11 +1896,8 @@ static bool vk_apply_corner_mask(be_output_state_t *state, uint64_t dst_fbo, int
 	    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
 	};
 	VkImageView src_view;
-	if (vkCreateImageView(vk->device, &vci, NULL, &src_view) != VK_SUCCESS) {
-		vk_destroy_fbo(tmp);
-		free(tmp);
+	if (vkCreateImageView(vk->device, &vci, NULL, &src_view) != VK_SUCCESS)
 		return false;
-	}
 	VkDescriptorSetAllocateInfo dsai = {
 	    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
 	    .descriptorPool = vk->desc_pool,
@@ -1924,6 +1939,50 @@ static bool vk_apply_corner_mask(be_output_state_t *state, uint64_t dst_fbo, int
 	pc.br = p->border_radius_px;
 	pc.scale = p->scale;
 	pc.pre = p->pre_blit ? 1 : 0;
+
+	VkClearValue clear_val = {{{0.0f, 0.0f, 0.0f, 0.0f}}};
+
+	if (!p->pre_blit) {
+		VkImageMemoryBarrier b = {
+		    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		    .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		    .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		    .image = dst->img.image,
+		    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+		    .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
+		    .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
+		};
+		vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, &b);
+
+		VkRenderPassBeginInfo rp = {
+		    .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+		    .renderPass = vk->color_clear_render_pass,
+		    .framebuffer = dst->fb,
+		    .renderArea = {{0, 0}, {(uint32_t)dst_w, (uint32_t)dst_h}},
+		    .clearValueCount = 1,
+		    .pClearValues = &clear_val,
+		};
+		VkViewport vp = {0, (float)dst_h, (float)dst_w, -(float)dst_h, 0, 1};
+		VkRect2D sc = {{0, 0}, {(uint32_t)dst_w, (uint32_t)dst_h}};
+		vkCmdBeginRenderPass(vk->frame_cb, &rp, VK_SUBPASS_CONTENTS_INLINE);
+		vkCmdSetViewport(vk->frame_cb, 0, 1, &vp);
+		vkCmdSetScissor(vk->frame_cb, 0, 1, &sc);
+		vkCmdBindDescriptorSets(vk->frame_cb, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->pipe_layout, 0, 1, &ds, 0, NULL);
+		vkCmdPushConstants(vk->frame_cb, vk->pipe_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+		vkCmdBindPipeline(vk->frame_cb, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->pipe_corner_mask_clear);
+		vkCmdDraw(vk->frame_cb, 4, 1, 0, 0);
+		vkCmdEndRenderPass(vk->frame_cb);
+
+		vk_defer_view(src_view);
+		return true;
+	}
+
+	struct vk_fbo *tmp = calloc(1, sizeof(*tmp));
+	if (!tmp || !vk_create_fbo(dst_w, dst_h, vk->vk_fmt, tmp)) {
+		free(tmp);
+		return false;
+	}
 
 	// blit dst -> tmp: OUT buffer -> temp FBO
 	{
@@ -2169,8 +2228,8 @@ static bool vk_capture_readback(struct wlr_buffer *capture_buffer, be_output_sta
 	    .srcAccessMask = VK_ACCESS_MEMORY_READ_BIT,
 	    .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
 	};
-	vkCmdPipelineBarrier(
-	    vk->frame_cb, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &src_barrier);
+	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0,
+	    NULL, 1, &src_barrier);
 
 	VkImageMemoryBarrier dst_barrier = {
 	    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -2183,8 +2242,8 @@ static bool vk_capture_readback(struct wlr_buffer *capture_buffer, be_output_sta
 	    .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
 	    .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
 	};
-	vkCmdPipelineBarrier(
-	    vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &dst_barrier);
+	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL,
+	    0, NULL, 1, &dst_barrier);
 
 	int capture_w = src_w > 0 ? src_w : dst_w;
 	int capture_h = src_h > 0 ? src_h : dst_h;
@@ -2209,8 +2268,8 @@ static bool vk_capture_readback(struct wlr_buffer *capture_buffer, be_output_sta
 	    .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
 	    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
 	};
-	vkCmdPipelineBarrier(
-	    vk->frame_cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &src_barrier2);
+	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL,
+	    0, NULL, 1, &src_barrier2);
 
 	VkImageMemoryBarrier dst_barrier2 = {
 	    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -2223,10 +2282,10 @@ static bool vk_capture_readback(struct wlr_buffer *capture_buffer, be_output_sta
 	    .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
 	    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
 	};
-	vkCmdPipelineBarrier(
-	    vk->frame_cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &dst_barrier2);
+	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL,
+	    0, NULL, 1, &dst_barrier2);
 
-	wlr_texture_destroy(tex);
+	vk_defer_tex(tex);
 	*out_tex = (uint64_t)result_img;
 	wlr_log(WLR_INFO, "vk: capture done, result_img=%p", (void *)result_img);
 	return true;
