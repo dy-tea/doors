@@ -588,7 +588,7 @@ static void handle_map(struct wl_listener *listener, void *data) {
 
 	rule_consequence_t *rule = find_matching_rule(app_id, title, NULL);
 
-	if (rule && rule->has_manage && !rule->manage) {
+	if (rule && rule->has & RULE_TYPE_MANAGE && !(rule->flags & RULE_TYPE_MANAGE)) {
 		wlr_log(WLR_INFO, "XWayland window %s ignored by rule (manage=off)", app_id ? app_id : "?");
 		xwayland_view->node = NULL;
 		free_node(node);
@@ -596,11 +596,11 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	}
 
 	bool should_focus = true;
-	if (rule && rule->has_focus && !rule->focus)
+	if (rule && rule->has & RULE_TYPE_FOCUS && !(rule->flags & RULE_TYPE_FOCUS))
 		should_focus = false;
 
 	desktop_t *target_desktop = d;
-	if (rule && rule->has_desktop) {
+	if (rule && rule->has & RULE_TYPE_DESKTOP) {
 		desktop_t *new_desk = find_desktop_by_name(rule->desktop);
 		if (new_desk)
 			target_desktop = new_desk;
@@ -614,16 +614,16 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	rule_apply_consequence(node, client, rule);
 
 	if (rule) {
-		if (rule->has_blur)
-			xwayland_set_effect(xwayland_view, EFFECT_BLUR, rule->blur);
-		if (rule->has_mica)
-			xwayland_set_effect(xwayland_view, EFFECT_MICA, rule->mica);
-		if (rule->has_acrylic)
-			xwayland_set_effect(xwayland_view, EFFECT_ACRYLIC, rule->acrylic);
-		if (rule->has_border_radius)
+		if (rule->has & RULE_TYPE_BLUR)
+			xwayland_set_effect(xwayland_view, EFFECT_BLUR, rule->flags & RULE_TYPE_BLUR);
+		if (rule->has & RULE_TYPE_MICA)
+			xwayland_set_effect(xwayland_view, EFFECT_MICA, rule->flags & RULE_TYPE_MICA);
+		if (rule->has & RULE_TYPE_ACRYLIC)
+			xwayland_set_effect(xwayland_view, EFFECT_ACRYLIC, rule->flags & RULE_TYPE_ACRYLIC);
+		if (rule->has & RULE_TYPE_BORDER_RADIUS)
 			xwayland_set_border_radius(xwayland_view, rule->border_radius);
-		if (rule->has_shadow)
-			xwayland_set_shadow(xwayland_view, rule->shadow);
+		if (rule->has & RULE_TYPE_SHADOW)
+			xwayland_set_shadow(xwayland_view, rule->flags & RULE_TYPE_SHADOW);
 	}
 
 	render_unfocused_client_update(client);
@@ -645,7 +645,7 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	if (app_id)
 		wlr_foreign_toplevel_handle_v1_set_app_id(xwayland_view->foreign_toplevel, app_id);
 
-	bool rule_forces_float = rule && rule->has_state && rule->state == STATE_FLOATING;
+	bool rule_forces_float = rule && rule->has & RULE_TYPE_STATE && rule->state == STATE_FLOATING;
 	if (wants_float || rule_forces_float) {
 		wlr_scene_node_reparent(&xwayland_view->scene_tree->node, server.float_tree);
 		client->floating_rectangle.x = xsurface->x;
@@ -689,7 +689,7 @@ static void handle_map(struct wl_listener *listener, void *data) {
 
 	if (xsurface->fullscreen && target_desktop->fullscreen_recreate_pending_window_id == xsurface->window_id) {
 		target_desktop->fullscreen_recreate_pending_window_id = 0;
-	} else if (rule && rule->has_state && rule->state == STATE_FULLSCREEN) {
+	} else if (rule && rule->has & RULE_TYPE_STATE && rule->state == STATE_FULLSCREEN) {
 		target_desktop->fullscreen_recreate_pending_window_id = 0;
 		enter_fullscreen(target_monitor, target_desktop, node);
 	} else if (xsurface->fullscreen && ignore_ewmh_fullscreen != 1) {

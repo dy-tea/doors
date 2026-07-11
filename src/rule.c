@@ -112,11 +112,11 @@ void list_rules(char *buf, size_t buf_size) {
 
 		offset += snprintf(buf + offset, buf_size - offset, "-> ");
 
-		if (r->consequence.has_desktop)
+		if (r->consequence.has & RULE_TYPE_DESKTOP)
 			offset += snprintf(buf + offset, buf_size - offset, "desktop=%s ", r->consequence.desktop);
-		if (r->consequence.has_monitor)
+		if (r->consequence.has & RULE_TYPE_MONITOR)
 			offset += snprintf(buf + offset, buf_size - offset, "monitor=%s ", r->consequence.monitor);
-		if (r->consequence.has_state) {
+		if (r->consequence.has & RULE_TYPE_STATE) {
 			const char *state_str = "unknown";
 			switch (r->consequence.state) {
 			case STATE_TILED:
@@ -134,46 +134,46 @@ void list_rules(char *buf, size_t buf_size) {
 			}
 			offset += snprintf(buf + offset, buf_size - offset, "state=%s ", state_str);
 		}
-		if (r->consequence.has_follow)
-			offset += snprintf(buf + offset, buf_size - offset, "follow=%s ", r->consequence.follow ? "on" : "off");
-		if (r->consequence.has_focus)
-			offset += snprintf(buf + offset, buf_size - offset, "focus=%s ", r->consequence.focus ? "on" : "off");
-		if (r->consequence.has_manage)
-			offset += snprintf(buf + offset, buf_size - offset, "manage=%s ", r->consequence.manage ? "on" : "off");
-		if (r->consequence.has_locked)
-			offset += snprintf(buf + offset, buf_size - offset, "locked=%s ", r->consequence.locked ? "on" : "off");
-		if (r->consequence.has_hidden)
-			offset += snprintf(buf + offset, buf_size - offset, "hidden=%s ", r->consequence.hidden ? "on" : "off");
-		if (r->consequence.has_sticky)
-			offset += snprintf(buf + offset, buf_size - offset, "sticky=%s ", r->consequence.sticky ? "on" : "off");
-		if (r->consequence.has_scroller_proportion)
+		if (r->consequence.has & RULE_TYPE_FOLLOW)
+			offset += snprintf(buf + offset, buf_size - offset, "follow=%s ", r->consequence.flags & RULE_TYPE_FOLLOW ? "on" : "off");
+		if (r->consequence.has & RULE_TYPE_FOCUS)
+			offset += snprintf(buf + offset, buf_size - offset, "focus=%s ", r->consequence.flags & RULE_TYPE_FOCUS ? "on" : "off");
+		if (r->consequence.has & RULE_TYPE_MANAGE)
+			offset += snprintf(buf + offset, buf_size - offset, "manage=%s ", r->consequence.flags & RULE_TYPE_MANAGE ? "on" : "off");
+		if (r->consequence.has & RULE_TYPE_LOCKED)
+			offset += snprintf(buf + offset, buf_size - offset, "locked=%s ", r->consequence.flags & RULE_TYPE_LOCKED ? "on" : "off");
+		if (r->consequence.has & RULE_TYPE_HIDDEN)
+			offset += snprintf(buf + offset, buf_size - offset, "hidden=%s ", r->consequence.flags & RULE_TYPE_HIDDEN ? "on" : "off");
+		if (r->consequence.has & RULE_TYPE_STICKY)
+			offset += snprintf(buf + offset, buf_size - offset, "sticky=%s ", r->consequence.flags & RULE_TYPE_STICKY ? "on" : "off");
+		if (r->consequence.has & RULE_TYPE_SCROLLER_PROPORTION)
 			offset += snprintf(
 			    buf + offset, buf_size - offset, "scroller_proportion=%.2f ", r->consequence.scroller_proportion);
-		if (r->consequence.has_scroller_proportion_single)
+		if (r->consequence.has & RULE_TYPE_SCROLLER_PROPORTION_SINGLE)
 			offset += snprintf(buf + offset, buf_size - offset, "scroller_proportion_single=%.2f ",
 			    r->consequence.scroller_proportion_single);
-		if (r->consequence.has_blur)
-			offset += snprintf(buf + offset, buf_size - offset, "blur=%s ", r->consequence.blur ? "on" : "off");
-		if (r->consequence.has_mica)
-			offset += snprintf(buf + offset, buf_size - offset, "mica=%s ", r->consequence.mica ? "on" : "off");
-		if (r->consequence.has_acrylic)
-			offset += snprintf(buf + offset, buf_size - offset, "acrylic=%s ", r->consequence.acrylic ? "on" : "off");
-		if (r->consequence.has_border_radius)
+		if (r->consequence.has & RULE_TYPE_BLUR)
+			offset += snprintf(buf + offset, buf_size - offset, "blur=%s ", r->consequence.flags & RULE_TYPE_BLUR ? "on" : "off");
+		if (r->consequence.has & RULE_TYPE_MICA)
+			offset += snprintf(buf + offset, buf_size - offset, "mica=%s ", r->consequence.flags & RULE_TYPE_MICA ? "on" : "off");
+		if (r->consequence.has & RULE_TYPE_ACRYLIC)
+			offset += snprintf(buf + offset, buf_size - offset, "acrylic=%s ", r->consequence.flags & RULE_TYPE_ACRYLIC ? "on" : "off");
+		if (r->consequence.has & RULE_TYPE_BORDER_RADIUS)
 			offset += snprintf(buf + offset, buf_size - offset, "border_radius=%.1f ", r->consequence.border_radius);
-		if (r->consequence.has_shadow)
-			offset += snprintf(buf + offset, buf_size - offset, "shadow=%s ", r->consequence.shadow ? "on" : "off");
-		if (r->consequence.has_block_out_from_screenshare)
+		if (r->consequence.has & RULE_TYPE_SHADOW)
+			offset += snprintf(buf + offset, buf_size - offset, "shadow=%s ", r->consequence.flags & RULE_TYPE_SHADOW ? "on" : "off");
+		if (r->consequence.has & RULE_TYPE_BLOCK_OUT_FROM_SCREENSHARE)
 			offset += snprintf(buf + offset, buf_size - offset, "block_out_from_screenshare=%s ",
-			    r->consequence.block_out_from_screenshare ? "on" : "off");
-		if (r->consequence.has_allow_tearing)
+			    r->consequence.has & RULE_TYPE_BLOCK_OUT_FROM_SCREENSHARE ? "on" : "off");
+		if (r->consequence.has & RULE_TYPE_ALLOW_TEARING)
 			offset += snprintf(
-			    buf + offset, buf_size - offset, "allow_tearing=%s ", r->consequence.allow_tearing ? "on" : "off");
-		if (r->consequence.has_shortcuts_inhibitor)
+			    buf + offset, buf_size - offset, "allow_tearing=%s ", r->consequence.flags & RULE_TYPE_ALLOW_TEARING ? "on" : "off");
+		if (r->consequence.has & RULE_TYPE_SHORTCUTS_INHIBITOR)
 			offset += snprintf(buf + offset, buf_size - offset, "shortcuts_inhibitor=%s ",
-			    r->consequence.shortcuts_inhibitor ? "on" : "off");
-		if (r->consequence.has_render_unfocused)
+			    r->consequence.flags & RULE_TYPE_SHORTCUTS_INHIBITOR ? "on" : "off");
+		if (r->consequence.has & RULE_TYPE_RENDER_UNFOCUSED)
 			offset += snprintf(
-			    buf + offset, buf_size - offset, "render_unfocused=%s ", r->consequence.render_unfocused ? "on" : "off");
+			    buf + offset, buf_size - offset, "render_unfocused=%s ", r->consequence.flags & RULE_TYPE_RENDER_UNFOCUSED ? "on" : "off");
 
 		offset += snprintf(buf + offset, buf_size - offset, "\n");
 
@@ -223,49 +223,49 @@ void rule_apply_consequence(node_t *node, client_t *client, const rule_consequen
 	if (!rule)
 		return;
 
-	if (rule->has_state)
+	if (rule->has & RULE_TYPE_STATE)
 		client->state = rule->state;
 
-	if (rule->has_hidden)
-		node->hidden = rule->hidden;
-	if (rule->has_sticky)
-		node->sticky = rule->sticky;
-	if (rule->has_locked)
-		node->locked = rule->locked;
+	if (rule->has & RULE_TYPE_HIDDEN)
+		node->hidden = rule->flags & RULE_TYPE_HIDDEN;
+	if (rule->has & RULE_TYPE_STICKY)
+		node->sticky = rule->flags & RULE_TYPE_STICKY;
+	if (rule->has & RULE_TYPE_LOCKED)
+		node->locked = rule->flags & RULE_TYPE_LOCKED;
 
-	if (rule->has_scroller_proportion || rule->has_scroller_proportion_single)
-		scroller_apply_client_rules(client, rule->has_scroller_proportion ? rule->scroller_proportion : 0.0f,
-		    rule->has_scroller_proportion_single ? rule->scroller_proportion_single : 0.0f);
+	if (rule->has & RULE_TYPE_SCROLLER_PROPORTION || rule->has & RULE_TYPE_SCROLLER_PROPORTION_SINGLE)
+		scroller_apply_client_rules(client, rule->has & RULE_TYPE_SCROLLER_PROPORTION ? rule->scroller_proportion : 0.0f,
+		    rule->has & RULE_TYPE_SCROLLER_PROPORTION_SINGLE ? rule->scroller_proportion_single : 0.0f);
 
-	if (rule->has_block_out_from_screenshare)
-		client->block_out_from_screenshare = rule->block_out_from_screenshare;
+	if (rule->has & RULE_TYPE_BLOCK_OUT_FROM_SCREENSHARE)
+		client->block_out_from_screenshare = rule->flags & RULE_TYPE_BLOCK_OUT_FROM_SCREENSHARE;
 
-	if (rule->has_allow_tearing) {
-		client->allow_tearing = rule->allow_tearing;
+	if (rule->has & RULE_TYPE_ALLOW_TEARING) {
+		client->allow_tearing = rule->flags & RULE_TYPE_ALLOW_TEARING;
 		client->allow_tearing_from_rule = true;
 	}
 
-	if (rule->has_render_unfocused) {
-		client->render_unfocused = rule->render_unfocused;
+	if (rule->has & RULE_TYPE_RENDER_UNFOCUSED) {
+		client->render_unfocused = rule->flags & RULE_TYPE_RENDER_UNFOCUSED;
 		client->render_unfocused_from_rule = true;
 	}
 
-	if (rule->has_blur) {
-		client->blur = rule->blur;
+	if (rule->has & RULE_TYPE_BLUR) {
+		client->blur = rule->flags & RULE_TYPE_BLUR;
 		client->blur_from_rule = true;
 	}
 
-	if (rule->has_mica)
-		client->mica = rule->mica;
+	if (rule->has & RULE_TYPE_MICA)
+		client->mica = rule->flags & RULE_TYPE_MICA;
 
-	if (rule->has_acrylic)
-		client->acrylic = rule->acrylic;
+	if (rule->has & RULE_TYPE_ACRYLIC)
+		client->acrylic = rule->flags & RULE_TYPE_ACRYLIC;
 
-	if (rule->has_border_radius)
+	if (rule->has & RULE_TYPE_BORDER_RADIUS)
 		client->border_radius = rule->border_radius;
 
-	if (rule->has_shadow) {
-		client->shadow = rule->shadow;
+	if (rule->has & RULE_TYPE_SHADOW) {
+		client->shadow = rule->flags & RULE_TYPE_SHADOW;
 		client->shadow_size = shadow_size;
 		client->shadow_offset_x = shadow_offset_x;
 		client->shadow_offset_y = shadow_offset_y;

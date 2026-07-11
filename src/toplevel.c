@@ -475,7 +475,7 @@ void toplevel_map(struct wl_listener *listener, void *data) {
 
 	rule_consequence_t *rule = find_matching_rule(app_id, title, toplevel->tag);
 
-	if (rule && rule->has_manage && !rule->manage) {
+	if (rule && rule->has & RULE_TYPE_MANAGE && !(rule->flags & RULE_TYPE_MANAGE)) {
 		wlr_log(WLR_INFO, "Window %s ignored by rule (manage=off)", app_id ? app_id : "?");
 		free_node(n);
 		return;
@@ -483,13 +483,13 @@ void toplevel_map(struct wl_listener *listener, void *data) {
 
 	bool should_focus = true;
 	if (rule) {
-		if (rule->has_focus && !rule->focus)
+		if (rule->has & RULE_TYPE_FOCUS && !(rule->flags & RULE_TYPE_FOCUS))
 			should_focus = false;
 	}
 
 	// find target monitor
 	output_t *target_output = m;
-	if (rule && rule->has_monitor) {
+	if (rule && rule->has & RULE_TYPE_MONITOR) {
 		wlr_log(WLR_DEBUG, "  Rule specifies monitor: %s", rule->monitor);
 		struct output_t *new_monitor = find_output_by_name(rule->monitor);
 		if (new_monitor) {
@@ -519,7 +519,7 @@ void toplevel_map(struct wl_listener *listener, void *data) {
 	// find target desktop
 	desktop_t *target_desktop = d;
 	wlr_log(WLR_DEBUG, "Window %s: current desktop=%s, has_rule=%d", app_id ? app_id : "?", d->name, rule != NULL);
-	if (rule && rule->has_desktop) {
+	if (rule && rule->has & RULE_TYPE_DESKTOP) {
 		wlr_log(WLR_DEBUG, "  Rule specifies desktop: %s", rule->desktop);
 		desktop_t *new_desk = find_desktop_by_name_in_monitor(target_output, rule->desktop);
 		if (new_desk) {
@@ -536,16 +536,16 @@ void toplevel_map(struct wl_listener *listener, void *data) {
 	rule_apply_consequence(n, n->client, rule);
 
 	if (rule) {
-		if (rule->has_blur)
-			toplevel_set_effect(toplevel, EFFECT_BLUR, rule->blur);
-		if (rule->has_mica)
-			toplevel_set_effect(toplevel, EFFECT_MICA, rule->mica);
-		if (rule->has_acrylic)
-			toplevel_set_effect(toplevel, EFFECT_ACRYLIC, rule->acrylic);
-		if (rule->has_border_radius)
+		if (rule->has & RULE_TYPE_BLUR)
+			toplevel_set_effect(toplevel, EFFECT_BLUR, rule->flags & RULE_TYPE_BLUR);
+		if (rule->has & RULE_TYPE_MICA)
+			toplevel_set_effect(toplevel, EFFECT_MICA, rule->flags & RULE_TYPE_MICA);
+		if (rule->has & RULE_TYPE_ACRYLIC)
+			toplevel_set_effect(toplevel, EFFECT_ACRYLIC, rule->flags & RULE_TYPE_ACRYLIC);
+		if (rule->has & RULE_TYPE_BORDER_RADIUS)
 			toplevel_set_border_radius(toplevel, rule->border_radius);
-		if (rule->has_shadow)
-			toplevel_set_shadow(toplevel, rule->shadow);
+		if (rule->has & RULE_TYPE_SHADOW)
+			toplevel_set_shadow(toplevel, rule->flags & RULE_TYPE_SHADOW);
 	}
 
 	// create foreign toplevel handles
