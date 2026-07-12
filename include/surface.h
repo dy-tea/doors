@@ -57,6 +57,8 @@ typedef enum {
 	EFFECT_ACRYLIC,
 } surface_effect_t;
 
+struct wlr_scene_node;
+
 void surface_set_effect(struct wlr_scene_tree *scene_tree, struct node_t *node, struct surface_blur_t **blur,
     surface_effect_t effect, bool enabled);
 void surface_set_border_radius(struct wlr_scene_tree *scene_tree, struct wlr_scene_tree *content_tree,
@@ -70,3 +72,5 @@ void surface_update_rounded(struct surface_rounded_t **rounded, float color[4], 
 void surface_client_set_effect(struct client_t *client, surface_effect_t effect, bool enabled);
 void surface_client_set_border_radius(struct client_t *client, float radius);
 void surface_client_set_shadow(struct client_t *client, bool enabled);
+
+void surface_set_opacity(struct wlr_scene_node *node, float opacity);

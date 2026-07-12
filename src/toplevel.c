@@ -546,6 +546,8 @@ void toplevel_map(struct wl_listener *listener, void *data) {
 			toplevel_set_border_radius(toplevel, rule->border_radius);
 		if (rule->has & RULE_TYPE_SHADOW)
 			toplevel_set_shadow(toplevel, rule->flags & RULE_TYPE_SHADOW);
+		if (rule->has & RULE_TYPE_OPACITY)
+			surface_set_opacity(&toplevel->scene_tree->node, rule->opacity);
 	}
 
 	// create foreign toplevel handles
@@ -882,6 +884,10 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
 		if (wants_blur != has_blur)
 			toplevel_set_effect(toplevel, EFFECT_BLUR, wants_blur);
 	}
+
+	// update opacity
+	if (toplevel->node && toplevel->node->client && !animation_is_opacity_fading(toplevel))
+		surface_set_opacity(&toplevel->scene_tree->node, toplevel->node->client->opacity);
 }
 
 void toplevel_set_effect(toplevel_t *tl, surface_effect_t effect, bool enabled) {

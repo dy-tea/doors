@@ -320,6 +320,32 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
 			float r = atof(key + 14);
 			surface_client_set_border_radius(n->client, r);
 			send_success(client_fd, "border_radius set\n");
+		} else if (strncmp(key, "opacity", 7) == 0) {
+			if (!n->client) {
+				send_failure(client_fd, "node -g: no client\n");
+				return;
+			}
+			float o = atof(key + 8);
+
+			if (o < 0 || o > 1.0) {
+				send_failure(client_fd, "node -g: opacity out of range 0.0-1.0\n");
+				return;
+			}
+
+			n->client->opacity = o;
+
+			struct wlr_scene_node *node = NULL;
+			if (n->client->toplevel)
+				node = &n->client->toplevel->scene_tree->node;
+			if (n->client->xwayland_view)
+				node = &n->client->xwayland_view->scene_tree->node;
+
+			if (node) {
+				surface_set_opacity(node, o);
+				send_success(client_fd, "opacity set\n");
+			} else {
+				send_failure(client_fd, "node -g: no toplevel or xwayland view\n");
+			}
 		} else {
 			send_failure(client_fd, "node -g: unknown flag\n");
 			return;

@@ -494,6 +494,7 @@ doorsctl node --flag mica=on|off       						# Toggle mica effect on window
 doorsctl node --flag acrylic=on|off    						# Toggle acrylic effect on window
 doorsctl node --flag border_radius=<float>  			# Set border radius on window
 doorsctl node --flag shadow=on|off       					# Toggle shadow effect on window
+doorsctl node --flag opacity=<0.0-1.0>  					# Set opacity on window
 doorsctl node --move <dx> <dy>         						# Move floating window by delta x,y
 doorsctl node --resize <handle> <dx> <dy>  				# Resize floating window (handle: northwest/nw/north/n/ne/east/e/southeast/se/south/s/southwest/sw/west/w/center/c)
 doorsctl node --activate               						# Activate focused window
@@ -651,6 +652,7 @@ doorsctl rule -a vesktop desktop=III
 - `shortcuts_inhibitor=on|off` - Controls whether the matched window(s) can use the keyboard shortcuts inhibitor protocol to suppress compositor keybindings (default: on).
 - `shadow=on|off` - Whether a window should have the shadow effect set
 - `render_unfocused=on|off` - When on, the window continues rendering even when hidden/unfocused. Configure the throttle rate via `doorsctl config render_unfocused_fps <value>` (default: 15).
+- `opacity=<0.0-1.0>` - Set the opacity of the matched window(s)
 
 **Matching by Title or Tag:**
 

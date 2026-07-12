@@ -46,8 +46,7 @@ typedef struct output_t {
 	uint64_t refresh_nsec;
 	int max_render_time;
 
-	enum scale_filter_mode scale_filter_mode;
-	enum scale_filter_mode applied_scale_filter;
+	enum scale_filter_mode scale_filter_mode, applied_scale_filter;
 	enum wl_output_subpixel detected_subpixel;
 
 	struct wlr_color_transform *color_transform;
@@ -61,12 +60,9 @@ typedef struct output_t {
 	unsigned int sticky_count;
 
 	struct wlr_box rectangle;
-	desktop_t *desk;
-	desktop_t *last_desk;
-	desktop_t *desk_head;
-	desktop_t *desk_tail;
-	struct output_t *prev;
-	struct output_t *next;
+	desktop_t *desk, *last_desk;
+	desktop_t *desk_head, *desk_tail;
+	struct output_t *prev, *next;
 } output_t;
 
 void handle_new_output(struct wl_listener *listener, void *data);

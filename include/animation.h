@@ -43,6 +43,7 @@ bool animation_fade_in(toplevel_t *toplevel);
 bool animation_fade_in_layer(layer_surface_t *layer);
 bool animation_fade_out(toplevel_t *toplevel);
 bool animation_fade_out_layer(layer_surface_t *layer);
+bool animation_is_opacity_fading(toplevel_t *toplevel);
 
 bool animation_workspace_switch_active(void);
 void animation_cancel_node(node_t *node);

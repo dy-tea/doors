@@ -501,10 +501,12 @@ static void handle_commit(struct wl_listener *listener, void *data) {
 		if (xwayland_view->node && xwayland_view->node->client && xwayland_view->node->client->state == STATE_FLOATING) {
 			xwayland_view->node->client->floating_rectangle.width = new_geo.width;
 			xwayland_view->node->client->floating_rectangle.height = new_geo.height;
-		} else if (xwayland_view->node && xwayland_view->node->client
-		    && xwayland_view->node->client->state == STATE_TILED) {
 		}
 	}
+
+	// update opacity
+	if (xwayland_view->node && xwayland_view->node->client && xwayland_view->scene_tree)
+		surface_set_opacity(&xwayland_view->scene_tree->node, xwayland_view->node->client->opacity);
 }
 
 static void handle_map(struct wl_listener *listener, void *data) {
@@ -624,6 +626,8 @@ static void handle_map(struct wl_listener *listener, void *data) {
 			xwayland_set_border_radius(xwayland_view, rule->border_radius);
 		if (rule->has & RULE_TYPE_SHADOW)
 			xwayland_set_shadow(xwayland_view, rule->flags & RULE_TYPE_SHADOW);
+		if (rule->has & RULE_TYPE_OPACITY)
+			surface_set_opacity(&xwayland_view->scene_tree->node, rule->opacity);
 	}
 
 	render_unfocused_client_update(client);

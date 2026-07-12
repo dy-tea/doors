@@ -63,15 +63,11 @@ typedef enum { WORKSPACE_ANIM_VERTICAL, WORKSPACE_ANIM_HORIZONTAL } workspace_an
 
 // structures
 typedef struct {
-	int top;
-	int right;
-	int bottom;
-	int left;
+	int top, right, bottom, left;
 } padding_t;
 
 typedef struct {
-	uint16_t min_width;
-	uint16_t min_height;
+	uint16_t min_width, min_height;
 } constraints_t;
 
 typedef struct {
@@ -83,46 +79,31 @@ typedef struct {
 typedef struct client_t {
 	char app_id[MAXLEN];
 	char title[MAXLEN];
-	bool urgent;
-	bool shown;
-	bool freed;
-	client_state_t state;
-	client_state_t last_state;
-	stack_layer_t layer;
-	stack_layer_t last_layer;
-	struct wlr_box floating_rectangle;
-	struct wlr_box tiled_rectangle;
-	struct wlr_box committed_tiled_rectangle;
+	bool urgent, shown, freed;
+	client_state_t state, last_state;
+	stack_layer_t layer, last_layer;
+	struct wlr_box floating_rectangle, tiled_rectangle, committed_tiled_rectangle;
 	struct toplevel_t *toplevel;
 	struct xwayland_toplevel_t *xwayland_view;
 
 	// Scroller layout properties
-	float scroller_proportion;
-	float scroller_proportion_single;
+	float scroller_proportion, scroller_proportion_single;
 	float stack_proportion;
-	struct client_t *next_in_stack;
-	struct client_t *prev_in_stack;
+	struct client_t *next_in_stack, *prev_in_stack;
 
 	// Master-stack layout properties
 	uint64_t master_stack_order;
 	bool master_stack_master;
 
 	// Resize state for scroller
-	float old_scroller_proportion;
-	float old_stack_proportion;
-	bool cursor_in_left_half;
-	bool cursor_in_upper_half;
+	float old_scroller_proportion, old_stack_proportion;
+	bool cursor_in_left_half, cursor_in_upper_half;
 
 	// Visual effects
-	bool blur;
-	bool blur_from_rule;
-	bool mica;
-	bool acrylic;
+	bool blur, blur_from_rule, mica, acrylic, shadow;
 	float border_radius;
-	bool shadow;
-	float shadow_size;
-	float shadow_offset_x;
-	float shadow_offset_y;
+	float opacity;
+	float shadow_size, shadow_offset_x, shadow_offset_y;
 	float shadow_color[4];
 
 	// Screenshare privacy
@@ -144,43 +125,26 @@ typedef struct node_t {
 	presel_t *presel;
 	struct wlr_box rectangle;
 	constraints_t constraints;
-	bool vacant;
-	bool hidden;
-	bool sticky;
-	bool scratchpad;
-	bool private_node;
-	bool locked;
-	bool marked;
-	struct node_t *first_child;
-	struct node_t *second_child;
-	struct node_t *parent;
+	bool vacant, hidden, sticky, scratchpad, private_node, locked, marked;
+	struct node_t *first_child, *second_child, *parent;
 	client_t *client;
 	struct output_t *output;
 	struct desktop_t *desktop;
 
 	// transaction support
-	struct transaction_inst_t *instruction;
-	struct transaction_inst_t *pending_inst;
+	struct transaction_inst_t *instruction, *pending_inst;
 	size_t ntxnrefs;
 	bool dirty;
 	bool destroying;
 	bool freed;
 
-	// current state
+	// current and pending state
 	struct {
 		struct wlr_box rectangle;
 		double split_ratio;
 		split_type_t split_type;
 		bool hidden;
-	} current;
-
-	// pending state
-	struct {
-		struct wlr_box rectangle;
-		double split_ratio;
-		split_type_t split_type;
-		bool hidden;
-	} pending;
+	} current, pending;
 
 	struct tab_bar_t *tab_bar;
 } node_t;
@@ -188,12 +152,9 @@ typedef struct node_t {
 typedef struct desktop_t {
 	char name[SMALEN];
 	uint32_t id;
-	layout_t layout;
-	layout_t user_layout;
-	node_t *root;
-	node_t *focus;
-	struct desktop_t *prev;
-	struct desktop_t *next;
+	layout_t layout, user_layout;
+	node_t *root, *focus;
+	struct desktop_t *prev,  *next;
 	padding_t padding;
 	int window_gap;
 	int master_stack_count;

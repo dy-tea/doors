@@ -7,8 +7,7 @@ extern char text_font[128];
 extern int text_height;
 
 typedef struct text_node_t {
-	int width;
-	int max_width;
+	int width, max_width;
 	int height;
 	int baseline;
 	bool pango_markup;

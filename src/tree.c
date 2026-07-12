@@ -137,6 +137,7 @@ client_t *make_client(void) {
 	c->shown = false;
 	c->master_stack_order = next_master_stack_order++;
 	c->master_stack_master = false;
+	c->opacity = 1.0f;
 
 	// initialize shadow defaults
 	c->shadow = false;

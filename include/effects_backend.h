@@ -36,8 +36,7 @@ struct be_blur_params {
 	int passes;
 	float radius;
 	int downsample;
-	float vibrancy;
-	float vibrancy_darkness;
+	float vibrancy, vibrancy_darkness;
 	float noise_strength;
 	float brightness;
 	float contrast;
@@ -54,19 +53,13 @@ struct be_blur_params {
 
 struct be_shadow_params {
 	float shadow_size;
-	float shadow_offset_x;
-	float shadow_offset_y;
+	float shadow_offset_x, shadow_offset_y;
 	float shadow_color[4];
 	float border_radius;
-	float inner_width;
-	float inner_height;
-	float hole_x;
-	float hole_y;
-	float hole_width;
-	float hole_height;
+	float inner_width, inner_height;
+	float hole_x, hole_y, hole_width, hole_height;
 	float scale;
-	int buf_w;
-	int buf_h;
+	int buf_w, buf_h;
 };
 
 struct be_border_params {
@@ -82,8 +75,7 @@ struct be_border_params {
 	int gradient2_count;
 	float gradient2_angle;
 	float gradient_lerp;
-	int buf_w;
-	int buf_h;
+	int buf_w, buf_h;
 };
 
 struct be_corner_mask_params {

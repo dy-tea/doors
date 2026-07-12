@@ -59,8 +59,7 @@ struct output_config {
 	float refresh_rate;
 	float scale;
 	int transform;
-	char *background;
-	char *background_option;
+	char *background, *background_option;
 	enum output_config_dpms dpms_state;
 	enum output_config_scale_filter scale_filter;
 	enum output_config_adaptive_sync adaptive_sync;

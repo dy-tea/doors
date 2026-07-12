@@ -41,8 +41,7 @@ typedef struct subscriber_t {
 	subscriber_mask_t mask;
 	int count;
 	struct wl_event_source *event_source;
-	struct subscriber_t *prev;
-	struct subscriber_t *next;
+	struct subscriber_t *prev, *next;
 } subscriber_t;
 
 extern subscriber_t *subscriber_head;

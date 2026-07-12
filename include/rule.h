@@ -29,7 +29,8 @@ typedef enum {
 	RULE_TYPE_ALLOW_TEARING = 1 << 17,
 	RULE_TYPE_SHORTCUTS_INHIBITOR = 1 << 18,
 	RULE_TYPE_RENDER_UNFOCUSED = 1 << 19,
-	RULE_TYPE_LAST = 1 << 20,
+	RULE_TYPE_OPACITY = 1 << 20,
+	RULE_TYPE_LAST = 1 << 21,
 } rule_type_t;
 
 typedef struct {
@@ -50,6 +51,7 @@ typedef struct {
 	float scroller_proportion;
 	float scroller_proportion_single;
 	float border_radius;
+	float opacity;
 } rule_consequence_t;
 
 typedef struct rule_t {

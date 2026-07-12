@@ -99,8 +99,7 @@ typedef enum {
 typedef struct {
 	bind_action_t action;
 	int desktop_index;
-	const char *submap_name;
-	const char *external_cmd;
+	const char *submap_name, *external_cmd;
 } bind_t;
 
 typedef struct {
@@ -126,8 +125,7 @@ typedef struct {
 
 typedef struct {
 	enum hotcorner corner;
-	int corner_x;
-	int corner_y;
+	int corner_x, corner_y;
 	bind_action_t action;
 	int desktop_index;
 	char external_cmd[MAXLEN];

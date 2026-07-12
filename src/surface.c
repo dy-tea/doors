@@ -218,3 +218,16 @@ void surface_client_set_shadow(client_t *client, bool enabled) {
 	else if (client->xwayland_view)
 		xwayland_set_shadow(client->xwayland_view, enabled);
 }
+
+static void surface_set_opacity_for_each_buffer(struct wlr_scene_buffer *buffer, int x, int y, void *data) {
+	(void)x;
+	(void)y;
+	float *opacity = data;
+	if (buffer)
+		wlr_scene_buffer_set_opacity(buffer, *opacity);
+}
+
+void surface_set_opacity(struct wlr_scene_node *node, float opacity) {
+	if (node)
+		wlr_scene_node_for_each_buffer(node, surface_set_opacity_for_each_buffer, &opacity);
+}

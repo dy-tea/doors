@@ -52,18 +52,9 @@ typedef struct {
 	char *identifier;
 	enum input_config_type type;
 
-	char *xkb_layout;
-	char *xkb_model;
-	char *xkb_options;
-	char *xkb_rules;
-	char *xkb_variant;
-	char *xkb_file;
-
-	int repeat_rate;
-	int repeat_delay;
-
-	int xkb_numlock;
-	int xkb_capslock;
+	char *xkb_layout, *xkb_model, *xkb_options, *xkb_rules, *xkb_variant, *xkb_file;
+	int repeat_rate, repeat_delay;
+	int xkb_numlock, xkb_capslock;
 
 	double pointer_accel;
 	enum input_config_accel_profile accel_profile;
@@ -74,16 +65,13 @@ typedef struct {
 	enum input_config_tap_button_map tap_button_map;
 	int drag;
 	enum input_config_drag_lock drag_lock;
-	int dwt;
-	int dwtp;
+	int dwt, dwtp;
 
 	enum input_config_click_method click_method;
 	int middle_emulation;
 
 	enum input_config_scroll_method scroll_method;
-	int scroll_button;
-	int scroll_button_lock;
-	int scroll_factor;
+	int scroll_button, scroll_button_lock, scroll_factor;
 
 	float rotation_angle;
 

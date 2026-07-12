@@ -110,15 +110,21 @@ void ipc_cmd_rule(char **args, int num, int client_fd) {
 				r->match.one_shot = true;
 			} else if (strncmp(arg, "scroller_proportion=", 20) == 0) {
 				float val = atof(arg + 20);
-				if (val >= 0.1f && val <= 1.0f) {
+				if (val > 0.0f && val <= 1.0f) {
 					r->consequence.scroller_proportion = val;
 					r->consequence.has |= RULE_TYPE_SCROLLER_PROPORTION;
+				} else {
+					send_failure(client_fd, "scroller_proportion must be between 0.0 and 1.0");
+					return;
 				}
 			} else if (strncmp(arg, "scroller_proportion_single=", 27) == 0) {
 				float val = atof(arg + 27);
-				if (val >= 0.1f && val <= 1.0f) {
+				if (val > 0.0f && val <= 1.0f) {
 					r->consequence.scroller_proportion_single = val;
 					r->consequence.has |= RULE_TYPE_SCROLLER_PROPORTION_SINGLE;
+				} else {
+					send_failure(client_fd, "scroller_proportion_single must be between 0.0 and 1.0");
+					return;
 				}
 			} else if (streq("blur=on", arg)) {
 				r->consequence.flags |= RULE_TYPE_BLUR;
@@ -171,6 +177,15 @@ void ipc_cmd_rule(char **args, int num, int client_fd) {
 			} else if (streq("render_unfocused=off", arg)) {
 				r->consequence.flags &= ~RULE_TYPE_RENDER_UNFOCUSED;
 				r->consequence.has |= RULE_TYPE_RENDER_UNFOCUSED;
+			} else if (strncmp("opacity=", arg, 8) == 0) {
+				float val = atof(arg + 8);
+				if (val >= 0.0f && val <= 1.0f) {
+					r->consequence.has |= RULE_TYPE_OPACITY;
+					r->consequence.opacity = val;
+				} else {
+					send_failure(client_fd, "opacity must be between 0.0 and 1.0 inclusive");
+					return;
+				}
 			}
 
 			args++;

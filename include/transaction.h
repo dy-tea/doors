@@ -39,8 +39,7 @@ typedef struct transaction_inst_t {
 typedef struct transaction_t {
 	struct wl_event_source *timer;
 	struct wl_list instructions;
-	size_t num_waiting;
-	size_t num_configures;
+	size_t num_waiting, num_configures;
 	struct timespec commit_time;
 } transaction_t;
 
