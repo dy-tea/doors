@@ -22,8 +22,6 @@ typedef struct layer_surface_t {
 	uint64_t blur_native[2];
 	bool blur_scene_hidden;
 	pixman_region32_t blur_region;
-	int blur_region_offset_x, blur_region_offset_y;
-	int blur_region_width, blur_region_height;
 
 	struct wl_listener new_popup;
 	struct wl_listener destroy;

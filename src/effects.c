@@ -760,16 +760,15 @@ static bool rebuild_live_blur_layers(output_t *output, uint64_t bg_tex, pixman_r
 				continue;
 
 			// store the blur region offset for push_blur_to_layers
-			ls->blur_region_offset_x = boxes[0].x1;
-			ls->blur_region_offset_y = boxes[0].y1;
+			int32_t x1 = ls->blur_region.extents.x1;
+			int32_t y1 = ls->blur_region.extents.y1;
 			for (int b = 1; b < nboxes; b++) {
-				if (boxes[b].x1 < ls->blur_region_offset_x)
-					ls->blur_region_offset_x = boxes[b].x1;
-				if (boxes[b].y1 < ls->blur_region_offset_y)
-					ls->blur_region_offset_y = boxes[b].y1;
+				if (boxes[b].x1 < x1)
+					x1 = boxes[b].x1;
+				if (boxes[b].y1 < y1)
+					y1 = boxes[b].y1;
 			}
-			ls->blur_region_width = blur_width;
-			ls->blur_region_height = blur_height;
+			pixman_region32_init_rect(&ls->blur_region, x1, y1, blur_width, blur_height);
 
 			uint64_t src;
 			if (bg_tex) {
@@ -827,7 +826,8 @@ static void push_blur_to_layers(output_t *output) {
 			}
 
 			// get blur region bounds
-			if (ls->blur_region_width <= 0 || ls->blur_region_height <= 0) {
+			if (ls->blur_region.extents.x2 - ls->blur_region.extents.x1 <= 0
+			    || ls->blur_region.extents.y2 - ls->blur_region.extents.y1 <= 0) {
 				wlr_scene_buffer_set_buffer(ls->blur_node, NULL);
 				continue;
 			}
@@ -842,10 +842,10 @@ static void push_blur_to_layers(output_t *output) {
 			}
 
 			// position blur_node at the blur region offset within the scene_tree
-			int blur_r_x = ls->blur_region_offset_x;
-			int blur_r_y = ls->blur_region_offset_y;
-			int blur_r_w = ls->blur_region_width;
-			int blur_r_h = ls->blur_region_height;
+			int blur_r_x = ls->blur_region.extents.x1;
+			int blur_r_y = ls->blur_region.extents.y1;
+			int blur_r_w = ls->blur_region.extents.x2 - ls->blur_region.extents.x1;
+			int blur_r_h = ls->blur_region.extents.y2 - ls->blur_region.extents.y1;
 
 			// compute the source box in output-local coordinates
 			struct wlr_box r = {.x = lx + blur_r_x, .y = ly + blur_r_y, .width = blur_r_w, .height = blur_r_h};

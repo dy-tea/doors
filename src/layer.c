@@ -51,10 +51,6 @@ void layer_surface_set_blur(layer_surface_t *ls, bool enabled) {
 		wlr_scene_node_destroy(&ls->blur_node->node);
 		ls->blur_node = NULL;
 		pixman_region32_clear(&ls->blur_region);
-		ls->blur_region_offset_x = 0;
-		ls->blur_region_offset_y = 0;
-		ls->blur_region_width = 0;
-		ls->blur_region_height = 0;
 		if (ls->blur_buf) {
 			effects_destroy_buffer(&ls->blur_buf, ls->blur_native);
 		}
