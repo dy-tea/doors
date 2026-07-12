@@ -19,14 +19,14 @@
 char text_font[128] = "Sans 10";
 int text_height = 18;
 
-struct cairo_buffer {
+typedef struct {
 	struct wlr_buffer base;
 	cairo_surface_t *surface;
 	cairo_t *cairo;
-};
+} cairo_buffer_t;
 
 static void cairo_buffer_destroy(struct wlr_buffer *wlr_buffer) {
-	struct cairo_buffer *buffer = wl_container_of(wlr_buffer, buffer, base);
+	cairo_buffer_t *buffer = wl_container_of(wlr_buffer, buffer, base);
 	cairo_surface_destroy(buffer->surface);
 	cairo_destroy(buffer->cairo);
 	free(buffer);
@@ -35,7 +35,7 @@ static void cairo_buffer_destroy(struct wlr_buffer *wlr_buffer) {
 static bool cairo_buffer_begin_data_ptr_access(
     struct wlr_buffer *wlr_buffer, uint32_t flags, void **data, uint32_t *format, size_t *stride) {
 	(void)flags;
-	struct cairo_buffer *buffer = wl_container_of(wlr_buffer, buffer, base);
+	cairo_buffer_t *buffer = wl_container_of(wlr_buffer, buffer, base);
 	*data = cairo_image_surface_get_data(buffer->surface);
 	*stride = cairo_image_surface_get_stride(buffer->surface);
 	*format = DRM_FORMAT_ARGB8888;
@@ -50,7 +50,7 @@ static const struct wlr_buffer_impl cairo_buffer_impl = {
     .end_data_ptr_access = cairo_buffer_end_data_ptr_access,
 };
 
-struct text_buffer_t {
+typedef struct {
 	struct wlr_scene_buffer *buffer_node;
 	char *text;
 	text_node_t props;
@@ -60,7 +60,7 @@ struct text_buffer_t {
 
 	struct wl_listener outputs_update;
 	struct wl_listener destroy;
-};
+} text_buffer_t;
 
 int text_node_default_height(void) { return text_height; }
 
@@ -100,7 +100,7 @@ static PangoLayout *make_pango_layout(cairo_t *cairo, const char *text, bool pan
 	return layout;
 }
 
-static void text_calc_size(struct text_buffer_t *buffer) {
+static void text_calc_size(text_buffer_t *buffer) {
 	cairo_surface_t *recorder = cairo_recording_surface_create(CAIRO_CONTENT_COLOR_ALPHA, NULL);
 	cairo_t *c = cairo_create(recorder);
 	cairo_surface_destroy(recorder);
@@ -126,7 +126,7 @@ static void text_calc_size(struct text_buffer_t *buffer) {
 	wlr_scene_buffer_set_dest_size(buffer->buffer_node, get_text_width(&buffer->props), buffer->props.height);
 }
 
-static void render_backing_buffer(struct text_buffer_t *buffer) {
+static void render_backing_buffer(text_buffer_t *buffer) {
 	if (!buffer->visible)
 		return;
 
@@ -150,7 +150,7 @@ static void render_backing_buffer(struct text_buffer_t *buffer) {
 		return;
 	}
 
-	struct cairo_buffer *cairo_buffer = calloc(1, sizeof(*cairo_buffer));
+	cairo_buffer_t *cairo_buffer = calloc(1, sizeof(*cairo_buffer));
 	if (!cairo_buffer) {
 		cairo_surface_destroy(surface);
 		return;
@@ -193,7 +193,7 @@ static void render_backing_buffer(struct text_buffer_t *buffer) {
 }
 
 static void handle_outputs_update(struct wl_listener *listener, void *data) {
-	struct text_buffer_t *buffer = wl_container_of(listener, buffer, outputs_update);
+	text_buffer_t *buffer = wl_container_of(listener, buffer, outputs_update);
 	struct wlr_scene_outputs_update_event *event = data;
 
 	float scale = 0;
@@ -213,7 +213,7 @@ static void handle_outputs_update(struct wl_listener *listener, void *data) {
 
 static void handle_destroy(struct wl_listener *listener, void *data) {
 	(void)data;
-	struct text_buffer_t *buffer = wl_container_of(listener, buffer, destroy);
+	text_buffer_t *buffer = wl_container_of(listener, buffer, destroy);
 
 	wl_list_remove(&buffer->outputs_update.link);
 	wl_list_remove(&buffer->destroy.link);
@@ -224,7 +224,7 @@ static void handle_destroy(struct wl_listener *listener, void *data) {
 
 text_node_t *text_node_create(
     struct wlr_scene_tree *parent, const char *text, const float color[4], bool pango_markup) {
-	struct text_buffer_t *buffer = calloc(1, sizeof(*buffer));
+	text_buffer_t *buffer = calloc(1, sizeof(*buffer));
 	if (!buffer)
 		return NULL;
 
@@ -270,7 +270,7 @@ void text_node_set_color(text_node_t *node, const float color[4]) {
 		return;
 
 	memcpy(node->color, color, sizeof(float) * 4);
-	struct text_buffer_t *buffer = wl_container_of(node, buffer, props);
+	text_buffer_t *buffer = wl_container_of(node, buffer, props);
 	render_backing_buffer(buffer);
 }
 
@@ -281,7 +281,7 @@ void text_node_set_background(text_node_t *node, const float background[4]) {
 		return;
 
 	memcpy(node->background, background, sizeof(float) * 4);
-	struct text_buffer_t *buffer = wl_container_of(node, buffer, props);
+	text_buffer_t *buffer = wl_container_of(node, buffer, props);
 	render_backing_buffer(buffer);
 }
 
@@ -289,7 +289,7 @@ void text_node_set_text(text_node_t *node, const char *text) {
 	if (!node)
 		return;
 
-	struct text_buffer_t *buffer = wl_container_of(node, buffer, props);
+	text_buffer_t *buffer = wl_container_of(node, buffer, props);
 	if (!text)
 		text = "";
 	if (strcmp(buffer->text, text) == 0)
@@ -309,7 +309,7 @@ void text_node_set_max_width(text_node_t *node, int max_width) {
 	if (!node)
 		return;
 
-	struct text_buffer_t *buffer = wl_container_of(node, buffer, props);
+	text_buffer_t *buffer = wl_container_of(node, buffer, props);
 	if (max_width == buffer->props.max_width)
 		return;
 
