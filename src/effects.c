@@ -617,8 +617,12 @@ static bool rebuild_live_blur(output_t *output, pixman_region32_t *damage, uint6
 			effects_backend->blur(&ctx->be_state, src, ctx->blur_w, ctx->blur_h, &bp, &blurred);
 		}
 
-		if (!ensure_output_buf(&tl->blur->blur_buf, tl->blur->blur_native, w, h))
+		if (!ensure_output_buf(&tl->blur->blur_buf, tl->blur->blur_native, w, h)) {
+			if (tl->blur->blur_node) {
+				wlr_scene_buffer_set_buffer(tl->blur->blur_node, NULL);
+			}
 			continue;
+		}
 
 		// blit blurred to dest with full-screen quad (no scissor needed at this stage)
 		effects_backend->blit(blurred, tl->blur->blur_native[0], w, h, NULL, 0);
@@ -1039,8 +1043,10 @@ static bool rebuild_mica(output_t *output) {
 	int w = output->width, h = output->height;
 
 	uint64_t src = capture_bg_to_tex1(output, ctx, true, NULL, NULL);
-	if (!src)
+	if (!src) {
+		ctx->mica_dirty = false;
 		return false;
+	}
 
 	struct be_blur_params bp = {
 	    .algorithm = blur_algorithm,
@@ -1055,8 +1061,10 @@ static bool rebuild_mica(output_t *output) {
 	uint64_t blurred;
 	effects_backend->blur(&ctx->be_state, src, ctx->blur_w, ctx->blur_h, &bp, &blurred);
 
-	if (!ensure_output_buf(&ctx->mica_buf, ctx->mica_native, w, h))
+	if (!ensure_output_buf(&ctx->mica_buf, ctx->mica_native, w, h)) {
+		ctx->mica_dirty = false;
 		return false;
+	}
 
 	effects_backend->apply_mica_tint(&ctx->be_state, blurred, mica_tint, mica_tint_strength, ctx->mica_native[0], w, h);
 
@@ -1380,18 +1388,23 @@ static bool rebuild_corner_masks(output_t *output, uint64_t bg_tex) {
 
 			if (!ok || !cap_state.buffer) {
 				wlr_output_state_finish(&cap_state);
+				tl->rounded->corner_mask_dirty = false;
 				continue;
 			}
 
 			effects_backend->capture_readback(cap_state.buffer, &ctx->be_state, ctx->be_state.pong.native_handle[0],
 			    ctx->blur_w, ctx->blur_h, cw, ch, &src);
 			wlr_output_state_finish(&cap_state);
-			if (!src)
+			if (!src) {
+				tl->rounded->corner_mask_dirty = false;
 				continue;
+			}
 		}
 
-		if (!ensure_output_buf(&tl->rounded->corner_mask_buf, tl->rounded->corner_mask_native, w, h))
+		if (!ensure_output_buf(&tl->rounded->corner_mask_buf, tl->rounded->corner_mask_native, w, h)) {
+			tl->rounded->corner_mask_dirty = false;
 			continue;
+		}
 
 		float ow = (float)w, oh = (float)h;
 		int bw_i = (c->state == STATE_FULLSCREEN) ? 0 : border_width;
@@ -1805,7 +1818,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 				push_blur_to_layers(output);
 			}
 			if (any_cm_dirty)
-				rebuild_corner_masks(output, 0);
+				rebuild_corner_masks(output, bg_tex);
 			push_corner_masks_to_toplevels(output);
 		} else if (any_layer_needs_blur) {
 			rebuild_live_blur_layers(output, 0, &scene_output->damage_ring.current);

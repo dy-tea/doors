@@ -289,38 +289,37 @@ void output_frame(struct wl_listener *listener, void *data) {
 		return;
 	output->frame_scheduled = false;
 
-	if (output->max_render_time == 0) {
-		output_repaint(output);
-		return;
-	}
+	if (output->max_render_time >= 0) {
+		struct timespec now;
+		clock_gettime(CLOCK_MONOTONIC, &now);
 
-	struct timespec now;
-	clock_gettime(CLOCK_MONOTONIC, &now);
+		int msec_until_refresh = 0;
+		if (output->last_presentation.tv_sec > 0) {
+			struct timespec predicted_refresh = output->last_presentation;
+			predicted_refresh.tv_nsec += (long)(output->refresh_nsec % NSEC_PER_SEC);
+			predicted_refresh.tv_sec += (long)(output->refresh_nsec / NSEC_PER_SEC);
+			if (predicted_refresh.tv_nsec >= NSEC_PER_SEC) {
+				predicted_refresh.tv_sec += 1;
+				predicted_refresh.tv_nsec -= NSEC_PER_SEC;
+			}
 
-	int msec_until_refresh = 0;
-	if (output->last_presentation.tv_sec > 0) {
-		struct timespec predicted_refresh = output->last_presentation;
-		predicted_refresh.tv_nsec += (long)(output->refresh_nsec % NSEC_PER_SEC);
-		predicted_refresh.tv_sec += (long)(output->refresh_nsec / NSEC_PER_SEC);
-		if (predicted_refresh.tv_nsec >= NSEC_PER_SEC) {
-			predicted_refresh.tv_sec += 1;
-			predicted_refresh.tv_nsec -= NSEC_PER_SEC;
+			if (predicted_refresh.tv_sec >= now.tv_sec) {
+				long nsec_until_refresh = (predicted_refresh.tv_sec - now.tv_sec) * NSEC_PER_SEC
+				    + (predicted_refresh.tv_nsec - now.tv_nsec);
+				msec_until_refresh = (int)(nsec_until_refresh / NSEC_PER_MSEC);
+			}
 		}
 
-		if (predicted_refresh.tv_sec >= now.tv_sec) {
-			long nsec_until_refresh = (predicted_refresh.tv_sec - now.tv_sec) * NSEC_PER_SEC
-			    + (predicted_refresh.tv_nsec - now.tv_nsec);
-			msec_until_refresh = (int)(nsec_until_refresh / NSEC_PER_MSEC);
+		int delay = msec_until_refresh - output->max_render_time;
+
+		if (delay < 1) {
+			output_repaint(output);
+		} else {
+			output->wlr_output->frame_pending = true;
+			wl_event_source_timer_update(output->repaint_timer, delay);
 		}
-	}
-
-	int delay = msec_until_refresh - output->max_render_time;
-
-	if (delay < 1) {
-		output_repaint(output);
 	} else {
-		output->wlr_output->frame_pending = true;
-		wl_event_source_timer_update(output->repaint_timer, delay);
+		output_repaint(output);
 	}
 }
 
@@ -407,6 +406,7 @@ void handle_new_output(struct wl_listener *listener, void *data) {
 	// init output info
 	output->enabled = false;
 	output->allow_tearing = false;
+	output->max_render_time = -1;
 	strncpy(output->name, wlr_output->name, SMALEN - 1);
 	output->name[SMALEN - 1] = 0;
 	if (wlr_output_is_headless(wlr_output)) {
