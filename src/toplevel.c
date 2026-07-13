@@ -883,6 +883,8 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
 	if (toplevel->node && toplevel->node->client && !toplevel->node->client->blur_from_rule) {
 		if (wants_blur != has_blur)
 			toplevel_set_effect(toplevel, EFFECT_BLUR, wants_blur);
+		if (toplevel->blur && fx)
+			pixman_region32_copy(&toplevel->blur->blur_region, &fx->blur_region);
 	}
 
 	// update opacity
@@ -960,6 +962,7 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
 		if (toplevel->blur->acrylic_buf)
 			effects_destroy_buffer(&toplevel->blur->acrylic_buf, toplevel->blur->acrylic_native);
 
+		pixman_region32_fini(&toplevel->blur->blur_region);
 		free(toplevel->blur);
 		toplevel->blur = NULL;
 	}

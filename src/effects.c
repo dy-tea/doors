@@ -13,6 +13,7 @@
 #include "tree.h"
 
 #include <drm_fourcc.h>
+#include <pixman.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -422,7 +423,7 @@ static uint64_t capture_bg_to_tex1(
 			if (!tl->blur)
 				continue;
 			tl->blur->blur_scene_hidden = false;
-			if ((tl->blur->blur_node || tl->blur->mica_node) && tl->scene_tree && tl->scene_tree->node.enabled) {
+			if ((tl->blur->blur_node || tl->blur->mica_node || tl->blur->acrylic_node) && tl->scene_tree && tl->scene_tree->node.enabled) {
 				wlr_scene_node_set_enabled(&tl->scene_tree->node, false);
 				tl->blur->blur_scene_hidden = true;
 			}
@@ -553,14 +554,36 @@ static bool rebuild_live_blur(output_t *output, pixman_region32_t *damage, uint6
 		// skip if toplevel already has a valid blur and the damage doesn't overlap it
 		// but don't skip if we're animating (need to update position)
 		if (tl->blur->blur_buf && damage && !pixman_region32_empty(damage) && !animating) {
-			struct wlr_box r = get_client_rect(tl);
-			pixman_region32_t tl_rgn, intersection;
-			pixman_region32_init_rect(&tl_rgn, r.x - output->lx, r.y - output->ly, r.width, r.height);
+			pixman_region32_t intersection;
 			pixman_region32_init(&intersection);
-			pixman_region32_intersect(&intersection, damage, &tl_rgn);
-			bool overlaps = !pixman_region32_empty(&intersection);
+			bool overlaps = false;
+
+			// use blur_region if available and non-empty, otherwise use full client rect
+			if (tl->blur && !pixman_region32_empty(&tl->blur->blur_region)) {
+				int lx = 0, ly = 0;
+				wlr_scene_node_coords(&tl->scene_tree->node, &lx, &ly);
+				int nboxes;
+				pixman_box32_t *boxes = pixman_region32_rectangles(&tl->blur->blur_region, &nboxes);
+				pixman_region32_t blur_rgn;
+				pixman_region32_init(&blur_rgn);
+				for (int b = 0; b < nboxes; b++) {
+					pixman_region32_union_rect(&blur_rgn, &blur_rgn,
+						boxes[b].x1 + lx, boxes[b].y1 + ly,
+						boxes[b].x2 - boxes[b].x1, boxes[b].y2 - boxes[b].y1);
+				}
+				pixman_region32_intersect(&intersection, damage, &blur_rgn);
+				pixman_region32_fini(&blur_rgn);
+				overlaps = !pixman_region32_empty(&intersection);
+			} else {
+				// fallback to full client rect
+				struct wlr_box r = get_client_rect(tl);
+				pixman_region32_t tl_rgn;
+				pixman_region32_init_rect(&tl_rgn, r.x - output->lx, r.y - output->ly, r.width, r.height);
+				pixman_region32_intersect(&intersection, damage, &tl_rgn);
+				overlaps = !pixman_region32_empty(&intersection);
+				pixman_region32_fini(&tl_rgn);
+			}
 			pixman_region32_fini(&intersection);
-			pixman_region32_fini(&tl_rgn);
 			if (!overlaps)
 				continue;
 		}

@@ -55,6 +55,7 @@ void surface_set_effect(
 			*blur = calloc(1, sizeof(**blur));
 			if (!*blur)
 				return;
+			pixman_region32_init(&(*blur)->blur_region);
 		}
 
 		effect_fields_t f = get_effect_fields(*blur, effect);
@@ -80,6 +81,9 @@ void surface_set_effect(
 		}
 		if (f.buf && *f.buf)
 			effects_destroy_buffer(f.buf, f.native);
+		// clear blur_region when blur effect is disabled
+		if (effect == EFFECT_BLUR)
+			pixman_region32_clear(&(*blur)->blur_region);
 	}
 }
 

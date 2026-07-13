@@ -2,6 +2,7 @@
 
 #include "types.h"
 
+#include <pixman.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -16,6 +17,7 @@ typedef struct surface_blur_t {
 	uint64_t blur_native[2];
 	struct wlr_buffer *acrylic_buf;
 	uint64_t acrylic_native[2];
+	pixman_region32_t blur_region;
 } surface_blur_t;
 
 typedef struct surface_rounded_t {
