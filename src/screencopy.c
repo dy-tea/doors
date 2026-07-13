@@ -9,6 +9,7 @@
 
 #include <assert.h>
 #include <drm_fourcc.h>
+#include <pixman.h>
 #include <stdlib.h>
 #include <wlr/interfaces/wlr_output.h>
 #include <wlr/render/allocator.h>
@@ -46,6 +47,7 @@ typedef struct screencopy_frame_t {
 	struct wl_listener output_commit;
 	struct wl_listener output_destroy;
 
+	struct screencopy_client_t *client;
 	struct screencopy_mgr_t *manager;
 } screencopy_frame_t;
 
@@ -58,7 +60,23 @@ typedef struct screencopy_mgr_t {
 	};
 } screencopy_mgr_t;
 
+typedef struct screencopy_damage_t {
+	struct wl_list link;
+	struct wlr_output *output;
+	pixman_region32_t damage;
+	struct wl_listener output_precommit;
+	struct wl_listener output_destroy;
+} screencopy_damage_t;
+
+typedef struct screencopy_client_t {
+	int ref;
+	struct wl_list damages;
+	struct screencopy_mgr_t *manager;
+} screencopy_client_t;
+
 static const struct zwlr_screencopy_frame_v1_interface frame_impl;
+
+static void client_unref(screencopy_client_t *client);
 
 static screencopy_frame_t *frame_from_resource(struct wl_resource *resource) {
 	assert(wl_resource_instance_of(resource, &zwlr_screencopy_frame_v1_interface, &frame_impl));
@@ -83,6 +101,9 @@ static void frame_destroy(screencopy_frame_t *frame) {
 	if (frame->buffer)
 		wlr_buffer_unlock(frame->buffer);
 
+	if (frame->client)
+		client_unref(frame->client);
+
 	free(frame);
 }
 
@@ -91,6 +112,79 @@ static void frame_send_ready(screencopy_frame_t *frame, struct timespec *when) {
 	uint32_t tv_sec_hi = (sizeof(tv_sec) > 4) ? tv_sec >> 32 : 0;
 	uint32_t tv_sec_lo = tv_sec & 0xFFFFFFFF;
 	zwlr_screencopy_frame_v1_send_ready(frame->resource, tv_sec_hi, tv_sec_lo, when->tv_nsec);
+}
+
+static void screencopy_damage_destroy(screencopy_damage_t *damage) {
+	wl_list_remove(&damage->output_destroy.link);
+	wl_list_remove(&damage->output_precommit.link);
+	wl_list_remove(&damage->link);
+	pixman_region32_fini(&damage->damage);
+	free(damage);
+}
+
+static void screencopy_damage_handle_output_precommit(struct wl_listener *listener, void *data) {
+	screencopy_damage_t *damage = wl_container_of(listener, damage, output_precommit);
+	const struct wlr_output_event_precommit *event = data;
+
+	if (event->state->committed & WLR_OUTPUT_STATE_DAMAGE) {
+		pixman_region32_union(&damage->damage, &damage->damage, &event->state->damage);
+		pixman_region32_intersect_rect(&damage->damage, &damage->damage, 0, 0,
+		    damage->output->width, damage->output->height);
+	} else if (event->state->committed & WLR_OUTPUT_STATE_BUFFER) {
+		pixman_region32_union_rect(&damage->damage, &damage->damage, 0, 0,
+		    damage->output->width, damage->output->height);
+	}
+}
+
+static void screencopy_damage_handle_output_destroy(struct wl_listener *listener, void *data) {
+	(void)data;
+	screencopy_damage_t *damage = wl_container_of(listener, damage, output_destroy);
+	screencopy_damage_destroy(damage);
+}
+
+static screencopy_damage_t *screencopy_damage_create(screencopy_client_t *client, struct wlr_output *output) {
+	screencopy_damage_t *damage = calloc(1, sizeof(*damage));
+	if (!damage)
+		return NULL;
+
+	damage->output = output;
+	pixman_region32_init_rect(&damage->damage, 0, 0, output->width, output->height);
+	wl_list_insert(&client->damages, &damage->link);
+
+	damage->output_precommit.notify = screencopy_damage_handle_output_precommit;
+	wl_signal_add(&output->events.precommit, &damage->output_precommit);
+
+	damage->output_destroy.notify = screencopy_damage_handle_output_destroy;
+	wl_signal_add(&output->events.destroy, &damage->output_destroy);
+
+	return damage;
+}
+
+static screencopy_damage_t *screencopy_damage_find(screencopy_client_t *client, struct wlr_output *output) {
+	screencopy_damage_t *damage;
+	wl_list_for_each(damage, &client->damages, link) {
+		if (damage->output == output)
+			return damage;
+	}
+	return NULL;
+}
+
+static screencopy_damage_t *screencopy_damage_get_or_create(screencopy_client_t *client, struct wlr_output *output) {
+	screencopy_damage_t *damage = screencopy_damage_find(client, output);
+	return damage ? damage : screencopy_damage_create(client, output);
+}
+
+static void client_unref(screencopy_client_t *client) {
+	assert(client->ref > 0);
+
+	if (--client->ref != 0)
+		return;
+
+	screencopy_damage_t *damage, *tmp;
+	wl_list_for_each_safe(damage, tmp, &client->damages, link)
+		screencopy_damage_destroy(damage);
+
+	free(client);
 }
 
 static void block_out_window(toplevel_t *tl, struct wlr_render_pass *pass, struct wlr_output *output) {
@@ -252,6 +346,12 @@ static void frame_handle_output_commit(struct wl_listener *listener, void *data)
 	if (!frame->buffer)
 		return;
 
+	if (frame->with_damage) {
+		screencopy_damage_t *damage = screencopy_damage_get_or_create(frame->client, output);
+		if (damage && pixman_region32_empty(&damage->damage))
+			return;
+	}
+
 	wl_list_remove(&frame->output_commit.link);
 	wl_list_init(&frame->output_commit.link);
 
@@ -305,6 +405,21 @@ static void frame_handle_output_commit(struct wl_listener *listener, void *data)
 	}
 
 	zwlr_screencopy_frame_v1_send_flags(frame->resource, 0);
+
+	if (frame->with_damage) {
+		screencopy_damage_t *damage = screencopy_damage_get_or_create(frame->client, output);
+		if (damage) {
+			int n_boxes;
+			const pixman_box32_t *boxes = pixman_region32_rectangles(&damage->damage, &n_boxes);
+			for (int i = 0; i < n_boxes; i++) {
+				const pixman_box32_t *box = &boxes[i];
+				zwlr_screencopy_frame_v1_send_damage(frame->resource,
+				    box->x1, box->y1, box->x2 - box->x1, box->y2 - box->y1);
+			}
+			pixman_region32_clear(&damage->damage);
+		}
+	}
+
 	frame_send_ready(frame, &event->when);
 	frame_destroy(frame);
 	return;
@@ -419,7 +534,7 @@ static void frame_handle_resource_destroy(struct wl_resource *frame_resource) {
 	frame_destroy(frame);
 }
 
-static void capture_output(struct wl_client *wl_client, screencopy_mgr_t *manager, uint32_t version, uint32_t id,
+static void capture_output(struct wl_client *wl_client, screencopy_client_t *client, uint32_t version, uint32_t id,
     int32_t overlay_cursor, struct wlr_output *output, const struct wlr_box *box) {
 	screencopy_frame_t *frame = calloc(1, sizeof(*frame));
 	if (frame == NULL) {
@@ -444,8 +559,20 @@ static void capture_output(struct wl_client *wl_client, screencopy_mgr_t *manage
 		return;
 	}
 
-	frame->manager = manager;
-	wl_list_insert(&manager->frames, &frame->link);
+	screencopy_frame_t *existing;
+	wl_list_for_each(existing, &client->manager->frames, link) {
+		if (existing->client == client && existing->output == output) {
+			wl_resource_set_user_data(frame->resource, NULL);
+			zwlr_screencopy_frame_v1_send_failed(frame->resource);
+			free(frame);
+			return;
+		}
+	}
+
+	frame->client = client;
+	client->ref++;
+	frame->manager = client->manager;
+	wl_list_insert(&client->manager->frames, &frame->link);
 
 	wl_list_init(&frame->output_commit.link);
 
@@ -539,9 +666,9 @@ static void manager_handle_capture_output(struct wl_client *wl_client, struct wl
     uint32_t id, int32_t overlay_cursor, struct wl_resource *output_resource) {
 	uint32_t version = wl_resource_get_version(manager_resource);
 	struct wlr_output *output = wlr_output_from_resource(output_resource);
-	screencopy_mgr_t *manager = wl_resource_get_user_data(manager_resource);
+	screencopy_client_t *client = wl_resource_get_user_data(manager_resource);
 
-	capture_output(wl_client, manager, version, id, overlay_cursor, output, NULL);
+	capture_output(wl_client, client, version, id, overlay_cursor, output, NULL);
 }
 
 static void manager_handle_capture_output_region(struct wl_client *wl_client, struct wl_resource *manager_resource,
@@ -557,9 +684,9 @@ static void manager_handle_capture_output_region(struct wl_client *wl_client, st
 	    .height = height,
 	};
 
-	screencopy_mgr_t *manager = wl_resource_get_user_data(manager_resource);
+	screencopy_client_t *client = wl_resource_get_user_data(manager_resource);
 
-	capture_output(wl_client, manager, version, id, overlay_cursor, output, &box);
+	capture_output(wl_client, client, version, id, overlay_cursor, output, &box);
 }
 
 static void manager_handle_destroy(struct wl_client *wl_client, struct wl_resource *manager_resource) {
@@ -573,15 +700,32 @@ static const struct zwlr_screencopy_manager_v1_interface manager_impl = {
     .destroy = manager_handle_destroy,
 };
 
+static void manager_handle_resource_destroy(struct wl_resource *resource) {
+	screencopy_client_t *client = wl_resource_get_user_data(resource);
+	client_unref(client);
+}
+
 static void manager_bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id) {
 	screencopy_mgr_t *manager = data;
 
-	struct wl_resource *resource = wl_resource_create(wl_client, &zwlr_screencopy_manager_v1_interface, version, id);
-	if (resource == NULL) {
+	screencopy_client_t *client = calloc(1, sizeof(*client));
+	if (client == NULL) {
 		wl_client_post_no_memory(wl_client);
 		return;
 	}
-	wl_resource_set_implementation(resource, &manager_impl, manager, NULL);
+
+	struct wl_resource *resource = wl_resource_create(wl_client, &zwlr_screencopy_manager_v1_interface, version, id);
+	if (resource == NULL) {
+		free(client);
+		wl_client_post_no_memory(wl_client);
+		return;
+	}
+
+	client->ref = 1;
+	client->manager = manager;
+	wl_list_init(&client->damages);
+
+	wl_resource_set_implementation(resource, &manager_impl, client, manager_handle_resource_destroy);
 }
 
 static void handle_display_destroy(struct wl_listener *listener, void *data) {

@@ -429,7 +429,6 @@ static bool perform_output_capture(copy_frame_t *frame, image_copy_source_t *src
 		src->last_buffer = tmp_state.buffer;
 		wlr_buffer_lock(src->last_buffer);
 		wlr_output_state_finish(&tmp_state);
-		wlr_damage_ring_add_whole(&scene_output->damage_ring);
 		wlr_log(WLR_DEBUG, "ext-copy-capture: fresh render OK, buffer=%p (%dx%d)", (void *)src->last_buffer,
 		    src->last_buffer->width, src->last_buffer->height);
 	}
@@ -447,12 +446,15 @@ static bool perform_output_capture(copy_frame_t *frame, image_copy_source_t *src
 	    src->base.width, src->base.height);
 
 	// try rendering directly to client buffer
+	const pixman_region32_t *clip = !pixman_region32_empty(&frame->buffer_damage)
+	    ? &frame->buffer_damage : NULL;
 	struct wlr_render_pass *pass = wlr_renderer_begin_buffer_pass(output->renderer, frame->buffer, NULL);
 	if (pass) {
 		wlr_log(WLR_DEBUG, "ext-copy-capture: direct render pass started");
 		wlr_render_pass_add_texture(pass,
 		    &(struct wlr_render_texture_options){
 		        .texture = texture,
+		        .clip = clip,
 		        .blend_mode = WLR_RENDER_BLEND_MODE_NONE,
 		        .dst_box =
 		            {
@@ -637,7 +639,8 @@ static bool capture_renderer_render(capture_renderer_t *r, int width, int height
 	return true;
 }
 
-static bool copy_dmabuf_to_frame(struct wlr_buffer *dst, struct wlr_buffer *src, struct wlr_renderer *renderer) {
+static bool copy_dmabuf_to_frame(struct wlr_buffer *dst, struct wlr_buffer *src,
+    struct wlr_renderer *renderer, const pixman_region32_t *clip) {
 	struct wlr_texture *texture = wlr_texture_from_buffer(renderer, src);
 	if (!texture)
 		return false;
@@ -651,6 +654,7 @@ static bool copy_dmabuf_to_frame(struct wlr_buffer *dst, struct wlr_buffer *src,
 	wlr_render_pass_add_texture(pass,
 	    &(struct wlr_render_texture_options){
 	        .texture = texture,
+	        .clip = clip,
 	        .blend_mode = WLR_RENDER_BLEND_MODE_NONE,
 	    });
 
@@ -690,9 +694,12 @@ static bool copy_buffer_to_frame(copy_frame_t *frame, struct wlr_buffer *src, st
 	if (src->width != dst->width || src->height != dst->height)
 		return false;
 
+	const pixman_region32_t *clip = !pixman_region32_empty(&frame->buffer_damage)
+	    ? &frame->buffer_damage : NULL;
+
 	struct wlr_dmabuf_attributes dmabuf;
 	if (wlr_buffer_get_dmabuf(dst, &dmabuf))
-		return copy_dmabuf_to_frame(dst, src, renderer);
+		return copy_dmabuf_to_frame(dst, src, renderer, clip);
 
 	return copy_shm_to_frame(dst, src, renderer);
 }
@@ -786,8 +793,7 @@ static void frame_handle_capture(struct wl_client *wl_client, struct wl_resource
 	wlr_log(WLR_DEBUG, "ext-copy-capture: checking output source path");
 	if (wlr_output_try_from_ext_image_capture_source_v1(source) || source->impl == &source_impl) {
 		wlr_log(WLR_DEBUG,
-		    "ext-copy-capture: source is output-backed, "
-		    "calling perform_output_capture");
+		    "ext-copy-capture: source is output-backed, calling perform_output_capture");
 		image_copy_source_t *img_src = source_from_base(source);
 		if (perform_output_capture(frame, img_src)) {
 			session->frame = NULL;
@@ -961,32 +967,20 @@ static void send_buffer_constraints(copy_session_t *session, struct wlr_ext_imag
 		ext_image_copy_capture_session_v1_send_shm_format(session->resource, WL_SHM_FORMAT_ARGB8888);
 	}
 
-	if (source->impl == &source_impl) {
-		if (source->dmabuf_device) {
-			dev_t dev = source->dmabuf_device;
-			uint32_t dev_arr[2] = {(uint32_t)(dev >> 32), (uint32_t)dev};
-			struct wl_array arr;
-			wl_array_init(&arr);
-			uint32_t *d = wl_array_add(&arr, sizeof(dev_arr));
-
-			if (d)
-				memcpy(d, dev_arr, sizeof(dev_arr));
-
-			ext_image_copy_capture_session_v1_send_dmabuf_device(session->resource, &arr);
-			wl_array_release(&arr);
-		}
+	if (source->impl == &source_impl && source->dmabuf_formats.len > 0) {
+		struct wl_array dev_id_array = {
+			.data = &source->dmabuf_device,
+			.size = sizeof(source->dmabuf_device),
+		};
+		ext_image_copy_capture_session_v1_send_dmabuf_device(session->resource, &dev_id_array);
 
 		for (size_t i = 0; i < source->dmabuf_formats.len; i++) {
 			const struct wlr_drm_format *fmt = &source->dmabuf_formats.formats[i];
-			struct wl_array mods;
-			wl_array_init(&mods);
-			for (size_t j = 0; j < fmt->len; j++) {
-				uint64_t *m = wl_array_add(&mods, sizeof(uint64_t));
-				if (m)
-					*m = fmt->modifiers[j];
-			}
-			ext_image_copy_capture_session_v1_send_dmabuf_format(session->resource, fmt->format, &mods);
-			wl_array_release(&mods);
+			struct wl_array modifiers_array = {
+				.data = fmt->modifiers,
+				.size = fmt->len * sizeof(fmt->modifiers[0]),
+			};
+			ext_image_copy_capture_session_v1_send_dmabuf_format(session->resource, fmt->format, &modifiers_array);
 		}
 	}
 
