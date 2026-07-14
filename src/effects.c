@@ -1296,6 +1296,49 @@ static bool blur_render_border(toplevel_t *tl, int content_w, int content_h) {
 	return true;
 }
 
+// capture scene background once for corner masks, bypassing all toplevels
+static uint64_t capture_bg_cm(output_t *output, effects_output_t *ctx) {
+	int w = output->width, h = output->height;
+	if (!ctx->capture_output || !ctx->capture_scene_output)
+		return 0;
+	if (w <= 0 || h <= 0)
+		return 0;
+
+	wlr_scene_output_set_position(ctx->capture_scene_output, output->lx, output->ly);
+	wlr_scene_node_set_enabled(&server.top_tree->node, false);
+	wlr_scene_node_set_enabled(&server.full_tree->node, false);
+	wlr_scene_node_set_enabled(&server.over_tree->node, false);
+	wlr_scene_node_set_enabled(&server.lock_tree->node, false);
+	wlr_scene_node_set_enabled(&server.tile_tree->node, false);
+	wlr_scene_node_set_enabled(&server.float_tree->node, false);
+
+	wlr_damage_ring_add_whole(&ctx->capture_scene_output->damage_ring);
+	struct wlr_output_state cap_state;
+	wlr_output_state_init(&cap_state);
+	wlr_output_state_set_enabled(&cap_state, true);
+	wlr_output_state_set_custom_mode(&cap_state, w, h, 0);
+	bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
+
+	wlr_scene_node_set_enabled(&server.tile_tree->node, true);
+	wlr_scene_node_set_enabled(&server.float_tree->node, true);
+	wlr_scene_node_set_enabled(&server.top_tree->node, true);
+	wlr_scene_node_set_enabled(&server.full_tree->node, true);
+	wlr_scene_node_set_enabled(&server.over_tree->node, true);
+	wlr_scene_node_set_enabled(&server.lock_tree->node, true);
+	wlr_scene_output_set_position(ctx->capture_scene_output, -0x7fff, -0x7fff);
+
+	if (!ok || !cap_state.buffer) {
+		wlr_output_state_finish(&cap_state);
+		return 0;
+	}
+
+	uint64_t result;
+	effects_backend->capture_readback(cap_state.buffer, &ctx->be_state, ctx->be_state.pong.native_handle[0],
+	    ctx->blur_w, ctx->blur_h, w, h, &result);
+	wlr_output_state_finish(&cap_state);
+	return result;
+}
+
 static bool rebuild_corner_masks(output_t *output, uint64_t bg_tex) {
 	effects_output_t *ctx = output->effects;
 	int w = output->width, h = output->height;
@@ -1439,7 +1482,7 @@ static bool rebuild_corner_masks(output_t *output, uint64_t bg_tex) {
 	return any;
 }
 
-static void push_corner_masks_to_toplevels(output_t *output) {
+static void push_corner_masks_to_toplevels(output_t *output, bool rebuilt) {
 	toplevel_t *tl;
 	wl_list_for_each(tl, &server.toplevels, link) {
 		if (!tl->rounded || !tl->rounded->corner_mask_node || !tl->node || !tl->node->client)
@@ -1453,8 +1496,13 @@ static void push_corner_masks_to_toplevels(output_t *output) {
 			wlr_scene_buffer_set_buffer(tl->rounded->corner_mask_node, NULL);
 			continue;
 		}
-		if (!tl->rounded->corner_mask_buf) {
-			wlr_scene_node_set_enabled(&tl->rounded->corner_mask_node->node, false);
+		if (!tl->rounded->corner_mask_buf)
+			continue;
+
+		// when corner masks weren't rebuilt, only ensure the node is enabled
+		// (avoid touching the scene node's buffer/size/position on every frame)
+		if (!rebuilt) {
+			wlr_scene_node_set_enabled(&tl->rounded->corner_mask_node->node, true);
 			continue;
 		}
 
@@ -1469,10 +1517,8 @@ static void push_corner_masks_to_toplevels(output_t *output) {
 
 		struct wlr_fbox src;
 		int dw, dh;
-		if (!compute_src_box(output, &content_r, &src, &dw, &dh)) {
-			wlr_scene_node_set_enabled(&tl->rounded->corner_mask_node->node, false);
+		if (!compute_src_box(output, &content_r, &src, &dw, &dh))
 			continue;
-		}
 
 		int node_ox = (content_r.x < output->lx) ? (output->lx - content_r.x) : 0;
 		int node_oy = (content_r.y < output->ly) ? (output->ly - content_r.y) : 0;
@@ -1594,8 +1640,7 @@ void effects_evict_buffers(void) {
 		// only evict from hidden toplevels
 		if (tl->rounded) {
 			if (tl->rounded->corner_mask_buf && !visible) {
-				if (tl->rounded->corner_mask_node)
-					wlr_scene_buffer_set_buffer(tl->rounded->corner_mask_node, NULL);
+				tl->rounded->corner_mask_dirty = true;
 				effects_destroy_buffer(&tl->rounded->corner_mask_buf, tl->rounded->corner_mask_native);
 			}
 			if (tl->rounded->border_shader_buf && !visible) {
@@ -1714,7 +1759,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 			push_blur_to_toplevels(output);
 			push_blur_to_layers(output);
 		}
-		push_corner_masks_to_toplevels(output);
+		push_corner_masks_to_toplevels(output, false);
 		push_acrylic_to_toplevels(output);
 		push_mica_to_toplevels(output);
 		goto after_capture;
@@ -1808,6 +1853,8 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 			}
 		}
 
+		uint64_t cm_bg_tex = 0;
+
 		if (any_layer_needs_blur && any_cm) {
 			uint64_t bg_tex = capture_bg_combined(output, ctx);
 			if (bg_tex && blur_enabled) {
@@ -1818,20 +1865,27 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 				push_blur_to_layers(output);
 			}
 			if (any_cm_dirty)
-				rebuild_corner_masks(output, bg_tex);
-			push_corner_masks_to_toplevels(output);
+				cm_bg_tex = capture_bg_cm(output, ctx);
+			if (any_cm_dirty)
+				rebuild_corner_masks(output, cm_bg_tex);
+			push_corner_masks_to_toplevels(output, any_cm_dirty);
 		} else if (any_layer_needs_blur) {
 			rebuild_live_blur_layers(output, 0, &scene_output->damage_ring.current);
 			push_blur_to_layers(output);
 		} else if (any_cm) {
 			if (any_cm_dirty)
-				rebuild_corner_masks(output, 0);
-			push_corner_masks_to_toplevels(output);
+				cm_bg_tex = capture_bg_cm(output, ctx);
+			if (any_cm_dirty)
+				rebuild_corner_masks(output, cm_bg_tex);
+			push_corner_masks_to_toplevels(output, any_cm_dirty);
 		}
 	} else if (any_cm) {
+		uint64_t cm_bg_tex = 0;
 		if (any_cm_dirty)
-			rebuild_corner_masks(output, 0);
-		push_corner_masks_to_toplevels(output);
+			cm_bg_tex = capture_bg_cm(output, ctx);
+		if (any_cm_dirty)
+			rebuild_corner_masks(output, cm_bg_tex);
+		push_corner_masks_to_toplevels(output, any_cm_dirty);
 	}
 
 	{

@@ -102,9 +102,6 @@ struct gles2_data {
 		GLint resolution, shadow_size, shadow_color, border_radius, inner_size, hole_pos, hole_size;
 	} u_shadow;
 
-	uint8_t *readback_pixels;
-	size_t readback_pixels_size;
-
 	GLuint screen_shader_prog;
 	GLint screen_shader_u_tex;
 	GLint screen_shader_u_resolution;
@@ -403,9 +400,6 @@ static bool gles2_init(struct wlr_renderer *r, struct wlr_allocator *a) {
 	if (!g)
 		return false;
 
-	g->readback_pixels = NULL;
-	g->readback_pixels_size = 0;
-
 	if (!wlr_renderer_is_gles2(r)) {
 		wlr_log(WLR_INFO, "gles2: renderer is not GLES2");
 		free(g);
@@ -595,11 +589,6 @@ static void gles2_fini(void) {
 	if (g->screen_shader_prog)
 		glDeleteProgram(g->screen_shader_prog);
 	glDeleteBuffers(1, &g->vbo);
-	if (g->readback_pixels) {
-		free(g->readback_pixels);
-		g->readback_pixels = NULL;
-		g->readback_pixels_size = 0;
-	}
 	egl_unset_current();
 	g->screen_shader_prog = 0;
 	free(g);
@@ -1014,27 +1003,12 @@ static bool gles2_capture_readback(struct wlr_buffer *capture_buffer, be_output_
 	} else if (attach_type == GL_RENDERBUFFER) {
 		GLuint staging_tex = (GLuint)state->staging.native_handle[1];
 
+		// ensure renderbuffer rendering is complete before copy
+		glFinish();
 		glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
-		int bpp = 4;
-		size_t buf_size = (size_t)src_w * src_h * bpp;
-
-		// Use persistent readback buffer to avoid malloc/free per frame
-		if (buf_size > g->readback_pixels_size) {
-			uint8_t *new_pixels = (uint8_t *)realloc(g->readback_pixels, buf_size);
-			if (new_pixels) {
-				g->readback_pixels = new_pixels;
-				g->readback_pixels_size = buf_size;
-			}
-		}
-
-		if (g->readback_pixels) {
-			glReadPixels(0, 0, src_w, src_h, GL_RGBA, GL_UNSIGNED_BYTE, g->readback_pixels);
-			glBindTexture(GL_TEXTURE_2D, staging_tex);
-			glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, src_w, src_h, GL_RGBA, GL_UNSIGNED_BYTE, g->readback_pixels);
-			glBindTexture(GL_TEXTURE_2D, 0);
-		} else {
-			glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, src_w, src_h);
-		}
+		glBindTexture(GL_TEXTURE_2D, staging_tex);
+		glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, src_w, src_h);
+		glBindTexture(GL_TEXTURE_2D, 0);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)dst_fbo);
