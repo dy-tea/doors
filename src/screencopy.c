@@ -128,11 +128,10 @@ static void screencopy_damage_handle_output_precommit(struct wl_listener *listen
 
 	if (event->state->committed & WLR_OUTPUT_STATE_DAMAGE) {
 		pixman_region32_union(&damage->damage, &damage->damage, &event->state->damage);
-		pixman_region32_intersect_rect(&damage->damage, &damage->damage, 0, 0,
-		    damage->output->width, damage->output->height);
+		pixman_region32_intersect_rect(
+		    &damage->damage, &damage->damage, 0, 0, damage->output->width, damage->output->height);
 	} else if (event->state->committed & WLR_OUTPUT_STATE_BUFFER) {
-		pixman_region32_union_rect(&damage->damage, &damage->damage, 0, 0,
-		    damage->output->width, damage->output->height);
+		pixman_region32_union_rect(&damage->damage, &damage->damage, 0, 0, damage->output->width, damage->output->height);
 	}
 }
 
@@ -181,8 +180,7 @@ static void client_unref(screencopy_client_t *client) {
 		return;
 
 	screencopy_damage_t *damage, *tmp;
-	wl_list_for_each_safe(damage, tmp, &client->damages, link)
-		screencopy_damage_destroy(damage);
+	wl_list_for_each_safe(damage, tmp, &client->damages, link) screencopy_damage_destroy(damage);
 
 	free(client);
 }
@@ -413,8 +411,7 @@ static void frame_handle_output_commit(struct wl_listener *listener, void *data)
 			const pixman_box32_t *boxes = pixman_region32_rectangles(&damage->damage, &n_boxes);
 			for (int i = 0; i < n_boxes; i++) {
 				const pixman_box32_t *box = &boxes[i];
-				zwlr_screencopy_frame_v1_send_damage(frame->resource,
-				    box->x1, box->y1, box->x2 - box->x1, box->y2 - box->y1);
+				zwlr_screencopy_frame_v1_send_damage(frame->resource, box->x1, box->y1, box->x2 - box->x1, box->y2 - box->y1);
 			}
 			pixman_region32_clear(&damage->damage);
 		}

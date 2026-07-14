@@ -423,7 +423,8 @@ static uint64_t capture_bg_to_tex1(
 			if (!tl->blur)
 				continue;
 			tl->blur->blur_scene_hidden = false;
-			if ((tl->blur->blur_node || tl->blur->mica_node || tl->blur->acrylic_node) && tl->scene_tree && tl->scene_tree->node.enabled) {
+			if ((tl->blur->blur_node || tl->blur->mica_node || tl->blur->acrylic_node) && tl->scene_tree
+			    && tl->scene_tree->node.enabled) {
 				wlr_scene_node_set_enabled(&tl->scene_tree->node, false);
 				tl->blur->blur_scene_hidden = true;
 			}
@@ -567,9 +568,8 @@ static bool rebuild_live_blur(output_t *output, pixman_region32_t *damage, uint6
 				pixman_region32_t blur_rgn;
 				pixman_region32_init(&blur_rgn);
 				for (int b = 0; b < nboxes; b++) {
-					pixman_region32_union_rect(&blur_rgn, &blur_rgn,
-						boxes[b].x1 + lx, boxes[b].y1 + ly,
-						boxes[b].x2 - boxes[b].x1, boxes[b].y2 - boxes[b].y1);
+					pixman_region32_union_rect(&blur_rgn, &blur_rgn, boxes[b].x1 + lx, boxes[b].y1 + ly,
+					    boxes[b].x2 - boxes[b].x1, boxes[b].y2 - boxes[b].y1);
 				}
 				pixman_region32_intersect(&intersection, damage, &blur_rgn);
 				pixman_region32_fini(&blur_rgn);
