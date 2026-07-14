@@ -667,11 +667,13 @@ static void push_blur_to_toplevels(output_t *output) {
 			continue;
 
 		if (!tl->blur->blur_buf) {
-			wlr_scene_buffer_set_buffer(tl->blur->blur_node, NULL);
+			if (tl->blur->blur_node->buffer)
+				wlr_scene_buffer_set_buffer(tl->blur->blur_node, NULL);
 			continue;
 		}
 
-		wlr_scene_buffer_set_buffer(tl->blur->blur_node, tl->blur->blur_buf);
+		if (tl->blur->blur_node->buffer != tl->blur->blur_buf)
+			wlr_scene_buffer_set_buffer(tl->blur->blur_node, tl->blur->blur_buf);
 
 		client_t *c = tl->node->client;
 		struct wlr_box r;
@@ -848,18 +850,21 @@ static void push_blur_to_layers(output_t *output) {
 				continue;
 
 			if (!ls->blur_buf) {
-				wlr_scene_buffer_set_buffer(ls->blur_node, NULL);
+				if (ls->blur_node->buffer)
+					wlr_scene_buffer_set_buffer(ls->blur_node, NULL);
 				continue;
 			}
 
 			// get blur region bounds
 			if (ls->blur_region.extents.x2 - ls->blur_region.extents.x1 <= 0
 			    || ls->blur_region.extents.y2 - ls->blur_region.extents.y1 <= 0) {
-				wlr_scene_buffer_set_buffer(ls->blur_node, NULL);
+				if (ls->blur_node->buffer)
+					wlr_scene_buffer_set_buffer(ls->blur_node, NULL);
 				continue;
 			}
 
-			wlr_scene_buffer_set_buffer(ls->blur_node, ls->blur_buf);
+			if (ls->blur_node->buffer != ls->blur_buf)
+				wlr_scene_buffer_set_buffer(ls->blur_node, ls->blur_buf);
 
 			// get surface position for source box calculation
 			int lx, ly;
@@ -993,11 +998,13 @@ static void push_acrylic_to_toplevels(output_t *output) {
 			continue;
 
 		if (!tl->blur->acrylic_buf) {
-			wlr_scene_buffer_set_buffer(tl->blur->acrylic_node, NULL);
+			if (tl->blur->acrylic_node->buffer)
+				wlr_scene_buffer_set_buffer(tl->blur->acrylic_node, NULL);
 			continue;
 		}
 
-		wlr_scene_buffer_set_buffer(tl->blur->acrylic_node, tl->blur->acrylic_buf);
+		if (tl->blur->acrylic_node->buffer != tl->blur->acrylic_buf)
+			wlr_scene_buffer_set_buffer(tl->blur->acrylic_node, tl->blur->acrylic_buf);
 
 		client_t *c = tl->node->client;
 		struct wlr_box r;
@@ -1085,7 +1092,8 @@ static void push_mica_to_toplevels(output_t *output) {
 		if (!m || m != output)
 			continue;
 
-		wlr_scene_buffer_set_buffer(tl->blur->mica_node, buf);
+		if (tl->blur->mica_node->buffer != buf)
+			wlr_scene_buffer_set_buffer(tl->blur->mica_node, buf);
 
 		client_t *c = tl->node->client;
 		struct wlr_box r;
@@ -1213,7 +1221,8 @@ static bool blur_render_shadow(toplevel_t *tl) {
 	effects_backend->render_shadow(&sp, tl->shadow->shadow_native[0]);
 
 	wlr_scene_node_lower_to_bottom(&tl->shadow->shadow_node->node);
-	wlr_scene_buffer_set_buffer(tl->shadow->shadow_node, tl->shadow->shadow_buf);
+	if (tl->shadow->shadow_node->buffer != tl->shadow->shadow_buf)
+		wlr_scene_buffer_set_buffer(tl->shadow->shadow_node, tl->shadow->shadow_buf);
 	struct wlr_fbox src_box = {0, 0, phys_buf_w, phys_buf_h};
 	wlr_scene_buffer_set_source_box(tl->shadow->shadow_node, &src_box);
 	wlr_scene_buffer_set_dest_size(tl->shadow->shadow_node, buf_w, buf_h);
@@ -1282,7 +1291,8 @@ static bool blur_render_border(toplevel_t *tl, int content_w, int content_h) {
 
 	effects_backend->render_border(&bp, tl->rounded->border_shader_native[0]);
 
-	wlr_scene_buffer_set_buffer(tl->rounded->border_shader_node, tl->rounded->border_shader_buf);
+	if (tl->rounded->border_shader_node->buffer != tl->rounded->border_shader_buf)
+		wlr_scene_buffer_set_buffer(tl->rounded->border_shader_node, tl->rounded->border_shader_buf);
 	struct wlr_fbox src_box = {0, 0, (float)phys_w, (float)phys_h};
 	wlr_scene_buffer_set_source_box(tl->rounded->border_shader_node, &src_box);
 	wlr_scene_buffer_set_dest_size(tl->rounded->border_shader_node, (int)log_fw, (int)log_fh);
@@ -1524,7 +1534,8 @@ static void push_corner_masks_to_toplevels(output_t *output, bool rebuilt) {
 		int node_oy = (content_r.y < output->ly) ? (output->ly - content_r.y) : 0;
 
 		wlr_scene_node_set_enabled(&tl->rounded->corner_mask_node->node, true);
-		wlr_scene_buffer_set_buffer(tl->rounded->corner_mask_node, tl->rounded->corner_mask_buf);
+		if (tl->rounded->corner_mask_node->buffer != tl->rounded->corner_mask_buf)
+			wlr_scene_buffer_set_buffer(tl->rounded->corner_mask_node, tl->rounded->corner_mask_buf);
 		wlr_scene_node_set_position(&tl->rounded->corner_mask_node->node, node_ox, node_oy);
 		wlr_scene_buffer_set_source_box(tl->rounded->corner_mask_node, &src);
 		wlr_scene_buffer_set_dest_size(tl->rounded->corner_mask_node, dw, dh);
