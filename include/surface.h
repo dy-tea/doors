@@ -41,6 +41,7 @@ typedef struct surface_rounded_t {
 	struct wlr_scene_buffer *corner_mask_node;
 	struct wlr_buffer *corner_mask_buf;
 	uint64_t corner_mask_native[2];
+	float cached_radius;
 } surface_rounded_t;
 
 typedef struct surface_shadow_t {

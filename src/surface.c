@@ -117,8 +117,11 @@ void surface_set_border_radius(struct wlr_scene_tree *scene_tree, struct wlr_sce
 				(*rounded)->corner_mask_node->point_accepts_input = corner_mask_no_input;
 			}
 		}
-		(*rounded)->border_dirty = true;
-		(*rounded)->corner_mask_dirty = true;
+		if ((*rounded)->cached_radius != radius) {
+			(*rounded)->cached_radius = radius;
+			(*rounded)->border_dirty = true;
+			(*rounded)->corner_mask_dirty = true;
+		}
 	} else if (*rounded) {
 		if ((*rounded)->corner_mask_node) {
 			wlr_scene_node_destroy(&(*rounded)->corner_mask_node->node);
@@ -184,11 +187,28 @@ void surface_update_rounded(surface_rounded_t **rounded, float color[4], border_
 	}
 
 	surface_rounded_t *r = *rounded;
-	r->border_color[0] = color[0];
-	r->border_color[1] = color[1];
-	r->border_color[2] = color[2];
-	r->border_color[3] = color[3];
 
+	bool changed = false;
+	if (memcmp(r->border_color, color, sizeof(r->border_color)) != 0)
+		changed = true;
+	if (r->gradient_count != bt->gradient_count)
+		changed = true;
+	if (r->gradient_angle != bt->gradient_angle)
+		changed = true;
+	if (r->gradient2_count != bt->gradient2_count)
+		changed = true;
+	if (r->gradient2_angle != bt->gradient2_angle)
+		changed = true;
+	if (r->gradient_lerp != bt->gradient_lerp)
+		changed = true;
+	if (bt->gradient_count > 0
+	    && memcmp(r->gradient_colors, bt->gradient, bt->gradient_count * 4 * sizeof(float)) != 0)
+		changed = true;
+	if (bt->gradient2_count > 0
+	    && memcmp(r->gradient2_colors, bt->gradient2, bt->gradient2_count * 4 * sizeof(float)) != 0)
+		changed = true;
+
+	memcpy(r->border_color, color, sizeof(r->border_color));
 	memcpy(r->gradient_colors, bt->gradient, bt->gradient_count * 4 * sizeof(float));
 	r->gradient_count = bt->gradient_count;
 	r->gradient_angle = bt->gradient_angle;
@@ -196,8 +216,11 @@ void surface_update_rounded(surface_rounded_t **rounded, float color[4], border_
 	r->gradient2_count = bt->gradient2_count;
 	r->gradient2_angle = bt->gradient2_angle;
 	r->gradient_lerp = bt->gradient_lerp;
-	r->border_dirty = true;
-	r->corner_mask_dirty = true;
+
+	if (changed) {
+		r->border_dirty = true;
+		r->corner_mask_dirty = true;
+	}
 }
 
 void surface_client_set_effect(client_t *client, surface_effect_t effect, bool enabled) {

@@ -294,13 +294,16 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 			update_border_colors(node->client);
 			surface_rounded_t *rounded = client_get_rounded(node->client);
 			if (rounded && (node->client->border_radius > 0.0f || rounded->gradient_count >= 2)) {
-				rounded->border_dirty = true;
-				rounded->corner_mask_dirty = true;
 				if (rounded->border_shader_node) {
 					int new_fw = geo.width + 2 * (int)bw;
 					int new_fh = geo.height + 2 * (int)bw;
-					if (new_fw > 0 && new_fh > 0)
+					if (new_fw > 0 && new_fh > 0) {
+						if (rounded->border_shader_buf_w != new_fw || rounded->border_shader_buf_h != new_fh) {
+							rounded->border_dirty = true;
+							rounded->corner_mask_dirty = true;
+						}
 						wlr_scene_buffer_set_dest_size(rounded->border_shader_node, new_fw, new_fh);
+					}
 				}
 			}
 		} else if (border_tree) {

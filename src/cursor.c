@@ -206,8 +206,14 @@ static void update_scene_positions(node_t *n, struct wlr_box rect, desktop_t *d)
 					if (n->client->border_radius > 0.0f) {
 						surface_rounded_t *rounded = client_get_rounded(n->client);
 						if (rounded) {
-							rounded->border_dirty = true;
-							rounded->corner_mask_dirty = true;
+							int new_fw = r.width + 2 * (int)bw;
+							int new_fh = r.height + 2 * (int)bw;
+							if (new_fw > 0 && new_fh > 0
+							    && (rounded->border_shader_buf_w != new_fw
+							        || rounded->border_shader_buf_h != new_fh)) {
+								rounded->border_dirty = true;
+								rounded->corner_mask_dirty = true;
+							}
 						}
 					}
 				}
@@ -418,8 +424,14 @@ static void process_cursor_resize(void) {
 		update_borders(toplevel->border_tree, toplevel->border_rects, geo, bw);
 		update_border_colors(client);
 		if (client->border_radius > 0.0f && toplevel->rounded) {
-			toplevel->rounded->border_dirty = true;
-			toplevel->rounded->corner_mask_dirty = true;
+			int new_fw = new_width + 2 * (int)bw;
+			int new_fh = new_height + 2 * (int)bw;
+			if (new_fw > 0 && new_fh > 0
+			    && (toplevel->rounded->border_shader_buf_w != new_fw
+			        || toplevel->rounded->border_shader_buf_h != new_fh)) {
+				toplevel->rounded->border_dirty = true;
+				toplevel->rounded->corner_mask_dirty = true;
+			}
 		}
 	}
 }
