@@ -6,7 +6,6 @@
 #include <GLES2/gl2ext.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 #include <time.h>
 #include <wlr/config.h>
 #include <wlr/render/allocator.h>
@@ -705,7 +704,7 @@ static bool gles2_blit(uint64_t src_tex, uint64_t dst_fbo, int w, int h, const p
 	if (n_scissor > 0 && scissor) {
 		glEnable(GL_SCISSOR_TEST);
 		for (int i = 0; i < n_scissor; i++) {
-			glScissor(scissor[i].x1, scissor[i].y1, scissor[i].x2 - scissor[i].x1, scissor[i].y2 - scissor[i].y1);
+			glScissor(scissor[i].x1, h - scissor[i].y2, scissor[i].x2 - scissor[i].x1, scissor[i].y2 - scissor[i].y1);
 			draw_quad();
 		}
 		glDisable(GL_SCISSOR_TEST);
@@ -755,6 +754,22 @@ static bool gles2_blur(be_output_state_t *state, uint64_t src_handle, int src_w,
 			current = ping ? tex1 : tex0;
 			ping ^= 1;
 		}
+	}
+
+	// if the result ended up in the same texture as src, blit to the other buffer to preserve the source
+	if (current == (GLuint)src_handle) {
+		GLuint other_fbo = (tex0 == (GLuint)src_handle) ? fbo1 : fbo0;
+		GLuint other_tex = (tex0 == (GLuint)src_handle) ? tex1 : tex0;
+		glBindFramebuffer(GL_FRAMEBUFFER, other_fbo);
+		glViewport(0, 0, src_w, src_h);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, current);
+		glUseProgram(g->prog_blit);
+		glUniform1i(g->u_blit.tex, 0);
+		draw_quad();
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		current = other_tex;
 	}
 	*out_handle = (uint64_t)current;
 	return true;
