@@ -322,8 +322,7 @@ void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
 				int new_fw = border_w + 2 * (int)bw;
 				int new_fh = border_h + 2 * (int)bw;
 				if (new_fw > 0 && new_fh > 0) {
-					if (toplevel->rounded->border_shader_buf_w != new_fw
-					    || toplevel->rounded->border_shader_buf_h != new_fh) {
+					if (toplevel->rounded->border_shader_buf_w != new_fw || toplevel->rounded->border_shader_buf_h != new_fh) {
 						toplevel->rounded->border_dirty = true;
 						toplevel->rounded->corner_mask_dirty = true;
 					}
@@ -339,8 +338,7 @@ void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
 				int new_fw = container_rect->width + 2 * (int)bw;
 				int new_fh = container_rect->height + 2 * (int)bw;
 				if (new_fw > 0 && new_fh > 0) {
-					if (toplevel->rounded->border_shader_buf_w != new_fw
-					    || toplevel->rounded->border_shader_buf_h != new_fh) {
+					if (toplevel->rounded->border_shader_buf_w != new_fw || toplevel->rounded->border_shader_buf_h != new_fh) {
 						toplevel->rounded->border_dirty = true;
 						toplevel->rounded->corner_mask_dirty = true;
 					}

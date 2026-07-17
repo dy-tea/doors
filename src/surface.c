@@ -201,8 +201,7 @@ void surface_update_rounded(surface_rounded_t **rounded, float color[4], border_
 		changed = true;
 	if (r->gradient_lerp != bt->gradient_lerp)
 		changed = true;
-	if (bt->gradient_count > 0
-	    && memcmp(r->gradient_colors, bt->gradient, bt->gradient_count * 4 * sizeof(float)) != 0)
+	if (bt->gradient_count > 0 && memcmp(r->gradient_colors, bt->gradient, bt->gradient_count * 4 * sizeof(float)) != 0)
 		changed = true;
 	if (bt->gradient2_count > 0
 	    && memcmp(r->gradient2_colors, bt->gradient2, bt->gradient2_count * 4 * sizeof(float)) != 0)
