@@ -587,34 +587,35 @@ static bool rebuild_live_blur(output_t *output, pixman_region32_t *damage, uint6
 				continue;
 		}
 
+		uint64_t src;
 		uint64_t blurred;
 		if (shared_blurred) {
-			blurred = shared_blurred;
+			src = shared_blurred;
 		} else {
-			uint64_t src = capture_bg_to_tex1(output, ctx, false, &tl->scene_tree->node, &tl->blur->blur_scene_hidden);
+			src = capture_bg_to_tex1(output, ctx, false, &tl->scene_tree->node, &tl->blur->blur_scene_hidden);
 			if (!src)
 				continue;
-			struct be_blur_params bp = {
-			    .algorithm = blur_algorithm,
-			    .passes = blur_passes,
-			    .radius = blur_radius,
-			    .vibrancy = blur_vibrancy,
-			    .vibrancy_darkness = blur_vibrancy_darkness,
-			    .noise_strength = blur_noise_strength,
-			    .brightness = blur_brightness,
-			    .contrast = blur_contrast,
-			    .refraction_strength = refraction_strength,
-			    .refraction_edge_size_px = refraction_edge_size_px,
-			    .refraction_corner_radius_px = refraction_corner_radius_px,
-			    .refraction_normal_pow = refraction_normal_pow,
-			    .refraction_rgb_fringing = refraction_rgb_fringing,
-			    .refraction_texture_repeat_mode = refraction_texture_repeat_mode,
-			    .refraction_offset = refraction_offset,
-			    .refraction_noise_strength = refraction_noise_strength,
-			    .refraction_noise_scale = refraction_noise_scale,
-			};
-			effects_backend->blur(&ctx->be_state, src, ctx->blur_w, ctx->blur_h, &bp, &blurred);
 		}
+		struct be_blur_params bp = {
+		    .algorithm = blur_algorithm,
+		    .passes = blur_passes,
+		    .radius = blur_radius,
+		    .vibrancy = blur_vibrancy,
+		    .vibrancy_darkness = blur_vibrancy_darkness,
+		    .noise_strength = blur_noise_strength,
+		    .brightness = blur_brightness,
+		    .contrast = blur_contrast,
+		    .refraction_strength = refraction_strength,
+		    .refraction_edge_size_px = refraction_edge_size_px,
+		    .refraction_corner_radius_px = refraction_corner_radius_px,
+		    .refraction_normal_pow = refraction_normal_pow,
+		    .refraction_rgb_fringing = refraction_rgb_fringing,
+		    .refraction_texture_repeat_mode = refraction_texture_repeat_mode,
+		    .refraction_offset = refraction_offset,
+		    .refraction_noise_strength = refraction_noise_strength,
+		    .refraction_noise_scale = refraction_noise_scale,
+		};
+		effects_backend->blur(&ctx->be_state, src, ctx->blur_w, ctx->blur_h, &bp, &blurred);
 
 		if (!ensure_output_buf(&tl->blur->blur_buf, tl->blur->blur_native, w, h)) {
 			if (tl->blur->blur_node) {
@@ -1510,7 +1511,8 @@ static void push_corner_masks_to_toplevels(output_t *output, bool rebuilt) {
 		// when corner masks weren't rebuilt, only ensure the node is enabled
 		// (avoid touching the scene node's buffer/size/position on every frame)
 		if (!rebuilt) {
-			wlr_scene_node_set_enabled(&tl->rounded->corner_mask_node->node, true);
+			if (!tl->rounded->corner_mask_node->node.enabled)
+				wlr_scene_node_set_enabled(&tl->rounded->corner_mask_node->node, true);
 			continue;
 		}
 
@@ -1531,7 +1533,8 @@ static void push_corner_masks_to_toplevels(output_t *output, bool rebuilt) {
 		int node_ox = (content_r.x < output->lx) ? (output->lx - content_r.x) : 0;
 		int node_oy = (content_r.y < output->ly) ? (output->ly - content_r.y) : 0;
 
-		wlr_scene_node_set_enabled(&tl->rounded->corner_mask_node->node, true);
+		if (!tl->rounded->corner_mask_node->node.enabled)
+			wlr_scene_node_set_enabled(&tl->rounded->corner_mask_node->node, true);
 		if (tl->rounded->corner_mask_node->buffer != tl->rounded->corner_mask_buf)
 			wlr_scene_buffer_set_buffer(tl->rounded->corner_mask_node, tl->rounded->corner_mask_buf);
 		wlr_scene_node_set_position(&tl->rounded->corner_mask_node->node, node_ox, node_oy);
@@ -1733,7 +1736,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 			if (!tl->node->client->shadow) {
 				tl->shadow->shadow_dirty = false;
 				tl->shadow->shadow_geometry_dirty = false;
-				if (tl->shadow->shadow_node)
+				if (tl->shadow->shadow_node && tl->shadow->shadow_node->node.enabled)
 					wlr_scene_node_set_enabled(&tl->shadow->shadow_node->node, false);
 				continue;
 			}
@@ -1750,7 +1753,8 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 							wlr_scene_node_lower_to_bottom(&tl->shadow->shadow_node->node);
 							wlr_scene_node_set_position(
 							    &tl->shadow->shadow_node->node, shadow_offset_x - size, shadow_offset_y - size);
-							wlr_scene_node_set_enabled(&tl->shadow->shadow_node->node, true);
+							if (!tl->shadow->shadow_node->node.enabled)
+								wlr_scene_node_set_enabled(&tl->shadow->shadow_node->node, true);
 							tl->shadow->shadow_geometry_dirty = false;
 							continue;
 						}
@@ -1809,6 +1813,27 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 		}
 	}
 
+	// capture background once for sharing across blur/acrylic/effects
+	uint64_t shared_bg = 0;
+	if (bg_damaged) {
+		bool needs_bg = false;
+		{
+			toplevel_t *tl;
+			wl_list_for_each(tl, &server.toplevels, link) {
+				if (!tl->node || !tl->node->client || !tl->node->client->shown)
+					continue;
+				if (!tl->node->output || tl->node->output != output)
+					continue;
+				if (tl->blur && (tl->blur->blur_node || tl->blur->acrylic_node)) {
+					needs_bg = true;
+					break;
+				}
+			}
+		}
+		if (needs_bg)
+			shared_bg = capture_bg_to_tex1(output, ctx, false, NULL, NULL);
+	}
+
 	// toplevel blur
 	if (blur_enabled) {
 		bool any_blur = false;
@@ -1821,8 +1846,25 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 			}
 		}
 		if (any_blur) {
-			rebuild_live_blur(output, &scene_output->damage_ring.current, 0);
+			rebuild_live_blur(output, &scene_output->damage_ring.current, shared_bg);
 			push_blur_to_toplevels(output);
+		}
+	}
+
+	// apply acrylic (before layer blur / corner masks so shared_bg in pong is still valid)
+	{
+		bool any_acrylic = false;
+		toplevel_t *tl;
+		wl_list_for_each(tl, &server.toplevels, link) {
+			if (tl->blur && tl->blur->acrylic_node && tl->node && tl->node->client && tl->node->client->shown
+			    && tl->node->output && tl->node->output == output) {
+				any_acrylic = true;
+				break;
+			}
+		}
+		if (any_acrylic) {
+			rebuild_live_acrylic(output, &scene_output->damage_ring.current, shared_bg);
+			push_acrylic_to_toplevels(output);
 		}
 	}
 
@@ -1897,22 +1939,6 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 		if (any_cm_dirty)
 			rebuild_corner_masks(output, cm_bg_tex);
 		push_corner_masks_to_toplevels(output, any_cm_dirty);
-	}
-
-	{
-		bool any_acrylic = false;
-		toplevel_t *tl;
-		wl_list_for_each(tl, &server.toplevels, link) {
-			if (tl->blur && tl->blur->acrylic_node && tl->node && tl->node->client && tl->node->client->shown
-			    && tl->node->output && tl->node->output == output) {
-				any_acrylic = true;
-				break;
-			}
-		}
-		if (any_acrylic) {
-			rebuild_live_acrylic(output, &scene_output->damage_ring.current, 0);
-			push_acrylic_to_toplevels(output);
-		}
 	}
 
 	if (mica_dirty)
