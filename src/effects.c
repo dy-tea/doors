@@ -1045,14 +1045,19 @@ static void push_acrylic_to_toplevels(output_t *output) {
 	}
 }
 
-static bool rebuild_mica(output_t *output) {
+static bool rebuild_mica(output_t *output, uint64_t pre_captured_bg) {
 	effects_output_t *ctx = output->effects;
 	int w = output->width, h = output->height;
 
-	uint64_t src = capture_bg_to_tex1(output, ctx, true, NULL, NULL);
-	if (!src) {
-		ctx->mica_dirty = false;
-		return false;
+	uint64_t src;
+	if (pre_captured_bg) {
+		src = pre_captured_bg;
+	} else {
+		src = capture_bg_to_tex1(output, ctx, true, NULL, NULL);
+		if (!src) {
+			ctx->mica_dirty = false;
+			return false;
+		}
 	}
 
 	struct be_blur_params bp = {
@@ -1323,11 +1328,9 @@ static uint64_t capture_bg_cm(output_t *output, effects_output_t *ctx) {
 	wlr_scene_node_set_enabled(&server.float_tree->node, false);
 
 	wlr_damage_ring_add_whole(&ctx->capture_scene_output->damage_ring);
-	struct wlr_output_state cap_state;
-	wlr_output_state_init(&cap_state);
-	wlr_output_state_set_enabled(&cap_state, true);
-	wlr_output_state_set_custom_mode(&cap_state, w, h, 0);
-	bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, NULL);
+	wlr_output_state_set_enabled(&ctx->capture_state, true);
+	wlr_output_state_set_custom_mode(&ctx->capture_state, w, h, 0);
+	bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &ctx->capture_state, NULL);
 
 	wlr_scene_node_set_enabled(&server.tile_tree->node, true);
 	wlr_scene_node_set_enabled(&server.float_tree->node, true);
@@ -1337,15 +1340,17 @@ static uint64_t capture_bg_cm(output_t *output, effects_output_t *ctx) {
 	wlr_scene_node_set_enabled(&server.lock_tree->node, true);
 	wlr_scene_output_set_position(ctx->capture_scene_output, -0x7fff, -0x7fff);
 
-	if (!ok || !cap_state.buffer) {
-		wlr_output_state_finish(&cap_state);
+	if (!ok || !ctx->capture_state.buffer) {
+		wlr_buffer_unlock(ctx->capture_state.buffer);
+		ctx->capture_state.buffer = NULL;
 		return 0;
 	}
 
 	uint64_t result;
-	effects_backend->capture_readback(
-	    cap_state.buffer, &ctx->be_state, ctx->be_state.pong.native_handle[0], ctx->blur_w, ctx->blur_h, w, h, &result);
-	wlr_output_state_finish(&cap_state);
+	effects_backend->capture_readback(ctx->capture_state.buffer, &ctx->be_state, ctx->be_state.pong.native_handle[0],
+	    ctx->blur_w, ctx->blur_h, w, h, &result);
+	wlr_buffer_unlock(ctx->capture_state.buffer);
+	ctx->capture_state.buffer = NULL;
 	return result;
 }
 
@@ -1630,6 +1635,10 @@ void effects_evict_buffers(void) {
 	if (!effects_state.available)
 		return;
 
+	effects_state.eviction_counter++;
+	if (effects_state.eviction_counter % 10 != 0)
+		return;
+
 	toplevel_t *tl;
 	wl_list_for_each(tl, &server.toplevels, link) {
 		bool visible = tl->node && tl->node->client && tl->node->client->shown;
@@ -1870,6 +1879,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 	}
 
 	// apply corner masks and blur if needed
+	uint64_t cm_bg_tex = 0;
 	if (has_layer_blur) {
 		bool any_layer_needs_blur = false;
 		if (blur_enabled && bg_damaged) {
@@ -1907,8 +1917,6 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 			}
 		}
 
-		uint64_t cm_bg_tex = 0;
-
 		if (any_layer_needs_blur && any_cm) {
 			uint64_t bg_tex = capture_bg_combined(output, ctx);
 			if (bg_tex && blur_enabled) {
@@ -1934,7 +1942,6 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 			push_corner_masks_to_toplevels(output, any_cm_dirty);
 		}
 	} else if (any_cm) {
-		uint64_t cm_bg_tex = 0;
 		if (any_cm_dirty)
 			cm_bg_tex = capture_bg_cm(output, ctx);
 		if (any_cm_dirty)
@@ -1943,7 +1950,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 	}
 
 	if (mica_dirty)
-		rebuild_mica(output);
+		rebuild_mica(output, cm_bg_tex);
 
 	if (mica_enabled && ctx->mica_buf)
 		push_mica_to_toplevels(output);

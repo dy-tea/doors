@@ -68,6 +68,7 @@ typedef struct effects_state_t {
 	bool available;
 	const effects_backend_t *backend;
 	void *backend_data;
+	int eviction_counter;
 } effects_state_t;
 
 extern effects_state_t effects_state;

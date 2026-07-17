@@ -179,6 +179,7 @@ struct vk_data {
 
 	VkBuffer border_ubo;
 	VkDeviceMemory border_ubo_mem;
+	void *border_ubo_map;
 	VkDescriptorPool border_ds_pool;
 	VkDescriptorSet border_ds;
 
@@ -880,6 +881,8 @@ static bool vk_init(struct wlr_renderer *r, struct wlr_allocator *a) {
 	}
 	vkBindBufferMemory(vk->device, vk->border_ubo, vk->border_ubo_mem, 0);
 
+	vkMapMemory(vk->device, vk->border_ubo_mem, 0, VK_WHOLE_SIZE, 0, &vk->border_ubo_map);
+
 	VkDescriptorPoolSize bp_sz[] = {
 	    {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1}, {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}};
 	VkDescriptorPoolCreateInfo bpci = {
@@ -1460,33 +1463,24 @@ static bool vk_blit(uint64_t src_tex, uint64_t dst_fbo, int w, int h, const pixm
 	float sx = (float)vk->blur_w / (float)w;
 	float sy = (vk->blur_h > 0) ? (float)vk->blur_h / (float)h : sx;
 
-	VkImageMemoryBarrier src_barrier = {
-	    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-	    .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-	    .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-	    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-	    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-	    .image = src_img,
-	    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-	    .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
-	    .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+	VkImageMemoryBarrier pre_barriers[2] = {
+	    {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+	        .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+	        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+	        .image = src_img,
+	        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+	        .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
+	        .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT},
+	    {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+	        .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+	        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+	        .image = dst->img.image,
+	        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+	        .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
+	        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT},
 	};
 	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL,
-	    0, NULL, 1, &src_barrier);
-
-	VkImageMemoryBarrier dst_barrier = {
-	    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-	    .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-	    .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-	    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-	    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-	    .image = dst->img.image,
-	    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-	    .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
-	    .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-	};
-	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL,
-	    0, NULL, 1, &dst_barrier);
+	    0, NULL, 2, pre_barriers);
 
 	for (int i = 0; i < n_regions; i++) {
 		int x1 = scissor ? scissor[i].x1 : 0;
@@ -1503,33 +1497,24 @@ static bool vk_blit(uint64_t src_tex, uint64_t dst_fbo, int w, int h, const pixm
 		    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region, VK_FILTER_LINEAR);
 	}
 
-	VkImageMemoryBarrier src_barrier2 = {
-	    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-	    .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-	    .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-	    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-	    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-	    .image = src_img,
-	    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-	    .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-	    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+	VkImageMemoryBarrier post_barriers[2] = {
+	    {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+	        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+	        .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+	        .image = src_img,
+	        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+	        .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+	        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT},
+	    {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+	        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+	        .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+	        .image = dst->img.image,
+	        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+	        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+	        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT},
 	};
 	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL,
-	    0, NULL, 1, &src_barrier2);
-
-	VkImageMemoryBarrier dst_barrier2 = {
-	    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-	    .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-	    .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-	    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-	    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-	    .image = dst->img.image,
-	    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-	    .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-	    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-	};
-	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL,
-	    0, NULL, 1, &dst_barrier2);
+	    0, NULL, 2, post_barriers);
 
 	return true;
 }
@@ -1746,10 +1731,7 @@ static bool vk_render_border(struct be_border_params *p, uint64_t dst_fbo) {
 	ubo.gradient_angle = p->gradient_angle;
 	ubo.gradient2_angle = p->gradient2_angle;
 	ubo.gradient_lerp = p->gradient_lerp;
-	void *mapped;
-	vkMapMemory(vk->device, vk->border_ubo_mem, 0, sizeof(ubo), 0, &mapped);
-	memcpy(mapped, &ubo, sizeof(ubo));
-	vkUnmapMemory(vk->device, vk->border_ubo_mem);
+	memcpy(vk->border_ubo_map, &ubo, sizeof(ubo));
 
 	struct {
 		float res[2];
@@ -2108,33 +2090,24 @@ static bool vk_capture_readback(struct wlr_buffer *capture_buffer, be_output_sta
 	vkCmdBlitImage(vk->frame_cb, vk_attribs.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst->img.image,
 	    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region, VK_FILTER_LINEAR);
 
-	VkImageMemoryBarrier src_barrier2 = {
-	    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-	    .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-	    .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-	    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-	    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-	    .image = vk_attribs.image,
-	    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-	    .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-	    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+	VkImageMemoryBarrier post_barriers[2] = {
+	    {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+	        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+	        .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+	        .image = vk_attribs.image,
+	        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+	        .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+	        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT},
+	    {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+	        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+	        .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+	        .image = dst->img.image,
+	        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+	        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+	        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT},
 	};
 	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL,
-	    0, NULL, 1, &src_barrier2);
-
-	VkImageMemoryBarrier dst_barrier2 = {
-	    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-	    .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-	    .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-	    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-	    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-	    .image = dst->img.image,
-	    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-	    .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-	    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-	};
-	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL,
-	    0, NULL, 1, &dst_barrier2);
+	    0, NULL, 2, post_barriers);
 
 	vk_defer_tex(tex);
 	*out_tex = (uint64_t)result_img;
