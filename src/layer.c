@@ -38,6 +38,7 @@ void layer_surface_set_blur(layer_surface_t *ls, bool enabled) {
 	if (enabled && !ls->blur_node) {
 		ls->blur_node = wlr_scene_buffer_create(ls->scene_tree, NULL);
 		if (ls->blur_node) {
+			ls->blur_geometry_dirty = true;
 			wlr_scene_node_lower_to_bottom(&ls->blur_node->node);
 			// ensure next frame recaptures the background for this new blur node
 			struct wlr_scene_output *so = wlr_scene_get_scene_output(server.scene, ls->output->wlr_output);

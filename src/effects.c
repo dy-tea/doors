@@ -819,6 +819,7 @@ static bool rebuild_live_blur_layers(output_t *output, uint64_t bg_tex, pixman_r
 
 			if (!ensure_output_buf(&ls->blur_buf, ls->blur_native, w, h))
 				continue;
+			ls->blur_geometry_dirty = true;
 
 			// convert boxes to output-local coordinates for scissor
 			pixman_box32_t out_boxes[nboxes];
@@ -861,6 +862,9 @@ static void push_blur_to_layers(output_t *output) {
 				continue;
 			}
 
+			if (!ls->blur_geometry_dirty)
+				continue;
+
 			if (ls->blur_node->buffer != ls->blur_buf)
 				wlr_scene_buffer_set_buffer(ls->blur_node, ls->blur_buf);
 
@@ -895,6 +899,7 @@ static void push_blur_to_layers(output_t *output) {
 			wlr_scene_node_set_position(&ls->blur_node->node, blur_r_x + offset_x, blur_r_y + offset_y);
 			wlr_scene_buffer_set_source_box(ls->blur_node, &src);
 			wlr_scene_buffer_set_dest_size(ls->blur_node, dw, dh);
+			ls->blur_geometry_dirty = false;
 		}
 	}
 }
