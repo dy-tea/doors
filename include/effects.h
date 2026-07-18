@@ -2,6 +2,7 @@
 
 #include "effects_backend.h"
 
+#include <pixman.h>
 #include <stdbool.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/util/box.h>
@@ -57,6 +58,8 @@ typedef struct effects_output_t {
 	struct wlr_buffer *screen_shader_buf;
 	uint64_t screen_shader_native[2];
 	struct wlr_scene_buffer *screen_shader_node;
+
+	pixman_region32_t scratch_region_a, scratch_region_b;
 
 	struct wlr_backend *capture_backend;
 	struct wlr_output *capture_output;
