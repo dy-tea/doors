@@ -955,6 +955,8 @@ void config_init_with_config_dir(const char *config_dir) {
 	run_config(doorsrc_path);
 
 	snprintf(hotkey_init_path, sizeof(hotkey_init_path), "%s/%s", config_source, DOORSHKRC_NAME);
+
+	refresh_border_color_cache();
 }
 
 void config_fini(void) {

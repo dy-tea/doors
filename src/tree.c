@@ -72,6 +72,20 @@ border_theme_t focused_border_theme = {0};
 char presel_feedback_color[16] = "ff5555ff";
 char tiling_drag_indicator_color[16] = "4d9eff4d";
 
+float normal_border_color_rgba[4];
+float active_border_color_rgba[4];
+float focused_border_color_rgba[4];
+float presel_feedback_color_rgba[4];
+float tiling_drag_indicator_color_rgba[4];
+
+void refresh_border_color_cache(void) {
+	parse_color(normal_border_color, normal_border_color_rgba);
+	parse_color(active_border_color, active_border_color_rgba);
+	parse_color(focused_border_color, focused_border_color_rgba);
+	parse_color(presel_feedback_color, presel_feedback_color_rgba);
+	parse_color(tiling_drag_indicator_color, tiling_drag_indicator_color_rgba);
+}
+
 // global state
 output_t *mon = NULL;
 output_t *mon_head = NULL;
@@ -1765,7 +1779,6 @@ static void get_border_color(client_t *client, float *color) {
 		return;
 	}
 
-	const char *color_str;
 	border_state_t bs = get_border_state(client);
 
 	bool the_only_window = (mon_head == mon_tail) && bs.desk && bs.desk->root && bs.desk->root->client;
@@ -1781,18 +1794,16 @@ static void get_border_color(client_t *client, float *color) {
 	// check if this client's node has an active preselection
 	node_t *n = client_get_node(client);
 	if (n && n->presel) {
-		parse_color(presel_feedback_color, color);
+		memcpy(color, presel_feedback_color_rgba, sizeof(float) * 4);
 		return;
 	}
 
 	if (bs.is_focused)
-		color_str = focused_border_color;
+		memcpy(color, focused_border_color_rgba, sizeof(float) * 4);
 	else if (bs.is_active)
-		color_str = active_border_color;
+		memcpy(color, active_border_color_rgba, sizeof(float) * 4);
 	else
-		color_str = normal_border_color;
-
-	parse_color(color_str, color);
+		memcpy(color, normal_border_color_rgba, sizeof(float) * 4);
 }
 
 void create_borders(
@@ -1925,6 +1936,7 @@ fallback_rects:
 }
 
 void refresh_border_colors(void) {
+	refresh_border_color_cache();
 	for (output_t *m = mon_head; m != NULL; m = m->next) {
 		for (desktop_t *d = m->desk_head; d != NULL; d = d->next) {
 			if (d->root == NULL)

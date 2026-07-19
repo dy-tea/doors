@@ -1918,6 +1918,13 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 
 	effects_backend->frame_begin();
 
+	bool bg_damaged = background_capture_needed(scene_output);
+	bool mica_dirty = mica_enabled && ctx->mica_dirty;
+
+	// when no relevant damage and mica not dirty, skip all effects work
+	if (!bg_damaged && !mica_dirty)
+		goto after_capture;
+
 	{
 		toplevel_t *tl;
 		wl_list_for_each(tl, &server.toplevels, link) {
@@ -1961,21 +1968,6 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 			tl->shadow->shadow_dirty = false;
 			tl->shadow->shadow_geometry_dirty = false;
 		}
-	}
-
-	bool bg_damaged = background_capture_needed(scene_output);
-	bool mica_dirty = mica_enabled && ctx->mica_dirty;
-
-	// when no relevant damage and mica not dirty, skip all background captures
-	if (!bg_damaged && !mica_dirty) {
-		if (blur_enabled) {
-			push_blur_to_toplevels(output);
-			push_blur_to_layers(output);
-		}
-		push_corner_masks_to_toplevels(output, false);
-		push_acrylic_to_toplevels(output);
-		push_mica_to_toplevels(output);
-		goto after_capture;
 	}
 
 	// check if layer blur surfaces need rendering

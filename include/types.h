@@ -220,6 +220,12 @@ extern char focused_border_color[16];
 extern char presel_feedback_color[16];
 extern char tiling_drag_indicator_color[16];
 
+extern float normal_border_color_rgba[4];
+extern float active_border_color_rgba[4];
+extern float focused_border_color_rgba[4];
+extern float presel_feedback_color_rgba[4];
+extern float tiling_drag_indicator_color_rgba[4];
+
 // border gradient theme
 #define BORDER_GRADIENT_MAX_STOPS 10
 typedef struct {

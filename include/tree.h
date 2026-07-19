@@ -105,6 +105,7 @@ void update_borders(
     struct wlr_scene_tree *border_tree, struct wlr_scene_rect *rects[4], struct wlr_box geo, unsigned int bw);
 void update_border_colors(client_t *client);
 void refresh_border_colors(void);
+void refresh_border_color_cache(void);
 
 struct wlr_scene_tree *client_border_tree(client_t *client);
 struct wlr_scene_rect **client_border_rects(client_t *client);
