@@ -141,6 +141,7 @@ struct vk_data {
 	VkCommandBuffer frame_cb;
 	VkCommandBuffer frame_cb_bufs[2];
 	VkRenderPass render_pass;
+	VkRenderPass no_clear_render_pass;
 	VkRenderPass overlay_render_pass;
 	VkRenderPass color_clear_render_pass;
 	VkDescriptorSetLayout ds_layout;
@@ -199,6 +200,7 @@ struct vk_data {
 	VkFence frame_fence[2];
 	int frame_slot;
 	bool frame_dirty;
+	bool cb_begun;
 
 	VkImageView deferred_views[2][64];
 	int n_deferred_views[2];
@@ -404,7 +406,7 @@ static void vk_transition_to_shader_read(VkImage image) {
 	    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
 	};
 
-	if (vk->frame_cb) {
+	if (vk->cb_begun) {
 		vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,
 		    NULL, 0, NULL, 1, &barrier);
 		return;
@@ -495,30 +497,21 @@ static void vk_defer_tex(struct wlr_texture *tex) {
 
 static VkImageView vk_lookup_or_create_view(VkImage image);
 
-static struct vk_fbo *vk_scratch_fbo(int w, int h) {
-	if (vk->scratch_fbo && vk->scratch_w == w && vk->scratch_h == h)
-		return vk->scratch_fbo;
-	if (vk->scratch_fbo) {
-		vk_destroy_fbo(vk->scratch_fbo);
-		free(vk->scratch_fbo);
-		vk->scratch_fbo = NULL;
-	}
-	vk->scratch_fbo = calloc(1, sizeof(struct vk_fbo));
-	if (!vk->scratch_fbo)
-		return NULL;
-	if (!vk_create_fbo(w, h, vk->vk_fmt, vk->scratch_fbo)) {
-		free(vk->scratch_fbo);
-		vk->scratch_fbo = NULL;
-		return NULL;
-	}
-	vk->scratch_w = w;
-	vk->scratch_h = h;
-	return vk->scratch_fbo;
+static void vk_ensure_cb_begun(void) {
+	if (vk->cb_begun)
+		return;
+	vk->cb_begun = true;
+	VkCommandBufferBeginInfo bi = {
+	    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+	    .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+	};
+	vkBeginCommandBuffer(vk->frame_cb, &bi);
 }
 
 static void vk_draw_full(VkPipeline pipe, VkImage src_img, VkFramebuffer dst_fb, int w, int h, VkImage dst_img,
     const void *pc_data, size_t pc_size, const VkRect2D *scissor, uint32_t n_scissor) {
 	vk->frame_dirty = true;
+	vk_ensure_cb_begun();
 	VkImageMemoryBarrier barrier = {
 	    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 	    .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -568,11 +561,9 @@ static void vk_draw_full(VkPipeline pipe, VkImage src_img, VkFramebuffer dst_fb,
 
 	VkRenderPassBeginInfo rp = {
 	    .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-	    .renderPass = vk->render_pass,
+	    .renderPass = vk->no_clear_render_pass,
 	    .framebuffer = dst_fb,
 	    .renderArea = {{0, 0}, {w, h}},
-	    .clearValueCount = 1,
-	    .pClearValues = &(VkClearValue){{{0, 0, 0, 0}}},
 	};
 	VkViewport vp = {0, 0, (float)w, (float)h, 0, 1};
 	VkRect2D full_sc = {{0, 0}, {(uint32_t)w, (uint32_t)h}};
@@ -597,6 +588,7 @@ static void vk_draw_full(VkPipeline pipe, VkImage src_img, VkFramebuffer dst_fb,
 static void vk_draw_full_no_tex(VkPipeline pipe, VkImage dst_img, VkFramebuffer dst_fb, int w, int h, bool clear,
     const void *pc_data, size_t pc_size, VkPipelineLayout layout, VkDescriptorSet ds) {
 	vk->frame_dirty = true;
+	vk_ensure_cb_begun();
 	VkImageMemoryBarrier dst_barrier = {
 	    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 	    .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -613,7 +605,7 @@ static void vk_draw_full_no_tex(VkPipeline pipe, VkImage dst_img, VkFramebuffer 
 
 	VkRenderPassBeginInfo rp = {
 	    .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-	    .renderPass = vk->render_pass,
+	    .renderPass = clear ? vk->color_clear_render_pass : vk->no_clear_render_pass,
 	    .framebuffer = dst_fb,
 	    .renderArea = {{0, 0}, {w, h}},
 	    .clearValueCount = clear ? 1 : 0,
@@ -718,6 +710,23 @@ static bool vk_init(struct wlr_renderer *r, struct wlr_allocator *a) {
 	    .pSubpasses = &sp,
 	};
 	if (vkCreateRenderPass(vk->device, &rpci, NULL, &vk->render_pass) != VK_SUCCESS) {
+		vkDestroyCommandPool(vk->device, vk->cmd_pool, NULL);
+		free(vk);
+		vk = NULL;
+		return false;
+	}
+
+	VkAttachmentDescription no_clear_att = {
+	    .format = vk->vk_fmt,
+	    .samples = VK_SAMPLE_COUNT_1_BIT,
+	    .loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+	    .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+	    .initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	    .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+	};
+	rpci.pAttachments = &no_clear_att;
+	rpci.attachmentCount = 1;
+	if (vkCreateRenderPass(vk->device, &rpci, NULL, &vk->no_clear_render_pass) != VK_SUCCESS) {
 		vkDestroyCommandPool(vk->device, vk->cmd_pool, NULL);
 		free(vk);
 		vk = NULL;
@@ -1176,6 +1185,8 @@ static void vk_fini(void) {
 		vkDestroyDescriptorSetLayout(vk->device, vk->ds_layout, NULL);
 	if (vk->render_pass)
 		vkDestroyRenderPass(vk->device, vk->render_pass, NULL);
+	if (vk->no_clear_render_pass)
+		vkDestroyRenderPass(vk->device, vk->no_clear_render_pass, NULL);
 	if (vk->color_clear_render_pass)
 		vkDestroyRenderPass(vk->device, vk->color_clear_render_pass, NULL);
 	if (vk->overlay_render_pass)
@@ -1408,21 +1419,19 @@ static void vk_frame_begin(void) {
 	vk->frame_cb = vk->frame_cb_bufs[s];
 	vk->desc_pool = vk->desc_pool_bufs[s];
 	vk->frame_dirty = false;
+	vk->cb_begun = false;
 
 	vkResetDescriptorPool(vk->device, vk->desc_pool, 0);
 	vk->ds_idx[s] = 0;
-
-	VkCommandBufferBeginInfo bi = {
-	    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-	    .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-	};
-	vkBeginCommandBuffer(vk->frame_cb, &bi);
 }
 
 static void vk_frame_end(void) {
 	if (!vk)
 		return;
 	int s = vk->frame_slot;
+
+	if (!vk->cb_begun)
+		return;
 
 	vkEndCommandBuffer(vk->frame_cb);
 
@@ -1443,6 +1452,7 @@ static void vk_frame_end(void) {
 
 static bool vk_blit(uint64_t src_tex, uint64_t dst_fbo, int w, int h, const pixman_box32_t *scissor, int n_scissor) {
 	vk->frame_dirty = true;
+	vk_ensure_cb_begun();
 	struct vk_fbo *dst = vk_fbo_of(dst_fbo);
 	if (!dst)
 		return false;
@@ -1773,6 +1783,7 @@ static bool vk_apply_corner_mask(be_output_state_t *state, uint64_t dst_fbo, int
     struct be_corner_mask_params *p) {
 	(void)state;
 	vk->frame_dirty = true;
+	vk_ensure_cb_begun();
 	struct vk_fbo *dst = vk_fbo_of(dst_fbo);
 	if (!dst)
 		return false;
@@ -1826,169 +1837,37 @@ static bool vk_apply_corner_mask(be_output_state_t *state, uint64_t dst_fbo, int
 
 	VkClearValue clear_val = {{{0.0f, 0.0f, 0.0f, 0.0f}}};
 
-	if (!p->pre_blit) {
-		VkImageMemoryBarrier b = {
-		    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		    .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		    .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		    .image = dst->img.image,
-		    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-		    .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
-		    .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
-		};
-		vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-		    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, &b);
+	VkImageMemoryBarrier b = {
+	    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+	    .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+	    .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	    .image = dst->img.image,
+	    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+	    .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
+	    .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
+	};
+	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+	    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, &b);
 
-		VkRenderPassBeginInfo rp = {
-		    .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-		    .renderPass = vk->color_clear_render_pass,
-		    .framebuffer = dst->fb,
-		    .renderArea = {{0, 0}, {(uint32_t)dst_w, (uint32_t)dst_h}},
-		    .clearValueCount = 1,
-		    .pClearValues = &clear_val,
-		};
-		VkViewport vp = {0, (float)dst_h, (float)dst_w, -(float)dst_h, 0, 1};
-		VkRect2D sc = {{0, 0}, {(uint32_t)dst_w, (uint32_t)dst_h}};
-		vkCmdBeginRenderPass(vk->frame_cb, &rp, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdSetViewport(vk->frame_cb, 0, 1, &vp);
-		vkCmdSetScissor(vk->frame_cb, 0, 1, &sc);
-		vkCmdBindDescriptorSets(vk->frame_cb, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->pipe_layout, 0, 1, &ds, 0, NULL);
-		vkCmdPushConstants(vk->frame_cb, vk->pipe_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
-		vkCmdBindPipeline(vk->frame_cb, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->pipe_corner_mask_clear);
-		vkCmdDraw(vk->frame_cb, 4, 1, 0, 0);
-		vkCmdEndRenderPass(vk->frame_cb);
-
-		return true;
-	}
-
-	struct vk_fbo *tmp = vk_scratch_fbo(dst_w, dst_h);
-	if (!tmp)
-		return false;
-
-	// blit dst -> tmp: OUT buffer -> temp FBO
-	{
-		VkImageMemoryBarrier b[2] = {
-		    {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		        .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		        .image = dst->img.image,
-		        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-		        .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
-		        .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT},
-		    {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		        .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		        .image = tmp->img.image,
-		        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-		        .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
-		        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT},
-		};
-		vkCmdPipelineBarrier(
-		    vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 2, b);
-	}
-	{
-		VkImageBlit blit = {.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
-		    .srcOffsets = {{0, 0, 0}, {dst_w, dst_h, 1}},
-		    .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
-		    .dstOffsets = {{0, 0, 0}, {dst_w, dst_h, 1}}};
-		vkCmdBlitImage(vk->frame_cb, dst->img.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, tmp->img.image,
-		    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
-	}
-	// transition: tmp -> COLOR_ATTACHMENT, dst -> SHADER_READ_ONLY
-	{
-		VkImageMemoryBarrier b[2] = {
-		    {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		        .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		        .image = tmp->img.image,
-		        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-		        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-		        .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT},
-		    {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		        .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		        .image = dst->img.image,
-		        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-		        .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-		        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT},
-		};
-		vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_TRANSFER_BIT,
-		    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 2,
-		    b);
-	}
-
-	// render pass: overlay corner mask on tmp
-	{
-		VkRenderPassBeginInfo rp = {
-		    .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-		    .renderPass = vk->overlay_render_pass,
-		    .framebuffer = tmp->fb,
-		    .renderArea = {{0, 0}, {(uint32_t)dst_w, (uint32_t)dst_h}},
-		    .clearValueCount = 0,
-		    .pClearValues = NULL,
-		};
-		VkViewport vp = {0, (float)dst_h, (float)dst_w, -(float)dst_h, 0, 1};
-		VkRect2D sc = {{0, 0}, {(uint32_t)dst_w, (uint32_t)dst_h}};
-		vkCmdBeginRenderPass(vk->frame_cb, &rp, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdSetViewport(vk->frame_cb, 0, 1, &vp);
-		vkCmdSetScissor(vk->frame_cb, 0, 1, &sc);
-		vkCmdBindDescriptorSets(vk->frame_cb, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->pipe_layout, 0, 1, &ds, 0, NULL);
-		vkCmdPushConstants(vk->frame_cb, vk->pipe_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
-		vkCmdBindPipeline(vk->frame_cb, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->pipe_corner_mask);
-		vkCmdDraw(vk->frame_cb, 4, 1, 0, 0);
-		vkCmdEndRenderPass(vk->frame_cb);
-	}
-
-	// blit tmp -> dst: copy corner-masked result back to output buffer
-	{
-		VkImageMemoryBarrier b[2] = {
-		    {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		        .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		        .image = tmp->img.image,
-		        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-		        .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
-		        .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT},
-		    {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		        .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		        .image = dst->img.image,
-		        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-		        .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
-		        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT},
-		};
-		vkCmdPipelineBarrier(
-		    vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 2, b);
-	}
-	{
-		VkImageBlit blit = {.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
-		    .srcOffsets = {{0, 0, 0}, {dst_w, dst_h, 1}},
-		    .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
-		    .dstOffsets = {{0, 0, 0}, {dst_w, dst_h, 1}}};
-		vkCmdBlitImage(vk->frame_cb, tmp->img.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst->img.image,
-		    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
-	}
-	// transition both back to SHADER_READ_ONLY
-	{
-		VkImageMemoryBarrier b[2] = {
-		    {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		        .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		        .image = tmp->img.image,
-		        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-		        .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-		        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT},
-		    {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		        .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		        .image = dst->img.image,
-		        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-		        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-		        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT},
-		};
-		vkCmdPipelineBarrier(
-		    vk->frame_cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 2, b);
-	}
+	VkRenderPassBeginInfo rp = {
+	    .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+	    .renderPass = p->pre_blit ? vk->overlay_render_pass : vk->color_clear_render_pass,
+	    .framebuffer = dst->fb,
+	    .renderArea = {{0, 0}, {(uint32_t)dst_w, (uint32_t)dst_h}},
+	    .clearValueCount = p->pre_blit ? 0 : 1,
+	    .pClearValues = p->pre_blit ? NULL : &clear_val,
+	};
+	VkViewport vp = {0, (float)dst_h, (float)dst_w, -(float)dst_h, 0, 1};
+	VkRect2D sc = {{0, 0}, {(uint32_t)dst_w, (uint32_t)dst_h}};
+	vkCmdBeginRenderPass(vk->frame_cb, &rp, VK_SUBPASS_CONTENTS_INLINE);
+	vkCmdSetViewport(vk->frame_cb, 0, 1, &vp);
+	vkCmdSetScissor(vk->frame_cb, 0, 1, &sc);
+	vkCmdBindDescriptorSets(vk->frame_cb, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->pipe_layout, 0, 1, &ds, 0, NULL);
+	vkCmdPushConstants(vk->frame_cb, vk->pipe_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+	vkCmdBindPipeline(vk->frame_cb, VK_PIPELINE_BIND_POINT_GRAPHICS,
+	    p->pre_blit ? vk->pipe_corner_mask : vk->pipe_corner_mask_clear);
+	vkCmdDraw(vk->frame_cb, 4, 1, 0, 0);
+	vkCmdEndRenderPass(vk->frame_cb);
 
 	return true;
 }
@@ -2017,6 +1896,7 @@ static bool vk_apply_screen_shader(
 static bool vk_capture_readback(struct wlr_buffer *capture_buffer, be_output_state_t *state, uint64_t dst_fbo,
     int dst_w, int dst_h, int src_w, int src_h, uint64_t *out_tex) {
 	vk->frame_dirty = true;
+	vk_ensure_cb_begun();
 	(void)src_w;
 	(void)src_h;
 	struct wlr_texture *tex = wlr_texture_from_buffer(vk->wlr_renderer, capture_buffer);
