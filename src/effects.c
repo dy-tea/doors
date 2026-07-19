@@ -400,8 +400,16 @@ static bool compute_src_box(
 }
 
 // capture scene with all blur/mica/acrylic toplevel scene trees hidden
-static uint64_t capture_bg_to_tex1(
-    output_t *output, effects_output_t *ctx, bool mica_only, struct wlr_scene_node *hide_node, bool *hide_flag) {
+static uint64_t capture_bg_to_tex1_ex(output_t *output, effects_output_t *ctx, bool mica_only,
+    struct wlr_scene_node *hide_node, bool *hide_flag, bool hide_blur_toplevels);
+
+static uint64_t capture_bg_to_tex1(output_t *output, effects_output_t *ctx, bool mica_only,
+    struct wlr_scene_node *hide_node, bool *hide_flag) {
+	return capture_bg_to_tex1_ex(output, ctx, mica_only, hide_node, hide_flag, true);
+}
+
+static uint64_t capture_bg_to_tex1_ex(output_t *output, effects_output_t *ctx, bool mica_only,
+    struct wlr_scene_node *hide_node, bool *hide_flag, bool hide_blur_toplevels) {
 	int w = output->width, h = output->height;
 	if (!ctx->capture_output || !ctx->capture_scene_output)
 		return 0;
@@ -432,7 +440,7 @@ static uint64_t capture_bg_to_tex1(
 			wlr_scene_node_set_enabled(hide_node, false);
 			*hide_flag = true;
 		}
-	} else {
+	} else if (hide_blur_toplevels) {
 		wl_list_for_each(tl, &server.toplevels, link) {
 			if (!tl->blur)
 				continue;
@@ -445,6 +453,20 @@ static uint64_t capture_bg_to_tex1(
 		}
 	}
 
+	// hide blur layer surfaces
+	for (int i = 0; i < 4; i++) {
+		layer_surface_t *ls;
+		wl_list_for_each(ls, &output->layers[i], link) {
+			if (ls->blur_node && ls->mapped) {
+				ls->blur_scene_hidden = false;
+				if (ls->scene_tree->node.enabled) {
+					wlr_scene_node_set_enabled(&ls->scene_tree->node, false);
+					ls->blur_scene_hidden = true;
+				}
+			}
+		}
+	}
+
 	wlr_damage_ring_add_whole(&ctx->capture_scene_output->damage_ring);
 
 	bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &ctx->capture_state, NULL);
@@ -452,9 +474,16 @@ static uint64_t capture_bg_to_tex1(
 	if (hide_node) {
 		if (*hide_flag)
 			wlr_scene_node_set_enabled(hide_node, true);
-	} else {
+	} else if (hide_blur_toplevels) {
 		wl_list_for_each(tl, &server.toplevels, link) if (tl->blur && tl->blur->blur_scene_hidden)
 		    wlr_scene_node_set_enabled(&tl->scene_tree->node, true);
+	}
+
+	// restore blur layer surfaces
+	for (int i = 0; i < 4; i++) {
+		layer_surface_t *ls;
+		wl_list_for_each(ls, &output->layers[i], link) if (ls->blur_scene_hidden)
+		    wlr_scene_node_set_enabled(&ls->scene_tree->node, true);
 	}
 
 	if (!server.top_tree->node.enabled)
@@ -490,84 +519,17 @@ static uint64_t capture_bg_to_tex1(
 	return result;
 }
 
-static uint64_t capture_bg_combined(output_t *output, effects_output_t *ctx) {
-	int w = output->width, h = output->height;
-	if (!ctx->capture_output || !ctx->capture_scene_output)
-		return 0;
-	if (w <= 0 || h <= 0)
-		return 0;
-
-	wlr_scene_output_set_position(ctx->capture_scene_output, output->lx, output->ly);
-
-	if (server.top_tree->node.enabled)
-		wlr_scene_node_set_enabled(&server.top_tree->node, false);
-	if (server.full_tree->node.enabled)
-		wlr_scene_node_set_enabled(&server.full_tree->node, false);
-	if (server.over_tree->node.enabled)
-		wlr_scene_node_set_enabled(&server.over_tree->node, false);
-	if (server.lock_tree->node.enabled)
-		wlr_scene_node_set_enabled(&server.lock_tree->node, false);
-
-	// hide all blur-layer surfaces
-	for (int i = 0; i < 4; i++) {
-		layer_surface_t *ls;
-		wl_list_for_each(ls, &output->layers[i], link) {
-			if (ls->blur_node && ls->mapped) {
-				ls->blur_scene_hidden = false;
-				if (ls->scene_tree->node.enabled) {
-					wlr_scene_node_set_enabled(&ls->scene_tree->node, false);
-					ls->blur_scene_hidden = true;
-				}
-			}
-		}
-	}
-
-	wlr_damage_ring_add_whole(&ctx->capture_scene_output->damage_ring);
-
-	bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &ctx->capture_state, NULL);
-
-	// restore blur-layer surfaces
-	for (int i = 0; i < 4; i++) {
-		layer_surface_t *ls;
-		wl_list_for_each(ls, &output->layers[i], link) if (ls->blur_scene_hidden)
-		    wlr_scene_node_set_enabled(&ls->scene_tree->node, true);
-	}
-
-	if (!server.top_tree->node.enabled)
-		wlr_scene_node_set_enabled(&server.top_tree->node, true);
-	if (!server.full_tree->node.enabled)
-		wlr_scene_node_set_enabled(&server.full_tree->node, true);
-	if (!server.over_tree->node.enabled)
-		wlr_scene_node_set_enabled(&server.over_tree->node, true);
-	if (!server.lock_tree->node.enabled)
-		wlr_scene_node_set_enabled(&server.lock_tree->node, true);
-
-	wlr_scene_output_set_position(ctx->capture_scene_output, -0x7fff, -0x7fff);
-
-	if (!ok || !ctx->capture_state.buffer) {
-		wlr_log(WLR_INFO, "capture_bg_combined: no buffer from build_state");
-		wlr_buffer_unlock(ctx->capture_state.buffer);
-		ctx->capture_state.buffer = NULL;
-		return 0;
-	}
-
-	uint64_t result;
-	effects_backend->capture_readback(ctx->capture_state.buffer, &ctx->be_state, ctx->be_state.pong.native_handle[0],
-	    ctx->blur_w, ctx->blur_h, w, h, &result);
-	wlr_buffer_unlock(ctx->capture_state.buffer);
-	ctx->capture_state.buffer = NULL;
-	return result;
-}
-
 static struct wlr_box get_client_rect(toplevel_t *tl);
 
-static bool rebuild_live_blur(output_t *output, pixman_region32_t *damage, uint64_t shared_blurred) {
+// captures scene with blur layer surfaces hidden but blur toplevels visible (for layer blur)
+static uint64_t capture_bg_combined(output_t *output, effects_output_t *ctx) {
+	return capture_bg_to_tex1_ex(output, ctx, false, NULL, NULL, false);
+}
+
+static bool rebuild_live_blur(output_t *output, uint64_t shared_blurred) {
 	effects_output_t *ctx = output->effects;
 	int w = output->width, h = output->height;
 	bool any = false;
-
-	pixman_region32_t *overlap_rgn = &ctx->scratch_region_a;
-	pixman_region32_t *blur_rgn = &ctx->scratch_region_b;
 
 	struct be_blur_params bp = {
 	    .algorithm = blur_algorithm,
@@ -589,8 +551,27 @@ static bool rebuild_live_blur(output_t *output, pixman_region32_t *damage, uint6
 	    .refraction_noise_scale = refraction_noise_scale,
 	};
 
-	if (shared_blurred) {
-		// save unblurred background for all toplevels
+	// capture shared background if not provided (fallback for non-damaged frames)
+	if (!shared_blurred) {
+		shared_blurred = capture_bg_to_tex1(output, ctx, false, NULL, NULL);
+		if (!shared_blurred) {
+			toplevel_t *tl;
+			wl_list_for_each(tl, &server.toplevels, link) {
+				if (!tl->blur || !tl->blur->blur_node || !tl->node || !tl->node->client)
+					continue;
+				if (!tl->node->client->shown)
+					continue;
+				if (!tl->node->output || tl->node->output != output)
+					continue;
+				if (tl->blur->blur_node)
+					wlr_scene_buffer_set_buffer(tl->blur->blur_node, NULL);
+			}
+			return false;
+		}
+	}
+
+	// save unblurred background for all toplevels
+	{
 		toplevel_t *tl;
 		wl_list_for_each(tl, &server.toplevels, link) {
 			if (!tl->blur || !tl->blur->blur_node || !tl->node || !tl->node->client)
@@ -607,89 +588,10 @@ static bool rebuild_live_blur(output_t *output, pixman_region32_t *damage, uint6
 			}
 			effects_backend->blit(shared_blurred, tl->blur->blur_native[0], w, h, NULL, 0);
 		}
+	}
 
-		// blur and overlay for each toplevel
-		wl_list_for_each(tl, &server.toplevels, link) {
-			if (!tl->blur || !tl->blur->blur_node || !tl->node || !tl->node->client)
-				continue;
-			if (!tl->node->client->shown)
-				continue;
-			if (!tl->node->output || tl->node->output != output)
-				continue;
-
-			double progress = 1.0;
-			struct wlr_box anim_from, anim_to;
-			bool animating = animation_get_toplevel_resize_progress(tl, &progress, &anim_from, &anim_to);
-
-			if (tl->blur->blur_buf && damage && !pixman_region32_empty(damage) && !animating) {
-				bool overlaps = false;
-				if (tl->blur && !pixman_region32_empty(&tl->blur->blur_region)) {
-					int lx = 0, ly = 0;
-					wlr_scene_node_coords(&tl->scene_tree->node, &lx, &ly);
-					int nboxes;
-					pixman_box32_t *boxes = pixman_region32_rectangles(&tl->blur->blur_region, &nboxes);
-					pixman_region32_clear(blur_rgn);
-					for (int b = 0; b < nboxes; b++)
-						pixman_region32_union_rect(blur_rgn, blur_rgn, boxes[b].x1 + lx, boxes[b].y1 + ly,
-						    boxes[b].x2 - boxes[b].x1, boxes[b].y2 - boxes[b].y1);
-					pixman_region32_intersect(overlap_rgn, damage, blur_rgn);
-					overlaps = !pixman_region32_empty(overlap_rgn);
-				} else {
-					struct wlr_box r = get_client_rect(tl);
-					pixman_region32_clear(overlap_rgn);
-					pixman_region32_union_rect(overlap_rgn, overlap_rgn, r.x - output->lx, r.y - output->ly, r.width, r.height);
-					overlaps = !pixman_region32_empty(overlap_rgn);
-				}
-				if (!overlaps)
-					continue;
-			}
-
-			uint64_t blurred;
-			effects_backend->blur(&ctx->be_state, shared_blurred, ctx->blur_w, ctx->blur_h, &bp, &blurred);
-
-			if (tl->blur && !pixman_region32_empty(&tl->blur->blur_region)) {
-				int lx = 0, ly = 0;
-				wlr_scene_node_coords(&tl->scene_tree->node, &lx, &ly);
-				int nboxes;
-				pixman_box32_t *boxes = pixman_region32_rectangles(&tl->blur->blur_region, &nboxes);
-				pixman_box32_t scissor_boxes[nboxes];
-				for (int b = 0; b < nboxes; b++) {
-					scissor_boxes[b].x1 = boxes[b].x1 + lx;
-					scissor_boxes[b].y1 = boxes[b].y1 + ly;
-					scissor_boxes[b].x2 = boxes[b].x2 + lx;
-					scissor_boxes[b].y2 = boxes[b].y2 + ly;
-				}
-				effects_backend->blit(blurred, tl->blur->blur_native[0], w, h, scissor_boxes, nboxes);
-			} else {
-				effects_backend->blit(blurred, tl->blur->blur_native[0], w, h, NULL, 0);
-			}
-
-			client_t *c = tl->node->client;
-			if (c && c->border_radius > 0.0f && c->state != STATE_FULLSCREEN) {
-				struct wlr_box content_r = get_client_rect(tl);
-				float ow = (float)w, oh = (float)h;
-				float win_u = (float)(content_r.x - output->lx) / ow;
-				float win_v = (float)(content_r.y - output->ly) / oh;
-				float win_sw = (float)content_r.width / ow;
-				float win_sh = (float)content_r.height / oh;
-				int bw_i = (c->state == STATE_FULLSCREEN) ? 0 : border_width;
-				float inner_r = (c->border_radius > (float)bw_i) ? c->border_radius - (float)bw_i : 0.0f;
-				struct be_corner_mask_params params = {
-				    .win_u = win_u,
-				    .win_v = win_v,
-				    .win_sw = win_sw,
-				    .win_sh = win_sh,
-				    .win_size_px_w = (float)content_r.width,
-				    .win_size_px_h = (float)content_r.height,
-				    .border_radius_px = inner_r,
-				    .scale = output->wlr_output->scale,
-				    .pre_blit = false,
-				};
-				effects_backend->apply_corner_mask(&ctx->be_state, tl->blur->blur_native[0], w, h, blurred, &params);
-			}
-			any = true;
-		}
-	} else {
+	// blur and overlay for each toplevel
+	{
 		toplevel_t *tl;
 		wl_list_for_each(tl, &server.toplevels, link) {
 			if (!tl->blur || !tl->blur->blur_node || !tl->node || !tl->node->client)
@@ -699,47 +601,8 @@ static bool rebuild_live_blur(output_t *output, pixman_region32_t *damage, uint6
 			if (!tl->node->output || tl->node->output != output)
 				continue;
 
-			double progress = 1.0;
-			struct wlr_box anim_from, anim_to;
-			bool animating = animation_get_toplevel_resize_progress(tl, &progress, &anim_from, &anim_to);
-
-			if (tl->blur->blur_buf && damage && !pixman_region32_empty(damage) && !animating) {
-				bool overlaps = false;
-				if (tl->blur && !pixman_region32_empty(&tl->blur->blur_region)) {
-					int lx = 0, ly = 0;
-					wlr_scene_node_coords(&tl->scene_tree->node, &lx, &ly);
-					int nboxes;
-					pixman_box32_t *boxes = pixman_region32_rectangles(&tl->blur->blur_region, &nboxes);
-					pixman_region32_clear(blur_rgn);
-					for (int b = 0; b < nboxes; b++)
-						pixman_region32_union_rect(blur_rgn, blur_rgn, boxes[b].x1 + lx, boxes[b].y1 + ly,
-						    boxes[b].x2 - boxes[b].x1, boxes[b].y2 - boxes[b].y1);
-					pixman_region32_intersect(overlap_rgn, damage, blur_rgn);
-					overlaps = !pixman_region32_empty(overlap_rgn);
-				} else {
-					struct wlr_box r = get_client_rect(tl);
-					pixman_region32_clear(overlap_rgn);
-					pixman_region32_union_rect(overlap_rgn, overlap_rgn, r.x - output->lx, r.y - output->ly, r.width, r.height);
-					overlaps = !pixman_region32_empty(overlap_rgn);
-				}
-				if (!overlaps)
-					continue;
-			}
-
-			uint64_t src = capture_bg_to_tex1(output, ctx, false, &tl->scene_tree->node, &tl->blur->blur_scene_hidden);
-			if (!src)
-				continue;
-
-			if (!ensure_output_buf(&tl->blur->blur_buf, tl->blur->blur_native, w, h)) {
-				if (tl->blur->blur_node)
-					wlr_scene_buffer_set_buffer(tl->blur->blur_node, NULL);
-				continue;
-			}
-
-			effects_backend->blit(src, tl->blur->blur_native[0], w, h, NULL, 0);
-
 			uint64_t blurred;
-			effects_backend->blur(&ctx->be_state, src, ctx->blur_w, ctx->blur_h, &bp, &blurred);
+			effects_backend->blur(&ctx->be_state, shared_blurred, ctx->blur_w, ctx->blur_h, &bp, &blurred);
 
 			if (tl->blur && !pixman_region32_empty(&tl->blur->blur_region)) {
 				int lx = 0, ly = 0;
@@ -1481,61 +1344,6 @@ static bool blur_render_border(toplevel_t *tl, int content_w, int content_h) {
 	return true;
 }
 
-// capture scene background once for corner masks, bypassing all toplevels
-static uint64_t capture_bg_cm(output_t *output, effects_output_t *ctx) {
-	int w = output->width, h = output->height;
-	if (!ctx->capture_output || !ctx->capture_scene_output)
-		return 0;
-	if (w <= 0 || h <= 0)
-		return 0;
-
-	wlr_scene_output_set_position(ctx->capture_scene_output, output->lx, output->ly);
-	if (server.top_tree->node.enabled)
-		wlr_scene_node_set_enabled(&server.top_tree->node, false);
-	if (server.full_tree->node.enabled)
-		wlr_scene_node_set_enabled(&server.full_tree->node, false);
-	if (server.over_tree->node.enabled)
-		wlr_scene_node_set_enabled(&server.over_tree->node, false);
-	if (server.lock_tree->node.enabled)
-		wlr_scene_node_set_enabled(&server.lock_tree->node, false);
-	if (server.tile_tree->node.enabled)
-		wlr_scene_node_set_enabled(&server.tile_tree->node, false);
-	if (server.float_tree->node.enabled)
-		wlr_scene_node_set_enabled(&server.float_tree->node, false);
-
-	wlr_damage_ring_add_whole(&ctx->capture_scene_output->damage_ring);
-	wlr_output_state_set_enabled(&ctx->capture_state, true);
-	wlr_output_state_set_custom_mode(&ctx->capture_state, w, h, 0);
-	bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &ctx->capture_state, NULL);
-
-	if (!server.tile_tree->node.enabled)
-		wlr_scene_node_set_enabled(&server.tile_tree->node, true);
-	if (!server.float_tree->node.enabled)
-		wlr_scene_node_set_enabled(&server.float_tree->node, true);
-	if (!server.top_tree->node.enabled)
-		wlr_scene_node_set_enabled(&server.top_tree->node, true);
-	if (!server.full_tree->node.enabled)
-		wlr_scene_node_set_enabled(&server.full_tree->node, true);
-	if (!server.over_tree->node.enabled)
-		wlr_scene_node_set_enabled(&server.over_tree->node, true);
-	if (!server.lock_tree->node.enabled)
-		wlr_scene_node_set_enabled(&server.lock_tree->node, true);
-	wlr_scene_output_set_position(ctx->capture_scene_output, -0x7fff, -0x7fff);
-
-	if (!ok || !ctx->capture_state.buffer) {
-		wlr_buffer_unlock(ctx->capture_state.buffer);
-		ctx->capture_state.buffer = NULL;
-		return 0;
-	}
-
-	uint64_t result;
-	effects_backend->capture_readback(ctx->capture_state.buffer, &ctx->be_state, ctx->be_state.pong.native_handle[0],
-	    ctx->blur_w, ctx->blur_h, w, h, &result);
-	wlr_buffer_unlock(ctx->capture_state.buffer);
-	ctx->capture_state.buffer = NULL;
-	return result;
-}
-
 static bool rebuild_corner_masks(output_t *output, uint64_t bg_tex) {
 	effects_output_t *ctx = output->effects;
 	int w = output->width, h = output->height;
@@ -2002,19 +1810,17 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 
 	// capture background once for sharing across blur/acrylic/effects
 	uint64_t shared_bg = 0;
-	if (bg_damaged) {
+	{
 		bool needs_bg = false;
-		{
-			toplevel_t *tl;
-			wl_list_for_each(tl, &server.toplevels, link) {
-				if (!tl->node || !tl->node->client || !tl->node->client->shown)
-					continue;
-				if (!tl->node->output || tl->node->output != output)
-					continue;
-				if (tl->blur && (tl->blur->blur_node || tl->blur->acrylic_node)) {
-					needs_bg = true;
-					break;
-				}
+		toplevel_t *tl;
+		wl_list_for_each(tl, &server.toplevels, link) {
+			if (!tl->node || !tl->node->client || !tl->node->client->shown)
+				continue;
+			if (!tl->node->output || tl->node->output != output)
+				continue;
+			if (tl->blur && (tl->blur->blur_node || tl->blur->acrylic_node)) {
+				needs_bg = true;
+				break;
 			}
 		}
 		if (needs_bg)
@@ -2033,7 +1839,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 			}
 		}
 		if (any_blur) {
-			rebuild_live_blur(output, &scene_output->damage_ring.current, shared_bg);
+			rebuild_live_blur(output, shared_bg);
 			push_blur_to_toplevels(output);
 		}
 	}
@@ -2059,7 +1865,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 	uint64_t cm_bg_tex = 0;
 	if (has_layer_blur) {
 		bool any_layer_needs_blur = false;
-		if (blur_enabled && bg_damaged) {
+		if (blur_enabled) {
 			pixman_region32_t *damage = &scene_output->damage_ring.current;
 			for (int i = 0; i < 4 && !any_layer_needs_blur; i++) {
 				layer_surface_t *ls;
@@ -2104,7 +1910,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 				push_blur_to_layers(output);
 			}
 			if (any_cm_dirty)
-				cm_bg_tex = capture_bg_cm(output, ctx);
+				cm_bg_tex = capture_bg_to_tex1(output, ctx, true, NULL, NULL);
 			if (any_cm_dirty)
 				rebuild_corner_masks(output, cm_bg_tex);
 			push_corner_masks_to_toplevels(output, any_cm_dirty);
@@ -2113,14 +1919,14 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 			push_blur_to_layers(output);
 		} else if (any_cm) {
 			if (any_cm_dirty)
-				cm_bg_tex = capture_bg_cm(output, ctx);
+				cm_bg_tex = capture_bg_to_tex1(output, ctx, true, NULL, NULL);
 			if (any_cm_dirty)
 				rebuild_corner_masks(output, cm_bg_tex);
 			push_corner_masks_to_toplevels(output, any_cm_dirty);
 		}
 	} else if (any_cm) {
 		if (any_cm_dirty)
-			cm_bg_tex = capture_bg_cm(output, ctx);
+			cm_bg_tex = capture_bg_to_tex1(output, ctx, true, NULL, NULL);
 		if (any_cm_dirty)
 			rebuild_corner_masks(output, cm_bg_tex);
 		push_corner_masks_to_toplevels(output, any_cm_dirty);
