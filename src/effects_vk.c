@@ -205,13 +205,17 @@ struct vk_data {
 	struct wlr_texture *deferred_texs[2][16];
 	int n_deferred_texs[2];
 
-#define VK_VIEW_CACHE_SIZE 16
+#define VK_VIEW_CACHE_SIZE 64
 	VkImage cached_images[2][VK_VIEW_CACHE_SIZE];
 	VkImageView cached_views[2][VK_VIEW_CACHE_SIZE];
 	int n_cached_views[2];
 
 	struct vk_fbo *scratch_fbo;
 	int scratch_w, scratch_h;
+
+#define VK_MAX_DRAW_CALLS 256
+	VkDescriptorSet desc_sets[2][VK_MAX_DRAW_CALLS];
+	int ds_idx[2];
 };
 
 static struct vk_data *vk = NULL;
@@ -489,6 +493,8 @@ static void vk_defer_tex(struct wlr_texture *tex) {
 		wlr_texture_destroy(tex);
 }
 
+static VkImageView vk_lookup_or_create_view(VkImage image);
+
 static struct vk_fbo *vk_scratch_fbo(int w, int h) {
 	if (vk->scratch_fbo && vk->scratch_w == w && vk->scratch_h == h)
 		return vk->scratch_fbo;
@@ -527,33 +533,13 @@ static void vk_draw_full(VkPipeline pipe, VkImage src_img, VkFramebuffer dst_fb,
 	vkCmdPipelineBarrier(vk->frame_cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 	    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
 
-	int s = vk->frame_slot;
-	VkImageView tmp_view = VK_NULL_HANDLE;
-	for (int i = 0; i < vk->n_cached_views[s]; i++) {
-		if (vk->cached_images[s][i] == src_img) {
-			tmp_view = vk->cached_views[s][i];
-			break;
-		}
-	}
-	if (tmp_view == VK_NULL_HANDLE) {
-		VkImageViewCreateInfo vci = {
-		    .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		    .image = src_img,
-		    .viewType = VK_IMAGE_VIEW_TYPE_2D,
-		    .format = vk->vk_fmt,
-		    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-		};
-		if (vkCreateImageView(vk->device, &vci, NULL, &tmp_view) != VK_SUCCESS)
-			return;
-		if (vk->n_cached_views[s] < VK_VIEW_CACHE_SIZE) {
-			vk->cached_images[s][vk->n_cached_views[s]] = src_img;
-			vk->cached_views[s][vk->n_cached_views[s]] = tmp_view;
-			vk->n_cached_views[s]++;
-		} else {
-			vk_defer_view(tmp_view);
-		}
-	}
+	VkImageView src_view = vk_lookup_or_create_view(src_img);
+	if (src_view == VK_NULL_HANDLE)
+		return;
 
+	int s = vk->frame_slot;
+	if (vk->ds_idx[s] >= VK_MAX_DRAW_CALLS)
+		return;
 	VkDescriptorSetAllocateInfo dsai = {
 	    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
 	    .descriptorPool = vk->desc_pool,
@@ -561,11 +547,13 @@ static void vk_draw_full(VkPipeline pipe, VkImage src_img, VkFramebuffer dst_fb,
 	    .pSetLayouts = &vk->ds_layout,
 	};
 	VkDescriptorSet ds;
-	vkAllocateDescriptorSets(vk->device, &dsai, &ds);
+	if (vkAllocateDescriptorSets(vk->device, &dsai, &ds) != VK_SUCCESS)
+		return;
+	vk->desc_sets[s][vk->ds_idx[s]++] = ds;
 
 	VkDescriptorImageInfo dii = {
 	    .sampler = vk->sampler,
-	    .imageView = tmp_view,
+	    .imageView = src_view,
 	    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 	};
 	VkWriteDescriptorSet write = {
@@ -1422,6 +1410,7 @@ static void vk_frame_begin(void) {
 	vk->frame_dirty = false;
 
 	vkResetDescriptorPool(vk->device, vk->desc_pool, 0);
+	vk->ds_idx[s] = 0;
 
 	VkCommandBufferBeginInfo bi = {
 	    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
