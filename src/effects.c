@@ -1918,7 +1918,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 				push_blur_to_layers(output);
 			}
 			if (any_cm_dirty)
-				cm_bg_tex = shared_bg ? shared_bg : capture_bg_to_tex1(output, ctx, false, NULL, NULL);
+				cm_bg_tex = capture_bg_to_tex1(output, ctx, true, NULL, NULL);
 			if (any_cm_dirty)
 				rebuild_corner_masks(output, cm_bg_tex);
 			push_corner_masks_to_toplevels(output, any_cm_dirty);
@@ -1927,14 +1927,14 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 			push_blur_to_layers(output);
 		} else if (any_cm) {
 			if (any_cm_dirty)
-				cm_bg_tex = shared_bg ? shared_bg : capture_bg_to_tex1(output, ctx, false, NULL, NULL);
+				cm_bg_tex = capture_bg_to_tex1(output, ctx, true, NULL, NULL);
 			if (any_cm_dirty)
 				rebuild_corner_masks(output, cm_bg_tex);
 			push_corner_masks_to_toplevels(output, any_cm_dirty);
 		}
 	} else if (any_cm) {
 		if (any_cm_dirty)
-			cm_bg_tex = shared_bg ? shared_bg : capture_bg_to_tex1(output, ctx, false, NULL, NULL);
+			cm_bg_tex = capture_bg_to_tex1(output, ctx, true, NULL, NULL);
 		if (any_cm_dirty)
 			rebuild_corner_masks(output, cm_bg_tex);
 		push_corner_masks_to_toplevels(output, any_cm_dirty);
