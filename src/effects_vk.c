@@ -139,7 +139,7 @@ struct vk_data {
 
 	VkCommandPool cmd_pool;
 	VkCommandBuffer frame_cb;
-	VkCommandBuffer frame_cb_bufs[2];
+	VkCommandBuffer frame_cb_bufs[3];
 	VkRenderPass render_pass;
 	VkRenderPass no_clear_render_pass;
 	VkRenderPass overlay_render_pass;
@@ -150,7 +150,7 @@ struct vk_data {
 	VkPipelineLayout border_pipe_layout;
 	VkSampler sampler;
 	VkDescriptorPool desc_pool;
-	VkDescriptorPool desc_pool_bufs[2];
+	VkDescriptorPool desc_pool_bufs[3];
 
 	VkShaderModule vert_module;
 	VkShaderModule frag_blit;
@@ -197,27 +197,27 @@ struct vk_data {
 	int blur_w, blur_h;
 	uint32_t vendor_id;
 
-	VkFence frame_fence[2];
+	VkFence frame_fence[3];
 	int frame_slot;
 	bool frame_dirty;
 	bool cb_begun;
 
-	VkImageView deferred_views[2][64];
-	int n_deferred_views[2];
-	struct wlr_texture *deferred_texs[2][16];
-	int n_deferred_texs[2];
+	VkImageView deferred_views[3][64];
+	int n_deferred_views[3];
+	struct wlr_texture *deferred_texs[3][16];
+	int n_deferred_texs[3];
 
 #define VK_VIEW_CACHE_SIZE 64
-	VkImage cached_images[2][VK_VIEW_CACHE_SIZE];
-	VkImageView cached_views[2][VK_VIEW_CACHE_SIZE];
-	int n_cached_views[2];
+	VkImage cached_images[3][VK_VIEW_CACHE_SIZE];
+	VkImageView cached_views[3][VK_VIEW_CACHE_SIZE];
+	int n_cached_views[3];
 
 	struct vk_fbo *scratch_fbo;
 	int scratch_w, scratch_h;
 
 #define VK_MAX_DRAW_CALLS 256
-	VkDescriptorSet desc_sets[2][VK_MAX_DRAW_CALLS];
-	int ds_idx[2];
+	VkDescriptorSet desc_sets[3][VK_MAX_DRAW_CALLS];
+	int ds_idx[3];
 };
 
 static struct vk_data *vk = NULL;
@@ -681,7 +681,7 @@ static bool vk_init(struct wlr_renderer *r, struct wlr_allocator *a) {
 	    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
 	    .commandPool = vk->cmd_pool,
 	    .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-	    .commandBufferCount = 2,
+	    .commandBufferCount = 3,
 	};
 	if (vkAllocateCommandBuffers(vk->device, &cai, vk->frame_cb_bufs) != VK_SUCCESS) {
 		vkDestroyCommandPool(vk->device, vk->cmd_pool, NULL);
@@ -912,11 +912,12 @@ static bool vk_init(struct wlr_renderer *r, struct wlr_allocator *a) {
 	VkDescriptorPoolSize ps = {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 128};
 	VkDescriptorPoolCreateInfo dpci = {
 	    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, .maxSets = 128, .poolSizeCount = 1, .pPoolSizes = &ps};
-	if (vkCreateDescriptorPool(vk->device, &dpci, NULL, &vk->desc_pool_bufs[0]) != VK_SUCCESS)
-		return false;
-	if (vkCreateDescriptorPool(vk->device, &dpci, NULL, &vk->desc_pool_bufs[1]) != VK_SUCCESS) {
-		vkDestroyDescriptorPool(vk->device, vk->desc_pool_bufs[0], NULL);
-		return false;
+	for (int i = 0; i < 3; i++) {
+		if (vkCreateDescriptorPool(vk->device, &dpci, NULL, &vk->desc_pool_bufs[i]) != VK_SUCCESS) {
+			for (int j = 0; j < i; j++)
+				vkDestroyDescriptorPool(vk->device, vk->desc_pool_bufs[j], NULL);
+			return false;
+		}
 	}
 	vk->desc_pool = vk->desc_pool_bufs[0];
 
@@ -1083,7 +1084,7 @@ static bool vk_init(struct wlr_renderer *r, struct wlr_allocator *a) {
 	vkUpdateDescriptorSets(vk->device, 1, &write_dummy2, 0, NULL);
 
 	VkFenceCreateInfo fci = {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = VK_FENCE_CREATE_SIGNALED_BIT};
-	for (int i = 0; i < 2; i++) {
+	for (int i = 0; i < 3; i++) {
 		if (vkCreateFence(vk->device, &fci, NULL, &vk->frame_fence[i]) != VK_SUCCESS) {
 			wlr_log(WLR_ERROR, "vk: failed to create frame fence %d", i);
 			return false;
@@ -1091,12 +1092,11 @@ static bool vk_init(struct wlr_renderer *r, struct wlr_allocator *a) {
 	}
 
 	vk->frame_slot = 0;
-	vk->n_deferred_views[0] = 0;
-	vk->n_deferred_views[1] = 0;
-	vk->n_deferred_texs[0] = 0;
-	vk->n_deferred_texs[1] = 0;
-	vk->n_cached_views[0] = 0;
-	vk->n_cached_views[1] = 0;
+	for (int i = 0; i < 3; i++) {
+		vk->n_deferred_views[i] = 0;
+		vk->n_deferred_texs[i] = 0;
+		vk->n_cached_views[i] = 0;
+	}
 
 	wlr_log(WLR_INFO, "vk: initialised");
 	return true;
@@ -1170,7 +1170,7 @@ static void vk_fini(void) {
 		vkFreeMemory(vk->device, vk->border_ubo_mem, NULL);
 	if (vk->border_ubo)
 		vkDestroyBuffer(vk->device, vk->border_ubo, NULL);
-	for (int i = 0; i < 2; i++)
+	for (int i = 0; i < 3; i++)
 		if (vk->desc_pool_bufs[i])
 			vkDestroyDescriptorPool(vk->device, vk->desc_pool_bufs[i], NULL);
 	if (vk->sampler)
@@ -1191,7 +1191,7 @@ static void vk_fini(void) {
 		vkDestroyRenderPass(vk->device, vk->color_clear_render_pass, NULL);
 	if (vk->overlay_render_pass)
 		vkDestroyRenderPass(vk->device, vk->overlay_render_pass, NULL);
-	for (int i = 0; i < 2; i++) {
+	for (int i = 0; i < 3; i++) {
 		vkWaitForFences(vk->device, 1, &vk->frame_fence[i], VK_TRUE, UINT64_MAX);
 		vkDestroyFence(vk->device, vk->frame_fence[i], NULL);
 		for (int j = 0; j < vk->n_deferred_views[i]; j++)
@@ -1399,7 +1399,7 @@ static void vk_frame_begin(void) {
 	if (!vk)
 		return;
 
-	vk->frame_slot = (vk->frame_slot + 1) % 2;
+	vk->frame_slot = (vk->frame_slot + 1) % 3;
 	int s = vk->frame_slot;
 
 	for (int i = 0; i < vk->n_cached_views[s]; i++)

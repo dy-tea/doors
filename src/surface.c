@@ -143,6 +143,7 @@ void surface_set_border_radius(struct wlr_scene_tree *scene_tree, struct wlr_sce
 					(*rounded)->border_shader_buf_w = 0;
 					(*rounded)->border_shader_buf_h = 0;
 				}
+				(*rounded)->border_cache_valid = false;
 			}
 			(*rounded)->border_dirty = false;
 			(*rounded)->corner_mask_dirty = false;

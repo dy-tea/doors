@@ -347,6 +347,7 @@ void effects_output_resize(effects_output_t *ctx, int width, int height, output_
 			tl->rounded->border_shader_buf_h = 0;
 			tl->rounded->border_dirty = true;
 			tl->rounded->corner_mask_dirty = true;
+			tl->rounded->border_cache_valid = false;
 		}
 	}
 
@@ -1327,7 +1328,13 @@ static bool blur_render_border(toplevel_t *tl, int content_w, int content_h) {
 	bp.buf_w = phys_w;
 	bp.buf_h = phys_h;
 
-	effects_backend->render_border(&bp, tl->rounded->border_shader_native[0]);
+	if (!tl->rounded->border_cache_valid || tl->rounded->border_shader_buf != tl->rounded->cached_border_buf
+	    || memcmp(&bp, &tl->rounded->cached_border_params, sizeof(bp)) != 0) {
+		effects_backend->render_border(&bp, tl->rounded->border_shader_native[0]);
+		tl->rounded->cached_border_params = bp;
+		tl->rounded->cached_border_buf = tl->rounded->border_shader_buf;
+		tl->rounded->border_cache_valid = true;
+	}
 
 	if (tl->rounded->border_shader_node->buffer != tl->rounded->border_shader_buf)
 		wlr_scene_buffer_set_buffer(tl->rounded->border_shader_node, tl->rounded->border_shader_buf);
@@ -1669,6 +1676,7 @@ void effects_evict_buffers(void) {
 				effects_destroy_buffer(&tl->rounded->border_shader_buf, tl->rounded->border_shader_native);
 				tl->rounded->border_shader_buf_w = 0;
 				tl->rounded->border_shader_buf_h = 0;
+				tl->rounded->border_cache_valid = false;
 			}
 		}
 	}

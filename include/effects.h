@@ -65,6 +65,9 @@ typedef struct effects_output_t {
 	struct wlr_output *capture_output;
 	struct wlr_scene_output *capture_scene_output;
 	struct wlr_output_state capture_state;
+
+	uint64_t cached_bg_tex;
+	bool bg_cache_valid;
 } effects_output_t;
 
 typedef struct effects_state_t {
