@@ -1864,8 +1864,8 @@ static bool vk_apply_corner_mask(be_output_state_t *state, uint64_t dst_fbo, int
 	vkCmdSetScissor(vk->frame_cb, 0, 1, &sc);
 	vkCmdBindDescriptorSets(vk->frame_cb, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->pipe_layout, 0, 1, &ds, 0, NULL);
 	vkCmdPushConstants(vk->frame_cb, vk->pipe_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
-	vkCmdBindPipeline(vk->frame_cb, VK_PIPELINE_BIND_POINT_GRAPHICS,
-	    p->pre_blit ? vk->pipe_corner_mask : vk->pipe_corner_mask_clear);
+	vkCmdBindPipeline(
+	    vk->frame_cb, VK_PIPELINE_BIND_POINT_GRAPHICS, p->pre_blit ? vk->pipe_corner_mask : vk->pipe_corner_mask_clear);
 	vkCmdDraw(vk->frame_cb, 4, 1, 0, 0);
 	vkCmdEndRenderPass(vk->frame_cb);
 
