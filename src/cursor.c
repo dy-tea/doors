@@ -1,6 +1,7 @@
 #include "cursor.h"
 
 #include "config.h"
+#include "idle_power.h"
 #include "input.h"
 #include "input_method.h"
 #include "keyboard.h"
@@ -521,6 +522,7 @@ static void process_cursor_motion(uint32_t time, double dx, double dy, double dx
 	}
 
 	wlr_idle_notifier_v1_notify_activity(server.idle_notifier, server.seat);
+	idle_power_notify_activity();
 
 	double sx, sy;
 	struct wlr_seat *seat = server.seat;
@@ -565,6 +567,9 @@ static void process_cursor_motion(uint32_t time, double dx, double dy, double dx
 		if (focus_follows_mouse == FOLLOWS_ALWAYS)
 			wlr_seat_keyboard_notify_clear_focus(seat);
 	}
+
+	if (m)
+		output_schedule_frame(m);
 }
 
 void begin_interactive(toplevel_t *toplevel, enum cursor_mode mode, uint32_t edges) {
@@ -647,6 +652,7 @@ void cursor_button(struct wl_listener *listener, void *data) {
 	struct wlr_pointer_button_event *event = data;
 	wlr_seat_pointer_notify_button(server.seat, event->time_msec, event->button, event->state);
 	wlr_idle_notifier_v1_notify_activity(server.idle_notifier, server.seat);
+	idle_power_notify_activity();
 
 	if (event->state == WL_POINTER_BUTTON_STATE_RELEASED) {
 		if (server.cursor_mode == CURSOR_TILING_DRAG) {
@@ -882,6 +888,7 @@ void cursor_axis(struct wl_listener *listener, void *data) {
 	wlr_seat_pointer_notify_axis(server.seat, event->time_msec, event->orientation, event->delta, event->delta_discrete,
 	    event->source, event->relative_direction);
 	wlr_idle_notifier_v1_notify_activity(server.idle_notifier, server.seat);
+	idle_power_notify_activity();
 }
 
 void cursor_frame(struct wl_listener *listener, void *data) {
@@ -1479,6 +1486,7 @@ static void handle_touch_down(struct wl_listener *listener, void *data) {
 	if (surface) {
 		wlr_seat_touch_notify_down(server.seat, surface, event->time_msec, event->touch_id, sx, sy);
 		wlr_idle_notifier_v1_notify_activity(server.idle_notifier, server.seat);
+		idle_power_notify_activity();
 
 		// touch-to-focus
 		if (type) {

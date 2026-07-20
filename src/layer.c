@@ -178,6 +178,8 @@ static void layer_surface_commit(struct wl_listener *listener, void *data) {
 	// update blur region if blur is enabled
 	if (fx && layer->blur_node)
 		pixman_region32_copy(&layer->blur_region, &fx->blur_region);
+
+	output_schedule_frame(layer->output);
 }
 
 void handle_new_layer_surface(struct wl_listener *listener, void *data) {

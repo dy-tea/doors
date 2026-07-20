@@ -507,6 +507,9 @@ static void handle_commit(struct wl_listener *listener, void *data) {
 	// update opacity
 	if (xwayland_view->node && xwayland_view->node->client && xwayland_view->scene_tree)
 		surface_set_opacity(&xwayland_view->scene_tree->node, xwayland_view->node->client->opacity);
+
+	if (xwayland_view->node && xwayland_view->node->output)
+		output_schedule_frame(xwayland_view->node->output);
 }
 
 static void handle_map(struct wl_listener *listener, void *data) {

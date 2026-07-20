@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include "fallthrough.h"
+#include "idle_power.h"
 #include "input.h"
 #include "input_method.h"
 #include "ipc.h"
@@ -125,6 +126,7 @@ void keyboard_key(struct wl_listener *listener, void *data) {
 	struct wlr_seat *wlr_seat = seat->wlr_seat;
 
 	wlr_idle_notifier_v1_notify_activity(server.idle_notifier, wlr_seat);
+	idle_power_notify_activity();
 
 	// get keysym
 	uint32_t keycode = event->keycode + 8;
@@ -167,6 +169,9 @@ void keyboard_key(struct wl_listener *listener, void *data) {
 			wlr_seat_keyboard_notify_key(wlr_seat, event->time_msec, event->keycode, event->state);
 		}
 	}
+
+	if (server.focused_output)
+		output_schedule_frame(server.focused_output);
 }
 
 void keyboard_destroy(struct wl_listener *listener, void *data) {

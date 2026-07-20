@@ -7,6 +7,7 @@
 #include "cursor.h"
 #include "effects.h"
 #include "idle.h"
+#include "idle_power.h"
 #include "input.h"
 #include "ipc.h"
 #include "keyboard.h"
@@ -682,6 +683,7 @@ void server_init(void) {
 	scratchpad_init();
 	workspace_init();
 	render_unfocused_init();
+	idle_power_init();
 	ipc_init();
 	rule_init();
 	output_config_init();
@@ -872,6 +874,7 @@ void server_fini(void) {
 	screencopy_fini();
 	image_copy_capture_fini();
 	render_unfocused_fini();
+	idle_power_fini();
 	animation_fini();
 	transaction_fini();
 	scratchpad_fini();

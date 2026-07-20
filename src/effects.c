@@ -1640,6 +1640,9 @@ void effects_evict_buffers(void) {
 	if (!effects_state.available)
 		return;
 
+	if (wl_list_empty(&server.toplevels))
+		return;
+
 	effects_state.eviction_counter++;
 	if (effects_state.eviction_counter % 10 != 0)
 		return;
@@ -1995,7 +1998,8 @@ after_capture:
 		}
 	}
 
-	handle_screen_shader_frame(output);
+	if (screen_shader_enabled)
+		handle_screen_shader_frame(output);
 
 	effects_backend->frame_end();
 }

@@ -26,3 +26,7 @@ doorsctl config gapless_monocle true
 
 # Enable animations
 doorsctl config enable_animations true
+
+# Idle power management (DPMS timeout in seconds, 0 to disable)
+doorsctl config idle_timeout 300
+doorsctl config idle_dpms true

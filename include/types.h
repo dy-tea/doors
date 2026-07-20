@@ -199,6 +199,13 @@ extern int ignore_ewmh_fullscreen;
 // Render-unfocused settings
 extern int render_unfocused_fps;
 
+// Idle power management (DPMS timeout)
+extern int idle_timeout;
+extern bool idle_dpms;
+
+// Real-time scheduling
+extern bool realtime_scheduling;
+
 // Shadow settings
 extern float shadow_size;
 extern float shadow_offset_x;

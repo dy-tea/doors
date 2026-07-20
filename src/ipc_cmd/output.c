@@ -715,6 +715,24 @@ void ipc_cmd_output(char **args, int num, int client_fd) {
 		free(mon);
 		transaction_commit_dirty();
 		send_success(client_fd, "removed\n");
+	} else if (streq("adaptive_sync", subcmd)) {
+		if (num < 2) {
+			send_failure(client_fd, "output adaptive_sync: missing argument (on/off)\n");
+			return;
+		}
+		args++;
+		num--;
+
+		if (streq("on", *args) || streq("true", *args) || streq("1", *args)) {
+			oc->adaptive_sync = OUTPUT_CONFIG_ADAPTIVE_SYNC_ENABLED;
+		} else if (streq("off", *args) || streq("false", *args) || streq("0", *args)) {
+			oc->adaptive_sync = OUTPUT_CONFIG_ADAPTIVE_SYNC_DISABLED;
+		} else {
+			send_failure(client_fd, "output adaptive_sync: expected \"on\" or \"off\"\n");
+			return;
+		}
+		output_config_apply(oc);
+		send_success(client_fd, "adaptive_sync set\n");
 	} else if (streq("rectangle", subcmd) || streq("-g", subcmd) || streq("--rectangle", subcmd)) {
 		if (num < 2) {
 			send_failure(client_fd, "output rectangle: missing rectangle\n");

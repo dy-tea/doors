@@ -3,11 +3,13 @@
 #include "animation.h"
 #include "bezier.h"
 #include "effects.h"
+#include "idle_power.h"
 #include "ipc.h"
 #include "ipc_cmd.h"
 #include "ipc_helpers.h"
 #include "master_stack.h"
 #include "output.h"
+#include "realtime.h"
 #include "scroller.h"
 #include "server.h"
 #include "spring.h"
@@ -826,6 +828,16 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 		}
 	} else if (streq("render_unfocused_fps", *args)) {
 		ipc_handle_int(args, num, client_fd, &render_unfocused_fps, IPC_FLAG_NONE, 1, INT_MAX, "value must be >=1");
+	} else if (streq("idle_timeout", *args)) {
+		if (ipc_handle_int(args, num, client_fd, &idle_timeout, IPC_FLAG_NONE, 0, 86400, "value must be 0-86400"))
+			idle_power_reset_timer();
+	} else if (streq("idle_dpms", *args)) {
+		if (ipc_handle_bool(args, num, client_fd, &idle_dpms, IPC_FLAG_NONE))
+			idle_power_reset_timer();
+	} else if (streq("realtime_scheduling", *args)) {
+		ipc_handle_bool(args, num, client_fd, &realtime_scheduling, IPC_FLAG_NONE);
+		if (realtime_scheduling)
+			set_rr_scheduling();
 	} else {
 		send_failure(client_fd, "config: unknown setting\n");
 	}

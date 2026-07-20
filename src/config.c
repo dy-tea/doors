@@ -37,6 +37,7 @@ hotcornerbind_t hotcorner_bindings[MAX_HOTCORNERBINDS];
 size_t num_hotcornerbinds = 0;
 submap_t *active_submap = NULL;
 bool minimize_to_scratchpad = false;
+bool realtime_scheduling = false;
 
 #define MAX_SUBMAPS 32
 static submap_t submaps[MAX_SUBMAPS];
@@ -979,24 +980,45 @@ void reload_hotkeys(void) {
 	}
 }
 
+static struct wl_event_source *hotkey_debounce_timer = NULL;
+
+static int hotkey_debounce_handler(void *data) {
+	(void)data;
+	reload_hotkeys();
+	hotkey_debounce_timer = NULL;
+	return 0;
+}
+
 static int hotkey_reload_handler(int fd, uint32_t mask, void *data) {
 	(void)data;
-	if (mask & WL_EVENT_READABLE) {
-		char buf[sizeof(struct inotify_event) + NAME_MAX + 1];
-		ssize_t len = read(fd, buf, sizeof(buf));
-		if (len > 0) {
-			struct inotify_event *event = (struct inotify_event *)buf;
+	if (!(mask & WL_EVENT_READABLE))
+		return 0;
 
-			if (event->len > 0 && event->name[0] != '\0') {
-				const char *config_file_name = strrchr(hotkey_config_path, '/');
-				config_file_name = config_file_name ? config_file_name + 1 : hotkey_config_path;
+	char buf[sizeof(struct inotify_event) + NAME_MAX + 1];
+	ssize_t len = read(fd, buf, sizeof(buf));
+	if (len <= 0)
+		return 0;
 
-				if (strcmp(event->name, config_file_name) == 0)
-					reload_hotkeys();
-			} else {
-				reload_hotkeys();
-			}
-		}
+	struct inotify_event *event = (struct inotify_event *)buf;
+
+	bool match = false;
+	if (event->len > 0 && event->name[0] != '\0') {
+		const char *config_file_name = strrchr(hotkey_config_path, '/');
+		config_file_name = config_file_name ? config_file_name + 1 : hotkey_config_path;
+		match = (strcmp(event->name, config_file_name) == 0);
+	} else {
+		match = true;
+	}
+
+	if (!match)
+		return 0;
+
+	if (hotkey_debounce_timer) {
+		wl_event_source_timer_update(hotkey_debounce_timer, 100);
+	} else if (hotkey_event_loop) {
+		hotkey_debounce_timer = wl_event_loop_add_timer(hotkey_event_loop, hotkey_debounce_handler, NULL);
+		if (hotkey_debounce_timer)
+			wl_event_source_timer_update(hotkey_debounce_timer, 100);
 	}
 	return 0;
 }

@@ -896,6 +896,9 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
 	// update opacity
 	if (toplevel->node && toplevel->node->client && !animation_is_opacity_fading(toplevel))
 		surface_set_opacity(&toplevel->scene_tree->node, toplevel->node->client->opacity);
+
+	if (toplevel->node && toplevel->node->output)
+		output_schedule_frame(toplevel->node->output);
 }
 
 void toplevel_set_effect(toplevel_t *tl, surface_effect_t effect, bool enabled) {

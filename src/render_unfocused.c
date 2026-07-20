@@ -7,7 +7,7 @@
 #include <time.h>
 #include <wlr/types/wlr_scene.h>
 
-int render_unfocused_fps = 15;
+int render_unfocused_fps = 5;
 
 static struct wl_list render_unfocused_clients;
 static struct wl_event_source *render_unfocused_timer = NULL;
