@@ -77,9 +77,6 @@ typedef struct {
 
 	float calibration_matrix[6];
 	bool calibration_matrix_set;
-
-	char *xcursor_theme;
-	int xcursor_size;
 } input_config_t;
 
 input_config_t *input_config_create(const char *identifier);

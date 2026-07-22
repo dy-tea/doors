@@ -10,7 +10,6 @@
 #include <string.h>
 #include <wlr/backend/libinput.h>
 #include <wlr/types/wlr_keyboard.h>
-#include <wlr/types/wlr_xcursor_manager.h>
 #include <wlr/util/log.h>
 
 extern struct server_t server;
@@ -100,7 +99,6 @@ void input_config_destroy(input_config_t *config) {
 	free(config->xkb_rules);
 	free(config->xkb_variant);
 	free(config->xkb_file);
-	free(config->xcursor_theme);
 	free(config);
 }
 
@@ -347,11 +345,6 @@ bool input_config_set_value(input_config_t *config, const char *name, const char
 		config->scroll_factor = atof(value);
 	} else if (strcmp(name, "rotation_angle") == 0) {
 		config->rotation_angle = atof(value);
-	} else if (strcmp(name, "xcursor_theme") == 0) {
-		free(config->xcursor_theme);
-		config->xcursor_theme = strdup(value);
-	} else if (strcmp(name, "xcursor_size") == 0) {
-		config->xcursor_size = atoi(value);
 	} else {
 		return false;
 	}
@@ -413,19 +406,6 @@ void input_config_apply(const input_config_t *config, struct wlr_input_device *d
 	case WLR_INPUT_DEVICE_TABLET:
 	case WLR_INPUT_DEVICE_TABLET_PAD:
 	case WLR_INPUT_DEVICE_SWITCH: {
-		if (config->xcursor_theme || config->xcursor_size > 0) {
-			char *theme = config->xcursor_theme ? config->xcursor_theme : NULL;
-			int size = config->xcursor_size > 0 ? config->xcursor_size : 24;
-
-			if (server.cursor_mgr)
-				wlr_xcursor_manager_destroy(server.cursor_mgr);
-			server.cursor_mgr = wlr_xcursor_manager_create(theme, size);
-			if (server.cursor_mgr) {
-				wlr_xcursor_manager_load(server.cursor_mgr, 1);
-				wlr_log(WLR_INFO, "Applied xcursor theme '%s' size %d", theme ? theme : "default", size);
-			}
-		}
-
 		if (!wlr_input_device_is_libinput(device))
 			return;
 		struct libinput_device *libinput_dev = wlr_libinput_get_device_handle(device);
