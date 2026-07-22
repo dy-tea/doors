@@ -551,11 +551,16 @@ bool animation_fade_out_layer(layer_surface_t *layer) {
 	return true;
 }
 
-bool animation_workspace_switch_active(void) {
+bool animation_workspace_switch_active(output_t *output) {
 	animation_entry_t *entry;
-	wl_list_for_each(entry, &animations, link) if (entry->workspace_switch) return true;
+	wl_list_for_each(entry, &animations, link) if (entry->workspace_switch && entry->output == output) return true;
 
 	return false;
+}
+
+bool animation_node_workspace_slide_out(node_t *node) {
+	animation_entry_t *entry = find_animation(node);
+	return entry && entry->workspace_switch && entry->slide_out;
 }
 
 bool animation_start_workspace_slide(output_t *output, node_t *node, struct wlr_scene_tree *scene_tree,
@@ -568,9 +573,11 @@ bool animation_start_workspace_slide(output_t *output, node_t *node, struct wlr_
 
 	animation_entry_t *entry = find_animation(node);
 	if (entry) {
+		entry->output = output;
 		entry->from.x = scene_tree->node.x;
 		entry->from.y = scene_tree->node.y;
 		entry->to = to;
+		entry->workspace_switch = true;
 		entry->slide_out = slide_out;
 		clock_gettime(CLOCK_MONOTONIC, &entry->start);
 		entry->duration_ms = ANIMATION_DURATION_MS;
@@ -589,6 +596,7 @@ bool animation_start_workspace_slide(output_t *output, node_t *node, struct wlr_
 
 	entry->node = node;
 	entry->scene_tree = scene_tree;
+	entry->output = output;
 	entry->from = from;
 	entry->to = to;
 	entry->workspace_switch = true;

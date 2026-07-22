@@ -45,7 +45,8 @@ bool animation_fade_out(toplevel_t *toplevel);
 bool animation_fade_out_layer(layer_surface_t *layer);
 bool animation_is_opacity_fading(toplevel_t *toplevel);
 
-bool animation_workspace_switch_active(void);
+bool animation_workspace_switch_active(output_t *output);
+bool animation_node_workspace_slide_out(node_t *node);
 void animation_cancel_node(node_t *node);
 void animation_cancel_toplevel(toplevel_t *toplevel);
 bool animation_has_fade_out(struct wlr_scene_tree *scene_tree);

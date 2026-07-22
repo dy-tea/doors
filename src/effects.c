@@ -400,23 +400,50 @@ static bool compute_src_box(
 	return true;
 }
 
+static void hide_workspace_slide_out_tree(
+    output_t *output, node_t *node, struct wlr_scene_tree *tree, struct wl_array *hidden_nodes) {
+	if (!node || node->output != output || !tree || !tree->node.enabled)
+		return;
+	if (!animation_node_workspace_slide_out(node))
+		return;
+
+	struct wlr_scene_node **hidden = wl_array_add(hidden_nodes, sizeof(*hidden));
+	if (!hidden)
+		return;
+
+	*hidden = &tree->node;
+	wlr_scene_node_set_enabled(*hidden, false);
+}
+
 // capture scene with all blur/mica/acrylic toplevel scene trees hidden
 static uint64_t capture_bg_to_tex1_ex(output_t *output, effects_output_t *ctx, bool mica_only,
-    struct wlr_scene_node *hide_node, bool *hide_flag, bool hide_blur_toplevels);
+    struct wlr_scene_node *hide_node, bool *hide_flag, bool hide_blur_toplevels, bool exclude_slide_out);
 
 static uint64_t capture_bg_to_tex1(
     output_t *output, effects_output_t *ctx, bool mica_only, struct wlr_scene_node *hide_node, bool *hide_flag) {
-	return capture_bg_to_tex1_ex(output, ctx, mica_only, hide_node, hide_flag, true);
+	return capture_bg_to_tex1_ex(output, ctx, mica_only, hide_node, hide_flag, true, false);
 }
 
 static uint64_t capture_bg_to_tex1_ex(output_t *output, effects_output_t *ctx, bool mica_only,
-    struct wlr_scene_node *hide_node, bool *hide_flag, bool hide_blur_toplevels) {
+    struct wlr_scene_node *hide_node, bool *hide_flag, bool hide_blur_toplevels, bool exclude_slide_out) {
 	int w = output->width, h = output->height;
 	if (!ctx->capture_output || !ctx->capture_scene_output)
 		return 0;
 	wlr_scene_output_set_position(ctx->capture_scene_output, output->lx, output->ly);
 	if (w <= 0 || h <= 0)
 		return 0;
+
+	struct wl_array hidden_slide_out;
+	wl_array_init(&hidden_slide_out);
+	if (exclude_slide_out) {
+		toplevel_t *tl;
+		wl_list_for_each(tl, &server.toplevels, link)
+		    hide_workspace_slide_out_tree(output, tl->node, tl->scene_tree, &hidden_slide_out);
+
+		xwayland_toplevel_t *xw;
+		wl_list_for_each(xw, &server.xwayland.views, link)
+		    hide_workspace_slide_out_tree(output, xw->node, xw->scene_tree, &hidden_slide_out);
+	}
 
 	if (server.top_tree->node.enabled)
 		wlr_scene_node_set_enabled(&server.top_tree->node, false);
@@ -487,6 +514,10 @@ static uint64_t capture_bg_to_tex1_ex(output_t *output, effects_output_t *ctx, b
 		    wlr_scene_node_set_enabled(&ls->scene_tree->node, true);
 	}
 
+	struct wlr_scene_node **hidden;
+	wl_array_for_each(hidden, &hidden_slide_out) wlr_scene_node_set_enabled(*hidden, true);
+	wl_array_release(&hidden_slide_out);
+
 	if (!server.top_tree->node.enabled)
 		wlr_scene_node_set_enabled(&server.top_tree->node, true);
 	if (!server.full_tree->node.enabled)
@@ -524,10 +555,10 @@ static struct wlr_box get_client_rect(toplevel_t *tl);
 
 // captures scene with blur layer surfaces hidden but blur toplevels visible (for layer blur)
 static uint64_t capture_bg_combined(output_t *output, effects_output_t *ctx) {
-	return capture_bg_to_tex1_ex(output, ctx, false, NULL, NULL, false);
+	return capture_bg_to_tex1_ex(output, ctx, false, NULL, NULL, false, false);
 }
 
-static bool rebuild_live_blur(output_t *output, uint64_t shared_blurred) {
+static bool rebuild_live_blur(output_t *output, uint64_t shared_blurred, bool only_missing) {
 	effects_output_t *ctx = output->effects;
 	int w = output->width, h = output->height;
 	bool any = false;
@@ -581,6 +612,8 @@ static bool rebuild_live_blur(output_t *output, uint64_t shared_blurred) {
 				continue;
 			if (!tl->node->output || tl->node->output != output)
 				continue;
+			if (only_missing && tl->blur->blur_buf)
+				continue;
 
 			if (!ensure_output_buf(&tl->blur->blur_buf, tl->blur->blur_native, w, h)) {
 				if (tl->blur->blur_node)
@@ -600,6 +633,8 @@ static bool rebuild_live_blur(output_t *output, uint64_t shared_blurred) {
 			if (!tl->node->client->shown)
 				continue;
 			if (!tl->node->output || tl->node->output != output)
+				continue;
+			if (only_missing && tl->blur->blur_buf)
 				continue;
 
 			uint64_t blurred;
@@ -938,7 +973,8 @@ static void push_blur_to_layers(output_t *output) {
 	}
 }
 
-static bool rebuild_live_acrylic(output_t *output, pixman_region32_t *damage, uint64_t shared_capture) {
+static bool rebuild_live_acrylic(
+    output_t *output, pixman_region32_t *damage, uint64_t shared_capture, bool only_missing) {
 	effects_output_t *ctx = output->effects;
 	int w = output->width, h = output->height;
 	bool any = false;
@@ -952,6 +988,8 @@ static bool rebuild_live_acrylic(output_t *output, pixman_region32_t *damage, ui
 		if (!tl->node->client->shown)
 			continue;
 		if (!tl->node->output || tl->node->output != output)
+			continue;
+		if (only_missing && tl->blur->acrylic_buf)
 			continue;
 
 		// skip if toplevel already has a valid acrylic buffer and the damage doesn't overlap it
@@ -1720,6 +1758,23 @@ static bool background_capture_needed(struct wlr_scene_output *scene_output) {
 	return false;
 }
 
+static bool workspace_effect_buffers_missing(output_t *output) {
+	toplevel_t *tl;
+	wl_list_for_each(tl, &server.toplevels, link) {
+		if (!tl->blur || !tl->node || !tl->node->client)
+			continue;
+		if (!tl->node->client->shown || tl->node->output != output)
+			continue;
+
+		if (blur_enabled && tl->blur->blur_node && !tl->blur->blur_buf)
+			return true;
+		if (tl->blur->acrylic_node && !tl->blur->acrylic_buf)
+			return true;
+	}
+
+	return false;
+}
+
 void effects_output_frame(output_t *output, struct wlr_scene_output *scene_output) {
 	if (!effects_state.available)
 		return;
@@ -1727,17 +1782,22 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 	if (!ctx)
 		return;
 
-	if (animation_workspace_switch_active())
-		return;
-
 	effects_evict_buffers();
+
+	bool workspace_switch = animation_workspace_switch_active(output);
+	bool workspace_warmup = workspace_switch && workspace_effect_buffers_missing(output);
+
+	// Hidden workspaces have their effect buffers evicted. Rebuild them once as
+	// they enter, then keep the cached result for the rest of the slide.
+	if (workspace_switch && !workspace_warmup)
+		return;
 
 	if (ctx->width != output->width || ctx->height != output->height)
 		effects_output_resize(ctx, output->width, output->height, output);
 
 	effects_backend->frame_begin();
 
-	bool bg_damaged = background_capture_needed(scene_output);
+	bool bg_damaged = workspace_warmup || background_capture_needed(scene_output);
 	bool mica_dirty = mica_enabled && ctx->mica_dirty;
 
 	// when no relevant damage and mica not dirty, skip all effects work
@@ -1835,7 +1895,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 			}
 		}
 		if (needs_bg)
-			shared_bg = capture_bg_to_tex1(output, ctx, false, NULL, NULL);
+			shared_bg = capture_bg_to_tex1_ex(output, ctx, false, NULL, NULL, true, workspace_warmup);
 	}
 
 	// toplevel blur
@@ -1850,7 +1910,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 			}
 		}
 		if (any_blur) {
-			rebuild_live_blur(output, shared_bg);
+			rebuild_live_blur(output, shared_bg, workspace_warmup);
 			push_blur_to_toplevels(output);
 		}
 	}
@@ -1867,7 +1927,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 			}
 		}
 		if (any_acrylic) {
-			rebuild_live_acrylic(output, &scene_output->damage_ring.current, shared_bg);
+			rebuild_live_acrylic(output, &scene_output->damage_ring.current, shared_bg, workspace_warmup);
 			push_acrylic_to_toplevels(output);
 		}
 	}
