@@ -1109,12 +1109,31 @@ void flip_vertical(void) {
 
 #define RESIZE_AMOUNT 0.05
 
+static bool resize_master_stack_ratio(bool horizontal, float delta) {
+	if (mon->desk->layout != LAYOUT_MASTER_STACK)
+		return false;
+
+	bool horizontal_split = master_stack_orientation == MASTER_LEFT || master_stack_orientation == MASTER_RIGHT
+	    || master_stack_orientation == MASTER_CENTER;
+	if (horizontal != horizontal_split)
+		return true;
+
+	if (master_stack_orientation == MASTER_RIGHT || master_stack_orientation == MASTER_BOTTOM)
+		delta = -delta;
+
+	if (master_stack_adjust_ratio(delta))
+		arrange(mon, mon->desk, true);
+	return true;
+}
+
 void resize_left(void) {
 	if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL) {
 		wlr_log(WLR_ERROR, "resize_left: invalid state mon=%p desk=%p focus=%p", (void *)mon,
 		    mon ? (void *)mon->desk : NULL, mon && mon->desk ? (void *)mon->desk->focus : NULL);
 		return;
 	}
+	if (resize_master_stack_ratio(true, -RESIZE_AMOUNT))
+		return;
 
 	node_t *n = mon->desk->focus;
 	if (n->parent == NULL) {
@@ -1152,6 +1171,8 @@ void resize_right(void) {
 		wlr_log(WLR_ERROR, "resize_right: invalid state");
 		return;
 	}
+	if (resize_master_stack_ratio(true, RESIZE_AMOUNT))
+		return;
 
 	node_t *n = mon->desk->focus;
 	if (n->parent == NULL) {
@@ -1189,6 +1210,8 @@ void resize_up(void) {
 		wlr_log(WLR_ERROR, "resize_up: invalid state");
 		return;
 	}
+	if (resize_master_stack_ratio(false, -RESIZE_AMOUNT))
+		return;
 
 	node_t *n = mon->desk->focus;
 	if (n->parent == NULL) {
@@ -1226,6 +1249,8 @@ void resize_down(void) {
 		wlr_log(WLR_ERROR, "resize_down: invalid state");
 		return;
 	}
+	if (resize_master_stack_ratio(false, RESIZE_AMOUNT))
+		return;
 
 	node_t *n = mon->desk->focus;
 	if (n->parent == NULL) {

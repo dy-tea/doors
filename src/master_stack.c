@@ -192,15 +192,15 @@ static void distribute_area(struct wlr_box area, struct wlr_box *out, int count,
 }
 
 static int master_span_size(int span, int gap_count, int gap) {
-	int maximum = span - gap_count * gap;
-	if (maximum < 1)
-		maximum = 1;
+	int usable = span - gap_count * (gap > 0 ? gap : 0);
+	if (usable < 1)
+		usable = 1;
 
-	int size = (int)(span * master_stack_ratio);
+	int size = (int)(usable * master_stack_ratio);
 	if (size < 1)
 		size = 1;
-	if (size > maximum)
-		size = maximum;
+	if (size > usable)
+		size = usable;
 	return size;
 }
 
@@ -442,6 +442,19 @@ void master_stack_set_count(desktop_t *d, int count) {
 	if (!d)
 		return;
 	d->master_stack_count = count < 0 ? 0 : count;
+}
+
+bool master_stack_adjust_ratio(float delta) {
+	float ratio = master_stack_ratio + delta;
+	if (ratio < 0.1f)
+		ratio = 0.1f;
+	if (ratio > 0.9f)
+		ratio = 0.9f;
+	if (ratio == master_stack_ratio)
+		return false;
+
+	master_stack_ratio = ratio;
+	return true;
 }
 
 void master_stack_set_orientation(master_area_orientation_t orientation) {
