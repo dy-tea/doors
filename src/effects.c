@@ -738,19 +738,6 @@ static void push_blur_to_toplevels(output_t *output) {
 			else
 				r = c->tiled_rectangle;
 
-			double progress = 1.0;
-			struct wlr_box anim_from, anim_to;
-			if (animation_get_toplevel_resize_progress(tl, &progress, &anim_from, &anim_to)) {
-				r.x = (int)(anim_from.x + (anim_to.x - anim_from.x) * progress);
-				r.y = (int)(anim_from.y + (anim_to.y - anim_from.y) * progress);
-				r.width = (int)(anim_from.width + (anim_to.width - anim_from.width) * progress);
-				r.height = (int)(anim_from.height + (anim_to.height - anim_from.height) * progress);
-				if (r.width < 1)
-					r.width = 1;
-				if (r.height < 1)
-					r.height = 1;
-			}
-
 			struct wlr_fbox src;
 			int dw, dh;
 			if (!compute_src_box(output, &r, &src, &dw, &dh)) {
@@ -993,11 +980,7 @@ static bool rebuild_live_acrylic(
 			continue;
 
 		// skip if toplevel already has a valid acrylic buffer and the damage doesn't overlap it
-		// but don't skip if we're animating (need to update position)
-		double progress = 1.0;
-		struct wlr_box anim_from, anim_to;
-		if (tl->blur->acrylic_buf && damage && !pixman_region32_empty(damage)
-		    && !animation_get_toplevel_resize_progress(tl, &progress, &anim_from, &anim_to)) {
+		if (tl->blur->acrylic_buf && damage && !pixman_region32_empty(damage)) {
 			struct wlr_box r = get_client_rect(tl);
 			pixman_region32_clear(overlap_rgn);
 			pixman_region32_union_rect(overlap_rgn, overlap_rgn, r.x - output->lx, r.y - output->ly, r.width, r.height);
@@ -1087,20 +1070,6 @@ static void push_acrylic_to_toplevels(output_t *output) {
 		else
 			r = c->tiled_rectangle;
 
-		double progress = 1.0;
-		struct wlr_box anim_from, anim_to;
-		if (animation_get_toplevel_resize_progress(tl, &progress, &anim_from, &anim_to)) {
-			// interpolate the rectangle for animation
-			r.x = (int)(anim_from.x + (anim_to.x - anim_from.x) * progress);
-			r.y = (int)(anim_from.y + (anim_to.y - anim_from.y) * progress);
-			r.width = (int)(anim_from.width + (anim_to.width - anim_from.width) * progress);
-			r.height = (int)(anim_from.height + (anim_to.height - anim_from.height) * progress);
-			if (r.width < 1)
-				r.width = 1;
-			if (r.height < 1)
-				r.height = 1;
-		}
-
 		struct wlr_fbox src;
 		int dw, dh;
 		if (!compute_src_box(output, &r, &src, &dw, &dh)) {
@@ -1181,19 +1150,6 @@ static void push_mica_to_toplevels(output_t *output) {
 		else
 			r = c->tiled_rectangle;
 
-		double progress = 1.0;
-		struct wlr_box anim_from, anim_to;
-		if (animation_get_toplevel_resize_progress(tl, &progress, &anim_from, &anim_to)) {
-			r.x = (int)(anim_from.x + (anim_to.x - anim_from.x) * progress);
-			r.y = (int)(anim_from.y + (anim_to.y - anim_from.y) * progress);
-			r.width = (int)(anim_from.width + (anim_to.width - anim_from.width) * progress);
-			r.height = (int)(anim_from.height + (anim_to.height - anim_from.height) * progress);
-			if (r.width < 1)
-				r.width = 1;
-			if (r.height < 1)
-				r.height = 1;
-		}
-
 		struct wlr_fbox src;
 		int dw, dh;
 		if (!compute_src_box(output, &r, &src, &dw, &dh)) {
@@ -1240,18 +1196,6 @@ static bool blur_render_shadow(toplevel_t *tl) {
 		return false;
 
 	struct wlr_box client_r = get_client_rect(tl);
-	double progress = 1.0;
-	struct wlr_box anim_from, anim_to;
-	if (animation_get_toplevel_resize_progress(tl, &progress, &anim_from, &anim_to)) {
-		client_r.x = (int)(anim_from.x + (anim_to.x - anim_from.x) * progress);
-		client_r.y = (int)(anim_from.y + (anim_to.y - anim_from.y) * progress);
-		client_r.width = (int)(anim_from.width + (anim_to.width - anim_from.width) * progress);
-		client_r.height = (int)(anim_from.height + (anim_to.height - anim_from.height) * progress);
-		if (client_r.width < 1)
-			client_r.width = 1;
-		if (client_r.height < 1)
-			client_r.height = 1;
-	}
 	if (client_r.width <= 0 || client_r.height <= 0)
 		return false;
 
@@ -1566,13 +1510,6 @@ static void push_corner_masks_to_toplevels(output_t *output, bool rebuilt) {
 		}
 
 		struct wlr_box content_r = get_client_rect(tl);
-
-		double progress = 1.0;
-		struct wlr_box anim_from, anim_to;
-		if (animation_get_toplevel_resize_progress(tl, &progress, &anim_from, &anim_to)) {
-			content_r.x = (int)(anim_from.x + (anim_to.x - anim_from.x) * progress);
-			content_r.y = (int)(anim_from.y + (anim_to.y - anim_from.y) * progress);
-		}
 
 		struct wlr_fbox src;
 		int dw, dh;
@@ -2032,17 +1969,6 @@ after_capture:
 			}
 
 			struct wlr_box content_r = get_client_rect(tl);
-
-			double progress = 1.0;
-			struct wlr_box anim_from, anim_to;
-			if (animation_get_toplevel_resize_progress(tl, &progress, &anim_from, &anim_to)) {
-				content_r.width = (int)(anim_from.width + (anim_to.width - anim_from.width) * progress);
-				content_r.height = (int)(anim_from.height + (anim_to.height - anim_from.height) * progress);
-				if (content_r.width < 1)
-					content_r.width = 1;
-				if (content_r.height < 1)
-					content_r.height = 1;
-			}
 
 			if ((c->state == STATE_TILED || c->state == STATE_PSEUDO_TILED) && tl->geometry.width > 0
 			    && tl->geometry.height > 0) {

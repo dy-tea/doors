@@ -219,19 +219,7 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 		return;
 	}
 
-	bool snapshot_resize = false;
-	if (node->client->toplevel && node->client->toplevel->saved_surface_tree
-	    && instruction->previous_tiled_rectangle.width > 0 && instruction->previous_tiled_rectangle.height > 0
-	    && (instruction->previous_tiled_rectangle.width != rect->width
-	        || instruction->previous_tiled_rectangle.height != rect->height)) {
-		snapshot_resize = animation_start_snapshot_resize(
-		    node->client->toplevel, instruction->previous_tiled_rectangle, *rect);
-		wlr_log(WLR_DEBUG, "Started snapshot resize animation for node %u: from=(%dx%d) to=(%dx%d) active=%d", node->id,
-		    instruction->previous_tiled_rectangle.width, instruction->previous_tiled_rectangle.height, rect->width,
-		    rect->height, snapshot_resize);
-	}
-
-	if (node->client->toplevel && node->client->toplevel->saved_surface_tree && !snapshot_resize) {
+	if (node->client->toplevel && node->client->toplevel->saved_surface_tree) {
 		toplevel_remove_saved_buffer(node->client->toplevel);
 		wlr_log(WLR_DEBUG, "Removed saved buffer for node %u", node->id);
 	}
@@ -250,16 +238,14 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 		return;
 	}
 
-	if (!snapshot_resize) {
-		if (node->client->toplevel && node->client->toplevel->wants_fade) {
-			node->client->toplevel->wants_fade = false;
-			wlr_scene_node_set_position(&scene_tree->node, rect->x, rect->y);
-			animation_fade_in(node->client->toplevel);
-		} else if (instruction->previous_tiled_rectangle.width > 0 && instruction->previous_tiled_rectangle.height > 0) {
-			animation_apply_geometry_from(node, scene_tree, instruction->previous_tiled_rectangle, *rect, true);
-		} else {
-			animation_apply_geometry(node, scene_tree, *rect, true);
-		}
+	if (node->client->toplevel && node->client->toplevel->wants_fade) {
+		node->client->toplevel->wants_fade = false;
+		wlr_scene_node_set_position(&scene_tree->node, rect->x, rect->y);
+		animation_fade_in(node->client->toplevel);
+	} else if (instruction->previous_tiled_rectangle.width > 0 && instruction->previous_tiled_rectangle.height > 0) {
+		animation_apply_geometry_from(node, scene_tree, instruction->previous_tiled_rectangle, *rect, true);
+	} else {
+		animation_apply_geometry(node, scene_tree, *rect, true);
 	}
 
 	if (effective_border_width(node->desktop) != 0) {
@@ -548,13 +534,6 @@ static void transaction_commit(transaction_t *txn) {
 				// wait for all mapped toplevels to respond
 				instruction->waiting = true;
 				txn->num_waiting++;
-				if (has_stable_frame && node->client->shown && !node->client->toplevel->saved_surface_tree
-				    && node->client->toplevel->configured) {
-					toplevel_save_buffer(node->client->toplevel);
-					wlr_log(WLR_DEBUG, "Saved buffer for node %u", node->id);
-				} else if (!has_stable_frame) {
-					wlr_log(WLR_DEBUG, "Skipping buffer save for node %u - no stable prior frame", node->id);
-				}
 
 				num_configures++;
 
