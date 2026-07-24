@@ -238,68 +238,86 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 		return;
 	}
 
-	if (node->client->toplevel && node->client->toplevel->wants_fade) {
-		node->client->toplevel->wants_fade = false;
-		wlr_scene_node_set_position(&scene_tree->node, rect->x, rect->y);
-		animation_fade_in(node->client->toplevel);
-	} else if (instruction->previous_tiled_rectangle.width > 0 && instruction->previous_tiled_rectangle.height > 0) {
-		animation_apply_geometry_from(node, scene_tree, instruction->previous_tiled_rectangle, *rect, true);
-	} else {
-		animation_apply_geometry(node, scene_tree, *rect, true);
+	// attempt resize animation for size changes
+	bool snapshot_resize = false;
+	if (node->client->toplevel && instruction->previous_tiled_rectangle.width > 0
+	    && instruction->previous_tiled_rectangle.height > 0
+	    && (instruction->previous_tiled_rectangle.width != rect->width
+	        || instruction->previous_tiled_rectangle.height != rect->height)) {
+		snapshot_resize = animation_start_resize(
+		    node->client->toplevel, instruction->previous_tiled_rectangle, *rect);
+		wlr_log(WLR_DEBUG, "Started resize animation for node %u: from=(%dx%d) to=(%dx%d) active=%d", node->id,
+		    instruction->previous_tiled_rectangle.width, instruction->previous_tiled_rectangle.height, rect->width, rect->height,
+		    snapshot_resize);
 	}
 
-	if (effective_border_width(node->desktop) != 0) {
-		unsigned int bw = effective_border_width(node->desktop);
-		struct wlr_scene_tree *border_tree = client_border_tree(node->client);
-		struct wlr_scene_rect **border_rects = client_border_rects(node->client);
-
-		if (node->client->toplevel) {
-			struct toplevel_t *tl = node->client->toplevel;
-			bool undersized = instruction->state != STATE_FLOATING && instruction->state != STATE_FULLSCREEN
-			    && tl->geometry.width > 0 && tl->geometry.height > 0
-			    && ((int)tl->geometry.width < rect->width || (int)tl->geometry.height < rect->height
-			        || (int)tl->geometry.width > rect->width || (int)tl->geometry.height > rect->height);
-			struct wlr_box geo;
-			int border_x, border_y;
-			if (undersized) {
-				int center_x = (rect->width - (int)tl->geometry.width) / 2;
-				int center_y = (rect->height - (int)tl->geometry.height) / 2;
-				int cx = center_x > 0 ? center_x : 0;
-				int cy = center_y > 0 ? center_y : 0;
-				geo = (struct wlr_box){0, 0, (int)tl->geometry.width < rect->width ? (int)tl->geometry.width : rect->width,
-				    (int)tl->geometry.height < rect->height ? (int)tl->geometry.height : rect->height};
-				border_x = cx - (int)bw;
-				border_y = cy - (int)bw;
-			} else {
-				geo = (struct wlr_box){0, 0, rect->width, rect->height};
-				border_x = -(int)bw;
-				border_y = -(int)bw;
-			}
-			update_borders(border_tree, border_rects, geo, bw);
-			wlr_scene_node_set_position(&border_tree->node, border_x, border_y);
-			update_border_colors(node->client);
-			surface_rounded_t *rounded = client_get_rounded(node->client);
-			if (rounded && (node->client->border_radius > 0.0f || rounded->gradient_count >= 2)) {
-				if (rounded->border_shader_node) {
-					int new_fw = geo.width + 2 * (int)bw;
-					int new_fh = geo.height + 2 * (int)bw;
-					if (new_fw > 0 && new_fh > 0) {
-						if (rounded->border_shader_buf_w != new_fw || rounded->border_shader_buf_h != new_fh) {
-							rounded->border_dirty = true;
-							rounded->corner_mask_dirty = true;
-						}
-						wlr_scene_buffer_set_dest_size(rounded->border_shader_node, new_fw, new_fh);
-					}
-				}
-			}
-		} else if (border_tree) {
-			const struct wlr_box geo = {0, 0, rect->width, rect->height};
-			update_borders(border_tree, border_rects, geo, bw);
-			update_border_colors(node->client);
+	if (!snapshot_resize) {
+		if (node->client->toplevel && node->client->toplevel->wants_fade) {
+			node->client->toplevel->wants_fade = false;
+			wlr_scene_node_set_position(&scene_tree->node, rect->x, rect->y);
+			animation_fade_in(node->client->toplevel);
+		} else if (instruction->previous_tiled_rectangle.width > 0 && instruction->previous_tiled_rectangle.height > 0) {
+			animation_apply_geometry_from(node, scene_tree, instruction->previous_tiled_rectangle, *rect, true);
+		} else {
+			animation_apply_geometry(node, scene_tree, *rect, true);
 		}
 	}
 
-	if (node->client->toplevel)
+	// skip border/clip updates during resize animation (handled by animation tick)
+	if (!snapshot_resize) {
+		if (effective_border_width(node->desktop) != 0) {
+			unsigned int bw = effective_border_width(node->desktop);
+			struct wlr_scene_tree *border_tree = client_border_tree(node->client);
+			struct wlr_scene_rect **border_rects = client_border_rects(node->client);
+
+			if (node->client->toplevel) {
+				struct toplevel_t *tl = node->client->toplevel;
+				bool undersized = instruction->state != STATE_FLOATING && instruction->state != STATE_FULLSCREEN
+				    && tl->geometry.width > 0 && tl->geometry.height > 0
+				    && ((int)tl->geometry.width < rect->width || (int)tl->geometry.height < rect->height
+				        || (int)tl->geometry.width > rect->width || (int)tl->geometry.height > rect->height);
+				struct wlr_box geo;
+				int border_x, border_y;
+				if (undersized) {
+					int center_x = (rect->width - (int)tl->geometry.width) / 2;
+					int center_y = (rect->height - (int)tl->geometry.height) / 2;
+					int cx = center_x > 0 ? center_x : 0;
+					int cy = center_y > 0 ? center_y : 0;
+					geo = (struct wlr_box){0, 0, (int)tl->geometry.width < rect->width ? (int)tl->geometry.width : rect->width,
+					    (int)tl->geometry.height < rect->height ? (int)tl->geometry.height : rect->height};
+					border_x = cx - (int)bw;
+					border_y = cy - (int)bw;
+				} else {
+					geo = (struct wlr_box){0, 0, rect->width, rect->height};
+					border_x = -(int)bw;
+					border_y = -(int)bw;
+				}
+				update_borders(border_tree, border_rects, geo, bw);
+				wlr_scene_node_set_position(&border_tree->node, border_x, border_y);
+				update_border_colors(node->client);
+				surface_rounded_t *rounded = client_get_rounded(node->client);
+				if (rounded && (node->client->border_radius > 0.0f || rounded->gradient_count >= 2)) {
+					if (rounded->border_shader_node) {
+						int new_fw = geo.width + 2 * (int)bw;
+						int new_fh = geo.height + 2 * (int)bw;
+						if (new_fw > 0 && new_fh > 0) {
+							if (rounded->border_shader_buf_w != new_fw || rounded->border_shader_buf_h != new_fh) {
+								rounded->border_dirty = true;
+								rounded->corner_mask_dirty = true;
+							}
+							wlr_scene_buffer_set_dest_size(rounded->border_shader_node, new_fw, new_fh);
+						}
+					}
+				}
+			} else if (border_tree) {
+				const struct wlr_box geo = {0, 0, rect->width, rect->height};
+				update_borders(border_tree, border_rects, geo, bw);
+				update_border_colors(node->client);
+			}
+		}
+	}
+
+	if (!snapshot_resize && node->client->toplevel)
 		toplevel_center_and_clip_surface(node->client->toplevel);
 
 	if (node->client->xwayland_view && node->client->xwayland_view->xwayland_surface) {

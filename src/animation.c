@@ -22,6 +22,7 @@ typedef struct {
 	struct wl_list link;
 	bool workspace_switch;
 	bool slide_out;
+	bool is_resize;
 	node_t *node;
 	toplevel_t *toplevel;
 	struct wlr_scene_tree *scene_tree;
@@ -293,9 +294,11 @@ void animation_cancel_node(struct node_t *node) {
 
 	wlr_log(WLR_DEBUG, "animation: cancel node %u entry=%p", node ? node->id : 0, (void *)entry);
 
-	if (entry->from_opacity != entry->to_opacity && entry->scene_tree) {
+	if (entry->is_resize && entry->toplevel && entry->toplevel->content_tree)
+		wlr_scene_subsurface_tree_set_clip(&entry->toplevel->content_tree->node, NULL);
+
+	if (entry->from_opacity != entry->to_opacity && entry->scene_tree)
 		surface_set_opacity(&entry->scene_tree->node, entry->to_opacity);
-	}
 
 	wl_list_remove(&entry->link);
 	free(entry);
@@ -523,6 +526,158 @@ bool animation_start_workspace_slide(output_t *output, node_t *node, struct wlr_
 	return true;
 }
 
+bool animation_start_resize(toplevel_t *toplevel, struct wlr_box from, struct wlr_box to) {
+	if (!toplevel || !toplevel->scene_tree || !toplevel->content_tree || !toplevel->node || !enable_animations)
+		return false;
+
+	if (!anim_type_configs[1].enabled)
+		return false;
+
+	// skip if the size didn't actually change
+	if (from.width == to.width && from.height == to.height)
+		return false;
+
+	// skip trivially small size changes
+	int max_change = from.width > to.width ? from.width - to.width : to.width - from.width;
+	int h_change = from.height > to.height ? from.height - to.height : to.height - from.height;
+	if (max_change < h_change)
+		max_change = h_change;
+	if (max_change < 10)
+		return false;
+
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+
+	animation_entry_t *entry = find_animation(toplevel->node);
+	if (entry) {
+		// compute current interpolated state from the ongoing animation
+		double e = entry->eased;
+		from.x = (int)(entry->from.x + (entry->to.x - entry->from.x) * e);
+		from.y = (int)(entry->from.y + (entry->to.y - entry->from.y) * e);
+		from.width = (int)(entry->from.width + (entry->to.width - entry->from.width) * e);
+		from.height = (int)(entry->from.height + (entry->to.height - entry->from.height) * e);
+		if (from.width < 1)
+			from.width = 1;
+		if (from.height < 1)
+			from.height = 1;
+	} else {
+		entry = create_animation_entry();
+		if (!entry)
+			return false;
+	}
+
+	entry->is_resize = true;
+	entry->node = toplevel->node;
+	entry->toplevel = toplevel;
+	entry->scene_tree = toplevel->scene_tree;
+	entry->output = toplevel->node->output;
+	entry->from = from;
+	entry->to = to;
+	entry->start = now;
+	entry->duration_ms = ANIMATION_DURATION_MS;
+	entry->from_opacity = toplevel->node->client->opacity;
+	entry->to_opacity = toplevel->node->client->opacity;
+	apply_config_to_entry(entry, 1);
+
+	// position the scene tree at the start of the animation
+	wlr_scene_node_set_position(&toplevel->scene_tree->node, from.x, from.y);
+
+	wlr_log(WLR_DEBUG,
+	    "animation: start resize entry=%p node=%u from=(%d,%d %dx%d) to=(%d,%d %dx%d)", (void *)entry,
+	    entry->node ? entry->node->id : 0, from.x, from.y, from.width, from.height, to.x, to.y, to.width, to.height);
+
+	schedule_output(toplevel->node->output);
+	return true;
+}
+
+static void update_resize_entry(animation_entry_t *entry) {
+	if (!entry->toplevel || !entry->toplevel->content_tree)
+		return;
+
+	double eased = entry->eased;
+	int x = (int)(entry->from.x + (entry->to.x - entry->from.x) * eased);
+	int y = (int)(entry->from.y + (entry->to.y - entry->from.y) * eased);
+	int width = (int)(entry->from.width + (entry->to.width - entry->from.width) * eased);
+	int height = (int)(entry->from.height + (entry->to.height - entry->from.height) * eased);
+
+	if (entry->from.width <= 0 || entry->from.height <= 0)
+		return;
+	if (width < 1)
+		width = 1;
+	if (height < 1)
+		height = 1;
+
+	// update scene tree position
+	wlr_scene_node_set_position(&entry->toplevel->scene_tree->node, x, y);
+
+	// clip content tree to the animated size
+	struct wlr_box clip = {
+	    .x = entry->toplevel->geometry.x,
+	    .y = entry->toplevel->geometry.y,
+	    .width = width,
+	    .height = height,
+	};
+	wlr_scene_subsurface_tree_set_clip(&entry->toplevel->content_tree->node, &clip);
+
+	// update borders to follow the animated size
+	if (entry->toplevel->border_tree) {
+		unsigned int bw = 0;
+		if (entry->node && entry->node->client)
+			bw = effective_border_width(entry->node->desktop);
+
+		// constrain to the actual surface geometry when content is smaller than container
+		int bwidth = width;
+		int bheight = height;
+		if ((int)entry->toplevel->geometry.width > 0 && (int)entry->toplevel->geometry.width < width)
+			bwidth = (int)entry->toplevel->geometry.width;
+		if ((int)entry->toplevel->geometry.height > 0 && (int)entry->toplevel->geometry.height < height)
+			bheight = (int)entry->toplevel->geometry.height;
+
+		struct wlr_box geo = {0, 0, bwidth, bheight};
+		update_borders(entry->toplevel->border_tree, entry->toplevel->border_rects, geo, bw);
+
+		// center border tree if content is offset (undersized surface)
+		int cx = entry->toplevel->content_tree->node.x;
+		int cy = entry->toplevel->content_tree->node.y;
+		if (cx > 0 || cy > 0)
+			wlr_scene_node_set_position(&entry->toplevel->border_tree->node, cx - (int)bw, cy - (int)bw);
+
+		// update rounded corner shader buffer to match animated size
+		if (entry->toplevel->rounded && entry->toplevel->rounded->border_shader_node && bw > 0) {
+			int new_fw = bwidth + 2 * (int)bw;
+			int new_fh = bheight + 2 * (int)bw;
+			if (new_fw > 0 && new_fh > 0)
+				wlr_scene_buffer_set_dest_size(entry->toplevel->rounded->border_shader_node, new_fw, new_fh);
+		}
+	}
+}
+
+bool animation_is_resizing(node_t *node) {
+	if (!node)
+		return false;
+	animation_entry_t *entry = find_animation(node);
+	return entry && entry->is_resize;
+}
+
+bool animation_get_toplevel_resize_progress(
+    toplevel_t *toplevel, double *progress, struct wlr_box *anim_from, struct wlr_box *anim_to) {
+	if (!toplevel || !toplevel->node)
+		return false;
+
+	animation_entry_t *entry = find_animation(toplevel->node);
+	if (!entry || !entry->is_resize)
+		return false;
+
+	if (progress)
+		*progress = entry->eased;
+	if (anim_from)
+		*anim_from = entry->from;
+	if (anim_to)
+		*anim_to = entry->to;
+
+	return true;
+}
+
 bool animation_has_fade_out(struct wlr_scene_tree *scene_tree) {
 	if (!scene_tree)
 		return false;
@@ -642,6 +797,9 @@ bool animation_update_output(output_t *output, struct timespec now) {
 			continue;
 
 		if (!entry->node->client->shown || !entry->scene_tree->node.enabled) {
+			// if this is a resize animation finishing early, clean up the clip
+			if (entry->is_resize && entry->toplevel && entry->toplevel->content_tree)
+				wlr_scene_subsurface_tree_set_clip(&entry->toplevel->content_tree->node, NULL);
 			wl_list_remove(&entry->link);
 			free(entry);
 			continue;
@@ -649,29 +807,49 @@ bool animation_update_output(output_t *output, struct timespec now) {
 
 		tick_entry(entry, now);
 
-		int x = (int)(entry->from.x + (entry->to.x - entry->from.x) * entry->eased);
-		int y = (int)(entry->from.y + (entry->to.y - entry->from.y) * entry->eased);
-		wlr_scene_node_set_position(&entry->scene_tree->node, x, y);
+		if (entry->is_resize) {
+			// interpolate position and size, update clip and borders
+			update_resize_entry(entry);
 
-		if (is_entry_done(entry)) {
-			if (entry->from_opacity != entry->to_opacity) {
-				surface_set_opacity(&entry->scene_tree->node, entry->to_opacity);
+			if (is_entry_done(entry)) {
+				// remove clip, let normal layout take over
+				if (entry->toplevel && entry->toplevel->content_tree) {
+					wlr_scene_subsurface_tree_set_clip(&entry->toplevel->content_tree->node, NULL);
+				}
+				wlr_scene_node_set_position(&entry->scene_tree->node, entry->to.x, entry->to.y);
+				wlr_log(WLR_DEBUG, "animation: resize complete entry=%p node=%u", (void *)entry,
+				    entry->node ? entry->node->id : 0);
+				wl_list_remove(&entry->link);
+				free(entry);
+			} else {
+				active = true;
 			}
-
-			if (entry->workspace_switch && entry->slide_out && entry->node && entry->node->client) {
-				entry->node->client->shown = false;
-				wlr_scene_node_set_enabled(&entry->scene_tree->node, false);
-				wlr_log(WLR_DEBUG, "animation: workspace slide-out complete, disabled node=%u", entry->node->id);
-			}
-
-			wl_list_remove(&entry->link);
-			free(entry);
 		} else {
-			if (entry->from_opacity != entry->to_opacity) {
-				float cur_opacity = (float)(entry->from_opacity + (entry->to_opacity - entry->from_opacity) * entry->eased);
-				surface_set_opacity(&entry->scene_tree->node, cur_opacity);
+			// interpolate position only
+			int x = (int)(entry->from.x + (entry->to.x - entry->from.x) * entry->eased);
+			int y = (int)(entry->from.y + (entry->to.y - entry->from.y) * entry->eased);
+			wlr_scene_node_set_position(&entry->scene_tree->node, x, y);
+
+			if (is_entry_done(entry)) {
+				if (entry->from_opacity != entry->to_opacity) {
+					surface_set_opacity(&entry->scene_tree->node, entry->to_opacity);
+				}
+
+				if (entry->workspace_switch && entry->slide_out && entry->node && entry->node->client) {
+					entry->node->client->shown = false;
+					wlr_scene_node_set_enabled(&entry->scene_tree->node, false);
+					wlr_log(WLR_DEBUG, "animation: workspace slide-out complete, disabled node=%u", entry->node->id);
+				}
+
+				wl_list_remove(&entry->link);
+				free(entry);
+			} else {
+				if (entry->from_opacity != entry->to_opacity) {
+					float cur_opacity = (float)(entry->from_opacity + (entry->to_opacity - entry->from_opacity) * entry->eased);
+					surface_set_opacity(&entry->scene_tree->node, cur_opacity);
+				}
+				active = true;
 			}
-			active = true;
 		}
 	}
 

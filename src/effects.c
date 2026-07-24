@@ -552,6 +552,7 @@ static uint64_t capture_bg_to_tex1_ex(output_t *output, effects_output_t *ctx, b
 }
 
 static struct wlr_box get_client_rect(toplevel_t *tl);
+static struct wlr_box get_animated_client_rect(toplevel_t *tl);
 
 // captures scene with blur layer surfaces hidden but blur toplevels visible (for layer blur)
 static uint64_t capture_bg_combined(output_t *output, effects_output_t *ctx) {
@@ -659,7 +660,7 @@ static bool rebuild_live_blur(output_t *output, uint64_t shared_blurred, bool on
 
 			client_t *c = tl->node->client;
 			if (c && c->border_radius > 0.0f && c->state != STATE_FULLSCREEN) {
-				struct wlr_box content_r = get_client_rect(tl);
+				struct wlr_box content_r = get_animated_client_rect(tl);
 				float ow = (float)w, oh = (float)h;
 				float win_u = (float)(content_r.x - output->lx) / ow;
 				float win_v = (float)(content_r.y - output->ly) / oh;
@@ -981,7 +982,7 @@ static bool rebuild_live_acrylic(
 
 		// skip if toplevel already has a valid acrylic buffer and the damage doesn't overlap it
 		if (tl->blur->acrylic_buf && damage && !pixman_region32_empty(damage)) {
-			struct wlr_box r = get_client_rect(tl);
+			struct wlr_box r = get_animated_client_rect(tl);
 			pixman_region32_clear(overlap_rgn);
 			pixman_region32_union_rect(overlap_rgn, overlap_rgn, r.x - output->lx, r.y - output->ly, r.width, r.height);
 			if (pixman_region32_empty(overlap_rgn))
@@ -1015,7 +1016,7 @@ static bool rebuild_live_acrylic(
 
 		client_t *c = tl->node->client;
 		if (c && c->border_radius > 0.0f && c->state != STATE_FULLSCREEN) {
-			struct wlr_box content_r = get_client_rect(tl);
+			struct wlr_box content_r = get_animated_client_rect(tl);
 			float ow = (float)w, oh = (float)h;
 			float win_u = (float)(content_r.x - output->lx) / ow;
 			float win_v = (float)(content_r.y - output->ly) / oh;
@@ -1176,6 +1177,24 @@ static struct wlr_box get_client_rect(toplevel_t *tl) {
 		return c->tiled_rectangle;
 }
 
+// interpolate client rect with active resize animation progress
+static struct wlr_box get_animated_client_rect(toplevel_t *tl) {
+	struct wlr_box r = get_client_rect(tl);
+	double progress = 1.0;
+	struct wlr_box anim_from, anim_to;
+	if (animation_get_toplevel_resize_progress(tl, &progress, &anim_from, &anim_to)) {
+		r.x = (int)(anim_from.x + (anim_to.x - anim_from.x) * progress);
+		r.y = (int)(anim_from.y + (anim_to.y - anim_from.y) * progress);
+		r.width = (int)(anim_from.width + (anim_to.width - anim_from.width) * progress);
+		r.height = (int)(anim_from.height + (anim_to.height - anim_from.height) * progress);
+		if (r.width < 1)
+			r.width = 1;
+		if (r.height < 1)
+			r.height = 1;
+	}
+	return r;
+}
+
 static bool scene_buffer_no_input(struct wlr_scene_buffer *buffer, double *sx, double *sy) {
 	(void)buffer;
 	(void)sx;
@@ -1195,7 +1214,7 @@ static bool blur_render_shadow(toplevel_t *tl) {
 	if (c->state == STATE_FULLSCREEN)
 		return false;
 
-	struct wlr_box client_r = get_client_rect(tl);
+	struct wlr_box client_r = get_animated_client_rect(tl);
 	if (client_r.width <= 0 || client_r.height <= 0)
 		return false;
 
@@ -1351,7 +1370,7 @@ static bool rebuild_corner_masks(output_t *output, uint64_t bg_tex) {
 		if (c->border_radius <= 0.0f || c->state == STATE_FULLSCREEN)
 			continue;
 
-		struct wlr_box container_r = get_client_rect(tl);
+		struct wlr_box container_r = get_animated_client_rect(tl);
 		int cx = tl->content_tree->node.x;
 		int cy = tl->content_tree->node.y;
 		int surf_w = (tl->geometry.width > 0 && tl->geometry.width < container_r.width) ? (int)tl->geometry.width
@@ -1509,7 +1528,7 @@ static void push_corner_masks_to_toplevels(output_t *output, bool rebuilt) {
 			continue;
 		}
 
-		struct wlr_box content_r = get_client_rect(tl);
+		struct wlr_box content_r = get_animated_client_rect(tl);
 
 		struct wlr_fbox src;
 		int dw, dh;
