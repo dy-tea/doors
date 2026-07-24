@@ -58,6 +58,7 @@ struct ime_relay_t *input_method_relay_create(struct wlr_seat *wlr_seat);
 void input_method_relay_finish(ime_relay_t *relay);
 void input_method_relay_set_focus(ime_relay_t *relay, struct wlr_surface *surface);
 
-bool input_method_keyboard_grab_forward_key(
-    struct wlr_keyboard *keyboard, struct wlr_keyboard_key_event *event, struct ime_relay_t *relay);
-bool input_method_keyboard_grab_forward_modifiers(struct wlr_keyboard *keyboard, ime_relay_t *relay);
+bool input_method_keyboard_grab_forward_key(struct wlr_keyboard *keyboard,
+	struct wlr_keyboard_key_event *event, struct ime_relay_t *relay);
+bool input_method_keyboard_grab_forward_modifiers(struct wlr_keyboard *keyboard,
+	ime_relay_t *relay);

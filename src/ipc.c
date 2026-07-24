@@ -1,9 +1,7 @@
 #include "ipc.h"
-
 #include "output.h"
 #include "server.h"
 #include "tree.h"
-
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -50,7 +48,9 @@ static bool desktop_has_urgent(desktop_t *d) {
 	return false;
 }
 
-const char *ipc_get_socket_path(void) { return socket_path; }
+const char *ipc_get_socket_path(void) {
+	return socket_path;
+}
 
 void ipc_init(void) {
 	struct sockaddr_un addr;
@@ -105,7 +105,9 @@ void ipc_init(void) {
 	wlr_log(WLR_INFO, "IPC socket: %s", socket_path);
 }
 
-int ipc_get_socket_fd(void) { return ipc_socket_fd; }
+int ipc_get_socket_fd(void) {
+	return ipc_socket_fd;
+}
 
 static void send_response(int client_fd, bool success, const char *msg) {
 	char buf[DOORS_BUFSIZ];
@@ -124,9 +126,13 @@ static void send_response(int client_fd, bool success, const char *msg) {
 	ipc_write_all(client_fd, buf, offset);
 }
 
-void send_success(int client_fd, const char *msg) { send_response(client_fd, true, msg); }
+void send_success(int client_fd, const char *msg) {
+	send_response(client_fd, true, msg);
+}
 
-void send_failure(int client_fd, const char *msg) { send_response(client_fd, false, msg); }
+void send_failure(int client_fd, const char *msg) {
+	send_response(client_fd, false, msg);
+}
 
 void ipc_handle_incoming(int client_fd) {
 	char msg[DOORS_BUFSIZ];
@@ -244,9 +250,7 @@ void ipc_put_status(subscriber_mask_t mask, const char *fmt, ...) {
 		va_end(args);
 		if (len >= sizeof(buf))
 			len = sizeof(buf) - 1;
-	}
-
-	while (sb != NULL) {
+	} while (sb != NULL) {
 		subscriber_t *next = sb->next;
 		if (sb->mask & mask) {
 			if (sb->count > 0)

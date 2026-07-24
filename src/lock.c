@@ -1,9 +1,7 @@
 #include "lock.h"
-
 #include "output.h"
 #include "server.h"
 #include "tree.h"
-
 #include <stdlib.h>
 #include <wayland-util.h>
 #include <wlr/types/wlr_output.h>
@@ -27,7 +25,8 @@ void destroy_unlock(session_lock_t *session_lock, const bool unlock) {
 	if (!(server.locked = !unlock)) {
 		wlr_scene_node_set_enabled(&server.lock_background->node, false);
 
-		focus_node(server.focused_output, server.focused_output->desk, server.focused_output->desk->focus);
+		focus_node(server.focused_output, server.focused_output->desk,
+			server.focused_output->desk->focus);
 	}
 
 	wlr_scene_node_destroy(&session_lock->scene_tree->node);
@@ -54,8 +53,8 @@ void destroy_lock_surface(struct wl_listener *listener, void *data) {
 		if (next == surface || !next->surface->mapped)
 			continue;
 		struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server.seat);
-		wlr_seat_keyboard_notify_enter(
-		    server.seat, next->surface, keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
+		wlr_seat_keyboard_notify_enter(server.seat, next->surface, keyboard->keycodes,
+			keyboard->num_keycodes, &keyboard->modifiers);
 		return;
 	}
 
@@ -74,8 +73,8 @@ void map_lock_surface(struct wl_listener *listener, void *data) {
 
 	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server.seat);
 	if (keyboard)
-		wlr_seat_keyboard_notify_enter(
-		    server.seat, surface->surface, keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
+		wlr_seat_keyboard_notify_enter(server.seat, surface->surface, keyboard->keycodes,
+			keyboard->num_keycodes, &keyboard->modifiers);
 }
 
 void lock_new_surface(struct wl_listener *listener, void *data) {
@@ -83,7 +82,8 @@ void lock_new_surface(struct wl_listener *listener, void *data) {
 	struct wlr_session_lock_surface_v1 *surface = data;
 	output_t *output = surface->output->data;
 
-	struct wlr_scene_tree *scene_tree = wlr_scene_subsurface_tree_create(session_lock->scene_tree, surface->surface);
+	struct wlr_scene_tree *scene_tree = wlr_scene_subsurface_tree_create(session_lock->scene_tree,
+		surface->surface);
 	surface->surface->data = scene_tree;
 	output->lock_surface = surface;
 
@@ -100,8 +100,8 @@ void lock_new_surface(struct wl_listener *listener, void *data) {
 	if (server.focused_output == output) {
 		struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server.seat);
 		if (keyboard)
-			wlr_seat_keyboard_notify_enter(
-			    server.seat, surface->surface, keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
+			wlr_seat_keyboard_notify_enter(server.seat, surface->surface, keyboard->keycodes,
+				keyboard->num_keycodes, &keyboard->modifiers);
 	}
 }
 

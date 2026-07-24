@@ -3,7 +3,6 @@
 #include "realtime.h"
 #include "server.h"
 #include "types.h"
-
 #include <stdio.h>
 #include <string.h>
 #include <wlr/util/log.h>

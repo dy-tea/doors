@@ -1,6 +1,5 @@
 #include "server.h"
 #include "toplevel.h"
-
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_tearing_control_v1.h>
 #include <wlr/types/wlr_xdg_shell.h>
@@ -51,9 +50,11 @@ void handle_new_tearing_hint(struct wl_listener *listener, void *data) {
 	(void)listener;
 	struct wlr_tearing_control_v1 *tearing_control = data;
 
-	enum wp_tearing_control_v1_presentation_hint hint = wlr_tearing_control_manager_v1_surface_hint_from_surface(
-	    server.tearing_control_v1, tearing_control->surface);
-	wlr_log(WLR_DEBUG, "New presentation hint %d received for surface %p", hint, (void *)tearing_control->surface);
+	enum wp_tearing_control_v1_presentation_hint hint =
+		wlr_tearing_control_manager_v1_surface_hint_from_surface(server.tearing_control_v1,
+		tearing_control->surface);
+	wlr_log(WLR_DEBUG, "New presentation hint %d received for surface %p", hint,
+		(void *)tearing_control->surface);
 
 	tearing_controller_t *controller = calloc(1, sizeof(*controller));
 	if (!controller)

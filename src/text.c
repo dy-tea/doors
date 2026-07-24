@@ -1,5 +1,4 @@
 #include "text.h"
-
 #include <cairo.h>
 #include <drm_fourcc.h>
 #include <math.h>
@@ -32,8 +31,8 @@ static void cairo_buffer_destroy(struct wlr_buffer *wlr_buffer) {
 	free(buffer);
 }
 
-static bool cairo_buffer_begin_data_ptr_access(
-    struct wlr_buffer *wlr_buffer, uint32_t flags, void **data, uint32_t *format, size_t *stride) {
+static bool cairo_buffer_begin_data_ptr_access(struct wlr_buffer *wlr_buffer, uint32_t flags,
+		void **data, uint32_t *format, size_t *stride) {
 	(void)flags;
 	cairo_buffer_t *buffer = wl_container_of(wlr_buffer, buffer, base);
 	*data = cairo_image_surface_get_data(buffer->surface);
@@ -42,12 +41,14 @@ static bool cairo_buffer_begin_data_ptr_access(
 	return true;
 }
 
-static void cairo_buffer_end_data_ptr_access(struct wlr_buffer *wlr_buffer) { (void)wlr_buffer; }
+static void cairo_buffer_end_data_ptr_access(struct wlr_buffer *wlr_buffer) {
+	(void)wlr_buffer;
+}
 
 static const struct wlr_buffer_impl cairo_buffer_impl = {
-    .destroy = cairo_buffer_destroy,
-    .begin_data_ptr_access = cairo_buffer_begin_data_ptr_access,
-    .end_data_ptr_access = cairo_buffer_end_data_ptr_access,
+	.destroy = cairo_buffer_destroy,
+	.begin_data_ptr_access = cairo_buffer_begin_data_ptr_access,
+	.end_data_ptr_access = cairo_buffer_end_data_ptr_access,
 };
 
 typedef struct {
@@ -62,7 +63,9 @@ typedef struct {
 	struct wl_listener destroy;
 } text_buffer_t;
 
-int text_node_default_height(void) { return text_height; }
+int text_node_default_height(void) {
+	return text_height;
+}
 
 static int get_text_width(const text_node_t *props) {
 	int width = props->width;
@@ -123,7 +126,8 @@ static void text_calc_size(text_buffer_t *buffer) {
 	g_object_unref(layout);
 	cairo_destroy(c);
 
-	wlr_scene_buffer_set_dest_size(buffer->buffer_node, get_text_width(&buffer->props), buffer->props.height);
+	wlr_scene_buffer_set_dest_size(buffer->buffer_node, get_text_width(&buffer->props),
+		buffer->props.height);
 }
 
 static void render_backing_buffer(text_buffer_t *buffer) {
@@ -222,8 +226,8 @@ static void handle_destroy(struct wl_listener *listener, void *data) {
 	free(buffer);
 }
 
-text_node_t *text_node_create(
-    struct wlr_scene_tree *parent, const char *text, const float color[4], bool pango_markup) {
+text_node_t *text_node_create(struct wlr_scene_tree *parent, const char *text, const float color[4],
+		bool pango_markup) {
 	text_buffer_t *buffer = calloc(1, sizeof(*buffer));
 	if (!buffer)
 		return NULL;
@@ -248,7 +252,7 @@ text_node_t *text_node_create(
 	buffer->props.pango_markup = pango_markup;
 	memcpy(buffer->props.color, color, sizeof(float) * 4);
 	buffer->props.background[0] = buffer->props.background[1] = buffer->props.background[2] =
-	    buffer->props.background[3] = 0;
+		buffer->props.background[3] = 0;
 	buffer->scale = 1.0f;
 	buffer->visible = true;
 
@@ -314,6 +318,7 @@ void text_node_set_max_width(text_node_t *node, int max_width) {
 		return;
 
 	buffer->props.max_width = max_width;
-	wlr_scene_buffer_set_dest_size(buffer->buffer_node, get_text_width(&buffer->props), buffer->props.height);
+	wlr_scene_buffer_set_dest_size(buffer->buffer_node, get_text_width(&buffer->props),
+		buffer->props.height);
 	render_backing_buffer(buffer);
 }

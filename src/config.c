@@ -1,12 +1,10 @@
 #include "config.h"
-
 #include "keyboard.h"
 #include "master_stack.h"
 #include "server.h"
 #include "tree.h"
 #include "types.h"
 #include "workspace.h"
-
 #include <ctype.h>
 #include <limits.h>
 #include <stdio.h>
@@ -120,7 +118,13 @@ uint32_t parse_keycode(const char *name) {
 	if (!name || name[0] == '\0')
 		return 0;
 
-	static const char *mouse_buttons[] = {"mouse_left", "mouse_right", "mouse_middle", "mouse_back", "mouse_forward"};
+	static const char *mouse_buttons[] = {
+		"mouse_left",
+		"mouse_right",
+		"mouse_middle",
+		"mouse_back",
+		"mouse_forward"
+	};
 
 	for (size_t i = 0; i < sizeof(mouse_buttons) / sizeof(mouse_buttons[0]); i++)
 		if (strcmp(name, mouse_buttons[i]) == 0)
@@ -300,7 +304,8 @@ typedef struct {
 	size_t count;
 } expansion_result_t;
 
-static void expand_braces_recursive(const char *input, char *prefix, size_t prefix_len, expansion_result_t *result);
+static void expand_braces_recursive(const char *input, char *prefix, size_t prefix_len,
+	expansion_result_t *result);
 
 static void expand_braces(const char *input, expansion_result_t *result) {
 	result->count = 0;
@@ -308,7 +313,8 @@ static void expand_braces(const char *input, expansion_result_t *result) {
 	expand_braces_recursive(input, prefix, 0, result);
 }
 
-static void expand_braces_recursive(const char *input, char *prefix, size_t prefix_len, expansion_result_t *result) {
+static void expand_braces_recursive(const char *input, char *prefix, size_t prefix_len,
+		expansion_result_t *result) {
 	const char *brace_start = strchr(input, '{');
 	if (!brace_start) {
 		if (result->count < MAX_EXPANSIONS) {
@@ -368,10 +374,9 @@ static void expand_braces_recursive(const char *input, char *prefix, size_t pref
 				break;
 			}
 		}
-		if (is_dash
-		    && ((first >= '0' && first <= '9' && last >= '0' && last <= '9')
-		        || (first >= 'a' && first <= 'z' && last >= 'a' && last <= 'z')
-		        || (first >= 'A' && first <= 'Z' && last >= 'A' && last <= 'Z')))
+		if (is_dash && ((first >= '0' && first <= '9' && last >= '0' && last <= '9') || (first >= 'a' &&
+			first <= 'z' && last >= 'a' && last <= 'z') || (first >= 'A' && first <= 'Z' && last >= 'A' &&
+			last <= 'Z')))
 			is_range = true;
 	}
 
@@ -379,7 +384,10 @@ static void expand_braces_recursive(const char *input, char *prefix, size_t pref
 		char first = content[0];
 		char last = content[content_len - 1];
 		for (char c = first; c <= last; c++) {
-			char choice[2] = {c, '\0'};
+			char choice[2] = {
+				c,
+				'\0'
+			};
 			char full_input[MAXLEN * 2];
 			snprintf(full_input, sizeof(full_input), "%s%s", choice, rest);
 			expand_braces_recursive(full_input, new_prefix, strlen(new_prefix), result);
@@ -442,14 +450,15 @@ static char *expand_sequence(const char *input, char *output, size_t out_size) {
 	return output;
 }
 
-void add_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode, bool use_keycode, bind_action_t action,
-    int desktop_index, const char *external_cmd, const char *submap_name) {
+void add_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode, bool use_keycode,
+		bind_action_t action, int desktop_index, const char *external_cmd, const char *submap_name) {
 	size_t *num_ptr;
 	keybind_t *kb_array;
 
 	if (current_parsing_submap) {
 		if (current_parsing_submap->num_keybinds >= MAX_KEYBINDS) {
-			wlr_log(WLR_ERROR, "Maximum number of keybinds reached for submap %s", current_parsing_submap->name);
+			wlr_log(WLR_ERROR, "Maximum number of keybinds reached for submap %s",
+				current_parsing_submap->name);
 			return;
 		}
 		num_ptr = &current_parsing_submap->num_keybinds;
@@ -479,12 +488,12 @@ void add_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode, bool
 	else
 		kb->external_cmd[0] = '\0';
 
-	wlr_log(WLR_DEBUG, "Added keybind: mod=%u keysym=%u keycode=%u action=%d index=%d submap=%s", modifiers, keysym,
-	    keycode, action, desktop_index, submap_name ? submap_name : "global");
+	wlr_log(WLR_DEBUG, "Added keybind: mod=%u keysym=%u keycode=%u action=%d index=%d submap=%s",
+		modifiers, keysym, keycode, action, desktop_index, submap_name ? submap_name : "global");
 }
 
-static void add_gesturebind(enum gesture_type type, uint8_t fingers, uint32_t directions, const char *input,
-    bind_action_t action, int desktop_index, const char *external_cmd) {
+static void add_gesturebind(enum gesture_type type, uint8_t fingers, uint32_t directions,
+		const char *input, bind_action_t action, int desktop_index, const char *external_cmd) {
 	if (num_gesturebinds >= MAX_GESTUREBINDS) {
 		wlr_log(WLR_ERROR, "Maximum number of gesture binds reached");
 		return;
@@ -503,7 +512,8 @@ static void add_gesturebind(enum gesture_type type, uint8_t fingers, uint32_t di
 		gb->external_cmd[0] = '\0';
 	}
 
-	wlr_log(WLR_DEBUG, "Added gesturebind: type=%d fingers=%d dirs=%u action=%d", type, fingers, directions, action);
+	wlr_log(WLR_DEBUG, "Added gesturebind: type=%d fingers=%d dirs=%u action=%d", type, fingers,
+		directions, action);
 }
 
 static void parse_gesture_hotkey_line(const char *gesture_str, const char *command_str) {
@@ -531,12 +541,13 @@ static void parse_gesture_hotkey_line(const char *gesture_str, const char *comma
 	if (action != BIND_EXTERNAL) {
 		add_gesturebind(gest.type, gest.fingers, gest.directions, NULL, action, desktop_index, NULL);
 	} else {
-		add_gesturebind(gest.type, gest.fingers, gest.directions, NULL, action, desktop_index, expanded_cmd);
+		add_gesturebind(gest.type, gest.fingers, gest.directions, NULL, action, desktop_index,
+			expanded_cmd);
 	}
 }
 
-static void add_hotcornerbind(
-    int corner_x, int corner_y, bind_action_t action, int desktop_index, const char *external_cmd) {
+static void add_hotcornerbind(int corner_x, int corner_y, bind_action_t action, int desktop_index,
+		const char *external_cmd) {
 	if (num_hotcornerbinds >= MAX_HOTCORNERBINDS) {
 		wlr_log(WLR_ERROR, "Maximum number of hotcorner binds reached");
 		return;
@@ -562,7 +573,8 @@ static void add_hotcornerbind(
 	else
 		hc->external_cmd[0] = '\0';
 
-	wlr_log(WLR_DEBUG, "Added hotcornerbind: corner=%d (%d,%d) action=%d", hc->corner, corner_x, corner_y, action);
+	wlr_log(WLR_DEBUG, "Added hotcornerbind: corner=%d (%d,%d) action=%d", hc->corner, corner_x,
+		corner_y, action);
 }
 
 static void parse_hotcorner_hotkey_line(const char *hotcorner_str, const char *command_str) {
@@ -615,8 +627,8 @@ static void parse_hotkey_line(const char *hotkey_str, const char *command_str) {
 		bind_action_t action = parse_action(command_str, &desktop_index, submap_name);
 		if (action != BIND_EXTERNAL) {
 			bell_bind = (keybind_t){
-			    .action = action,
-			    .desktop_index = desktop_index,
+				.action = action,
+				.desktop_index = desktop_index,
 			};
 		} else {
 			snprintf(bell_bind.external_cmd, sizeof(bell_bind.external_cmd), "%s", command_str);
@@ -638,15 +650,16 @@ static void parse_hotkey_line(const char *hotkey_str, const char *command_str) {
 	expand_braces(hotkey_buf, &hk_expansions);
 	expand_braces(command_buf, &cmd_expansions);
 
-	wlr_log(WLR_DEBUG, "parse_hotkey_line: hotkey=[%s] cmd=[%s] hk_expans=%zu cmd_expans=%zu", hotkey_buf, command_buf,
-	    hk_expansions.count, cmd_expansions.count);
+	wlr_log(WLR_DEBUG, "parse_hotkey_line: hotkey=[%s] cmd=[%s] hk_expans=%zu cmd_expans=%zu",
+		hotkey_buf, command_buf, hk_expansions.count, cmd_expansions.count);
 
 	size_t num_pairs = 0;
 
 	if (hk_expansions.count == 0 && cmd_expansions.count == 0) {
 		num_pairs = 1;
 	} else if (hk_expansions.count > 0 && cmd_expansions.count > 0) {
-		num_pairs = (hk_expansions.count > cmd_expansions.count) ? hk_expansions.count : cmd_expansions.count;
+		num_pairs = (hk_expansions.count > cmd_expansions.count) ? hk_expansions.count :
+			cmd_expansions.count;
 	} else if (hk_expansions.count > 0) {
 		num_pairs = hk_expansions.count;
 	} else {
@@ -654,9 +667,10 @@ static void parse_hotkey_line(const char *hotkey_str, const char *command_str) {
 	}
 
 	for (size_t i = 0; i < num_pairs; i++) {
-		const char *single_hotkey = (hk_expansions.count > 0) ? hk_expansions.strings[i % hk_expansions.count] : hotkey_buf;
-		const char *single_cmd = (cmd_expansions.count > 0) ? cmd_expansions.strings[i % cmd_expansions.count]
-		                                                    : command_buf;
+		const char *single_hotkey = (hk_expansions.count > 0) ? hk_expansions.strings[i %
+			hk_expansions.count] : hotkey_buf;
+		const char *single_cmd = (cmd_expansions.count > 0) ? cmd_expansions.strings[i %
+			cmd_expansions.count] : command_buf;
 
 		wlr_log(WLR_DEBUG, "  pair %zu: hotkey=[%s] cmd=[%s]", i, single_hotkey, single_cmd);
 
@@ -693,13 +707,14 @@ static void parse_hotkey_line(const char *hotkey_str, const char *command_str) {
 			char submap_name[MAXLEN];
 			submap_name[0] = '\0';
 			bind_action_t action = parse_action(single_cmd, &desktop_index, submap_name);
-			wlr_log(WLR_DEBUG, "Parsed action: %d for cmd: '%s' submap: '%s'", action, single_cmd, submap_name);
+			wlr_log(WLR_DEBUG, "Parsed action: %d for cmd: '%s' submap: '%s'", action, single_cmd,
+				submap_name);
 			if (action != BIND_EXTERNAL)
-				add_keybind(
-				    modifiers, keysym, keycode, use_keycode, action, desktop_index, NULL, submap_name[0] ? submap_name : NULL);
+				add_keybind(modifiers, keysym, keycode, use_keycode, action, desktop_index, NULL,
+					submap_name[0] ? submap_name : NULL);
 			else
 				add_keybind(modifiers, keysym, keycode, use_keycode, action, desktop_index, single_cmd,
-				    submap_name[0] ? submap_name : NULL);
+					submap_name[0] ? submap_name : NULL);
 		}
 	}
 }
@@ -848,7 +863,8 @@ void load_hotkeys(const char *config_path) {
 			}
 		}
 
-		if (isgraph((unsigned char)first_char) || (first_char != '\0' && !isspace((unsigned char)first_char))) {
+		if (isgraph((unsigned char)first_char) || (first_char != '\0' &&
+				!isspace((unsigned char)first_char))) {
 			if (pending_hotkey[0] != '\0') {
 				if (indent == 0 || indent <= pending_hotkey_indent) {
 					snprintf(hotkey, sizeof(hotkey), "%s", pending_hotkey);
@@ -896,8 +912,9 @@ void load_hotkeys(const char *config_path) {
 	current_parsing_submap = NULL;
 
 	fclose(f);
-	wlr_log(WLR_INFO, "Loaded %zu keybinds, %zu gesturebinds, %zu hotcornerbinds and %zu submaps from %s", num_keybinds,
-	    num_gesturebinds, num_hotcornerbinds, num_submaps, config_path);
+	wlr_log(WLR_INFO,
+		"Loaded %zu keybinds, %zu gesturebinds, %zu hotcornerbinds and %zu submaps from %s", num_keybinds,
+		num_gesturebinds, num_hotcornerbinds, num_submaps, config_path);
 }
 
 static void setup_inotify_watch(const char *config_path) {
@@ -933,7 +950,9 @@ static void setup_inotify_watch(const char *config_path) {
 	add_hotkey_listener_to_event_loop();
 }
 
-void config_init(void) { config_init_with_config_dir(NULL); }
+void config_init(void) {
+	config_init_with_config_dir(NULL);
+}
 
 void config_init_with_config_dir(const char *config_dir) {
 	custom_config_dir = config_dir;
@@ -1023,7 +1042,8 @@ static int hotkey_reload_handler(int fd, uint32_t mask, void *data) {
 	return 0;
 }
 
-bool keybind_matches(const keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode) {
+bool keybind_matches(const keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysym,
+		uint32_t keycode) {
 	if (!kb)
 		return false;
 
@@ -1251,10 +1271,10 @@ void execute_keybind(const keybind_t *kb) {
 	if (!kb)
 		return;
 	bind_t bind = {
-	    .action = kb->action,
-	    .desktop_index = kb->desktop_index,
-	    .submap_name = kb->submap_name,
-	    .external_cmd = kb->external_cmd,
+		.action = kb->action,
+		.desktop_index = kb->desktop_index,
+		.submap_name = kb->submap_name,
+		.external_cmd = kb->external_cmd,
 	};
 	execute_bind(bind);
 }
@@ -1264,7 +1284,9 @@ void execute_bell_bind(void) {
 		execute_keybind(&bell_bind);
 }
 
-int get_hotkey_watch_fd(void) { return hotkey_watch_fd; }
+int get_hotkey_watch_fd(void) {
+	return hotkey_watch_fd;
+}
 
 void setup_hotkey_event_listener(struct wl_event_loop *event_loop) {
 	hotkey_event_loop = event_loop;
@@ -1278,8 +1300,8 @@ static void add_hotkey_listener_to_event_loop(void) {
 	}
 
 	if (hotkey_event_loop && hotkey_watch_fd >= 0)
-		hotkey_event_source = wl_event_loop_add_fd(
-		    hotkey_event_loop, hotkey_watch_fd, WL_EVENT_READABLE, hotkey_reload_handler, NULL);
+		hotkey_event_source = wl_event_loop_add_fd(hotkey_event_loop, hotkey_watch_fd, WL_EVENT_READABLE,
+			hotkey_reload_handler, NULL);
 }
 
 static submap_t *find_submap(const char *name) {
@@ -1306,7 +1328,9 @@ void exit_submap(void) {
 	}
 }
 
-keyboard_grouping_t get_keyboard_grouping(void) { return keyboard_grouping; }
+keyboard_grouping_t get_keyboard_grouping(void) {
+	return keyboard_grouping;
+}
 
 void set_keyboard_grouping(keyboard_grouping_t grouping) {
 	if (keyboard_grouping != grouping) {
@@ -1334,11 +1358,17 @@ void execute_gesturebind(const gesturebind_t *gb) {
 	if (gb->action == BIND_ENTER_SUBMAP)
 		return; // FIXME: support this?
 	bind_t bind = {
-	    .action = gb->action, .desktop_index = gb->desktop_index, .external_cmd = gb->external_cmd, .submap_name = NULL};
+		.action = gb->action,
+		.desktop_index = gb->desktop_index,
+		.external_cmd = gb->external_cmd,
+		.submap_name = NULL
+	};
 	execute_bind(bind);
 }
 
-void reload_gesturebinds(void) { num_gesturebinds = 0; }
+void reload_gesturebinds(void) {
+	num_gesturebinds = 0;
+}
 
 bool hotcornerbind_matches(const hotcornerbind_t *hc, int corner_x, int corner_y) {
 	if (!hc)
@@ -1360,26 +1390,95 @@ void execute_hotcornerbind(const hotcornerbind_t *hc) {
 	if (hc->action == BIND_ENTER_SUBMAP)
 		return; // FIXME: support this?
 	bind_t bind = {
-	    .action = hc->action, .desktop_index = hc->desktop_index, .external_cmd = hc->external_cmd, .submap_name = NULL};
+		.action = hc->action,
+		.desktop_index = hc->desktop_index,
+		.external_cmd = hc->external_cmd,
+		.submap_name = NULL
+	};
 	execute_bind(bind);
 }
 
-void reload_hotcornerbinds(void) { num_hotcornerbinds = 0; }
+void reload_hotcornerbinds(void) {
+	num_hotcornerbinds = 0;
+}
 
 const char *bind_action_name(bind_action_t action) {
-	static const char *names[] = {"none", "quit", "enter_submap", "exit_submap", "node_focus", "node_close",
-	    "node_state_tiled", "node_state_floating", "node_state_fullscreen", "node_to_desktop", "desktop_focus",
-	    "desktop_layout_tiled", "desktop_layout_monocle", "focus_west", "focus_south", "focus_north", "focus_east",
-	    "swap_west", "swap_south", "swap_north", "swap_east", "presel_west", "presel_south", "presel_north",
-	    "presel_east", "presel_cancel", "toggle_floating", "toggle_fullscreen", "toggle_pseudo_tiled", "toggle_monocle",
-	    "toggle_master_stack", "desktop_layout_master_stack", "master_stack_inc", "master_stack_dec", "master_stack_flip",
-	    "master_stack_cycle_orientation", "master_stack_cycle_stack_layout", "rotate_cw", "rotate_ccw", "flip_horizontal",
-	    "flip_vertical", "desktop_next", "desktop_prev", "desktop_last", "send_to_desktop_next", "send_to_desktop_prev",
-	    "send_to_desktop_1", "send_to_desktop_2", "send_to_desktop_3", "send_to_desktop_4", "send_to_desktop_5",
-	    "send_to_desktop_6", "send_to_desktop_7", "send_to_desktop_8", "send_to_desktop_9", "send_to_desktop_10",
-	    "desktop_1", "desktop_2", "desktop_3", "desktop_4", "desktop_5", "desktop_6", "desktop_7", "desktop_8",
-	    "desktop_9", "desktop_10", "resize_left", "resize_right", "resize_up", "resize_down", "interactive_move",
-	    "interactive_resize", "tiling_drag", "external"};
+	static const char *names[] = {
+		"none",
+		"quit",
+		"enter_submap",
+		"exit_submap",
+		"node_focus",
+		"node_close",
+		"node_state_tiled",
+		"node_state_floating",
+		"node_state_fullscreen",
+		"node_to_desktop",
+		"desktop_focus",
+		"desktop_layout_tiled",
+		"desktop_layout_monocle",
+		"focus_west",
+		"focus_south",
+		"focus_north",
+		"focus_east",
+		"swap_west",
+		"swap_south",
+		"swap_north",
+		"swap_east",
+		"presel_west",
+		"presel_south",
+		"presel_north",
+		"presel_east",
+		"presel_cancel",
+		"toggle_floating",
+		"toggle_fullscreen",
+		"toggle_pseudo_tiled",
+		"toggle_monocle",
+		"toggle_master_stack",
+		"desktop_layout_master_stack",
+		"master_stack_inc",
+		"master_stack_dec",
+		"master_stack_flip",
+		"master_stack_cycle_orientation",
+		"master_stack_cycle_stack_layout",
+		"rotate_cw",
+		"rotate_ccw",
+		"flip_horizontal",
+		"flip_vertical",
+		"desktop_next",
+		"desktop_prev",
+		"desktop_last",
+		"send_to_desktop_next",
+		"send_to_desktop_prev",
+		"send_to_desktop_1",
+		"send_to_desktop_2",
+		"send_to_desktop_3",
+		"send_to_desktop_4",
+		"send_to_desktop_5",
+		"send_to_desktop_6",
+		"send_to_desktop_7",
+		"send_to_desktop_8",
+		"send_to_desktop_9",
+		"send_to_desktop_10",
+		"desktop_1",
+		"desktop_2",
+		"desktop_3",
+		"desktop_4",
+		"desktop_5",
+		"desktop_6",
+		"desktop_7",
+		"desktop_8",
+		"desktop_9",
+		"desktop_10",
+		"resize_left",
+		"resize_right",
+		"resize_up",
+		"resize_down",
+		"interactive_move",
+		"interactive_resize",
+		"tiling_drag",
+		"external"
+	};
 	if (action >= 0 && action < (int)(sizeof(names) / sizeof(names[0])))
 		return names[action];
 
@@ -1387,7 +1486,10 @@ const char *bind_action_name(bind_action_t action) {
 }
 
 void execute_bind_action(bind_action_t action) {
-	bind_t b = {.action = action, .desktop_index = 0};
+	bind_t b = {
+		.action = action,
+		.desktop_index = 0
+	};
 	execute_bind(b);
 }
 

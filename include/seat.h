@@ -15,7 +15,7 @@ typedef struct seat_t {
 	struct wl_listener request_start_drag;
 	struct wl_listener start_drag;
 
-	struct wl_list tablets;     // tablet_t.link
+	struct wl_list tablets; // tablet_t.link
 	struct wl_list tablet_pads; // tablet_pad_t.link
 
 	char name[32];

@@ -1,10 +1,8 @@
-#include "popup.h"
-
 #include "layer.h"
 #include "output.h"
+#include "popup.h"
 #include "server.h"
 #include "toplevel.h"
-
 #include <stdlib.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_output_layout.h>
@@ -13,7 +11,7 @@
 #include <wlr/util/log.h>
 
 static void create_xdg_popup(struct wlr_xdg_popup *xdg_popup, struct wlr_scene_tree *parent_tree,
-    struct wlr_scene_tree *image_capture_parent_tree);
+	struct wlr_scene_tree *image_capture_parent_tree);
 
 void popup_unconstrain(popup_t *popup) {
 	int lx, ly;
@@ -28,10 +26,10 @@ void popup_unconstrain(popup_t *popup) {
 		return;
 
 	struct wlr_box box = {
-	    output->rectangle.x - lx,
-	    output->rectangle.y - ly,
-	    output->rectangle.width,
-	    output->rectangle.height,
+		output->rectangle.x - lx,
+		output->rectangle.y - ly,
+		output->rectangle.width,
+		output->rectangle.height,
 	};
 
 	// unconstrain the popup from the relative box
@@ -72,7 +70,7 @@ void popup_destroy(struct wl_listener *listener, void *data) {
 }
 
 static void create_xdg_popup(struct wlr_xdg_popup *xdg_popup, struct wlr_scene_tree *parent_tree,
-    struct wlr_scene_tree *image_capture_parent_tree) {
+		struct wlr_scene_tree *image_capture_parent_tree) {
 	popup_t *popup = calloc(1, sizeof(*popup));
 	if (!popup) {
 		wlr_log(WLR_ERROR, "allocation failed");

@@ -19,13 +19,31 @@ struct tab_bar_t;
 struct output_t *output_at(double x, double y);
 
 // enums
-typedef enum { TYPE_HORIZONTAL, TYPE_VERTICAL, TYPE_TABBED } split_type_t;
+typedef enum {
+	TYPE_HORIZONTAL,
+	TYPE_VERTICAL,
+	TYPE_TABBED
+} split_type_t;
 
-typedef enum { SCHEME_LONGEST_SIDE, SCHEME_ALTERNATE, SCHEME_SPIRAL } automatic_scheme_t;
+typedef enum {
+	SCHEME_LONGEST_SIDE,
+	SCHEME_ALTERNATE,
+	SCHEME_SPIRAL
+} automatic_scheme_t;
 
-typedef enum { STATE_TILED, STATE_PSEUDO_TILED, STATE_FLOATING, STATE_FULLSCREEN } client_state_t;
+typedef enum {
+	STATE_TILED,
+	STATE_PSEUDO_TILED,
+	STATE_FLOATING,
+	STATE_FULLSCREEN
+} client_state_t;
 
-typedef enum { DECORATION_NONE, DECORATION_TABS, DECORATION_ALWAYS, DECORATION_CSD } decoration_mode_t;
+typedef enum {
+	DECORATION_NONE,
+	DECORATION_TABS,
+	DECORATION_ALWAYS,
+	DECORATION_CSD
+} decoration_mode_t;
 
 typedef enum {
 	FOCUS_ON_ACTIVATE_FOCUS,
@@ -33,11 +51,25 @@ typedef enum {
 	FOCUS_ON_ACTIVATE_SMART,
 	FOCUS_ON_ACTIVATE_URGENT
 } focus_on_activate_mode_t;
-typedef enum { FOLLOWS_NO, FOLLOWS_YES, FOLLOWS_ALWAYS } focus_follows_mouse_mode_t;
 
-typedef enum { LAYER_BELOW, LAYER_NORMAL, LAYER_ABOVE } stack_layer_t;
+typedef enum {
+	FOLLOWS_NO,
+	FOLLOWS_YES,
+	FOLLOWS_ALWAYS
+} focus_follows_mouse_mode_t;
 
-typedef enum { LAYOUT_TILED, LAYOUT_MONOCLE, LAYOUT_SCROLLER, LAYOUT_MASTER_STACK } layout_t;
+typedef enum {
+	LAYER_BELOW,
+	LAYER_NORMAL,
+	LAYER_ABOVE
+} stack_layer_t;
+
+typedef enum {
+	LAYOUT_TILED,
+	LAYOUT_MONOCLE,
+	LAYOUT_SCROLLER,
+	LAYOUT_MASTER_STACK
+} layout_t;
 
 static inline char layout_to_char(layout_t l) {
 	switch (l) {
@@ -53,13 +85,27 @@ static inline char layout_to_char(layout_t l) {
 	return 0;
 }
 
-typedef enum { DIR_NORTH, DIR_WEST, DIR_SOUTH, DIR_EAST } direction_t;
+typedef enum {
+	DIR_NORTH,
+	DIR_WEST,
+	DIR_SOUTH,
+	DIR_EAST
+} direction_t;
 
-typedef enum { FIRST_CHILD, SECOND_CHILD } child_polarity_t;
+typedef enum {
+	FIRST_CHILD,
+	SECOND_CHILD
+} child_polarity_t;
 
-typedef enum { FLIP_HORIZONTAL, FLIP_VERTICAL } flip_t;
+typedef enum {
+	FLIP_HORIZONTAL,
+	FLIP_VERTICAL
+} flip_t;
 
-typedef enum { WORKSPACE_ANIM_VERTICAL, WORKSPACE_ANIM_HORIZONTAL } workspace_anim_direction_t;
+typedef enum {
+	WORKSPACE_ANIM_VERTICAL,
+	WORKSPACE_ANIM_HORIZONTAL
+} workspace_anim_direction_t;
 
 // structures
 typedef struct {
@@ -154,7 +200,7 @@ typedef struct desktop_t {
 	uint32_t id;
 	layout_t layout, user_layout;
 	node_t *root, *focus;
-	struct desktop_t *prev,  *next;
+	struct desktop_t *prev, *next;
 	padding_t padding;
 	int window_gap;
 	int master_stack_count;

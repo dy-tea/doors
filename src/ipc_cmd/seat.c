@@ -1,12 +1,10 @@
-#include "seat.h"
-
 #include "config.h"
 #include "ipc.h"
 #include "ipc_cmd.h"
 #include "ipc_helpers.h"
 #include "keyboard.h"
+#include "seat.h"
 #include "server.h"
-
 #include <stdio.h>
 
 void ipc_cmd_seat(char **args, int num, int client_fd) {

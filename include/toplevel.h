@@ -13,10 +13,10 @@
 typedef struct toplevel_t {
 	struct wl_list link;
 	struct wlr_xdg_toplevel *xdg_toplevel;
-	struct wlr_scene_tree *scene_tree;         // Parent container
-	struct wlr_scene_tree *content_tree;       // XDG surface content
+	struct wlr_scene_tree *scene_tree; // Parent container
+	struct wlr_scene_tree *content_tree; // XDG surface content
 	struct wlr_scene_tree *saved_surface_tree; // Saved buffer snapshot
-	struct wlr_scene_buffer *output_handler;   // For tracking output enter/leave events
+	struct wlr_scene_buffer *output_handler; // For tracking output enter/leave events
 
 	surface_blur_t *blur;
 	surface_rounded_t *rounded;
@@ -101,4 +101,5 @@ void toplevel_apply_decoration_mode(toplevel_t *tl);
 
 bool toplevel_can_tear(toplevel_t *toplevel);
 
-void toplevel_send_frame_done_interator(struct wlr_scene_buffer *scene_buffer, int x, int y, void *data);
+void toplevel_send_frame_done_interator(struct wlr_scene_buffer *scene_buffer, int x, int y,
+	void *data);

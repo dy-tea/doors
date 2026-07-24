@@ -2,7 +2,6 @@
 #include "ipc.h"
 #include "ipc_cmd.h"
 #include "ipc_helpers.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,8 +50,8 @@ void ipc_cmd_hotkey(char **args, int num, int client_fd) {
 			else
 				snprintf(action_buf, sizeof(action_buf), "%s", action_label);
 
-			offset += snprintf(
-			    buf + offset, sizeof(buf) - offset, "%zu\t%s\t%s\t%s\n", i, mods[0] ? mods : "(none)", key_name, action_buf);
+			offset += snprintf(buf + offset, sizeof(buf) - offset, "%zu\t%s\t%s\t%s\n", i,
+				mods[0] ? mods : "(none)", key_name, action_buf);
 		}
 		offset += snprintf(buf + offset, sizeof(buf) - offset, "total: %zu keybinds\n", num_keybinds);
 		send_success(client_fd, buf);
@@ -108,8 +107,8 @@ void ipc_cmd_hotkey(char **args, int num, int client_fd) {
 	submap_name[0] = '\0';
 	bind_action_t action = parse_action(cmd, &desktop_index, submap_name);
 
-	add_keybind(modifiers, keysym, keycode, use_keycode, action, desktop_index, action == BIND_EXTERNAL ? cmd : NULL,
-	    submap_name[0] ? submap_name : NULL);
+	add_keybind(modifiers, keysym, keycode, use_keycode, action, desktop_index,
+		action == BIND_EXTERNAL ? cmd : NULL, submap_name[0] ? submap_name : NULL);
 
 	send_success(client_fd, "hotkey added\n");
 }

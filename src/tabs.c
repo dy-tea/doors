@@ -1,11 +1,9 @@
-#include "tabs.h"
-
 #include "server.h"
+#include "tabs.h"
 #include "text.h"
 #include "tree.h"
 #include "types.h"
 #include "xwayland.h"
-
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,14 +14,51 @@
 
 extern struct server_t server;
 
-float color_bar_bg[4] = {0.10f, 0.10f, 0.12f, 1.0f};
-float color_tab_bg[4] = {0.18f, 0.18f, 0.20f, 1.0f};
-float color_tab_bg_active[4] = {0.09f, 0.58f, 0.87f, 1.0f};
-float color_tab_text[4] = {0.85f, 0.85f, 0.88f, 1.0f};
-float color_tab_text_active[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-float color_tab_sep[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+float color_bar_bg[4] = {
+	0.10f,
+	0.10f,
+	0.12f,
+	1.0f
+};
 
-int tab_bar_height(void) { return TAB_BAR_HEIGHT; }
+float color_tab_bg[4] = {
+	0.18f,
+	0.18f,
+	0.20f,
+	1.0f
+};
+
+float color_tab_bg_active[4] = {
+	0.09f,
+	0.58f,
+	0.87f,
+	1.0f
+};
+
+float color_tab_text[4] = {
+	0.85f,
+	0.85f,
+	0.88f,
+	1.0f
+};
+
+float color_tab_text_active[4] = {
+	1.0f,
+	1.0f,
+	1.0f,
+	1.0f
+};
+
+float color_tab_sep[4] = {
+	0.0f,
+	0.0f,
+	0.0f,
+	1.0f
+};
+
+int tab_bar_height(void) {
+	return TAB_BAR_HEIGHT;
+}
 
 node_t *tabbed_ancestor(node_t *n) {
 	for (node_t *p = n ? n->parent : NULL; p != NULL; p = p->parent)
@@ -53,7 +88,9 @@ static size_t collect_leaves(node_t *n, node_t **out, size_t cap) {
 	return used;
 }
 
-static size_t count_leaves(node_t *n) { return collect_leaves(n, NULL, 0); }
+static size_t count_leaves(node_t *n) {
+	return collect_leaves(n, NULL, 0);
+}
 
 node_t *tab_focus_leaf(node_t *tabbed_node, node_t *focus) {
 	if (tabbed_node == NULL)
@@ -87,8 +124,8 @@ node_t *tab_next_leaf(node_t *tabbed_node, node_t *focus) {
 	for (size_t i = 0; i < n; i++)
 		if (arr[i] == cur) {
 			idx = i;
-			break;
-		}
+		break;
+	}
 	node_t *res = arr[(idx + 1) % n];
 	free(arr);
 	return res;
@@ -109,8 +146,8 @@ node_t *tab_prev_leaf(node_t *tabbed_node, node_t *focus) {
 	for (size_t i = 0; i < n; i++)
 		if (arr[i] == cur) {
 			idx = i;
-			break;
-		}
+		break;
+	}
 	node_t *res = arr[(idx + n - 1) % n];
 	free(arr);
 	return res;
@@ -269,10 +306,10 @@ void tabs_arrange(node_t *n, struct wlr_box rect) {
 		}
 
 		e->hit_box = (struct wlr_box){
-		    .x = rect.x + x,
-		    .y = rect.y,
-		    .width = w,
-		    .height = TAB_BAR_HEIGHT,
+			.x = rect.x + x,
+			.y = rect.y,
+			.width = w,
+			.height = TAB_BAR_HEIGHT,
 		};
 
 		x += w;
@@ -332,8 +369,8 @@ node_t *tabs_hit_test(const node_t *n, double lx, double ly) {
 		if (e->leaf == NULL || e->leaf->destroying)
 			continue;
 
-		if (lx >= e->hit_box.x && lx < e->hit_box.x + e->hit_box.width && ly >= e->hit_box.y
-		    && ly < e->hit_box.y + e->hit_box.height)
+		if (lx >= e->hit_box.x && lx < e->hit_box.x + e->hit_box.width && ly >= e->hit_box.y &&
+			ly < e->hit_box.y + e->hit_box.height)
 			return e->leaf;
 	}
 

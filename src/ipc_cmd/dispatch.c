@@ -1,7 +1,6 @@
 #include "ipc.h"
 #include "ipc_cmd.h"
 #include "ipc_helpers.h"
-
 #include <stdlib.h>
 #include <wlr/util/log.h>
 
@@ -15,34 +14,34 @@ typedef struct {
 bool ipc_cmd_subscribe(char **args, int num, int client_fd);
 
 static const cmd_entry_t cmds[] = {
-    {"balance", ipc_cmd_balance},
-    {"bezier", ipc_cmd_bezier},
-    {"config", ipc_cmd_config},
-    {"desktop", ipc_cmd_desktop},
-    {"env", ipc_cmd_env},
-    {"equalize", ipc_cmd_equalize},
-    {"flip", ipc_cmd_flip},
-    {"focus", ipc_cmd_focus},
-    {"hotkey", ipc_cmd_hotkey},
-    {"input", ipc_cmd_input},
-    {"keyboard_grouping", ipc_cmd_keyboard_grouping},
-    {"master_stack", ipc_cmd_master_stack},
-    {"node", ipc_cmd_node},
-    {"output", ipc_cmd_output},
-    {"presel", ipc_cmd_presel},
-    {"query", ipc_cmd_query},
-    {"quit", ipc_cmd_quit},
-    {"resize", ipc_cmd_resize},
-    {"rotate", ipc_cmd_rotate},
-    {"rule", ipc_cmd_rule},
-    {"scratchpad", ipc_cmd_scratchpad},
-    {"scroller", ipc_cmd_scroller},
-    {"seat", ipc_cmd_seat},
-    {"send", ipc_cmd_send},
-    {"spring", ipc_cmd_spring},
-    {"swap", ipc_cmd_swap},
-    {"toggle", ipc_cmd_toggle},
-    {"wm", ipc_cmd_wm},
+	{"balance", ipc_cmd_balance},
+	{"bezier", ipc_cmd_bezier},
+	{"config", ipc_cmd_config},
+	{"desktop", ipc_cmd_desktop},
+	{"env", ipc_cmd_env},
+	{"equalize", ipc_cmd_equalize},
+	{"flip", ipc_cmd_flip},
+	{"focus", ipc_cmd_focus},
+	{"hotkey", ipc_cmd_hotkey},
+	{"input", ipc_cmd_input},
+	{"keyboard_grouping", ipc_cmd_keyboard_grouping},
+	{"master_stack", ipc_cmd_master_stack},
+	{"node", ipc_cmd_node},
+	{"output", ipc_cmd_output},
+	{"presel", ipc_cmd_presel},
+	{"query", ipc_cmd_query},
+	{"quit", ipc_cmd_quit},
+	{"resize", ipc_cmd_resize},
+	{"rotate", ipc_cmd_rotate},
+	{"rule", ipc_cmd_rule},
+	{"scratchpad", ipc_cmd_scratchpad},
+	{"scroller", ipc_cmd_scroller},
+	{"seat", ipc_cmd_seat},
+	{"send", ipc_cmd_send},
+	{"spring", ipc_cmd_spring},
+	{"swap", ipc_cmd_swap},
+	{"toggle", ipc_cmd_toggle},
+	{"wm", ipc_cmd_wm},
 };
 
 bool process_ipc_message(char *msg, int msg_len, int client_fd) {

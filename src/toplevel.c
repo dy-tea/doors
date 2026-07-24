@@ -1,5 +1,3 @@
-#include "toplevel.h"
-
 #include "animation.h"
 #include "config.h"
 #include "copy_capture.h"
@@ -17,12 +15,12 @@
 #include "surface.h"
 #include "tablet.h"
 #include "tabs.h"
+#include "toplevel.h"
 #include "transaction.h"
 #include "tree.h"
 #include "types.h"
 #include "workspace.h"
 #include "xwayland.h"
-
 #include <math.h>
 #include <pixman.h>
 #include <stdlib.h>
@@ -43,7 +41,8 @@
 
 extern struct server_t server;
 
-static struct wlr_fbox clamp_scene_buffer_source_box(struct wlr_scene_buffer *buffer, struct wlr_fbox box) {
+static struct wlr_fbox clamp_scene_buffer_source_box(struct wlr_scene_buffer *buffer,
+		struct wlr_fbox box) {
 	if (!buffer || !buffer->buffer)
 		return (struct wlr_fbox){0};
 
@@ -60,7 +59,12 @@ static struct wlr_fbox clamp_scene_buffer_source_box(struct wlr_scene_buffer *bu
 	float max_h = (float)buffer->buffer->height;
 
 	if (max_w < 1.0f || max_h < 1.0f)
-		return (struct wlr_fbox){0, 0, 1, 1};
+		return (struct wlr_fbox){
+			0,
+			0,
+			1,
+			1
+		};
 
 	if (box.x > max_w)
 		box.x = max_w;
@@ -116,9 +120,8 @@ void toplevel_apply_decoration_mode(struct toplevel_t *tl) {
 	if (!tl->xdg_toplevel->base->initialized)
 		return;
 
-	enum wlr_xdg_toplevel_decoration_v1_mode mode = toplevel_should_use_server_decorations(tl)
-	    ? WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
-	    : WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
+	enum wlr_xdg_toplevel_decoration_v1_mode mode = toplevel_should_use_server_decorations(tl) ?
+		WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE : WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
 
 	wlr_xdg_toplevel_decoration_v1_set_mode(tl->xdg_decoration, mode);
 }
@@ -245,7 +248,8 @@ static void handle_outputs_update(struct wl_listener *listener, void *data) {
 
 			if (!active) {
 				wlr_log(WLR_DEBUG, "Toplevel output leave: %s", toplevel_output->output->name);
-				wlr_foreign_toplevel_handle_v1_output_leave(toplevel->foreign_toplevel, toplevel_output->output);
+				wlr_foreign_toplevel_handle_v1_output_leave(toplevel->foreign_toplevel,
+					toplevel_output->output);
 			}
 		}
 
@@ -257,7 +261,8 @@ static void handle_outputs_update(struct wl_listener *listener, void *data) {
 	}
 }
 
-static bool toplevel_output_handler_point_accepts_input(struct wlr_scene_buffer *buffer, double *x, double *y) {
+static bool toplevel_output_handler_point_accepts_input(struct wlr_scene_buffer *buffer, double *x,
+		double *y) {
 	(void)buffer;
 	(void)x;
 	(void)y;
@@ -295,8 +300,9 @@ void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
 			y = center_y > 0 ? center_y : 0;
 
 			if ((floating || fullscreen) && (x != 0 || y != 0)) {
-				wlr_log(WLR_DEBUG, "Centering surface: %dx%d at offset (%d,%d) in container %dx%d", toplevel->geometry.width,
-				    toplevel->geometry.height, x, y, container_rect->width, container_rect->height);
+				wlr_log(WLR_DEBUG, "Centering surface: %dx%d at offset (%d,%d) in container %dx%d",
+					toplevel->geometry.width, toplevel->geometry.height, x, y, container_rect->width,
+					container_rect->height);
 				clip_to_geometry = false;
 			}
 		}
@@ -306,23 +312,30 @@ void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
 
 	// when tiled or floating surface is smaller than its container, update borders
 	// to wrap the actual surface instead of the full allocated space
-	if ((tiled || floating) && toplevel->border_tree && effective_border_width(toplevel->node->desktop) > 0) {
+	if ((tiled || floating) && toplevel->border_tree &&
+			effective_border_width(toplevel->node->desktop) > 0) {
 		unsigned int bw = effective_border_width(toplevel->node->desktop);
 		if (tiled && (x > 0 || y > 0)) {
-			int border_w = (int)toplevel->geometry.width < container_rect->width ? (int)toplevel->geometry.width
-			                                                                     : container_rect->width;
-			int border_h = (int)toplevel->geometry.height < container_rect->height ? (int)toplevel->geometry.height
-			                                                                       : container_rect->height;
-			struct wlr_box content_geo = {0, 0, border_w, border_h};
+			int border_w = (int)toplevel->geometry.width < container_rect->width ?
+				(int)toplevel->geometry.width : container_rect->width;
+			int border_h = (int)toplevel->geometry.height < container_rect->height ?
+				(int)toplevel->geometry.height : container_rect->height;
+			struct wlr_box content_geo = {
+				0,
+				0,
+				border_w,
+				border_h
+			};
 			update_borders(toplevel->border_tree, toplevel->border_rects, content_geo, bw);
 			wlr_scene_node_set_position(&toplevel->border_tree->node, (int)x - (int)bw, (int)y - (int)bw);
 			update_border_colors(c);
-			if (toplevel->rounded && toplevel->rounded->border_shader_node
-			    && (c->border_radius > 0.0f || toplevel->rounded->gradient_count >= 2)) {
+			if (toplevel->rounded && toplevel->rounded->border_shader_node && (c->border_radius > 0.0f ||
+					toplevel->rounded->gradient_count >= 2)) {
 				int new_fw = border_w + 2 * (int)bw;
 				int new_fh = border_h + 2 * (int)bw;
 				if (new_fw > 0 && new_fh > 0) {
-					if (toplevel->rounded->border_shader_buf_w != new_fw || toplevel->rounded->border_shader_buf_h != new_fh) {
+					if (toplevel->rounded->border_shader_buf_w != new_fw ||
+							toplevel->rounded->border_shader_buf_h != new_fh) {
 						toplevel->rounded->border_dirty = true;
 						toplevel->rounded->corner_mask_dirty = true;
 					}
@@ -330,15 +343,21 @@ void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
 				}
 			}
 		} else if (container_rect) {
-			struct wlr_box full_geo = {0, 0, container_rect->width, container_rect->height};
+			struct wlr_box full_geo = {
+				0,
+				0,
+				container_rect->width,
+				container_rect->height
+			};
 			update_borders(toplevel->border_tree, toplevel->border_rects, full_geo, bw);
 			update_border_colors(c);
-			if (toplevel->rounded && toplevel->rounded->border_shader_node
-			    && (c->border_radius > 0.0f || toplevel->rounded->gradient_count >= 2)) {
+			if (toplevel->rounded && toplevel->rounded->border_shader_node && (c->border_radius > 0.0f ||
+					toplevel->rounded->gradient_count >= 2)) {
 				int new_fw = container_rect->width + 2 * (int)bw;
 				int new_fh = container_rect->height + 2 * (int)bw;
 				if (new_fw > 0 && new_fh > 0) {
-					if (toplevel->rounded->border_shader_buf_w != new_fw || toplevel->rounded->border_shader_buf_h != new_fh) {
+					if (toplevel->rounded->border_shader_buf_w != new_fw ||
+							toplevel->rounded->border_shader_buf_h != new_fh) {
 						toplevel->rounded->border_dirty = true;
 						toplevel->rounded->corner_mask_dirty = true;
 					}
@@ -362,7 +381,12 @@ void toplevel_center_and_clip_surface(toplevel_t *toplevel) {
 				clip_h = container_rect->height;
 		}
 
-		struct wlr_box clip = {.x = toplevel->geometry.x, .y = toplevel->geometry.y, .width = clip_w, .height = clip_h};
+		struct wlr_box clip = {
+			.x = toplevel->geometry.x,
+			.y = toplevel->geometry.y,
+			.width = clip_w,
+			.height = clip_h
+		};
 
 		if (clip_to_geometry) {
 			wlr_scene_subsurface_tree_set_clip(&toplevel->content_tree->node, &clip);
@@ -393,8 +417,8 @@ void xdg_toplevel_tag_manager_v1_handle_set_tag(struct wl_listener *listener, vo
 		const char *app_id = toplevel->node->client->app_id;
 		const char *title = toplevel->node->client->title;
 		find_matching_rule(app_id, title, toplevel->tag);
-		ipc_put_status(SUB_MASK_NODE_CHANGE, "node_change[%s,%s,%u,tag]\n", app_id && app_id[0] ? app_id : "?",
-		    title && title[0] ? title : "?", toplevel->node->id);
+		ipc_put_status(SUB_MASK_NODE_CHANGE, "node_change[%s,%s,%u,tag]\n",
+			app_id && app_id[0] ? app_id : "?", title && title[0] ? title : "?", toplevel->node->id);
 	}
 
 	transaction_commit_dirty();
@@ -524,7 +548,8 @@ void toplevel_map(struct wl_listener *listener, void *data) {
 
 	// find target desktop
 	desktop_t *target_desktop = d;
-	wlr_log(WLR_DEBUG, "Window %s: current desktop=%s, has_rule=%d", app_id ? app_id : "?", d->name, rule != NULL);
+	wlr_log(WLR_DEBUG, "Window %s: current desktop=%s, has_rule=%d", app_id ? app_id : "?", d->name,
+		rule != NULL);
 	if (rule && rule->has & RULE_TYPE_DESKTOP) {
 		wlr_log(WLR_DEBUG, "  Rule specifies desktop: %s", rule->desktop);
 		desktop_t *new_desk = find_desktop_by_name_in_monitor(target_output, rule->desktop);
@@ -537,7 +562,8 @@ void toplevel_map(struct wl_listener *listener, void *data) {
 	}
 
 	bool desktop_changed = (target_desktop != d);
-	wlr_log(WLR_DEBUG, "  Final target desktop: %s (changed=%d)", target_desktop->name, desktop_changed);
+	wlr_log(WLR_DEBUG, "  Final target desktop: %s (changed=%d)", target_desktop->name,
+		desktop_changed);
 
 	rule_apply_consequence(n, n->client, rule);
 
@@ -558,20 +584,24 @@ void toplevel_map(struct wl_listener *listener, void *data) {
 
 	// create foreign toplevel handles
 	struct wlr_ext_foreign_toplevel_handle_v1_state ext_state = {
-	    .app_id = app_id,
-	    .title = title,
+		.app_id = app_id,
+		.title = title,
 	};
-	toplevel->ext_foreign_toplevel = wlr_ext_foreign_toplevel_handle_v1_create(server.foreign_toplevel_list, &ext_state);
+	toplevel->ext_foreign_toplevel =
+		wlr_ext_foreign_toplevel_handle_v1_create(server.foreign_toplevel_list, &ext_state);
 	toplevel->ext_foreign_toplevel->data = toplevel;
 	toplevel->foreign_identifier = toplevel->ext_foreign_toplevel->identifier;
 
-	toplevel->foreign_toplevel = wlr_foreign_toplevel_handle_v1_create(server.foreign_toplevel_manager);
+	toplevel->foreign_toplevel =
+		wlr_foreign_toplevel_handle_v1_create(server.foreign_toplevel_manager);
 
 	toplevel->foreign_activate_request.notify = handle_foreign_activate_request;
-	wl_signal_add(&toplevel->foreign_toplevel->events.request_activate, &toplevel->foreign_activate_request);
+	wl_signal_add(&toplevel->foreign_toplevel->events.request_activate,
+		&toplevel->foreign_activate_request);
 
 	toplevel->foreign_fullscreen_request.notify = handle_foreign_fullscreen_request;
-	wl_signal_add(&toplevel->foreign_toplevel->events.request_fullscreen, &toplevel->foreign_fullscreen_request);
+	wl_signal_add(&toplevel->foreign_toplevel->events.request_fullscreen,
+		&toplevel->foreign_fullscreen_request);
 
 	toplevel->foreign_close_request.notify = handle_foreign_close_request;
 	wl_signal_add(&toplevel->foreign_toplevel->events.request_close, &toplevel->foreign_close_request);
@@ -588,12 +618,14 @@ void toplevel_map(struct wl_listener *listener, void *data) {
 		wlr_scene_node_reparent(&toplevel->scene_tree->node, server.float_tree);
 		struct wlr_box mon_rect = target_output->rectangle;
 		struct wlr_box base_rect = n->client->toplevel->xdg_toplevel->base->geometry;
-		n->client->floating_rectangle = (struct wlr_box){.x = mon_rect.x + (mon_rect.width - base_rect.width) / 2,
-		    .y = mon_rect.y + (mon_rect.height - base_rect.height) / 2,
-		    .width = base_rect.width,
-		    .height = base_rect.height};
-		wlr_scene_node_set_position(
-		    &toplevel->scene_tree->node, n->client->floating_rectangle.x, n->client->floating_rectangle.y);
+		n->client->floating_rectangle = (struct wlr_box){
+			.x = mon_rect.x + (mon_rect.width - base_rect.width) / 2,
+			.y = mon_rect.y + (mon_rect.height - base_rect.height) / 2,
+			.width = base_rect.width,
+			.height = base_rect.height
+		};
+		wlr_scene_node_set_position(&toplevel->scene_tree->node, n->client->floating_rectangle.x,
+			n->client->floating_rectangle.y);
 		n->client->last_state = STATE_TILED;
 		n->client->state = STATE_FLOATING;
 		n->hidden = true;
@@ -602,18 +634,24 @@ void toplevel_map(struct wl_listener *listener, void *data) {
 	} else if (rule && rule->state == STATE_PSEUDO_TILED) {
 		struct wlr_box base_rect = n->client->toplevel->xdg_toplevel->base->geometry;
 		n->client->floating_rectangle = (struct wlr_box){
-		    .x = 0, .y = 0, .width = base_rect.width, .height = base_rect.height};
+			.x = 0,
+			.y = 0,
+			.width = base_rect.width,
+			.height = base_rect.height
+		};
 		n->client->state = STATE_PSEUDO_TILED;
 	} else if (auto_float_dialogs && toplevel->is_dialog) {
 		wlr_scene_node_reparent(&toplevel->scene_tree->node, server.float_tree);
 		struct wlr_box mon_rect = target_output->rectangle;
 		struct wlr_box base_rect = n->client->toplevel->xdg_toplevel->base->geometry;
-		n->client->floating_rectangle = (struct wlr_box){.x = mon_rect.x + (mon_rect.width - base_rect.width) / 2,
-		    .y = mon_rect.y + (mon_rect.height - base_rect.height) / 2,
-		    .width = base_rect.width,
-		    .height = base_rect.height};
-		wlr_scene_node_set_position(
-		    &toplevel->scene_tree->node, n->client->floating_rectangle.x, n->client->floating_rectangle.y);
+		n->client->floating_rectangle = (struct wlr_box){
+			.x = mon_rect.x + (mon_rect.width - base_rect.width) / 2,
+			.y = mon_rect.y + (mon_rect.height - base_rect.height) / 2,
+			.width = base_rect.width,
+			.height = base_rect.height
+		};
+		wlr_scene_node_set_position(&toplevel->scene_tree->node, n->client->floating_rectangle.x,
+			n->client->floating_rectangle.y);
 		n->client->last_state = STATE_TILED;
 		n->client->state = STATE_FLOATING;
 		n->hidden = true;
@@ -623,7 +661,8 @@ void toplevel_map(struct wl_listener *listener, void *data) {
 
 	// notify wlr_foreign_toplevel clients about the output association
 	if (toplevel->foreign_toplevel && target_output && target_output->wlr_output)
-		wlr_foreign_toplevel_handle_v1_output_enter(toplevel->foreign_toplevel, target_output->wlr_output);
+		wlr_foreign_toplevel_handle_v1_output_enter(toplevel->foreign_toplevel,
+			target_output->wlr_output);
 
 	// create borders if applicable
 	create_borders(toplevel->scene_tree, &toplevel->border_tree, toplevel->border_rects);
@@ -659,22 +698,24 @@ void toplevel_map(struct wl_listener *listener, void *data) {
 	toplevel->wants_fade = true;
 	arrange(target_output, target_desktop, true);
 
-	ipc_put_status(SUB_MASK_NODE_ADD, "node_add[%s,%s,%u]\n", n->client && n->client->app_id[0] ? n->client->app_id : "?",
-	    n->client && n->client->title[0] ? n->client->title : "?", n->id);
+	ipc_put_status(SUB_MASK_NODE_ADD, "node_add[%s,%s,%u]\n",
+		n->client && n->client->app_id[0] ? n->client->app_id : "?",
+		n->client && n->client->title[0] ? n->client->title : "?", n->id);
 
 	// apply the configured xdg-decoration policy
 	toplevel_apply_decoration_mode(toplevel);
 
 	if (!n->client->block_out_from_screenshare) {
-		toplevel->image_capture_surface = wlr_scene_surface_create(
-		    &toplevel->image_capture->tree, toplevel->xdg_toplevel->base->surface);
+		toplevel->image_capture_surface = wlr_scene_surface_create(&toplevel->image_capture->tree,
+			toplevel->xdg_toplevel->base->surface);
 	}
 
 	update_foreign_toplevel_state(toplevel);
 
 	render_unfocused_client_update(n->client);
 
-	wlr_log(WLR_INFO, "Window mapped and tiled: %s", n->client->title[0] ? n->client->title : "untitled");
+	wlr_log(WLR_INFO, "Window mapped and tiled: %s",
+		n->client->title[0] ? n->client->title : "untitled");
 }
 
 void toplevel_freeze_sibling_buffers(desktop_t *d, node_t *n) {
@@ -686,8 +727,8 @@ void toplevel_freeze_sibling_buffers(desktop_t *d, node_t *n) {
 	node_t *root = d->root;
 	node_t *leaf = first_extrema(root);
 	while (leaf) {
-		if (leaf != n && leaf->client && leaf->client->shown && leaf->client->toplevel
-		    && !leaf->client->toplevel->saved_surface_tree) {
+		if (leaf != n && leaf->client && leaf->client->shown && leaf->client->toplevel &&
+				!leaf->client->toplevel->saved_surface_tree) {
 			toplevel_save_buffer(leaf->client->toplevel);
 			wlr_log(WLR_DEBUG, "Froze buffer for sibling node %u", leaf->id);
 		}
@@ -754,8 +795,8 @@ void toplevel_unmap(struct wl_listener *listener, void *data) {
 				m = d->output;
 				wlr_log(WLR_DEBUG, "Found node %u belongs to desktop %s (via n->desktop)", n->id, d->name);
 			} else {
-				wlr_log(WLR_ERROR, "Could not find desktop for node %u root %p, using current desktop %s", n->id, (void *)root,
-				    m->desk->name);
+				wlr_log(WLR_ERROR, "Could not find desktop for node %u root %p, using current desktop %s", n->id,
+					(void *)root, m->desk->name);
 				d = m->desk;
 			}
 		}
@@ -769,8 +810,8 @@ void toplevel_unmap(struct wl_listener *listener, void *data) {
 		if (n) {
 			node_set_dirty(n);
 			ipc_put_status(SUB_MASK_NODE_REMOVE, "node_remove[%s,%s,%u]\n",
-			    n->client && n->client->app_id[0] ? n->client->app_id : "?",
-			    n->client && n->client->title[0] ? n->client->title : "?", n->id);
+				n->client && n->client->app_id[0] ? n->client->app_id : "?",
+				n->client && n->client->title[0] ? n->client->title : "?", n->id);
 		}
 		remove_node(d, n);
 
@@ -806,8 +847,8 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
 			wlr_xdg_surface_schedule_configure(xdg_surface);
 
 		wlr_xdg_toplevel_set_wm_capabilities(toplevel->xdg_toplevel,
-		    WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN | WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE
-		        | WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE);
+			WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN | WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE |
+			WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE);
 		return;
 	}
 
@@ -816,24 +857,27 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
 		if (toplevel->node) {
 			struct wlr_xdg_toplevel_state *state = &toplevel->xdg_toplevel->current;
 			bool constraints_changed = false;
-			if (state->min_width > 0 && (uint16_t)state->min_width != toplevel->node->constraints.min_width) {
+			if (state->min_width > 0 &&
+					(uint16_t)state->min_width != toplevel->node->constraints.min_width) {
 				toplevel->node->constraints.min_width = state->min_width;
 				constraints_changed = true;
 			}
-			if (state->min_height > 0 && (uint16_t)state->min_height != toplevel->node->constraints.min_height) {
+			if (state->min_height > 0 &&
+					(uint16_t)state->min_height != toplevel->node->constraints.min_height) {
 				toplevel->node->constraints.min_height = state->min_height;
 				constraints_changed = true;
 			}
 			if (constraints_changed && toplevel->node->output && toplevel->node->desktop) {
 				wlr_log(WLR_DEBUG, "toplevel_commit: node %u constraints updated to %dx%d", toplevel->node->id,
-				    toplevel->node->constraints.min_width, toplevel->node->constraints.min_height);
+					toplevel->node->constraints.min_width, toplevel->node->constraints.min_height);
 				arrange(toplevel->node->output, toplevel->node->desktop, true);
 			}
 		}
 
 		struct wlr_box *new_geo = &xdg_surface->geometry;
-		bool new_size = new_geo->width != toplevel->geometry.width || new_geo->height != toplevel->geometry.height
-		    || new_geo->x != toplevel->geometry.x || new_geo->y != toplevel->geometry.y;
+		bool new_size = new_geo->width != toplevel->geometry.width ||
+			new_geo->height != toplevel->geometry.height || new_geo->x != toplevel->geometry.x ||
+			new_geo->y != toplevel->geometry.y;
 
 		if (new_size) {
 			// update stored geometry
@@ -846,14 +890,16 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
 					if (c->floating_rectangle.width > 0) {
 						c->floating_rectangle.width = toplevel->geometry.width;
 						c->floating_rectangle.height = toplevel->geometry.height;
-						wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, toplevel->geometry.width, toplevel->geometry.height);
+						wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, toplevel->geometry.width,
+							toplevel->geometry.height);
 						transaction_commit_dirty_client();
 					}
 				} else if (IS_TILED(c)) {
-					if (c->tiled_rectangle.width > 0 && c->tiled_rectangle.height > 0
-					    && (toplevel->geometry.width != c->tiled_rectangle.width
-					        || toplevel->geometry.height != c->tiled_rectangle.height)) {
-						wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, c->tiled_rectangle.width, c->tiled_rectangle.height);
+					if (c->tiled_rectangle.width > 0 && c->tiled_rectangle.height > 0 &&
+							(toplevel->geometry.width != c->tiled_rectangle.width ||
+							toplevel->geometry.height != c->tiled_rectangle.height)) {
+						wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, c->tiled_rectangle.width,
+							c->tiled_rectangle.height);
 						node_set_dirty(toplevel->node);
 						transaction_commit_dirty_client();
 					}
@@ -870,7 +916,8 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
 		// ack as configured if serial is non-zero
 		if (!toplevel->configured && serial != 0) {
 			toplevel->configured = true;
-			wlr_log(WLR_DEBUG, "Toplevel marked configured via serial=%u (transaction match=%d)", serial, successful);
+			wlr_log(WLR_DEBUG, "Toplevel marked configured via serial=%u (transaction match=%d)", serial,
+				successful);
 		}
 
 		if (toplevel->saved_surface_tree && !successful)
@@ -880,8 +927,8 @@ void toplevel_commit(struct wl_listener *listener, void *data) {
 	}
 
 	// check ext_background_effect_v1 state
-	const struct wlr_ext_background_effect_surface_v1_state *fx = wlr_ext_background_effect_v1_get_surface_state(
-	    xdg_surface->surface);
+	const struct wlr_ext_background_effect_surface_v1_state *fx =
+		wlr_ext_background_effect_v1_get_surface_state(xdg_surface->surface);
 	bool wants_blur = fx && !pixman_region32_empty(&fx->blur_region);
 	bool has_blur = toplevel->blur && toplevel->blur->blur_node != NULL;
 
@@ -906,8 +953,8 @@ void toplevel_set_effect(toplevel_t *tl, surface_effect_t effect, bool enabled) 
 }
 
 void toplevel_set_border_radius(toplevel_t *tl, float radius) {
-	surface_set_border_radius(
-	    tl->scene_tree, tl->content_tree, tl->border_tree, tl->node, &tl->rounded, &tl->shadow, radius);
+	surface_set_border_radius(tl->scene_tree, tl->content_tree, tl->border_tree, tl->node, &tl->rounded,
+		&tl->shadow, radius);
 }
 
 void toplevel_set_shadow(toplevel_t *tl, bool enabled) {
@@ -980,7 +1027,8 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
 		// border_shader_node lives inside border_tree which destroy_borders will free,
 		// but we still need to release the backing buffer
 		if (toplevel->rounded->border_shader_buf) {
-			effects_destroy_buffer(&toplevel->rounded->border_shader_buf, toplevel->rounded->border_shader_native);
+			effects_destroy_buffer(&toplevel->rounded->border_shader_buf,
+				toplevel->rounded->border_shader_native);
 			toplevel->rounded->border_shader_buf_w = 0;
 			toplevel->rounded->border_shader_buf_h = 0;
 		}
@@ -992,7 +1040,8 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
 		}
 
 		if (toplevel->rounded->corner_mask_buf) {
-			effects_destroy_buffer(&toplevel->rounded->corner_mask_buf, toplevel->rounded->corner_mask_native);
+			effects_destroy_buffer(&toplevel->rounded->corner_mask_buf,
+				toplevel->rounded->corner_mask_native);
 		}
 
 		free(toplevel->rounded);
@@ -1154,8 +1203,8 @@ void toplevel_set_title(struct wl_listener *listener, void *data) {
 		tabs_update_label_for_leaf(toplevel->node);
 
 		ipc_put_status(SUB_MASK_NODE_CHANGE, "node_change[%s,%s,%u,title]\n",
-		    toplevel->node->client->app_id[0] ? toplevel->node->client->app_id : "?", title ? title : "?",
-		    toplevel->node->id);
+			toplevel->node->client->app_id[0] ? toplevel->node->client->app_id : "?", title ? title : "?",
+			toplevel->node->id);
 	}
 }
 
@@ -1180,7 +1229,7 @@ void toplevel_set_app_id(struct wl_listener *listener, void *data) {
 		tabs_update_label_for_leaf(toplevel->node);
 
 		ipc_put_status(SUB_MASK_NODE_CHANGE, "node_change[%s,%s,%u,app_id]\n", app_id ? app_id : "?",
-		    toplevel->node->client->title[0] ? toplevel->node->client->title : "?", toplevel->node->id);
+			toplevel->node->client->title[0] ? toplevel->node->client->title : "?", toplevel->node->id);
 	}
 }
 
@@ -1212,7 +1261,7 @@ void focus_toplevel(struct toplevel_t *toplevel) {
 
 	if (seat->keyboard_state.keyboard != NULL)
 		wlr_seat_keyboard_notify_enter(seat, surface, seat->keyboard_state.keyboard->keycodes,
-		    seat->keyboard_state.keyboard->num_keycodes, &seat->keyboard_state.keyboard->modifiers);
+			seat->keyboard_state.keyboard->num_keycodes, &seat->keyboard_state.keyboard->modifiers);
 
 	// update input method focus
 	seat_t *s = seat_default();
@@ -1265,7 +1314,8 @@ void toplevel_apply_geometry(toplevel_t *toplevel) {
 
 	toplevel_center_and_clip_surface(toplevel);
 
-	wlr_log(WLR_DEBUG, "Applied geometry: %dx%d at %d,%d", rect->width, rect->height, rect->x, rect->y);
+	wlr_log(WLR_DEBUG, "Applied geometry: %dx%d at %d,%d", rect->width, rect->height, rect->x,
+		rect->y);
 }
 
 void handle_new_xdg_toplevel(struct wl_listener *listener, void *data) {
@@ -1313,7 +1363,8 @@ void handle_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 	wl_signal_add(&xdg_toplevel->base->surface->events.unmap, &toplevel->unmap);
 
 	// create surface scene within the content tree
-	struct wlr_scene_tree *xdg_tree = wlr_scene_xdg_surface_create(toplevel->content_tree, xdg_toplevel->base);
+	struct wlr_scene_tree *xdg_tree = wlr_scene_xdg_surface_create(toplevel->content_tree,
+		xdg_toplevel->base);
 	if (!xdg_tree) {
 		wlr_log(WLR_ERROR, "Failed to create XDG surface scene for toplevel");
 		wlr_scene_node_destroy(&toplevel->scene_tree->node);
@@ -1381,8 +1432,8 @@ void handle_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 }
 
 bool toplevel_is_ready(struct toplevel_t *toplevel) {
-	return toplevel && toplevel->mapped && toplevel->xdg_toplevel && toplevel->xdg_toplevel->base
-	    && toplevel->xdg_toplevel->base->surface && toplevel->xdg_toplevel->base->surface->mapped;
+	return toplevel && toplevel->mapped && toplevel->xdg_toplevel && toplevel->xdg_toplevel->base &&
+		toplevel->xdg_toplevel->base->surface && toplevel->xdg_toplevel->base->surface->mapped;
 }
 
 static int buffer_copy_count = 0;
@@ -1413,7 +1464,8 @@ static void save_buffer_iterator(struct wlr_scene_buffer *buffer, int sx, int sy
 	wlr_scene_buffer_set_transform(sbuf, buffer->transform);
 	wlr_scene_buffer_set_buffer(sbuf, buffer->buffer);
 
-	wlr_log(WLR_DEBUG, "Successfully copied buffer %dx%d at (%d,%d)", buffer->dst_width, buffer->dst_height, sx, sy);
+	wlr_log(WLR_DEBUG, "Successfully copied buffer %dx%d at (%d,%d)", buffer->dst_width,
+		buffer->dst_height, sx, sy);
 }
 
 void toplevel_save_buffer(toplevel_t *toplevel) {
@@ -1436,9 +1488,11 @@ void toplevel_save_buffer(toplevel_t *toplevel) {
 
 	// copy scene buffers
 	buffer_copy_count = 0;
-	wlr_log(WLR_DEBUG, "Starting buffer iteration for content_tree=%p", (void *)toplevel->content_tree);
+	wlr_log(WLR_DEBUG, "Starting buffer iteration for content_tree=%p",
+		(void *)toplevel->content_tree);
 
-	wlr_scene_node_for_each_buffer(&toplevel->content_tree->node, save_buffer_iterator, toplevel->saved_surface_tree);
+	wlr_scene_node_for_each_buffer(&toplevel->content_tree->node, save_buffer_iterator,
+		toplevel->saved_surface_tree);
 
 	wlr_log(WLR_DEBUG, "Buffer iteration complete, copied %d buffers", buffer_copy_count);
 
@@ -1469,7 +1523,8 @@ void toplevel_remove_saved_buffer(struct toplevel_t *toplevel) {
 		wlr_scene_node_set_enabled(&toplevel->content_tree->node, true);
 }
 
-void toplevel_send_frame_done_interator(struct wlr_scene_buffer *scene_buffer, int x, int y, void *data) {
+void toplevel_send_frame_done_interator(struct wlr_scene_buffer *scene_buffer, int x, int y,
+		void *data) {
 	(void)x;
 	(void)y;
 	struct timespec *when = data;
@@ -1489,7 +1544,7 @@ void toplevel_send_frame_done(struct toplevel_t *toplevel) {
 
 	struct wlr_scene_node *node;
 	wl_list_for_each(node, &toplevel->content_tree->children, link)
-	    wlr_scene_node_for_each_buffer(node, toplevel_send_frame_done_interator, &when);
+		wlr_scene_node_for_each_buffer(node, toplevel_send_frame_done_interator, &when);
 }
 
 void handle_new_toplevel_capture_request(struct wl_listener *listener, void *data) {
@@ -1521,19 +1576,23 @@ void handle_new_toplevel_capture_request(struct wl_listener *listener, void *dat
 	}
 
 	if (*image_capture_source_ptr == NULL) {
-		*image_capture_source_ptr = wlr_ext_image_capture_source_v1_create_with_scene_node(
-		    &image_capture->tree.node, wl_display_get_event_loop(server.wl_display), server.allocator, server.renderer);
+		*image_capture_source_ptr =
+			wlr_ext_image_capture_source_v1_create_with_scene_node(&image_capture->tree.node,
+			wl_display_get_event_loop(server.wl_display), server.allocator, server.renderer);
 
 		if (*image_capture_source_ptr == NULL)
 			return;
 	}
 
-	wlr_ext_foreign_toplevel_image_capture_source_manager_v1_request_accept(request, *image_capture_source_ptr);
+	wlr_ext_foreign_toplevel_image_capture_source_manager_v1_request_accept(request,
+		*image_capture_source_ptr);
 }
 
 static struct toplevel_t *toplevel_for_xdg_surface(struct wlr_xdg_surface *surface) {
 	toplevel_t *tl;
-	wl_list_for_each(tl, &server.toplevels, link) if (tl->xdg_toplevel && tl->xdg_toplevel->base == surface) return tl;
+	wl_list_for_each(tl, &server.toplevels, link)
+		if (tl->xdg_toplevel && tl->xdg_toplevel->base == surface)
+			return tl;
 
 	return NULL;
 }

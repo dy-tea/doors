@@ -1,5 +1,4 @@
 #include "bezier.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -58,7 +57,8 @@ bezier_curve_t *bezier_add(const char *name, double p1x, double p1y, double p2x,
 		existing->p2x = p2x;
 		existing->p2y = p2y;
 		bake_curve(existing);
-		wlr_log(WLR_DEBUG, "bezier: updated '%s' with P1=(%.3f,%.3f) P2=(%.3f,%.3f)", name, p1x, p1y, p2x, p2y);
+		wlr_log(WLR_DEBUG, "bezier: updated '%s' with P1=(%.3f,%.3f) P2=(%.3f,%.3f)", name, p1x, p1y, p2x,
+			p2y);
 		return existing;
 	}
 
@@ -74,18 +74,23 @@ bezier_curve_t *bezier_add(const char *name, double p1x, double p1y, double p2x,
 	bake_curve(curve);
 
 	wl_list_insert(&bezier_curves, &curve->link);
-	wlr_log(WLR_DEBUG, "bezier: added '%s' with P1=(%.3f,%.3f) P2=(%.3f,%.3f)", name, p1x, p1y, p2x, p2y);
+	wlr_log(WLR_DEBUG, "bezier: added '%s' with P1=(%.3f,%.3f) P2=(%.3f,%.3f)", name, p1x, p1y, p2x,
+		p2y);
 	return curve;
 }
 
-bool bezier_exists(const char *name) { return bezier_find(name) != NULL; }
+bool bezier_exists(const char *name) {
+	return bezier_find(name) != NULL;
+}
 
 bezier_curve_t *bezier_find(const char *name) {
 	if (!name || name[0] == '\0')
 		return NULL;
 
 	bezier_curve_t *curve;
-	wl_list_for_each(curve, &bezier_curves, link) if (strcmp(curve->name, name) == 0) return curve;
+	wl_list_for_each(curve, &bezier_curves, link)
+		if (strcmp(curve->name, name) == 0)
+			return curve;
 
 	return NULL;
 }

@@ -9,7 +9,6 @@
 #include "spring.h"
 #include "transaction.h"
 #include "tree.h"
-
 #include <stdlib.h>
 #include <string.h>
 
@@ -207,7 +206,8 @@ void ipc_cmd_bezier(char **args, int num, int client_fd) {
 
 void ipc_cmd_spring(char **args, int num, int client_fd) {
 	if (num < 3) {
-		send_failure(client_fd, "usage: spring <name> <stiffness> <damping> [mass] [value_eps] [velocity_eps]\n");
+		send_failure(client_fd,
+			"usage: spring <name> <stiffness> <damping> [mass] [value_eps] [velocity_eps]\n");
 		return;
 	}
 	double stiffness = atof(args[1]);

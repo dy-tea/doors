@@ -1,10 +1,8 @@
-#include "surface.h"
-
 #include "effects_backend.h"
 #include "output.h"
 #include "server.h"
+#include "surface.h"
 #include "toplevel.h"
-
 #include <pixman.h>
 #include <stdlib.h>
 #include <string.h>
@@ -45,8 +43,8 @@ static effect_fields_t get_effect_fields(surface_blur_t *b, surface_effect_t eff
 	return f;
 }
 
-void surface_set_effect(
-    struct wlr_scene_tree *scene_tree, node_t *node, surface_blur_t **blur, surface_effect_t effect, bool enabled) {
+void surface_set_effect(struct wlr_scene_tree *scene_tree, node_t *node, surface_blur_t **blur,
+		surface_effect_t effect, bool enabled) {
 	if (!scene_tree)
 		return;
 
@@ -64,10 +62,11 @@ void surface_set_effect(
 			if (*f.node) {
 				wlr_scene_node_lower_to_bottom(&(*f.node)->node);
 				if (node && node->output) {
-					struct wlr_scene_output *so = wlr_scene_get_scene_output(server.scene, node->output->wlr_output);
+					struct wlr_scene_output *so = wlr_scene_get_scene_output(server.scene,
+						node->output->wlr_output);
 					if (so) {
 						pixman_region32_union_rect(&so->damage_ring.current, &so->damage_ring.current, 0, 0,
-						    (unsigned int)node->output->width, (unsigned int)node->output->height);
+							(unsigned int)node->output->width, (unsigned int)node->output->height);
 						output_schedule_frame(node->output);
 					}
 				}
@@ -87,9 +86,9 @@ void surface_set_effect(
 	}
 }
 
-void surface_set_border_radius(struct wlr_scene_tree *scene_tree, struct wlr_scene_tree *content_tree,
-    struct wlr_scene_tree *border_tree, node_t *node, surface_rounded_t **rounded, surface_shadow_t **shadow,
-    float radius) {
+void surface_set_border_radius(struct wlr_scene_tree *scene_tree,
+		struct wlr_scene_tree *content_tree, struct wlr_scene_tree *border_tree, node_t *node,
+		surface_rounded_t **rounded, surface_shadow_t **shadow, float radius) {
 	if (!scene_tree || !content_tree)
 		return;
 
@@ -142,10 +141,8 @@ void surface_set_border_radius(struct wlr_scene_tree *scene_tree, struct wlr_sce
 					effects_destroy_buffer(&(*rounded)->border_shader_buf, (*rounded)->border_shader_native);
 					(*rounded)->border_shader_buf_w = 0;
 					(*rounded)->border_shader_buf_h = 0;
-				}
-				(*rounded)->border_cache_valid = false;
-			}
-			(*rounded)->border_dirty = false;
+				} (*rounded)->border_cache_valid = false;
+			} (*rounded)->border_dirty = false;
 			(*rounded)->corner_mask_dirty = false;
 		} else {
 			(*rounded)->border_dirty = true;
@@ -154,7 +151,8 @@ void surface_set_border_radius(struct wlr_scene_tree *scene_tree, struct wlr_sce
 	}
 }
 
-void surface_set_shadow(struct wlr_scene_tree *scene_tree, node_t *node, surface_shadow_t **shadow, bool enabled) {
+void surface_set_shadow(struct wlr_scene_tree *scene_tree, node_t *node, surface_shadow_t **shadow,
+		bool enabled) {
 	if (!scene_tree)
 		return;
 
@@ -166,8 +164,7 @@ void surface_set_shadow(struct wlr_scene_tree *scene_tree, node_t *node, surface
 			*shadow = calloc(1, sizeof(**shadow));
 			if (!*shadow)
 				return;
-		}
-		(*shadow)->shadow_dirty = true;
+		} (*shadow)->shadow_dirty = true;
 	} else if (*shadow) {
 		if ((*shadow)->shadow_node) {
 			wlr_scene_node_destroy(&(*shadow)->shadow_node->node);
@@ -175,8 +172,7 @@ void surface_set_shadow(struct wlr_scene_tree *scene_tree, node_t *node, surface
 		}
 		if ((*shadow)->shadow_buf) {
 			effects_destroy_buffer(&(*shadow)->shadow_buf, (*shadow)->shadow_native);
-		}
-		(*shadow)->shadow_dirty = false;
+		} (*shadow)->shadow_dirty = false;
 	}
 }
 
@@ -202,10 +198,11 @@ void surface_update_rounded(surface_rounded_t **rounded, float color[4], border_
 		changed = true;
 	if (r->gradient_lerp != bt->gradient_lerp)
 		changed = true;
-	if (bt->gradient_count > 0 && memcmp(r->gradient_colors, bt->gradient, bt->gradient_count * 4 * sizeof(float)) != 0)
+	if (bt->gradient_count > 0 && memcmp(r->gradient_colors, bt->gradient,
+		bt->gradient_count * 4 * sizeof(float)) != 0)
 		changed = true;
-	if (bt->gradient2_count > 0
-	    && memcmp(r->gradient2_colors, bt->gradient2, bt->gradient2_count * 4 * sizeof(float)) != 0)
+	if (bt->gradient2_count > 0 && memcmp(r->gradient2_colors, bt->gradient2,
+		bt->gradient2_count * 4 * sizeof(float)) != 0)
 		changed = true;
 
 	memcpy(r->border_color, color, sizeof(r->border_color));
@@ -246,7 +243,8 @@ void surface_client_set_shadow(client_t *client, bool enabled) {
 		xwayland_set_shadow(client->xwayland_view, enabled);
 }
 
-static void surface_set_opacity_for_each_buffer(struct wlr_scene_buffer *buffer, int x, int y, void *data) {
+static void surface_set_opacity_for_each_buffer(struct wlr_scene_buffer *buffer, int x, int y,
+		void *data) {
 	(void)x;
 	(void)y;
 	float *opacity = data;

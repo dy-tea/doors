@@ -1,5 +1,3 @@
-#include "xwayland.h"
-
 #include "animation.h"
 #include "config.h"
 #include "copy_capture.h"
@@ -19,7 +17,7 @@
 #include "tree.h"
 #include "types.h"
 #include "workspace.h"
-
+#include "xwayland.h"
 #include <pixman.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,24 +35,24 @@
 #include <xcb/xcb_icccm.h>
 
 static const char *atom_map[ATOM_LAST] = {
-    [NET_WM_WINDOW_TYPE_NORMAL] = "_NET_WM_WINDOW_TYPE_NORMAL",
-    [NET_WM_WINDOW_TYPE_DIALOG] = "_NET_WM_WINDOW_TYPE_DIALOG",
-    [NET_WM_WINDOW_TYPE_UTILITY] = "_NET_WM_WINDOW_TYPE_UTILITY",
-    [NET_WM_WINDOW_TYPE_TOOLBAR] = "_NET_WM_WINDOW_TYPE_TOOLBAR",
-    [NET_WM_WINDOW_TYPE_SPLASH] = "_NET_WM_WINDOW_TYPE_SPLASH",
-    [NET_WM_WINDOW_TYPE_MENU] = "_NET_WM_WINDOW_TYPE_MENU",
-    [NET_WM_WINDOW_TYPE_DROPDOWN_MENU] = "_NET_WM_WINDOW_TYPE_DROPDOWN_MENU",
-    [NET_WM_WINDOW_TYPE_POPUP_MENU] = "_NET_WM_WINDOW_TYPE_POPUP_MENU",
-    [NET_WM_WINDOW_TYPE_TOOLTIP] = "_NET_WM_WINDOW_TYPE_TOOLTIP",
-    [NET_WM_WINDOW_TYPE_NOTIFICATION] = "_NET_WM_WINDOW_TYPE_NOTIFICATION",
-    [NET_WM_STATE_MODAL] = "_NET_WM_STATE_MODAL",
+	[NET_WM_WINDOW_TYPE_NORMAL] = "_NET_WM_WINDOW_TYPE_NORMAL",
+	[NET_WM_WINDOW_TYPE_DIALOG] = "_NET_WM_WINDOW_TYPE_DIALOG",
+	[NET_WM_WINDOW_TYPE_UTILITY] = "_NET_WM_WINDOW_TYPE_UTILITY",
+	[NET_WM_WINDOW_TYPE_TOOLBAR] = "_NET_WM_WINDOW_TYPE_TOOLBAR",
+	[NET_WM_WINDOW_TYPE_SPLASH] = "_NET_WM_WINDOW_TYPE_SPLASH",
+	[NET_WM_WINDOW_TYPE_MENU] = "_NET_WM_WINDOW_TYPE_MENU",
+	[NET_WM_WINDOW_TYPE_DROPDOWN_MENU] = "_NET_WM_WINDOW_TYPE_DROPDOWN_MENU",
+	[NET_WM_WINDOW_TYPE_POPUP_MENU] = "_NET_WM_WINDOW_TYPE_POPUP_MENU",
+	[NET_WM_WINDOW_TYPE_TOOLTIP] = "_NET_WM_WINDOW_TYPE_TOOLTIP",
+	[NET_WM_WINDOW_TYPE_NOTIFICATION] = "_NET_WM_WINDOW_TYPE_NOTIFICATION",
+	[NET_WM_STATE_MODAL] = "_NET_WM_STATE_MODAL",
 };
 
 static void xwayland_view_destroy(xwayland_toplevel_t *xwayland_view);
 static xwayland_toplevel_t *create_xwayland_view(struct wlr_xwayland_surface *xsurface);
 static xwayland_unmanaged_t *create_unmanaged(struct wlr_xwayland_surface *xsurface);
-static void begin_xwayland_interactive(
-    struct xwayland_toplevel_t *xwayland_view, enum cursor_mode mode, uint32_t edges);
+static void begin_xwayland_interactive(struct xwayland_toplevel_t *xwayland_view,
+	enum cursor_mode mode, uint32_t edges);
 static void handle_xwayland_outputs_update(struct wl_listener *listener, void *data);
 
 static void unmanaged_handle_request_configure(struct wl_listener *listener, void *data) {
@@ -139,19 +137,19 @@ static void unmanaged_handle_map(struct wl_listener *listener, void *data) {
 		int abs_x = xsurface->x;
 		int abs_y = xsurface->y;
 
-		wlr_log(WLR_INFO, "Unmanaged window %u map: x=%d y=%d size=%dx%d parent=%p", xsurface->window_id, xsurface->x,
-		    xsurface->y, xsurface->width, xsurface->height, (void *)xsurface->parent);
+		wlr_log(WLR_INFO, "Unmanaged window %u map: x=%d y=%d size=%dx%d parent=%p", xsurface->window_id,
+			xsurface->x, xsurface->y, xsurface->width, xsurface->height, (void *)xsurface->parent);
 
 		if (xsurface->parent) {
 			wlr_log(WLR_INFO, "Parent window %u at X11 coords (%d,%d) override_redirect=%d data=%p",
-			    xsurface->parent->window_id, xsurface->parent->x, xsurface->parent->y, xsurface->parent->override_redirect,
-			    xsurface->parent->data);
+				xsurface->parent->window_id, xsurface->parent->x, xsurface->parent->y,
+				xsurface->parent->override_redirect, xsurface->parent->data);
 
 			// if parent is a managed window, use its X11 coordinates
 			if (!xsurface->parent->override_redirect && xsurface->parent->data) {
 				xwayland_toplevel_t *parent_view = xsurface->parent->data;
 				wlr_log(WLR_INFO, "Parent view found: scene_tree=%p node=%p", (void *)parent_view->scene_tree,
-				    (void *)parent_view->node);
+					(void *)parent_view->node);
 
 				if (parent_view->xwayland_surface && parent_view->node) {
 					// convert from X11 space to screen space
@@ -165,11 +163,10 @@ static void unmanaged_handle_map(struct wl_listener *listener, void *data) {
 						abs_y = parent_view->node->rectangle.y + y_offset;
 					}
 
-					wlr_log(WLR_INFO,
-					    "Parent X11 at (%d,%d), node at (%d,%d), popup X11 at (%d,%d), offset "
-					    "(%d,%d), final: (%d,%d)",
-					    parent_view->xwayland_surface->x, parent_view->xwayland_surface->y, parent_view->node->rectangle.x,
-					    parent_view->node->rectangle.y, xsurface->x, xsurface->y, x_offset, y_offset, abs_x, abs_y);
+					wlr_log(WLR_INFO, "Parent X11 at (%d,%d), node at (%d,%d), popup X11 at (%d,%d), offset "
+						"(%d,%d), final: (%d,%d)", parent_view->xwayland_surface->x, parent_view->xwayland_surface->y,
+							parent_view->node->rectangle.x, parent_view->node->rectangle.y, xsurface->x, xsurface->y,
+							x_offset, y_offset, abs_x, abs_y);
 				} else
 					goto add_abs;
 			} else {
@@ -191,8 +188,8 @@ static void unmanaged_handle_map(struct wl_listener *listener, void *data) {
 
 					while (n && !focused_view) {
 						if (n->client && n->client->toplevel == NULL) {
-							if (n->rectangle.x > 0 || n->rectangle.y > 0 || n->client->floating_rectangle.x > 0
-							    || n->client->floating_rectangle.y > 0) {
+							if (n->rectangle.x > 0 || n->rectangle.y > 0 || n->client->floating_rectangle.x > 0 ||
+									n->client->floating_rectangle.y > 0) {
 								if (n->client->state == STATE_FLOATING) {
 									abs_x = n->client->floating_rectangle.x + xsurface->x;
 									abs_y = n->client->floating_rectangle.y + xsurface->y;
@@ -228,8 +225,8 @@ static void unmanaged_handle_map(struct wl_listener *listener, void *data) {
 			}
 
 			// cursed
-			if (focused_view && focused_view != (xwayland_toplevel_t *)1 && focused_view->mapped && focused_view->node
-			    && focused_view->node->client) {
+			if (focused_view && focused_view != (xwayland_toplevel_t *)1 && focused_view->mapped &&
+					focused_view->node && focused_view->node->client) {
 				struct wlr_xwayland_surface *parent_xsurface = focused_view->xwayland_surface;
 
 				int x_offset = xsurface->x - parent_xsurface->x;
@@ -369,7 +366,8 @@ static struct xwayland_unmanaged_t *create_unmanaged(struct wlr_xwayland_surface
 	return surface;
 }
 
-static bool xwayland_output_handler_point_accepts_input(struct wlr_scene_buffer *buffer, double *x, double *y) {
+static bool xwayland_output_handler_point_accepts_input(struct wlr_scene_buffer *buffer, double *x,
+		double *y) {
 	(void)buffer;
 	(void)x;
 	(void)y;
@@ -394,14 +392,16 @@ static void handle_xwayland_outputs_update(struct wl_listener *listener, void *d
 
 			if (!active) {
 				wlr_log(WLR_DEBUG, "XWayland toplevel output leave: %s", toplevel_output->output->name);
-				wlr_foreign_toplevel_handle_v1_output_leave(xwayland_view->foreign_toplevel, toplevel_output->output);
+				wlr_foreign_toplevel_handle_v1_output_leave(xwayland_view->foreign_toplevel,
+					toplevel_output->output);
 			}
 		}
 
 		for (size_t i = 0; i < event->size; i++) {
 			struct wlr_scene_output *scene_output = event->active[i];
 			wlr_log(WLR_DEBUG, "XWayland toplevel output enter: %s", scene_output->output->name);
-			wlr_foreign_toplevel_handle_v1_output_enter(xwayland_view->foreign_toplevel, scene_output->output);
+			wlr_foreign_toplevel_handle_v1_output_enter(xwayland_view->foreign_toplevel,
+				scene_output->output);
 		}
 	}
 }
@@ -415,32 +415,38 @@ static bool xwayland_view_wants_floating(struct xwayland_toplevel_t *xwayland_vi
 	xwayland_t *xwayland = &server.xwayland;
 	for (size_t i = 0; i < surface->window_type_len; i++) {
 		xcb_atom_t type = surface->window_type[i];
-		if (type == xwayland->atoms[NET_WM_WINDOW_TYPE_DIALOG] || type == xwayland->atoms[NET_WM_WINDOW_TYPE_UTILITY]
-		    || type == xwayland->atoms[NET_WM_WINDOW_TYPE_TOOLBAR] || type == xwayland->atoms[NET_WM_WINDOW_TYPE_SPLASH]) {
+		if (type == xwayland->atoms[NET_WM_WINDOW_TYPE_DIALOG] ||
+				type == xwayland->atoms[NET_WM_WINDOW_TYPE_UTILITY] ||
+				type == xwayland->atoms[NET_WM_WINDOW_TYPE_TOOLBAR] ||
+				type == xwayland->atoms[NET_WM_WINDOW_TYPE_SPLASH]) {
 			return true;
 		}
 	}
 
 	xcb_size_hints_t *size_hints = surface->size_hints;
-	if (size_hints != NULL && size_hints->min_width > 0 && size_hints->min_height > 0
-	    && (size_hints->max_width == size_hints->min_width || size_hints->max_height == size_hints->min_height)) {
+	if (size_hints != NULL && size_hints->min_width > 0 && size_hints->min_height > 0 &&
+			(size_hints->max_width == size_hints->min_width ||
+			size_hints->max_height == size_hints->min_height)) {
 		return true;
 	}
 
 	return false;
 }
 
-static void xwayland_view_configure(xwayland_toplevel_t *xwayland_view, int x, int y, int width, int height) {
+static void xwayland_view_configure(xwayland_toplevel_t *xwayland_view, int x, int y, int width,
+		int height) {
 	struct wlr_xwayland_surface *xsurface = xwayland_view->xwayland_surface;
 	wlr_xwayland_surface_configure(xsurface, x, y, width, height);
 
-	if (xwayland_view->scene_tree && xwayland_view->node && xwayland_view->node->client
-	    && xwayland_view->node->client->state == STATE_FLOATING) {
+	if (xwayland_view->scene_tree && xwayland_view->node && xwayland_view->node->client &&
+			xwayland_view->node->client->state == STATE_FLOATING) {
 		wlr_scene_node_set_position(&xwayland_view->scene_tree->node, x, y);
 	}
 }
 
-static void xwayland_view_apply_disable_decorations(xwayland_toplevel_t *xwayland_view) { (void)xwayland_view; }
+static void xwayland_view_apply_disable_decorations(xwayland_toplevel_t *xwayland_view) {
+	(void)xwayland_view;
+}
 
 void xwayland_view_set_activated(xwayland_toplevel_t *xwayland_view, bool activated) {
 	struct wlr_xwayland_surface *surface = xwayland_view->xwayland_surface;
@@ -465,8 +471,9 @@ void xwayland_view_set_activated(xwayland_toplevel_t *xwayland_view, bool activa
 		if (s) {
 			struct wlr_seat *wlr_seat = s->wlr_seat;
 			if (wlr_seat->keyboard_state.keyboard != NULL) {
-				wlr_seat_keyboard_notify_enter(wlr_seat, surface->surface, wlr_seat->keyboard_state.keyboard->keycodes,
-				    wlr_seat->keyboard_state.keyboard->num_keycodes, &wlr_seat->keyboard_state.keyboard->modifiers);
+				wlr_seat_keyboard_notify_enter(wlr_seat, surface->surface,
+					wlr_seat->keyboard_state.keyboard->keycodes, wlr_seat->keyboard_state.keyboard->num_keycodes,
+					&wlr_seat->keyboard_state.keyboard->modifiers);
 			}
 			if (s->input_method_relay)
 				input_method_relay_set_focus(s->input_method_relay, surface->surface);
@@ -496,9 +503,11 @@ static void handle_commit(struct wl_listener *listener, void *data) {
 	new_geo.width = state->width;
 	new_geo.height = state->height;
 
-	if (xwayland_view->geometry.width != new_geo.width || xwayland_view->geometry.height != new_geo.height) {
+	if (xwayland_view->geometry.width != new_geo.width ||
+			xwayland_view->geometry.height != new_geo.height) {
 		xwayland_view->geometry = new_geo;
-		if (xwayland_view->node && xwayland_view->node->client && xwayland_view->node->client->state == STATE_FLOATING) {
+		if (xwayland_view->node && xwayland_view->node->client &&
+				xwayland_view->node->client->state == STATE_FLOATING) {
 			xwayland_view->node->client->floating_rectangle.width = new_geo.width;
 			xwayland_view->node->client->floating_rectangle.height = new_geo.height;
 		}
@@ -524,9 +533,11 @@ static void handle_map(struct wl_listener *listener, void *data) {
 		return;
 	}
 
-	wlr_log(WLR_DEBUG, "XWayland map: window_id=%u class='%s' title='%s' override_redirect=%d mapped=%d",
-	    xsurface->window_id, xsurface->class ? xsurface->class : "(null)", xsurface->title ? xsurface->title : "(null)",
-	    xsurface->override_redirect, xsurface->surface->mapped);
+	wlr_log(WLR_DEBUG,
+		"XWayland map: window_id=%u class='%s' title='%s' override_redirect=%d mapped=%d",
+		xsurface->window_id, xsurface->class ? xsurface->class : "(null)",
+		xsurface->title ? xsurface->title : "(null)", xsurface->override_redirect,
+		xsurface->surface->mapped);
 
 	wlr_scene_subsurface_tree_create(xwayland_view->content_tree, xsurface->surface);
 
@@ -635,19 +646,21 @@ static void handle_map(struct wl_listener *listener, void *data) {
 
 	render_unfocused_client_update(client);
 
-	wlr_log(WLR_INFO, "XWayland window mapped: %s (%s) wants_float=%d size=%dx%d", title ? title : "untitled",
-	    app_id ? app_id : "unknown", wants_float, xsurface->width, xsurface->height);
+	wlr_log(WLR_INFO, "XWayland window mapped: %s (%s) wants_float=%d size=%dx%d",
+		title ? title : "untitled", app_id ? app_id : "unknown", wants_float, xsurface->width,
+		xsurface->height);
 
 	struct wlr_ext_foreign_toplevel_handle_v1_state ext_state = {
-	    .app_id = app_id,
-	    .title = title,
+		.app_id = app_id,
+		.title = title,
 	};
-	xwayland_view->ext_foreign_toplevel = wlr_ext_foreign_toplevel_handle_v1_create(
-	    server.foreign_toplevel_list, &ext_state);
+	xwayland_view->ext_foreign_toplevel =
+		wlr_ext_foreign_toplevel_handle_v1_create(server.foreign_toplevel_list, &ext_state);
 	xwayland_view->ext_foreign_toplevel->data = xwayland_view;
 	xwayland_view->foreign_identifier = xwayland_view->ext_foreign_toplevel->identifier;
 
-	xwayland_view->foreign_toplevel = wlr_foreign_toplevel_handle_v1_create(server.foreign_toplevel_manager);
+	xwayland_view->foreign_toplevel =
+		wlr_foreign_toplevel_handle_v1_create(server.foreign_toplevel_manager);
 
 	if (app_id)
 		wlr_foreign_toplevel_handle_v1_set_app_id(xwayland_view->foreign_toplevel, app_id);
@@ -662,8 +675,8 @@ static void handle_map(struct wl_listener *listener, void *data) {
 		client->state = STATE_FLOATING;
 		client->last_state = STATE_TILED;
 
-		wlr_scene_node_set_position(
-		    &xwayland_view->scene_tree->node, client->floating_rectangle.x, client->floating_rectangle.y);
+		wlr_scene_node_set_position(&xwayland_view->scene_tree->node, client->floating_rectangle.x,
+			client->floating_rectangle.y);
 
 		node->hidden = true;
 		client->shown = true;
@@ -678,8 +691,8 @@ static void handle_map(struct wl_listener *listener, void *data) {
 		wlr_scene_node_set_enabled(&xwayland_view->scene_tree->node, true);
 		wlr_scene_node_set_enabled(&xwayland_view->content_tree->node, true);
 
-		wlr_log(WLR_DEBUG, "XWayland window will be tiled, scene_tree=%p enabled=%d", (void *)xwayland_view->scene_tree,
-		    xwayland_view->scene_tree->node.enabled);
+		wlr_log(WLR_DEBUG, "XWayland window will be tiled, scene_tree=%p enabled=%d",
+			(void *)xwayland_view->scene_tree, xwayland_view->scene_tree->node.enabled);
 	}
 
 	bool target_desktop_is_focused = (target_desktop == target_monitor->desk);
@@ -694,7 +707,8 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	if (should_focus)
 		activate_node(target_monitor, target_desktop, node);
 
-	if (xsurface->fullscreen && target_desktop->fullscreen_recreate_pending_window_id == xsurface->window_id) {
+	if (xsurface->fullscreen &&
+			target_desktop->fullscreen_recreate_pending_window_id == xsurface->window_id) {
 		target_desktop->fullscreen_recreate_pending_window_id = 0;
 	} else if (rule && rule->has & RULE_TYPE_STATE && rule->state == STATE_FULLSCREEN) {
 		target_desktop->fullscreen_recreate_pending_window_id = 0;
@@ -708,8 +722,9 @@ static void handle_map(struct wl_listener *listener, void *data) {
 
 	arrange(target_monitor, target_desktop, true);
 
-	ipc_put_status(SUB_MASK_NODE_ADD, "node_add[%s,%s,%u]\n", client && client->app_id[0] ? client->app_id : "?",
-	    client && client->title[0] ? client->title : "?", node->id);
+	ipc_put_status(SUB_MASK_NODE_ADD, "node_add[%s,%s,%u]\n",
+		client && client->app_id[0] ? client->app_id : "?",
+		client && client->title[0] ? client->title : "?", node->id);
 
 	if (!wants_float && xwayland_view->node && xwayland_view->node->client) {
 		client_t *client = xwayland_view->node->client;
@@ -724,25 +739,29 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	server.last_focused_xwayland_view = xwayland_view;
 
 	if (!client->block_out_from_screenshare) {
-		xwayland_view->image_capture_surface = wlr_scene_surface_create(
-		    &xwayland_view->image_capture->tree, xsurface->surface);
+		xwayland_view->image_capture_surface =
+			wlr_scene_surface_create(&xwayland_view->image_capture->tree, xsurface->surface);
 	}
 
 	wlr_log(WLR_DEBUG, "XWayland window map complete: scene_tree enabled=%d shown=%d",
-	    xwayland_view->scene_tree->node.enabled, client->shown);
+		xwayland_view->scene_tree->node.enabled, client->shown);
 }
 
-void xwayland_set_effect(xwayland_toplevel_t *xwayland_view, surface_effect_t effect, bool enabled) {
-	surface_set_effect(xwayland_view->scene_tree, xwayland_view->node, &xwayland_view->blur, effect, enabled);
+void xwayland_set_effect(xwayland_toplevel_t *xwayland_view, surface_effect_t effect,
+		bool enabled) {
+	surface_set_effect(xwayland_view->scene_tree, xwayland_view->node, &xwayland_view->blur, effect,
+		enabled);
 }
 
 void xwayland_set_border_radius(xwayland_toplevel_t *xwayland_view, float radius) {
-	surface_set_border_radius(xwayland_view->scene_tree, xwayland_view->content_tree, xwayland_view->border_tree,
-	    xwayland_view->node, &xwayland_view->rounded, &xwayland_view->shadow, radius);
+	surface_set_border_radius(xwayland_view->scene_tree, xwayland_view->content_tree,
+		xwayland_view->border_tree, xwayland_view->node, &xwayland_view->rounded, &xwayland_view->shadow,
+		radius);
 }
 
 void xwayland_set_shadow(xwayland_toplevel_t *xwayland_view, bool enabled) {
-	surface_set_shadow(xwayland_view->scene_tree, xwayland_view->node, &xwayland_view->shadow, enabled);
+	surface_set_shadow(xwayland_view->scene_tree, xwayland_view->node, &xwayland_view->shadow,
+		enabled);
 }
 
 static void handle_unmap(struct wl_listener *listener, void *data) {
@@ -779,8 +798,8 @@ static void handle_unmap(struct wl_listener *listener, void *data) {
 		if (mon) {
 			for (desktop_t *d = mon->desk_head; d; d = d->next) {
 				node_t *n = d->root;
-				if (n == xwayland_view->node
-				    || (n && (n->first_child == xwayland_view->node || n->second_child == xwayland_view->node))) {
+				if (n == xwayland_view->node || (n && (n->first_child == xwayland_view->node ||
+						n->second_child == xwayland_view->node))) {
 					desk = d;
 					break;
 				}
@@ -791,16 +810,16 @@ static void handle_unmap(struct wl_listener *listener, void *data) {
 			xwayland_view->node->client->xwayland_view = NULL;
 
 		if (desk) {
-			if (xwayland_view->node && xwayland_view->node->client
-			    && xwayland_view->node->client->state == STATE_FULLSCREEN) {
+			if (xwayland_view->node && xwayland_view->node->client &&
+					xwayland_view->node->client->state == STATE_FULLSCREEN) {
 				desk->fullscreen_recreate_pending_window_id = xwayland_view->xwayland_surface->window_id;
 			}
 			ipc_put_status(SUB_MASK_NODE_REMOVE, "node_remove[%s,%s,%u]\n",
-			    xwayland_view->node->client && xwayland_view->node->client->app_id[0] ? xwayland_view->node->client->app_id
-			                                                                          : "?",
-			    xwayland_view->node->client && xwayland_view->node->client->title[0] ? xwayland_view->node->client->title
-			                                                                         : "?",
-			    xwayland_view->node->id);
+				xwayland_view->node->client &&
+				xwayland_view->node->client->app_id[0] ? xwayland_view->node->client->app_id : "?",
+				xwayland_view->node->client &&
+				xwayland_view->node->client->title[0] ? xwayland_view->node->client->title : "?",
+				xwayland_view->node->id);
 			remove_node(desk, xwayland_view->node);
 			if (mon && desk) {
 				arrange(mon, desk, true);
@@ -827,7 +846,8 @@ static void handle_destroy(struct wl_listener *listener, void *data) {
 		handle_unmap(&xwayland_view->unmap, NULL);
 
 	if (server.last_focused_xwayland_view == xwayland_view) {
-		uint32_t window_id = xwayland_view->xwayland_surface ? xwayland_view->xwayland_surface->window_id : 0;
+		uint32_t window_id = xwayland_view->xwayland_surface ? xwayland_view->xwayland_surface->window_id
+			: 0;
 		wlr_log(WLR_INFO, "Clearing last_focused_xwayland_view (window %u being destroyed)", window_id);
 		server.last_focused_xwayland_view = NULL;
 	}
@@ -891,7 +911,8 @@ static void handle_request_configure(struct wl_listener *listener, void *data) {
 	}
 
 	// honor floating window request
-	if (xwayland_view->node && xwayland_view->node->client && xwayland_view->node->client->state == STATE_FLOATING) {
+	if (xwayland_view->node && xwayland_view->node->client &&
+			xwayland_view->node->client->state == STATE_FLOATING) {
 		xwayland_view_configure(xwayland_view, ev->x, ev->y, ev->width, ev->height);
 		if (xwayland_view->node) {
 			xwayland_view->node->client->floating_rectangle.x = ev->x;
@@ -991,8 +1012,8 @@ static void handle_request_activate(struct wl_listener *listener, void *data) {
 		if (mon) {
 			for (desktop_t *d = mon->desk_head; d; d = d->next) {
 				node_t *n = d->root;
-				if (n == xwayland_view->node
-				    || (n && (n->first_child == xwayland_view->node || n->second_child == xwayland_view->node))) {
+				if (n == xwayland_view->node || (n && (n->first_child == xwayland_view->node ||
+						n->second_child == xwayland_view->node))) {
 					activate_node(mon, d, xwayland_view->node);
 					break;
 				}
@@ -1008,7 +1029,8 @@ static void handle_request_move(struct wl_listener *listener, void *data) {
 	if (!xwayland_view->xwayland_surface->surface || !xwayland_view->xwayland_surface->surface->mapped)
 		return;
 
-	if (xwayland_view->node && xwayland_view->node->client && xwayland_view->node->client->state == STATE_FLOATING)
+	if (xwayland_view->node && xwayland_view->node->client &&
+		xwayland_view->node->client->state == STATE_FLOATING)
 		begin_xwayland_interactive(xwayland_view, CURSOR_MOVE, 0);
 }
 
@@ -1019,7 +1041,8 @@ static void handle_request_resize(struct wl_listener *listener, void *data) {
 	if (!xwayland_view->xwayland_surface->surface || !xwayland_view->xwayland_surface->surface->mapped)
 		return;
 
-	if (xwayland_view->node && xwayland_view->node->client && xwayland_view->node->client->state == STATE_FLOATING)
+	if (xwayland_view->node && xwayland_view->node->client &&
+		xwayland_view->node->client->state == STATE_FLOATING)
 		begin_xwayland_interactive(xwayland_view, CURSOR_RESIZE, ev->edges);
 }
 
@@ -1053,12 +1076,13 @@ static void handle_set_hints(struct wl_listener *listener, void *data) {
 	struct wlr_xwayland_surface *xsurface = xwayland_view->xwayland_surface;
 
 	if (xwayland_view->node && xwayland_view->node->client) {
-		xwayland_view->node->client->urgent = xsurface->hints && (xsurface->hints->flags & XCB_ICCCM_WM_HINT_X_URGENCY);
+		xwayland_view->node->client->urgent = xsurface->hints &&
+			(xsurface->hints->flags & XCB_ICCCM_WM_HINT_X_URGENCY);
 		ipc_put_status(SUB_MASK_REPORT, NULL);
 		ipc_put_status(SUB_MASK_NODE_FLAG, "node_flag[%s,%s,%u,%c]\n",
-		    xwayland_view->node->client->app_id[0] ? xwayland_view->node->client->app_id : "?",
-		    xwayland_view->node->client->title[0] ? xwayland_view->node->client->title : "?", xwayland_view->node->id,
-		    xwayland_view->node->client->urgent ? 'U' : 'u');
+			xwayland_view->node->client->app_id[0] ? xwayland_view->node->client->app_id : "?",
+			xwayland_view->node->client->title[0] ? xwayland_view->node->client->title : "?",
+			xwayland_view->node->id, xwayland_view->node->client->urgent ? 'U' : 'u');
 	}
 }
 
@@ -1070,8 +1094,8 @@ static void handle_set_startup_id(struct wl_listener *listener, void *data) {
 	if (xsurface->startup_id == NULL)
 		return;
 
-	struct wlr_xdg_activation_token_v1 *token = wlr_xdg_activation_v1_find_token(
-	    server.xdg_activation_v1, xsurface->startup_id);
+	struct wlr_xdg_activation_token_v1 *token =
+		wlr_xdg_activation_v1_find_token(server.xdg_activation_v1, xsurface->startup_id);
 	if (token) {
 		launcher_ctx_t *ctx = token->data;
 		if (ctx) {
@@ -1171,7 +1195,8 @@ static xwayland_toplevel_t *create_xwayland_view(struct wlr_xwayland_surface *xs
 	for (int i = 0; i < 4; i++)
 		xwayland_view->border_rects[i] = NULL;
 
-	create_borders(xwayland_view->scene_tree, &xwayland_view->border_tree, xwayland_view->border_rects);
+	create_borders(xwayland_view->scene_tree, &xwayland_view->border_tree,
+		xwayland_view->border_rects);
 
 	// create image capture scene
 	xwayland_view->image_capture = wlr_scene_create();
@@ -1225,7 +1250,8 @@ static xwayland_toplevel_t *create_xwayland_view(struct wlr_xwayland_surface *xs
 	xwayland_view->output_handler = wlr_scene_buffer_create(xwayland_view->scene_tree, NULL);
 	if (xwayland_view->output_handler) {
 		xwayland_view->outputs_update.notify = handle_xwayland_outputs_update;
-		wl_signal_add(&xwayland_view->output_handler->events.outputs_update, &xwayland_view->outputs_update);
+		wl_signal_add(&xwayland_view->output_handler->events.outputs_update,
+			&xwayland_view->outputs_update);
 		xwayland_view->output_handler->point_accepts_input = xwayland_output_handler_point_accepts_input;
 	}
 
@@ -1307,14 +1333,16 @@ static void xwayland_view_destroy(xwayland_toplevel_t *xwayland_view) {
 			xwayland_view->rounded->corner_mask_node = NULL;
 		}
 		if (xwayland_view->rounded->corner_mask_buf) {
-			effects_destroy_buffer(&xwayland_view->rounded->corner_mask_buf, xwayland_view->rounded->corner_mask_native);
+			effects_destroy_buffer(&xwayland_view->rounded->corner_mask_buf,
+				xwayland_view->rounded->corner_mask_native);
 		}
 		if (xwayland_view->rounded->border_shader_node) {
 			wlr_scene_node_destroy(&xwayland_view->rounded->border_shader_node->node);
 			xwayland_view->rounded->border_shader_node = NULL;
 		}
 		if (xwayland_view->rounded->border_shader_buf) {
-			effects_destroy_buffer(&xwayland_view->rounded->border_shader_buf, xwayland_view->rounded->border_shader_native);
+			effects_destroy_buffer(&xwayland_view->rounded->border_shader_buf,
+				xwayland_view->rounded->border_shader_native);
 		}
 		free(xwayland_view->rounded);
 		xwayland_view->rounded = NULL;
@@ -1323,7 +1351,8 @@ static void xwayland_view_destroy(xwayland_toplevel_t *xwayland_view) {
 	free(xwayland_view);
 }
 
-static void begin_xwayland_interactive(xwayland_toplevel_t *xwayland_view, enum cursor_mode mode, uint32_t edges) {
+static void begin_xwayland_interactive(xwayland_toplevel_t *xwayland_view, enum cursor_mode mode,
+		uint32_t edges) {
 	if (!xwayland_view || !xwayland_view->node || !xwayland_view->node->client)
 		return;
 	if (xwayland_view->node->client->state != STATE_FLOATING)

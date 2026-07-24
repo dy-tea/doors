@@ -1,10 +1,8 @@
-#include "scratchpad.h"
-
 #include "ipc.h"
 #include "ipc_cmd.h"
 #include "ipc_helpers.h"
+#include "scratchpad.h"
 #include "transaction.h"
-
 #include <stdio.h>
 #include <string.h>
 

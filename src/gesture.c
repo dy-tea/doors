@@ -1,5 +1,4 @@
 #include "gesture.h"
-
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -262,7 +261,8 @@ bool gesture_tracker_check(gesture_tracker_t *tracker, enum gesture_type type) {
 	return tracker->type == type && tracker->fingers > 0;
 }
 
-void gesture_tracker_update(gesture_tracker_t *tracker, double dx, double dy, double scale, double rotation) {
+void gesture_tracker_update(gesture_tracker_t *tracker, double dx, double dy, double scale,
+		double rotation) {
 	if (!tracker)
 		return;
 

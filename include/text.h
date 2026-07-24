@@ -17,7 +17,8 @@ typedef struct text_node_t {
 	struct wlr_scene_node *node;
 } text_node_t;
 
-text_node_t *text_node_create(struct wlr_scene_tree *parent, const char *text, const float color[4], bool pango_markup);
+text_node_t *text_node_create(struct wlr_scene_tree *parent, const char *text, const float color[4],
+	bool pango_markup);
 
 void text_node_set_color(text_node_t *node, const float color[4]);
 void text_node_set_background(text_node_t *node, const float background[4]);

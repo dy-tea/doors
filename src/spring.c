@@ -1,5 +1,4 @@
 #include "spring.h"
-
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,8 +26,8 @@ void spring_fini(void) {
 	}
 }
 
-spring_curve_t *spring_add(
-    const char *name, double stiffness, double damping, double mass, double value_epsilon, double velocity_epsilon) {
+spring_curve_t *spring_add(const char *name, double stiffness, double damping, double mass,
+		double value_epsilon, double velocity_epsilon) {
 	if (!name || name[0] == '\0')
 		return NULL;
 
@@ -39,7 +38,8 @@ spring_curve_t *spring_add(
 		existing->mass = mass;
 		existing->value_epsilon = value_epsilon;
 		existing->velocity_epsilon = velocity_epsilon;
-		wlr_log(WLR_DEBUG, "spring: updated '%s' (k=%.1f, d=%.1f, m=%.1f)", name, stiffness, damping, mass);
+		wlr_log(WLR_DEBUG, "spring: updated '%s' (k=%.1f, d=%.1f, m=%.1f)", name, stiffness, damping,
+			mass);
 		return existing;
 	}
 
@@ -58,19 +58,24 @@ spring_curve_t *spring_add(
 	return c;
 }
 
-bool spring_exists(const char *name) { return spring_find(name) != NULL; }
+bool spring_exists(const char *name) {
+	return spring_find(name) != NULL;
+}
 
 spring_curve_t *spring_find(const char *name) {
 	if (!name || name[0] == '\0')
 		return NULL;
 
 	spring_curve_t *c;
-	wl_list_for_each(c, &springs, link) if (strcmp(c->name, name) == 0) return c;
+	wl_list_for_each(c, &springs, link)
+		if (strcmp(c->name, name) == 0)
+			return c;
 
 	return NULL;
 }
 
-double spring_evaluate(const spring_curve_t *curve, double dt, double *position, double *velocity, bool *done) {
+double spring_evaluate(const spring_curve_t *curve, double dt, double *position, double *velocity,
+		bool *done) {
 	if (!curve || !position || !velocity)
 		return *position;
 

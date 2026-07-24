@@ -14,7 +14,6 @@
 #include "tree.h"
 #include "workspace.h"
 #include "xwayland.h"
-
 #include <fcntl.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -189,7 +188,8 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
 		}
 
 		if (src_desk == m->desk) {
-			for (node_t *n_iter = first_extrema(src_desk->root); n_iter != NULL; n_iter = next_leaf(n_iter, src_desk->root)) {
+			for (node_t *n_iter = first_extrema(src_desk->root); n_iter != NULL; n_iter = next_leaf(n_iter,
+					src_desk->root)) {
 				if (n_iter->client) {
 					n_iter->client->shown = true;
 					bool already_configured = true;
@@ -204,7 +204,8 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
 			}
 			arrange(m, src_desk, true);
 		} else if (src_desk->root) {
-			for (node_t *n_iter = first_extrema(src_desk->root); n_iter != NULL; n_iter = next_leaf(n_iter, src_desk->root)) {
+			for (node_t *n_iter = first_extrema(src_desk->root); n_iter != NULL; n_iter = next_leaf(n_iter,
+					src_desk->root)) {
 				if (n_iter->client) {
 					n_iter->client->shown = false;
 					struct wlr_scene_tree *scene_tree = client_get_scene_tree(n_iter->client);
@@ -402,7 +403,8 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
 
 		struct wlr_scene_tree *st = client_get_scene_tree(n->client);
 		if (st)
-			wlr_scene_node_set_position(&st->node, n->client->floating_rectangle.x, n->client->floating_rectangle.y);
+			wlr_scene_node_set_position(&st->node, n->client->floating_rectangle.x,
+				n->client->floating_rectangle.y);
 
 		transaction_commit_dirty();
 		send_success(client_fd, "moved\n");
@@ -446,7 +448,8 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
 
 		n->client->state = STATE_FLOATING;
 
-		if (strcmp(handle, "northwest") == 0 || strcmp(handle, "nw") == 0 || strcmp(handle, "left") == 0) {
+		if (strcmp(handle, "northwest") == 0 || strcmp(handle, "nw") == 0 || strcmp(handle,
+				"left") == 0) {
 			n->client->floating_rectangle.x += dx;
 			n->client->floating_rectangle.y += dy;
 			n->client->floating_rectangle.width -= dx;
@@ -458,7 +461,8 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
 			n->client->floating_rectangle.y += dy;
 			n->client->floating_rectangle.width += dx;
 			n->client->floating_rectangle.height -= dy;
-		} else if (strcmp(handle, "east") == 0 || strcmp(handle, "e") == 0 || strcmp(handle, "right") == 0) {
+		} else if (strcmp(handle, "east") == 0 || strcmp(handle, "e") == 0 || strcmp(handle,
+				"right") == 0) {
 			n->client->floating_rectangle.width += dx;
 		} else if (strcmp(handle, "southeast") == 0 || strcmp(handle, "se") == 0) {
 			n->client->floating_rectangle.width += dx;
@@ -489,13 +493,15 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
 
 		struct wlr_scene_tree *st = client_get_scene_tree(n->client);
 		if (st) {
-			wlr_scene_node_set_position(&st->node, n->client->floating_rectangle.x, n->client->floating_rectangle.y);
+			wlr_scene_node_set_position(&st->node, n->client->floating_rectangle.x,
+				n->client->floating_rectangle.y);
 			if (n->client->toplevel)
 				wlr_xdg_toplevel_set_size(n->client->toplevel->xdg_toplevel, n->client->floating_rectangle.width,
-				    n->client->floating_rectangle.height);
+					n->client->floating_rectangle.height);
 			else if (n->client->xwayland_view)
-				wlr_xwayland_surface_configure(n->client->xwayland_view->xwayland_surface, n->client->floating_rectangle.x,
-				    n->client->floating_rectangle.y, n->client->floating_rectangle.width, n->client->floating_rectangle.height);
+				wlr_xwayland_surface_configure(n->client->xwayland_view->xwayland_surface,
+					n->client->floating_rectangle.x, n->client->floating_rectangle.y,
+					n->client->floating_rectangle.width, n->client->floating_rectangle.height);
 		}
 
 		transaction_commit_dirty();
@@ -763,7 +769,8 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
 
 			if (prev_st == TYPE_TABBED && st != TYPE_TABBED) {
 				tabs_destroy(target);
-				for (node_t *leaf = first_extrema(target); leaf != NULL && leaf != target; leaf = next_leaf(leaf, target)) {
+				for (node_t *leaf = first_extrema(target); leaf != NULL && leaf != target; leaf = next_leaf(leaf,
+						target)) {
 					if (leaf->client == NULL)
 						continue;
 					if (leaf->client->state == STATE_FLOATING)
@@ -778,7 +785,8 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
 			arrange(m, m->desk, true);
 
 			// reapply decoration mode for all leaves
-			for (node_t *leaf = first_extrema(target); leaf != NULL && leaf != target; leaf = next_leaf(leaf, target)) {
+			for (node_t *leaf = first_extrema(target); leaf != NULL && leaf != target; leaf = next_leaf(leaf,
+					target)) {
 				if (leaf->client && leaf->client->toplevel)
 					toplevel_apply_decoration_mode(leaf->client->toplevel);
 			}

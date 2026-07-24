@@ -1,10 +1,8 @@
 #include "launcher.h"
-
 #include "output.h"
 #include "server.h"
 #include "toplevel.h"
 #include "tree.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -98,7 +96,8 @@ launcher_ctx_t *launcher_ctx_find_pid(pid_t pid) {
 	return ctx;
 }
 
-launcher_ctx_t *launcher_ctx_create(struct wlr_xdg_activation_token_v1 *token, const char *desktop_name) {
+launcher_ctx_t *launcher_ctx_create(struct wlr_xdg_activation_token_v1 *token,
+		const char *desktop_name) {
 	launcher_ctx_t *ctx = calloc(1, sizeof(*ctx));
 	if (ctx == NULL)
 		return NULL;

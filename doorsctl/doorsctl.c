@@ -53,7 +53,8 @@ int main(int argc, char *argv[]) {
 	argv++;
 	int msg_len = 0;
 
-	for (int offset = 0, rem = sizeof(msg), n = 0; argc > 0 && rem > 0; offset += n, rem -= n, argc--, argv++) {
+	for (int offset = 0, rem = sizeof(msg), n = 0; argc > 0 && rem > 0; offset += n, rem -= n, argc--,
+			argv++) {
 		n = snprintf(msg + offset, rem, "%s%c", *argv, 0);
 		msg_len += n;
 	}
@@ -66,7 +67,7 @@ int main(int argc, char *argv[]) {
 	int ret = EXIT_SUCCESS, nb;
 
 	struct pollfd fds[] = {
-	    {sock_fd, POLLIN | POLLHUP, 0},
+		{sock_fd, POLLIN | POLLHUP, 0},
 	};
 
 	while (poll(fds, 1, -1) > 0) {

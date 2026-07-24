@@ -173,7 +173,8 @@ typedef struct server_t {
 
 	struct wlr_ext_foreign_toplevel_list_v1 *foreign_toplevel_list;
 	struct wlr_foreign_toplevel_manager_v1 *foreign_toplevel_manager;
-	struct wlr_ext_foreign_toplevel_image_capture_source_manager_v1 *foreign_toplevel_image_capture_source_manager;
+	struct wlr_ext_foreign_toplevel_image_capture_source_manager_v1
+		*foreign_toplevel_image_capture_source_manager;
 	struct wl_listener new_toplevel_capture_request;
 
 	struct wlr_drm_lease_v1_manager *drm_lease_manager;

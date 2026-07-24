@@ -1,6 +1,5 @@
-#include "cursor.h"
-
 #include "config.h"
+#include "cursor.h"
 #include "idle_power.h"
 #include "input.h"
 #include "input_method.h"
@@ -17,7 +16,6 @@
 #include "tree.h"
 #include "types.h"
 #include "xwayland.h"
-
 #include <linux/input-event-codes.h>
 #include <math.h>
 #include <stdlib.h>
@@ -47,7 +45,8 @@
 extern keybind_t keybinds[];
 extern size_t num_keybinds;
 extern submap_t *active_submap;
-extern bool keybind_matches(const keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode);
+extern bool keybind_matches(const keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysym,
+	uint32_t keycode);
 extern void execute_keybind(const keybind_t *kb);
 extern bool handle_keybind_raw(uint32_t modifiers, uint32_t keycode, bool pressed);
 extern hotcornerbind_t hotcorner_bindings[];
@@ -198,10 +197,16 @@ static void update_scene_positions(node_t *n, struct wlr_box rect, desktop_t *d)
 				if (n->client->toplevel)
 					wlr_xdg_toplevel_set_size(n->client->toplevel->xdg_toplevel, r.width, r.height);
 				else if (n->client->xwayland_view)
-					wlr_xwayland_surface_configure(n->client->xwayland_view->xwayland_surface, r.x, r.y, r.width, r.height);
+					wlr_xwayland_surface_configure(n->client->xwayland_view->xwayland_surface, r.x, r.y, r.width,
+						r.height);
 
 				if (bw != 0) {
-					const struct wlr_box geo = {0, 0, r.width, r.height};
+					const struct wlr_box geo = {
+						0,
+						0,
+						r.width,
+						r.height
+					};
 					update_borders(client_border_tree(n->client), client_border_rects(n->client), geo, bw);
 					update_border_colors(n->client);
 					if (n->client->border_radius > 0.0f) {
@@ -209,8 +214,8 @@ static void update_scene_positions(node_t *n, struct wlr_box rect, desktop_t *d)
 						if (rounded) {
 							int new_fw = r.width + 2 * (int)bw;
 							int new_fh = r.height + 2 * (int)bw;
-							if (new_fw > 0 && new_fh > 0
-							    && (rounded->border_shader_buf_w != new_fw || rounded->border_shader_buf_h != new_fh)) {
+							if (new_fw > 0 && new_fh > 0 && (rounded->border_shader_buf_w != new_fw ||
+									rounded->border_shader_buf_h != new_fh)) {
 								rounded->border_dirty = true;
 								rounded->corner_mask_dirty = true;
 							}
@@ -221,14 +226,34 @@ static void update_scene_positions(node_t *n, struct wlr_box rect, desktop_t *d)
 		}
 	} else if (n->split_type == TYPE_VERTICAL) {
 		int split_x = rect.x + (int)(rect.width * n->split_ratio);
-		struct wlr_box left = {rect.x, rect.y, split_x - rect.x, rect.height};
-		struct wlr_box right = {split_x, rect.y, rect.x + rect.width - split_x, rect.height};
+		struct wlr_box left = {
+			rect.x,
+			rect.y,
+			split_x - rect.x,
+			rect.height
+		};
+		struct wlr_box right = {
+			split_x,
+			rect.y,
+			rect.x + rect.width - split_x,
+			rect.height
+		};
 		update_scene_positions(n->first_child, left, d);
 		update_scene_positions(n->second_child, right, d);
 	} else if (n->split_type == TYPE_HORIZONTAL) {
 		int split_y = rect.y + (int)(rect.height * n->split_ratio);
-		struct wlr_box top = {rect.x, rect.y, rect.width, split_y - rect.y};
-		struct wlr_box bottom = {rect.x, split_y, rect.width, rect.y + rect.height - split_y};
+		struct wlr_box top = {
+			rect.x,
+			rect.y,
+			rect.width,
+			split_y - rect.y
+		};
+		struct wlr_box bottom = {
+			rect.x,
+			split_y,
+			rect.width,
+			rect.y + rect.height - split_y
+		};
 		update_scene_positions(n->first_child, top, d);
 		update_scene_positions(n->second_child, bottom, d);
 	}
@@ -241,7 +266,8 @@ static void process_cursor_tiled_resize(void) {
 		return;
 
 	// handle horizontal resizing
-	if (server.tiled_resize_parent_vertical && (server.resize_edges & (WLR_EDGE_LEFT | WLR_EDGE_RIGHT))) {
+	if (server.tiled_resize_parent_vertical &&
+			(server.resize_edges & (WLR_EDGE_LEFT | WLR_EDGE_RIGHT))) {
 		node_t *parent = server.tiled_resize_parent_vertical;
 		double total_width = (double)parent->rectangle.width;
 
@@ -267,7 +293,8 @@ static void process_cursor_tiled_resize(void) {
 	}
 
 	// handle vertical resizing
-	if (server.tiled_resize_parent_horizontal && (server.resize_edges & (WLR_EDGE_TOP | WLR_EDGE_BOTTOM))) {
+	if (server.tiled_resize_parent_horizontal &&
+			(server.resize_edges & (WLR_EDGE_TOP | WLR_EDGE_BOTTOM))) {
 		node_t *parent = server.tiled_resize_parent_horizontal;
 		double total_height = (double)parent->rectangle.height;
 
@@ -293,12 +320,12 @@ static void process_cursor_tiled_resize(void) {
 	}
 
 	if (server.tiled_resize_parent_vertical && node->desktop) {
-		update_scene_positions(
-		    server.tiled_resize_parent_vertical, server.tiled_resize_parent_vertical->rectangle, node->desktop);
+		update_scene_positions(server.tiled_resize_parent_vertical,
+			server.tiled_resize_parent_vertical->rectangle, node->desktop);
 	}
 	if (server.tiled_resize_parent_horizontal && node->desktop) {
-		update_scene_positions(
-		    server.tiled_resize_parent_horizontal, server.tiled_resize_parent_horizontal->rectangle, node->desktop);
+		update_scene_positions(server.tiled_resize_parent_horizontal,
+			server.tiled_resize_parent_horizontal->rectangle, node->desktop);
 	}
 }
 
@@ -306,8 +333,8 @@ static void process_cursor_move(void) {
 	toplevel_t *toplevel = server.grabbed_toplevel;
 	xwayland_toplevel_t *xwayland_view = server.grabbed_xwayland_view;
 
-	if (xwayland_view && xwayland_view->node && xwayland_view->node->client
-	    && xwayland_view->node->client->state == STATE_FLOATING) {
+	if (xwayland_view && xwayland_view->node && xwayland_view->node->client &&
+			xwayland_view->node->client->state == STATE_FLOATING) {
 		double x = server.cursor->x - server.grab_x;
 		double y = server.cursor->y - server.grab_y;
 
@@ -318,11 +345,12 @@ static void process_cursor_move(void) {
 			wlr_scene_node_set_position(&xwayland_view->scene_tree->node, x, y);
 
 		wlr_xwayland_surface_configure(xwayland_view->xwayland_surface, (int)x, (int)y,
-		    xwayland_view->xwayland_surface->width, xwayland_view->xwayland_surface->height);
+			xwayland_view->xwayland_surface->width, xwayland_view->xwayland_surface->height);
 		return;
 	}
 
-	if (!toplevel || !toplevel->node || !toplevel->node->client || toplevel->node->client->state != STATE_FLOATING)
+	if (!toplevel || !toplevel->node || !toplevel->node->client ||
+		toplevel->node->client->state != STATE_FLOATING)
 		return;
 
 	double x = server.cursor->x - server.grab_x;
@@ -388,7 +416,8 @@ static void process_cursor_resize(void) {
 		if (xwayland_view->scene_tree)
 			wlr_scene_node_set_position(&xwayland_view->scene_tree->node, new_left, new_top);
 
-		wlr_xwayland_surface_configure(xwayland_view->xwayland_surface, new_left, new_top, new_width, new_height);
+		wlr_xwayland_surface_configure(xwayland_view->xwayland_surface, new_left, new_top, new_width,
+			new_height);
 
 		if (!xwayland_view->node || !xwayland_view->node->client)
 			return;
@@ -397,7 +426,12 @@ static void process_cursor_resize(void) {
 		client_t *client = xwayland_view->node->client;
 		unsigned int bw = effective_border_width(xwayland_view->node->desktop);
 		if (bw != 0) {
-			const struct wlr_box geo = {0, 0, new_width, new_height};
+			const struct wlr_box geo = {
+				0,
+				0,
+				new_width,
+				new_height
+			};
 			update_borders(xwayland_view->border_tree, xwayland_view->border_rects, geo, bw);
 			update_border_colors(client);
 		}
@@ -420,14 +454,19 @@ static void process_cursor_resize(void) {
 	// update borders
 	unsigned int bw = effective_border_width(toplevel->node->desktop);
 	if (bw != 0) {
-		const struct wlr_box geo = {0, 0, new_width, new_height};
+		const struct wlr_box geo = {
+			0,
+			0,
+			new_width,
+			new_height
+		};
 		update_borders(toplevel->border_tree, toplevel->border_rects, geo, bw);
 		update_border_colors(client);
 		if (client->border_radius > 0.0f && toplevel->rounded) {
 			int new_fw = new_width + 2 * (int)bw;
 			int new_fh = new_height + 2 * (int)bw;
-			if (new_fw > 0 && new_fh > 0
-			    && (toplevel->rounded->border_shader_buf_w != new_fw || toplevel->rounded->border_shader_buf_h != new_fh)) {
+			if (new_fw > 0 && new_fh > 0 && (toplevel->rounded->border_shader_buf_w != new_fw ||
+					toplevel->rounded->border_shader_buf_h != new_fh)) {
 				toplevel->rounded->border_dirty = true;
 				toplevel->rounded->corner_mask_dirty = true;
 			}
@@ -435,15 +474,17 @@ static void process_cursor_resize(void) {
 	}
 }
 
-static void process_cursor_motion(uint32_t time, double dx, double dy, double dx_unaccel, double dy_unaccel) {
+static void process_cursor_motion(uint32_t time, double dx, double dy, double dx_unaccel,
+		double dy_unaccel) {
 	if (time) {
-		wlr_relative_pointer_manager_v1_send_relative_motion(
-		    server.relative_pointer_manager, server.seat, time * 1000, dx, dy, dx_unaccel, dy_unaccel);
+		wlr_relative_pointer_manager_v1_send_relative_motion(server.relative_pointer_manager, server.seat,
+			time * 1000, dx, dy, dx_unaccel, dy_unaccel);
 
-		if (server.active_pointer_constraint != NULL && server.cursor_mode != CURSOR_RESIZE
-		    && server.cursor_mode != CURSOR_MOVE) {
+		if (server.active_pointer_constraint != NULL && server.cursor_mode != CURSOR_RESIZE &&
+				server.cursor_mode != CURSOR_MOVE) {
 			struct toplevel_t *toplevel = server.active_pointer_constraint->surface->data;
-			if (toplevel != NULL && server.active_pointer_constraint->surface == server.seat->pointer_state.focused_surface) {
+			if (toplevel != NULL &&
+					server.active_pointer_constraint->surface == server.seat->pointer_state.focused_surface) {
 				const struct wlr_box geo = toplevel->node->rectangle;
 
 				// calculate constraint
@@ -452,7 +493,8 @@ static void process_cursor_motion(uint32_t time, double dx, double dy, double dx
 				double cx, cy;
 
 				// apply confine on region
-				if (wlr_region_confine(&server.active_pointer_constraint->region, sx, sy, sx + dx, sy + dy, &cx, &cy)) {
+				if (wlr_region_confine(&server.active_pointer_constraint->region, sx, sy, sx + dx, sy + dy, &cx,
+						&cy)) {
 					dx = cx - sx;
 					dy = cy - sy;
 				}
@@ -549,7 +591,8 @@ static void process_cursor_motion(uint32_t time, double dx, double dy, double dx
 				if (toplevel && toplevel->node)
 					node = toplevel->node;
 			} else {
-				struct wlr_xwayland_surface *xwayland_surface = wlr_xwayland_surface_try_from_wlr_surface(surface);
+				struct wlr_xwayland_surface *xwayland_surface =
+					wlr_xwayland_surface_try_from_wlr_surface(surface);
 				if (xwayland_surface != NULL) {
 					xwayland_toplevel_t *xwayland_view = type;
 					if (xwayland_view && xwayland_view->node)
@@ -609,9 +652,11 @@ void begin_interactive(toplevel_t *toplevel, enum cursor_mode mode, uint32_t edg
 			double border_x = server.cursor->x;
 			double border_y = server.cursor->y;
 			if (edges & WLR_EDGE_RIGHT)
-				border_x = toplevel->node->client->floating_rectangle.x + toplevel->node->client->floating_rectangle.width;
+				border_x = toplevel->node->client->floating_rectangle.x +
+					toplevel->node->client->floating_rectangle.width;
 			if (edges & WLR_EDGE_BOTTOM)
-				border_y = toplevel->node->client->floating_rectangle.y + toplevel->node->client->floating_rectangle.height;
+				border_y = toplevel->node->client->floating_rectangle.y +
+					toplevel->node->client->floating_rectangle.height;
 
 			server.grab_x = server.cursor->x - border_x;
 			server.grab_y = server.cursor->y - border_y;
@@ -626,7 +671,8 @@ void cursor_motion(struct wl_listener *listener, void *data) {
 	(void)listener;
 	struct wlr_pointer_motion_event *event = data;
 	wlr_cursor_move(server.cursor, &event->pointer->base, event->delta_x, event->delta_y);
-	process_cursor_motion(event->time_msec, event->delta_x, event->delta_y, event->unaccel_dx, event->unaccel_dy);
+	process_cursor_motion(event->time_msec, event->delta_x, event->delta_y, event->unaccel_dx,
+		event->unaccel_dy);
 }
 
 void cursor_motion_absolute(struct wl_listener *listener, void *data) {
@@ -639,7 +685,8 @@ void cursor_motion_absolute(struct wl_listener *listener, void *data) {
 
 	// get absolute pos
 	double lx, ly, dx, dy;
-	wlr_cursor_absolute_to_layout_coords(server.cursor, &event->pointer->base, event->x, event->y, &lx, &ly);
+	wlr_cursor_absolute_to_layout_coords(server.cursor, &event->pointer->base, event->x, event->y, &lx,
+		&ly);
 	dx = lx - server.cursor->x;
 	dy = ly - server.cursor->y;
 
@@ -695,7 +742,8 @@ void cursor_button(struct wl_listener *listener, void *data) {
 			if (layer)
 				focus_layer_surface(layer);
 		} else {
-			struct wlr_xwayland_surface *xwayland_surface = wlr_xwayland_surface_try_from_wlr_surface(surface);
+			struct wlr_xwayland_surface *xwayland_surface =
+				wlr_xwayland_surface_try_from_wlr_surface(surface);
 
 			if (xwayland_surface != NULL) {
 				xwayland_toplevel_t *xwayland_view = type;
@@ -750,9 +798,8 @@ void cursor_button(struct wl_listener *listener, void *data) {
 					}
 				}
 
-				if (matched_kb
-				    && (matched_kb->action == BIND_INTERACTIVE_MOVE || matched_kb->action == BIND_INTERACTIVE_RESIZE
-				        || matched_kb->action == BIND_TILING_DRAG)) {
+				if (matched_kb && (matched_kb->action == BIND_INTERACTIVE_MOVE ||
+						matched_kb->action == BIND_INTERACTIVE_RESIZE || matched_kb->action == BIND_TILING_DRAG)) {
 					toplevel_t *toplevel = NULL;
 					if (type && ((toplevel_t *)type)->node)
 						toplevel = type;
@@ -885,8 +932,8 @@ void cursor_button(struct wl_listener *listener, void *data) {
 void cursor_axis(struct wl_listener *listener, void *data) {
 	(void)listener;
 	struct wlr_pointer_axis_event *event = data;
-	wlr_seat_pointer_notify_axis(server.seat, event->time_msec, event->orientation, event->delta, event->delta_discrete,
-	    event->source, event->relative_direction);
+	wlr_seat_pointer_notify_axis(server.seat, event->time_msec, event->orientation, event->delta,
+		event->delta_discrete, event->source, event->relative_direction);
 	wlr_idle_notifier_v1_notify_activity(server.idle_notifier, server.seat);
 	idle_power_notify_activity();
 }
@@ -1002,8 +1049,8 @@ void cursor_check_constraint_region(void) {
 				sx = (boxes[0].x1 + boxes[0].x2) / 2.0;
 				sy = (boxes[0].y1 + boxes[0].y2) / 2.0;
 
-				wlr_cursor_warp_closest(
-				    server.cursor, NULL, sx + toplevel->node->rectangle.x, sy + toplevel->node->rectangle.y);
+				wlr_cursor_warp_closest(server.cursor, NULL, sx + toplevel->node->rectangle.x,
+					sy + toplevel->node->rectangle.y);
 			}
 		}
 	}
@@ -1066,7 +1113,8 @@ static void cursor_constrain(struct wlr_pointer_constraint_v1 *constraint) {
 	server.cursor_requires_warp = true;
 
 	if (pixman_region32_not_empty(&constraint->current.region))
-		pixman_region32_intersect(&constraint->region, &constraint->surface->input_region, &constraint->current.region);
+		pixman_region32_intersect(&constraint->region, &constraint->surface->input_region,
+			&constraint->current.region);
 	else
 		pixman_region32_copy(&constraint->region, &constraint->surface->input_region);
 
@@ -1142,7 +1190,8 @@ static bool gesture_binding_check(enum gesture_type type, uint8_t fingers) {
 	return false;
 }
 
-static gesturebind_t *gesture_bind_match(enum gesture_type type, uint8_t fingers, uint32_t directions) {
+static gesturebind_t *gesture_bind_match(enum gesture_type type, uint8_t fingers,
+		uint32_t directions) {
 	gesturebind_t *best_match = NULL;
 	int8_t best_score = -1;
 
@@ -1155,8 +1204,16 @@ static gesturebind_t *gesture_bind_match(enum gesture_type type, uint8_t fingers
 			if ((directions & gb->directions) == 0)
 				continue;
 
-		gesture_t gest = {.type = type, .fingers = fingers, .directions = directions};
-		gesture_t target = {.type = gb->type, .fingers = gb->fingers, .directions = gb->directions};
+		gesture_t gest = {
+			.type = type,
+			.fingers = fingers,
+			.directions = directions
+		};
+		gesture_t target = {
+			.type = gb->type,
+			.fingers = gb->fingers,
+			.directions = gb->directions
+		};
 		int8_t score = gesture_compare(&gest, &target);
 
 		if (score > best_score) {
@@ -1175,7 +1232,8 @@ void handle_pointer_hold_begin(struct wl_listener *listener, void *data) {
 	if (gesture_binding_check(GESTURE_TYPE_HOLD, event->fingers)) {
 		gesture_tracker_begin(&server.gesture_tracker, GESTURE_TYPE_HOLD, event->fingers);
 	} else {
-		wlr_pointer_gestures_v1_send_hold_begin(server.pointer_gestures, server.seat, event->time_msec, event->fingers);
+		wlr_pointer_gestures_v1_send_hold_begin(server.pointer_gestures, server.seat, event->time_msec,
+			event->fingers);
 	}
 }
 
@@ -1184,7 +1242,8 @@ void handle_pointer_hold_end(struct wl_listener *listener, void *data) {
 	struct wlr_pointer_hold_end_event *event = data;
 
 	if (!gesture_tracker_check(&server.gesture_tracker, GESTURE_TYPE_HOLD)) {
-		wlr_pointer_gestures_v1_send_hold_end(server.pointer_gestures, server.seat, event->time_msec, event->cancelled);
+		wlr_pointer_gestures_v1_send_hold_end(server.pointer_gestures, server.seat, event->time_msec,
+			event->cancelled);
 		return;
 	}
 
@@ -1207,7 +1266,8 @@ void handle_pointer_pinch_begin(struct wl_listener *listener, void *data) {
 	if (gesture_binding_check(GESTURE_TYPE_PINCH, event->fingers)) {
 		gesture_tracker_begin(&server.gesture_tracker, GESTURE_TYPE_PINCH, event->fingers);
 	} else {
-		wlr_pointer_gestures_v1_send_pinch_begin(server.pointer_gestures, server.seat, event->time_msec, event->fingers);
+		wlr_pointer_gestures_v1_send_pinch_begin(server.pointer_gestures, server.seat, event->time_msec,
+			event->fingers);
 	}
 }
 
@@ -1216,10 +1276,11 @@ void handle_pointer_pinch_update(struct wl_listener *listener, void *data) {
 	struct wlr_pointer_pinch_update_event *event = data;
 
 	if (gesture_tracker_check(&server.gesture_tracker, GESTURE_TYPE_PINCH)) {
-		gesture_tracker_update(&server.gesture_tracker, event->dx, event->dy, event->scale, event->rotation);
+		gesture_tracker_update(&server.gesture_tracker, event->dx, event->dy, event->scale,
+			event->rotation);
 	} else {
-		wlr_pointer_gestures_v1_send_pinch_update(
-		    server.pointer_gestures, server.seat, event->time_msec, event->dx, event->dy, event->scale, event->rotation);
+		wlr_pointer_gestures_v1_send_pinch_update(server.pointer_gestures, server.seat, event->time_msec,
+			event->dx, event->dy, event->scale, event->rotation);
 	}
 }
 
@@ -1228,7 +1289,8 @@ void handle_pointer_pinch_end(struct wl_listener *listener, void *data) {
 	struct wlr_pointer_pinch_end_event *event = data;
 
 	if (!gesture_tracker_check(&server.gesture_tracker, GESTURE_TYPE_PINCH)) {
-		wlr_pointer_gestures_v1_send_pinch_end(server.pointer_gestures, server.seat, event->time_msec, event->cancelled);
+		wlr_pointer_gestures_v1_send_pinch_end(server.pointer_gestures, server.seat, event->time_msec,
+			event->cancelled);
 		return;
 	}
 
@@ -1243,7 +1305,8 @@ void handle_pointer_pinch_end(struct wl_listener *listener, void *data) {
 	else if (server.gesture_tracker.scale > 1.0)
 		directions |= GESTURE_DIRECTION_OUTWARD;
 
-	gesturebind_t *binding = gesture_bind_match(GESTURE_TYPE_PINCH, server.gesture_tracker.fingers, directions);
+	gesturebind_t *binding = gesture_bind_match(GESTURE_TYPE_PINCH, server.gesture_tracker.fingers,
+		directions);
 	if (binding)
 		execute_gesturebind(binding);
 
@@ -1257,7 +1320,8 @@ void handle_pointer_swipe_begin(struct wl_listener *listener, void *data) {
 	if (gesture_binding_check(GESTURE_TYPE_SWIPE, event->fingers)) {
 		gesture_tracker_begin(&server.gesture_tracker, GESTURE_TYPE_SWIPE, event->fingers);
 	} else {
-		wlr_pointer_gestures_v1_send_swipe_begin(server.pointer_gestures, server.seat, event->time_msec, event->fingers);
+		wlr_pointer_gestures_v1_send_swipe_begin(server.pointer_gestures, server.seat, event->time_msec,
+			event->fingers);
 	}
 }
 
@@ -1268,8 +1332,8 @@ void handle_pointer_swipe_update(struct wl_listener *listener, void *data) {
 	if (gesture_tracker_check(&server.gesture_tracker, GESTURE_TYPE_SWIPE)) {
 		gesture_tracker_update(&server.gesture_tracker, event->dx, event->dy, NAN, NAN);
 	} else {
-		wlr_pointer_gestures_v1_send_swipe_update(
-		    server.pointer_gestures, server.seat, event->time_msec, event->dx, event->dy);
+		wlr_pointer_gestures_v1_send_swipe_update(server.pointer_gestures, server.seat, event->time_msec,
+			event->dx, event->dy);
 	}
 }
 
@@ -1278,7 +1342,8 @@ void handle_pointer_swipe_end(struct wl_listener *listener, void *data) {
 	struct wlr_pointer_swipe_end_event *event = data;
 
 	if (!gesture_tracker_check(&server.gesture_tracker, GESTURE_TYPE_SWIPE)) {
-		wlr_pointer_gestures_v1_send_swipe_end(server.pointer_gestures, server.seat, event->time_msec, event->cancelled);
+		wlr_pointer_gestures_v1_send_swipe_end(server.pointer_gestures, server.seat, event->time_msec,
+			event->cancelled);
 		return;
 	}
 
@@ -1300,7 +1365,8 @@ void handle_pointer_swipe_end(struct wl_listener *listener, void *data) {
 	else if (server.gesture_tracker.dy > threshold)
 		directions |= GESTURE_DIRECTION_DOWN;
 
-	gesturebind_t *binding = gesture_bind_match(GESTURE_TYPE_SWIPE, server.gesture_tracker.fingers, directions);
+	gesturebind_t *binding = gesture_bind_match(GESTURE_TYPE_SWIPE, server.gesture_tracker.fingers,
+		directions);
 	if (binding)
 		execute_gesturebind(binding);
 	gesture_tracker_end(&server.gesture_tracker);
@@ -1368,7 +1434,10 @@ void handle_pointer_warp(struct wl_listener *listener, void *data) {
 		return;
 	}
 
-	struct wlr_box surface_box = {.width = event->surface->current.width, .height = event->surface->current.height};
+	struct wlr_box surface_box = {
+		.width = event->surface->current.width,
+		.height = event->surface->current.height
+	};
 
 	if (!wlr_box_contains_point(&surface_box, event->x, event->y)) {
 		wlr_log(WLR_DEBUG, "denying request to warp cursor outside of surface");
@@ -1406,7 +1475,8 @@ void handle_tablet_tool_axis(struct wl_listener *listener, void *data) {
 		if (event->updated_axes & WLR_TABLET_TOOL_AXIS_DISTANCE)
 			wlr_tablet_v2_tablet_tool_notify_distance(tool->tablet_v2_tool, event->distance);
 
-		if (event->updated_axes & WLR_TABLET_TOOL_AXIS_TILT_X || event->updated_axes & WLR_TABLET_TOOL_AXIS_TILT_Y)
+		if (event->updated_axes & WLR_TABLET_TOOL_AXIS_TILT_X ||
+			event->updated_axes & WLR_TABLET_TOOL_AXIS_TILT_Y)
 			wlr_tablet_v2_tablet_tool_notify_tilt(tool->tablet_v2_tool, event->tilt_x, event->tilt_y);
 
 		if (event->updated_axes & WLR_TABLET_TOOL_AXIS_ROTATION)
@@ -1453,8 +1523,8 @@ void handle_tablet_tool_tip(struct wl_listener *listener, void *data) {
 	if (!tool)
 		return;
 
-	handle_tablet_tool_position(
-	    event->tool, tablet, event->state == WLR_TABLET_TOOL_TIP_DOWN, event->x, event->y, event->time_msec);
+	handle_tablet_tool_position(event->tool, tablet, event->state == WLR_TABLET_TOOL_TIP_DOWN, event->x,
+		event->y, event->time_msec);
 }
 
 void handle_tablet_tool_button(struct wl_listener *listener, void *data) {
@@ -1468,8 +1538,8 @@ void handle_tablet_tool_button(struct wl_listener *listener, void *data) {
 	if (!tool || !tool->tablet_v2_tool)
 		return;
 
-	wlr_tablet_v2_tablet_tool_notify_button(
-	    tool->tablet_v2_tool, event->button, (enum zwp_tablet_pad_v2_button_state)event->state);
+	wlr_tablet_v2_tablet_tool_notify_button(tool->tablet_v2_tool, event->button,
+		(enum zwp_tablet_pad_v2_button_state)event->state);
 }
 
 static void handle_touch_down(struct wl_listener *listener, void *data) {
@@ -1477,7 +1547,8 @@ static void handle_touch_down(struct wl_listener *listener, void *data) {
 	struct wlr_touch_down_event *event = data;
 
 	double lx, ly;
-	wlr_cursor_absolute_to_layout_coords(server.cursor, &event->touch->base, event->x, event->y, &lx, &ly);
+	wlr_cursor_absolute_to_layout_coords(server.cursor, &event->touch->base, event->x, event->y, &lx,
+		&ly);
 
 	double sx, sy;
 	struct wlr_surface *surface = NULL;
@@ -1504,7 +1575,8 @@ static void handle_touch_down(struct wl_listener *listener, void *data) {
 				if (layer)
 					focus_layer_surface(layer);
 			} else {
-				struct wlr_xwayland_surface *xwayland_surface = wlr_xwayland_surface_try_from_wlr_surface(surface);
+				struct wlr_xwayland_surface *xwayland_surface =
+					wlr_xwayland_surface_try_from_wlr_surface(surface);
 				if (xwayland_surface != NULL) {
 					xwayland_toplevel_t *xwayland_view = type;
 					if (xwayland_view && xwayland_view->node) {
@@ -1529,7 +1601,8 @@ static void handle_touch_motion(struct wl_listener *listener, void *data) {
 	struct wlr_touch_motion_event *event = data;
 
 	double lx, ly;
-	wlr_cursor_absolute_to_layout_coords(server.cursor, &event->touch->base, event->x, event->y, &lx, &ly);
+	wlr_cursor_absolute_to_layout_coords(server.cursor, &event->touch->base, event->x, event->y, &lx,
+		&ly);
 
 	double sx, sy;
 	struct wlr_surface *surface = NULL;

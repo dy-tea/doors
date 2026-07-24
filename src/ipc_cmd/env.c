@@ -1,5 +1,4 @@
 #include "ipc_cmd.h"
-
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,7 +6,9 @@
 void send_success(int client_fd, const char *msg);
 void send_failure(int client_fd, const char *msg);
 
-static bool valid_env_name(const char *name) { return name[0] != '\0' && strchr(name, '=') == NULL; }
+static bool valid_env_name(const char *name) {
+	return name[0] != '\0' && strchr(name, '=') == NULL;
+}
 
 void ipc_cmd_env(char **args, int num, int client_fd) {
 	if (num < 1) {

@@ -1,12 +1,10 @@
 #include "copy_capture.h"
-
 #include "ext-image-capture-source-v1-protocol.h"
 #include "ext-image-copy-capture-v1-protocol.h"
 #include "server.h"
 #include "toplevel.h"
 #include "types.h"
 #include "xwayland.h"
-
 #include <assert.h>
 #include <drm_fourcc.h>
 #include <wayland-server-protocol.h>
@@ -62,12 +60,16 @@ static void output_source_start(struct wlr_ext_image_capture_source_v1 *base, bo
 	(void)with_cursors;
 }
 
-static void output_source_stop(struct wlr_ext_image_capture_source_v1 *base) { (void)base; }
+static void output_source_stop(struct wlr_ext_image_capture_source_v1 *base) {
+	(void)base;
+}
 
-static void output_source_request_frame(struct wlr_ext_image_capture_source_v1 *base, bool schedule_frame) {
+static void output_source_request_frame(struct wlr_ext_image_capture_source_v1 *base,
+		bool schedule_frame) {
 	(void)base;
 	(void)schedule_frame;
 }
+
 
 #define MAX_BLOCKED_WINDOWS 128
 
@@ -92,10 +94,8 @@ static int disable_blocked_windows(struct blocked_node_state *states, int max_st
 
 		if (count >= max_states)
 			break;
-		wlr_log(WLR_DEBUG,
-		    "ext-copy-capture: disabling toplevel scene_tree=%p"
-		    " app_id=%s",
-		    (void *)&tl->scene_tree->node, c->app_id);
+		wlr_log(WLR_DEBUG, "ext-copy-capture: disabling toplevel scene_tree=%p"
+			" app_id=%s", (void *)&tl->scene_tree->node, c->app_id);
 
 		states[count].node = &tl->scene_tree->node;
 		states[count].was_enabled = tl->scene_tree->node.enabled;
@@ -116,10 +116,8 @@ static int disable_blocked_windows(struct blocked_node_state *states, int max_st
 
 		if (count >= max_states)
 			break;
-		wlr_log(WLR_DEBUG,
-		    "ext-copy-capture: disabling xwayland scene_tree=%p"
-		    " title=%s",
-		    (void *)&xw->scene_tree->node, c->title);
+		wlr_log(WLR_DEBUG, "ext-copy-capture: disabling xwayland scene_tree=%p"
+			" title=%s", (void *)&xw->scene_tree->node, c->title);
 
 		states[count].node = &xw->scene_tree->node;
 		states[count].was_enabled = xw->scene_tree->node.enabled;
@@ -136,26 +134,26 @@ static void restore_blocked_windows(struct blocked_node_state *states, int count
 }
 
 static void output_source_copy_frame(struct wlr_ext_image_capture_source_v1 *base,
-    struct wlr_ext_image_copy_capture_frame_v1 *dst_frame,
-    struct wlr_ext_image_capture_source_v1_frame_event *frame_event) {
+		struct wlr_ext_image_copy_capture_frame_v1 *dst_frame,
+		struct wlr_ext_image_capture_source_v1_frame_event *frame_event) {
 	(void)base;
 	(void)dst_frame;
 	(void)frame_event;
 }
 
-static struct wlr_ext_image_capture_source_v1_cursor *output_source_get_pointer_cursor(
-    struct wlr_ext_image_capture_source_v1 *base, struct wlr_seat *seat) {
+static struct wlr_ext_image_capture_source_v1_cursor *output_source_get_pointer_cursor(struct
+		wlr_ext_image_capture_source_v1 *base, struct wlr_seat *seat) {
 	(void)base;
 	(void)seat;
 	return NULL;
 }
 
 static const struct wlr_ext_image_capture_source_v1_interface source_impl = {
-    .start = output_source_start,
-    .stop = output_source_stop,
-    .request_frame = output_source_request_frame,
-    .copy_frame = output_source_copy_frame,
-    .get_pointer_cursor = output_source_get_pointer_cursor,
+	.start = output_source_start,
+	.stop = output_source_stop,
+	.request_frame = output_source_request_frame,
+	.copy_frame = output_source_copy_frame,
+	.get_pointer_cursor = output_source_get_pointer_cursor,
 };
 
 static void source_handle_output_commit(struct wl_listener *listener, void *data) {
@@ -178,7 +176,7 @@ static void source_handle_output_commit(struct wl_listener *listener, void *data
 	pixman_region32_copy(&damage, &event->state->damage);
 
 	struct wlr_ext_image_capture_source_v1_frame_event frame_event = {
-	    .damage = &damage,
+		.damage = &damage,
 	};
 	wl_signal_emit_mutable(&src->base.events.frame, &frame_event);
 
@@ -242,8 +240,8 @@ typedef struct output_capture_mgr_t {
 	struct wl_listener display_destroy;
 } output_capture_mgr_t;
 
-static void output_mgr_handle_create_source(
-    struct wl_client *wl_client, struct wl_resource *mgr_resource, uint32_t id, struct wl_resource *output_resource) {
+static void output_mgr_handle_create_source(struct wl_client *wl_client,
+		struct wl_resource *mgr_resource, uint32_t id, struct wl_resource *output_resource) {
 	(void)mgr_resource;
 	struct wlr_output *wlr_output = wlr_output_from_resource(output_resource);
 	if (!wlr_output)
@@ -262,20 +260,22 @@ static void output_mgr_handle_create_source(
 	}
 }
 
-static void output_mgr_handle_destroy(struct wl_client *wl_client, struct wl_resource *mgr_resource) {
+static void output_mgr_handle_destroy(struct wl_client *wl_client,
+		struct wl_resource *mgr_resource) {
 	(void)wl_client;
 	wl_resource_destroy(mgr_resource);
 }
 
 static const struct ext_output_image_capture_source_manager_v1_interface output_mgr_impl = {
-    .create_source = output_mgr_handle_create_source,
-    .destroy = output_mgr_handle_destroy,
+	.create_source = output_mgr_handle_create_source,
+	.destroy = output_mgr_handle_destroy,
 };
 
-static void output_mgr_bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id) {
+static void output_mgr_bind(struct wl_client *wl_client, void *data, uint32_t version,
+		uint32_t id) {
 	output_capture_mgr_t *mgr = data;
-	struct wl_resource *resource = wl_resource_create(
-	    wl_client, &ext_output_image_capture_source_manager_v1_interface, version, id);
+	struct wl_resource *resource = wl_resource_create(wl_client,
+		&ext_output_image_capture_source_manager_v1_interface, version, id);
 	if (!resource) {
 		wl_client_post_no_memory(wl_client);
 		return;
@@ -341,8 +341,8 @@ static void frame_handle_destroy(struct wl_client *wl_client, struct wl_resource
 	wl_resource_destroy(frame_resource);
 }
 
-static void frame_handle_attach_buffer(
-    struct wl_client *wl_client, struct wl_resource *frame_resource, struct wl_resource *buffer_resource) {
+static void frame_handle_attach_buffer(struct wl_client *wl_client,
+		struct wl_resource *frame_resource, struct wl_resource *buffer_resource) {
 	(void)wl_client;
 	copy_frame_t *frame = frame_from_resource(frame_resource);
 	if (!frame)
@@ -350,27 +350,24 @@ static void frame_handle_attach_buffer(
 
 	struct wlr_buffer *buffer = wlr_buffer_try_from_resource(buffer_resource);
 	if (!buffer) {
-		wl_resource_post_error(frame->resource, EXT_IMAGE_COPY_CAPTURE_FRAME_V1_ERROR_NO_BUFFER, "invalid buffer");
+		wl_resource_post_error(frame->resource, EXT_IMAGE_COPY_CAPTURE_FRAME_V1_ERROR_NO_BUFFER,
+			"invalid buffer");
 		return;
 	}
 
 	struct wlr_dmabuf_attributes dmabuf_attribs;
 	struct wlr_shm_attributes shm_attribs;
 	if (wlr_buffer_get_dmabuf(buffer, &dmabuf_attribs)) {
-		wlr_log(WLR_INFO,
-		    "ext-copy-capture: attached buffer is DMA-BUF "
-		    "%dx%d fmt=0x%x n_planes=%d",
-		    buffer->width, buffer->height, dmabuf_attribs.format, dmabuf_attribs.n_planes);
+		wlr_log(WLR_INFO, "ext-copy-capture: attached buffer is DMA-BUF "
+			"%dx%d fmt=0x%x n_planes=%d", buffer->width, buffer->height, dmabuf_attribs.format,
+				dmabuf_attribs.n_planes);
 	} else if (wlr_buffer_get_shm(buffer, &shm_attribs)) {
-		wlr_log(WLR_INFO,
-		    "ext-copy-capture: attached buffer is SHM "
-		    "%dx%d fmt=0x%x stride=%d",
-		    buffer->width, buffer->height, shm_attribs.format, shm_attribs.stride);
+		wlr_log(WLR_INFO, "ext-copy-capture: attached buffer is SHM "
+			"%dx%d fmt=0x%x stride=%d", buffer->width, buffer->height, shm_attribs.format,
+				shm_attribs.stride);
 	} else {
-		wlr_log(WLR_INFO,
-		    "ext-copy-capture: attached buffer type is "
-		    "UNKNOWN %dx%d",
-		    buffer->width, buffer->height);
+		wlr_log(WLR_INFO, "ext-copy-capture: attached buffer type is "
+			"UNKNOWN %dx%d", buffer->width, buffer->height);
 	}
 
 	if (frame->buffer)
@@ -379,16 +376,16 @@ static void frame_handle_attach_buffer(
 	wlr_buffer_lock(frame->buffer);
 }
 
-static void frame_handle_damage_buffer(struct wl_client *wl_client, struct wl_resource *frame_resource, int32_t x,
-    int32_t y, int32_t width, int32_t height) {
+static void frame_handle_damage_buffer(struct wl_client *wl_client,
+		struct wl_resource *frame_resource, int32_t x, int32_t y, int32_t width, int32_t height) {
 	(void)wl_client;
 	copy_frame_t *frame = frame_from_resource(frame_resource);
 	if (!frame)
 		return;
 
 	if (x < 0 || y < 0 || width <= 0 || height <= 0) {
-		wl_resource_post_error(
-		    frame->resource, EXT_IMAGE_COPY_CAPTURE_FRAME_V1_ERROR_INVALID_BUFFER_DAMAGE, "invalid buffer damage");
+		wl_resource_post_error(frame->resource,
+			EXT_IMAGE_COPY_CAPTURE_FRAME_V1_ERROR_INVALID_BUFFER_DAMAGE, "invalid buffer damage");
 		return;
 	}
 
@@ -428,8 +425,8 @@ static bool perform_output_capture(copy_frame_t *frame, image_copy_source_t *src
 		src->last_buffer = tmp_state.buffer;
 		wlr_buffer_lock(src->last_buffer);
 		wlr_output_state_finish(&tmp_state);
-		wlr_log(WLR_DEBUG, "ext-copy-capture: fresh render OK, buffer=%p (%dx%d)", (void *)src->last_buffer,
-		    src->last_buffer->width, src->last_buffer->height);
+		wlr_log(WLR_DEBUG, "ext-copy-capture: fresh render OK, buffer=%p (%dx%d)",
+			(void *)src->last_buffer, src->last_buffer->width, src->last_buffer->height);
 	}
 
 	int phys_w = src->last_buffer->width;
@@ -441,30 +438,29 @@ static bool perform_output_capture(copy_frame_t *frame, image_copy_source_t *src
 		goto out;
 	}
 
-	wlr_log(WLR_DEBUG, "ext-copy-capture: texture=%p phys=%dx%d logical=%dx%d", (void *)texture, phys_w, phys_h,
-	    src->base.width, src->base.height);
+	wlr_log(WLR_DEBUG, "ext-copy-capture: texture=%p phys=%dx%d logical=%dx%d", (void *)texture, phys_w,
+		phys_h, src->base.width, src->base.height);
 
 	// try rendering directly to client buffer
-	const pixman_region32_t *clip = !pixman_region32_empty(&frame->buffer_damage) ? &frame->buffer_damage : NULL;
-	struct wlr_render_pass *pass = wlr_renderer_begin_buffer_pass(output->renderer, frame->buffer, NULL);
+	const pixman_region32_t *clip = !pixman_region32_empty(&frame->buffer_damage) ?
+		&frame->buffer_damage : NULL;
+	struct wlr_render_pass *pass = wlr_renderer_begin_buffer_pass(output->renderer, frame->buffer,
+		NULL);
 	if (pass) {
 		wlr_log(WLR_DEBUG, "ext-copy-capture: direct render pass started");
-		wlr_render_pass_add_texture(pass,
-		    &(struct wlr_render_texture_options){
-		        .texture = texture,
-		        .clip = clip,
-		        .blend_mode = WLR_RENDER_BLEND_MODE_NONE,
-		        .dst_box =
-		            {
-		                .width = src->base.width,
-		                .height = src->base.height,
-		            },
-		        .src_box =
-		            {
-		                .width = phys_w,
-		                .height = phys_h,
-		            },
-		    });
+		wlr_render_pass_add_texture(pass, &(struct wlr_render_texture_options){
+			.texture = texture,
+			.clip = clip,
+			.blend_mode = WLR_RENDER_BLEND_MODE_NONE,
+			.dst_box = {
+				.width = src->base.width,
+				.height = src->base.height,
+			},
+			.src_box = {
+				.width = phys_w,
+				.height = phys_h,
+			},
+		});
 
 		wlr_render_pass_submit(pass);
 		wlr_texture_destroy(texture);
@@ -473,33 +469,32 @@ static bool perform_output_capture(copy_frame_t *frame, image_copy_source_t *src
 		goto out;
 	}
 
-	wlr_log(WLR_INFO,
-	    "ext-copy-capture: direct render FAILED, "
-	    "falling back to SHM read-pixels path");
+	wlr_log(WLR_INFO, "ext-copy-capture: direct render FAILED, "
+		"falling back to SHM read-pixels path");
 
 	uint32_t dst_format;
 	size_t dst_stride;
 	void *dst_data;
 
-	if (!wlr_buffer_begin_data_ptr_access(
-	        frame->buffer, WLR_BUFFER_DATA_PTR_ACCESS_WRITE, &dst_data, &dst_format, &dst_stride)) {
+	if (!wlr_buffer_begin_data_ptr_access(frame->buffer, WLR_BUFFER_DATA_PTR_ACCESS_WRITE, &dst_data,
+			&dst_format, &dst_stride)) {
 		wlr_texture_destroy(texture);
 		wlr_log(WLR_DEBUG, "ext-copy-capture: client buffer not writable");
 		goto out;
 	}
 
-	wlr_log(WLR_DEBUG,
-	    "ext-copy-capture: client fmt=0x%x stride=%zu "
-	    "size=%dx%d",
-	    dst_format, dst_stride, phys_w, phys_h);
+	wlr_log(WLR_DEBUG, "ext-copy-capture: client fmt=0x%x stride=%zu "
+		"size=%dx%d", dst_format, dst_stride, phys_w, phys_h);
 
-	if (!wlr_texture_read_pixels(texture,
-	        &(struct wlr_texture_read_pixels_options){
-	            .data = dst_data,
-	            .format = dst_format,
-	            .stride = (uint32_t)dst_stride,
-	            .src_box = {.width = phys_w, .height = phys_h},
-	        })) {
+	if (!wlr_texture_read_pixels(texture, &(struct wlr_texture_read_pixels_options){
+		.data = dst_data,
+		.format = dst_format,
+		.stride = (uint32_t)dst_stride,
+		.src_box = {
+			.width = phys_w,
+			.height = phys_h
+		},
+	})) {
 		wlr_buffer_end_data_ptr_access(frame->buffer);
 		wlr_texture_destroy(texture);
 		wlr_log(WLR_DEBUG, "ext-copy-capture: wlr_texture_read_pixels failed");
@@ -524,7 +519,8 @@ out:
 	time_t tv_sec = now.tv_sec;
 	uint32_t tv_sec_hi = (sizeof(tv_sec) > 4) ? tv_sec >> 32 : 0;
 	uint32_t tv_sec_lo = tv_sec & 0xFFFFFFFF;
-	ext_image_copy_capture_frame_v1_send_presentation_time(frame->resource, tv_sec_hi, tv_sec_lo, now.tv_nsec);
+	ext_image_copy_capture_frame_v1_send_presentation_time(frame->resource, tv_sec_hi, tv_sec_lo,
+		now.tv_nsec);
 
 	ext_image_copy_capture_frame_v1_send_ready(frame->resource);
 	return true;
@@ -540,8 +536,8 @@ static size_t last_capture_output_num = 0;
 
 static bool capture_output_test(struct wlr_output *output, const struct wlr_output_state *state) {
 	(void)output;
-	uint32_t supported = WLR_OUTPUT_STATE_BACKEND_OPTIONAL | WLR_OUTPUT_STATE_BUFFER | WLR_OUTPUT_STATE_ENABLED
-	    | WLR_OUTPUT_STATE_MODE;
+	uint32_t supported = WLR_OUTPUT_STATE_BACKEND_OPTIONAL | WLR_OUTPUT_STATE_BUFFER |
+		WLR_OUTPUT_STATE_ENABLED | WLR_OUTPUT_STATE_MODE;
 	return (state->committed & ~supported) == 0;
 }
 
@@ -559,14 +555,14 @@ static bool capture_output_commit(struct wlr_output *output, const struct wlr_ou
 }
 
 static const struct wlr_output_impl capture_output_impl = {
-    .test = capture_output_test,
-    .commit = capture_output_commit,
+	.test = capture_output_test,
+	.commit = capture_output_commit,
 };
 
 static const struct wlr_backend_impl capture_backend_impl = {0};
 
-static bool capture_renderer_init(capture_renderer_t *r, struct wlr_scene *scene, struct wl_event_loop *loop,
-    struct wlr_allocator *allocator, struct wlr_renderer *renderer) {
+static bool capture_renderer_init(capture_renderer_t *r, struct wlr_scene *scene,
+		struct wl_event_loop *loop, struct wlr_allocator *allocator, struct wlr_renderer *renderer) {
 	wlr_backend_init(&r->backend, &capture_backend_impl);
 	r->backend.buffer_caps = WLR_BUFFER_CAP_DMABUF | WLR_BUFFER_CAP_SHM;
 
@@ -612,7 +608,8 @@ void capture_renderer_destroy(void *raw) {
 	free(r);
 }
 
-static bool capture_renderer_render(capture_renderer_t *r, int width, int height, struct wlr_buffer **out_buffer) {
+static bool capture_renderer_render(capture_renderer_t *r, int width, int height,
+		struct wlr_buffer **out_buffer) {
 	struct wlr_output_state state;
 	wlr_output_state_init(&state);
 	wlr_output_state_set_enabled(&state, true);
@@ -637,8 +634,8 @@ static bool capture_renderer_render(capture_renderer_t *r, int width, int height
 	return true;
 }
 
-static bool copy_dmabuf_to_frame(
-    struct wlr_buffer *dst, struct wlr_buffer *src, struct wlr_renderer *renderer, const pixman_region32_t *clip) {
+static bool copy_dmabuf_to_frame(struct wlr_buffer *dst, struct wlr_buffer *src,
+		struct wlr_renderer *renderer, const pixman_region32_t *clip) {
 	struct wlr_texture *texture = wlr_texture_from_buffer(renderer, src);
 	if (!texture)
 		return false;
@@ -649,23 +646,24 @@ static bool copy_dmabuf_to_frame(
 		return false;
 	}
 
-	wlr_render_pass_add_texture(pass,
-	    &(struct wlr_render_texture_options){
-	        .texture = texture,
-	        .clip = clip,
-	        .blend_mode = WLR_RENDER_BLEND_MODE_NONE,
-	    });
+	wlr_render_pass_add_texture(pass, &(struct wlr_render_texture_options){
+		.texture = texture,
+		.clip = clip,
+		.blend_mode = WLR_RENDER_BLEND_MODE_NONE,
+	});
 
 	bool ok = wlr_render_pass_submit(pass);
 	wlr_texture_destroy(texture);
 	return ok;
 }
 
-static bool copy_shm_to_frame(struct wlr_buffer *dst, struct wlr_buffer *src, struct wlr_renderer *renderer) {
+static bool copy_shm_to_frame(struct wlr_buffer *dst, struct wlr_buffer *src,
+		struct wlr_renderer *renderer) {
 	void *data;
 	uint32_t format;
 	size_t stride;
-	if (!wlr_buffer_begin_data_ptr_access(dst, WLR_BUFFER_DATA_PTR_ACCESS_WRITE, &data, &format, &stride))
+	if (!wlr_buffer_begin_data_ptr_access(dst, WLR_BUFFER_DATA_PTR_ACCESS_WRITE, &data, &format,
+		&stride))
 		return false;
 
 	struct wlr_texture *texture = wlr_texture_from_buffer(renderer, src);
@@ -674,25 +672,26 @@ static bool copy_shm_to_frame(struct wlr_buffer *dst, struct wlr_buffer *src, st
 		return false;
 	}
 
-	bool ok = wlr_texture_read_pixels(texture,
-	    &(struct wlr_texture_read_pixels_options){
-	        .data = data,
-	        .format = format,
-	        .stride = (uint32_t)stride,
-	    });
+	bool ok = wlr_texture_read_pixels(texture, &(struct wlr_texture_read_pixels_options){
+		.data = data,
+		.format = format,
+		.stride = (uint32_t)stride,
+	});
 
 	wlr_texture_destroy(texture);
 	wlr_buffer_end_data_ptr_access(dst);
 	return ok;
 }
 
-static bool copy_buffer_to_frame(copy_frame_t *frame, struct wlr_buffer *src, struct wlr_renderer *renderer) {
+static bool copy_buffer_to_frame(copy_frame_t *frame, struct wlr_buffer *src,
+		struct wlr_renderer *renderer) {
 	struct wlr_buffer *dst = frame->buffer;
 
 	if (src->width != dst->width || src->height != dst->height)
 		return false;
 
-	const pixman_region32_t *clip = !pixman_region32_empty(&frame->buffer_damage) ? &frame->buffer_damage : NULL;
+	const pixman_region32_t *clip = !pixman_region32_empty(&frame->buffer_damage) ?
+		&frame->buffer_damage : NULL;
 
 	struct wlr_dmabuf_attributes dmabuf;
 	if (wlr_buffer_get_dmabuf(dst, &dmabuf))
@@ -701,8 +700,9 @@ static bool copy_buffer_to_frame(copy_frame_t *frame, struct wlr_buffer *src, st
 	return copy_shm_to_frame(dst, src, renderer);
 }
 
-static bool perform_scene_node_capture(copy_frame_t *frame, struct wlr_ext_image_capture_source_v1 *source,
-    struct wlr_scene *capture_scene, bool block_out, void **capture_renderer_ptr) {
+static bool perform_scene_node_capture(copy_frame_t *frame,
+		struct wlr_ext_image_capture_source_v1 *source, struct wlr_scene *capture_scene, bool block_out,
+		void **capture_renderer_ptr) {
 	if (!capture_scene) {
 		wlr_log(WLR_DEBUG, "ext-copy-capture: no capture scene");
 		return false;
@@ -711,9 +711,8 @@ static bool perform_scene_node_capture(copy_frame_t *frame, struct wlr_ext_image
 	capture_renderer_t *r = *capture_renderer_ptr;
 	if (!r) {
 		r = calloc(1, sizeof(*r));
-		if (!r
-		    || !capture_renderer_init(
-		        r, capture_scene, wl_display_get_event_loop(server.wl_display), server.allocator, server.renderer)) {
+		if (!r || !capture_renderer_init(r, capture_scene, wl_display_get_event_loop(server.wl_display),
+				server.allocator, server.renderer)) {
 			free(r);
 			wlr_log(WLR_DEBUG, "ext-copy-capture: failed to init renderer");
 			return false;
@@ -749,7 +748,8 @@ static bool perform_scene_node_capture(copy_frame_t *frame, struct wlr_ext_image
 	time_t tv_sec = now.tv_sec;
 	uint32_t tv_sec_hi = (sizeof(tv_sec) > 4) ? tv_sec >> 32 : 0;
 	uint32_t tv_sec_lo = tv_sec & 0xFFFFFFFF;
-	ext_image_copy_capture_frame_v1_send_presentation_time(frame->resource, tv_sec_hi, tv_sec_lo, now.tv_nsec);
+	ext_image_copy_capture_frame_v1_send_presentation_time(frame->resource, tv_sec_hi, tv_sec_lo,
+		now.tv_nsec);
 
 	ext_image_copy_capture_frame_v1_send_ready(frame->resource);
 	return true;
@@ -762,11 +762,13 @@ static void frame_handle_capture(struct wl_client *wl_client, struct wl_resource
 		return;
 
 	if (!frame->buffer) {
-		wl_resource_post_error(frame->resource, EXT_IMAGE_COPY_CAPTURE_FRAME_V1_ERROR_NO_BUFFER, "capture without buffer");
+		wl_resource_post_error(frame->resource, EXT_IMAGE_COPY_CAPTURE_FRAME_V1_ERROR_NO_BUFFER,
+			"capture without buffer");
 		return;
 	}
 	if (frame->capturing) {
-		wl_resource_post_error(frame->resource, EXT_IMAGE_COPY_CAPTURE_FRAME_V1_ERROR_ALREADY_CAPTURED, "already captured");
+		wl_resource_post_error(frame->resource, EXT_IMAGE_COPY_CAPTURE_FRAME_V1_ERROR_ALREADY_CAPTURED,
+			"already captured");
 		return;
 	}
 
@@ -776,12 +778,12 @@ static void frame_handle_capture(struct wl_client *wl_client, struct wl_resource
 	struct wlr_ext_image_capture_source_v1 *source = session->source;
 
 	wlr_log(WLR_DEBUG, "ext-copy-capture: frame_handle_capture source=%p impl=%p", (void *)source,
-	    source ? (void *)source->impl : NULL);
+		source ? (void *)source->impl : NULL);
 
 	if (!source) {
 		wlr_log(WLR_DEBUG, "ext-copy-capture: source is NULL, sending stopped");
-		ext_image_copy_capture_frame_v1_send_failed(
-		    frame->resource, EXT_IMAGE_COPY_CAPTURE_FRAME_V1_FAILURE_REASON_STOPPED);
+		ext_image_copy_capture_frame_v1_send_failed(frame->resource,
+			EXT_IMAGE_COPY_CAPTURE_FRAME_V1_FAILURE_REASON_STOPPED);
 		session->frame = NULL;
 		frame_destroy(frame);
 		return;
@@ -808,13 +810,12 @@ static void frame_handle_capture(struct wl_client *wl_client, struct wl_resource
 		if (tl->image_capture_source != source)
 			continue;
 
-		wlr_log(WLR_DEBUG,
-		    "ext-copy-capture: found matching toplevel %p, "
-		    "calling perform_scene_node_capture",
-		    (void *)tl);
+		wlr_log(WLR_DEBUG, "ext-copy-capture: found matching toplevel %p, "
+			"calling perform_scene_node_capture", (void *)tl);
 		bool block_out = tl->node && tl->node->client && tl->node->client->block_out_from_screenshare;
 
-		if (perform_scene_node_capture(frame, source, tl->image_capture, block_out, &tl->capture_renderer)) {
+		if (perform_scene_node_capture(frame, source, tl->image_capture, block_out,
+				&tl->capture_renderer)) {
 			session->frame = NULL;
 			frame_destroy(frame);
 			return;
@@ -829,13 +830,12 @@ static void frame_handle_capture(struct wl_client *wl_client, struct wl_resource
 		if (xw->image_capture_source != source)
 			continue;
 
-		wlr_log(WLR_DEBUG,
-		    "ext-copy-capture: found matching xwayland view %p, "
-		    "calling perform_scene_node_capture",
-		    (void *)xw);
+		wlr_log(WLR_DEBUG, "ext-copy-capture: found matching xwayland view %p, "
+			"calling perform_scene_node_capture", (void *)xw);
 		bool block_out = xw->node && xw->node->client && xw->node->client->block_out_from_screenshare;
 
-		if (perform_scene_node_capture(frame, source, xw->image_capture, block_out, &xw->capture_renderer)) {
+		if (perform_scene_node_capture(frame, source, xw->image_capture, block_out,
+				&xw->capture_renderer)) {
 			session->frame = NULL;
 			frame_destroy(frame);
 			return;
@@ -845,16 +845,17 @@ static void frame_handle_capture(struct wl_client *wl_client, struct wl_resource
 	}
 
 	wlr_log(WLR_DEBUG, "ext-copy-capture: no matching source found, sending failed");
-	ext_image_copy_capture_frame_v1_send_failed(frame->resource, EXT_IMAGE_COPY_CAPTURE_FRAME_V1_FAILURE_REASON_UNKNOWN);
+	ext_image_copy_capture_frame_v1_send_failed(frame->resource,
+		EXT_IMAGE_COPY_CAPTURE_FRAME_V1_FAILURE_REASON_UNKNOWN);
 	session->frame = NULL;
 	frame_destroy(frame);
 }
 
 static const struct ext_image_copy_capture_frame_v1_interface frame_impl = {
-    .destroy = frame_handle_destroy,
-    .attach_buffer = frame_handle_attach_buffer,
-    .damage_buffer = frame_handle_damage_buffer,
-    .capture = frame_handle_capture,
+	.destroy = frame_handle_destroy,
+	.attach_buffer = frame_handle_attach_buffer,
+	.damage_buffer = frame_handle_damage_buffer,
+	.capture = frame_handle_capture,
 };
 
 copy_frame_t *frame_from_resource(struct wl_resource *resource) {
@@ -888,15 +889,15 @@ static void session_handle_resource_destroy(struct wl_resource *resource) {
 		session_destroy(session);
 }
 
-static void session_handle_create_frame(
-    struct wl_client *wl_client, struct wl_resource *session_resource, uint32_t id) {
+static void session_handle_create_frame(struct wl_client *wl_client,
+		struct wl_resource *session_resource, uint32_t id) {
 	copy_session_t *session = session_from_resource(session_resource);
 	if (!session)
 		return;
 
 	if (session->frame) {
-		wl_resource_post_error(
-		    session->resource, EXT_IMAGE_COPY_CAPTURE_SESSION_V1_ERROR_DUPLICATE_FRAME, "duplicate frame");
+		wl_resource_post_error(session->resource, EXT_IMAGE_COPY_CAPTURE_SESSION_V1_ERROR_DUPLICATE_FRAME,
+			"duplicate frame");
 		return;
 	}
 
@@ -906,8 +907,8 @@ static void session_handle_create_frame(
 		return;
 	}
 
-	frame->resource = wl_resource_create(
-	    wl_client, &ext_image_copy_capture_frame_v1_interface, wl_resource_get_version(session_resource), id);
+	frame->resource = wl_resource_create(wl_client, &ext_image_copy_capture_frame_v1_interface,
+		wl_resource_get_version(session_resource), id);
 	if (!frame->resource) {
 		free(frame);
 		wl_client_post_no_memory(wl_client);
@@ -921,18 +922,20 @@ static void session_handle_create_frame(
 	wl_resource_set_implementation(frame->resource, &frame_impl, frame, frame_handle_resource_destroy);
 }
 
-static void session_handle_destroy(struct wl_client *wl_client, struct wl_resource *session_resource) {
+static void session_handle_destroy(struct wl_client *wl_client,
+		struct wl_resource *session_resource) {
 	(void)wl_client;
 	wl_resource_destroy(session_resource);
 }
 
 static const struct ext_image_copy_capture_session_v1_interface session_impl = {
-    .create_frame = session_handle_create_frame,
-    .destroy = session_handle_destroy,
+	.create_frame = session_handle_create_frame,
+	.destroy = session_handle_destroy,
 };
 
 copy_session_t *session_from_resource(struct wl_resource *resource) {
-	assert(wl_resource_instance_of(resource, &ext_image_copy_capture_session_v1_interface, &session_impl));
+	assert(wl_resource_instance_of(resource, &ext_image_copy_capture_session_v1_interface,
+		&session_impl));
 	return wl_resource_get_user_data(resource);
 }
 
@@ -949,46 +952,50 @@ static uint32_t drm_format_to_wl_shm(uint32_t fmt) {
 	}
 }
 
-static void send_buffer_constraints(copy_session_t *session, struct wlr_ext_image_capture_source_v1 *source) {
+static void send_buffer_constraints(copy_session_t *session,
+		struct wlr_ext_image_capture_source_v1 *source) {
 	if (!source)
 		return;
 
-	ext_image_copy_capture_session_v1_send_buffer_size(session->resource, source->width, source->height);
+	ext_image_copy_capture_session_v1_send_buffer_size(session->resource, source->width,
+		source->height);
 
 	if (source->shm_formats_len) {
 		for (size_t i = 0; i < source->shm_formats_len; i++)
-			ext_image_copy_capture_session_v1_send_shm_format(
-			    session->resource, drm_format_to_wl_shm(source->shm_formats[i]));
+			ext_image_copy_capture_session_v1_send_shm_format(session->resource,
+				drm_format_to_wl_shm(source->shm_formats[i]));
 	} else {
 		ext_image_copy_capture_session_v1_send_shm_format(session->resource, WL_SHM_FORMAT_ARGB8888);
 	}
 
 	if (source->impl == &source_impl && source->dmabuf_formats.len > 0) {
 		struct wl_array dev_id_array = {
-		    .data = &source->dmabuf_device,
-		    .size = sizeof(source->dmabuf_device),
+			.data = &source->dmabuf_device,
+			.size = sizeof(source->dmabuf_device),
 		};
 		ext_image_copy_capture_session_v1_send_dmabuf_device(session->resource, &dev_id_array);
 
 		for (size_t i = 0; i < source->dmabuf_formats.len; i++) {
 			const struct wlr_drm_format *fmt = &source->dmabuf_formats.formats[i];
 			struct wl_array modifiers_array = {
-			    .data = fmt->modifiers,
-			    .size = fmt->len * sizeof(fmt->modifiers[0]),
+				.data = fmt->modifiers,
+				.size = fmt->len * sizeof(fmt->modifiers[0]),
 			};
-			ext_image_copy_capture_session_v1_send_dmabuf_format(session->resource, fmt->format, &modifiers_array);
+			ext_image_copy_capture_session_v1_send_dmabuf_format(session->resource, fmt->format,
+				&modifiers_array);
 		}
 	}
 
 	ext_image_copy_capture_session_v1_send_done(session->resource);
 }
 
-static void mgr_handle_create_session(struct wl_client *wl_client, struct wl_resource *mgr_resource, uint32_t id,
-    struct wl_resource *source_resource, uint32_t options) {
+static void mgr_handle_create_session(struct wl_client *wl_client, struct wl_resource *mgr_resource,
+		uint32_t id, struct wl_resource *source_resource, uint32_t options) {
 	(void)options;
 	(void)mgr_resource;
 
-	struct wlr_ext_image_capture_source_v1 *wlr_source = wlr_ext_image_capture_source_v1_from_resource(source_resource);
+	struct wlr_ext_image_capture_source_v1 *wlr_source =
+		wlr_ext_image_capture_source_v1_from_resource(source_resource);
 	if (!wlr_source)
 		return;
 
@@ -998,8 +1005,8 @@ static void mgr_handle_create_session(struct wl_client *wl_client, struct wl_res
 		return;
 	}
 
-	session->resource = wl_resource_create(
-	    wl_client, &ext_image_copy_capture_session_v1_interface, wl_resource_get_version(source_resource), id);
+	session->resource = wl_resource_create(wl_client, &ext_image_copy_capture_session_v1_interface,
+		wl_resource_get_version(source_resource), id);
 	if (!session->resource) {
 		free(session);
 		wl_client_post_no_memory(wl_client);
@@ -1007,25 +1014,27 @@ static void mgr_handle_create_session(struct wl_client *wl_client, struct wl_res
 	}
 
 	session->source = wlr_source;
-	wl_resource_set_implementation(session->resource, &session_impl, session, session_handle_resource_destroy);
+	wl_resource_set_implementation(session->resource, &session_impl, session,
+		session_handle_resource_destroy);
 
 	session->source_destroy.notify = session_source_destroy;
 	wl_signal_add(&wlr_source->events.destroy, &session->source_destroy);
 
-	wlr_log(WLR_DEBUG,
-	    "ext-copy-capture: create_session source=%p impl=%p "
-	    "width=%d height=%d shm_fmts=%zu",
-	    (void *)wlr_source, (void *)wlr_source->impl, wlr_source->width, wlr_source->height, wlr_source->shm_formats_len);
+	wlr_log(WLR_DEBUG, "ext-copy-capture: create_session source=%p impl=%p "
+		"width=%d height=%d shm_fmts=%zu", (void *)wlr_source, (void *)wlr_source->impl, wlr_source->width,
+			wlr_source->height, wlr_source->shm_formats_len);
 
 	if (wlr_source->impl->start) {
-		wlr_source->impl->start(wlr_source, options & EXT_IMAGE_COPY_CAPTURE_MANAGER_V1_OPTIONS_PAINT_CURSORS);
+		wlr_source->impl->start(wlr_source,
+			options & EXT_IMAGE_COPY_CAPTURE_MANAGER_V1_OPTIONS_PAINT_CURSORS);
 	}
 
 	send_buffer_constraints(session, wlr_source);
 }
 
-static void mgr_handle_create_pointer_cursor_session(struct wl_client *wl_client, struct wl_resource *mgr_resource,
-    uint32_t id, struct wl_resource *source_resource, struct wl_resource *pointer_resource) {
+static void mgr_handle_create_pointer_cursor_session(struct wl_client *wl_client,
+		struct wl_resource *mgr_resource, uint32_t id, struct wl_resource *source_resource,
+		struct wl_resource *pointer_resource) {
 	(void)mgr_resource;
 	(void)source_resource;
 	(void)pointer_resource;
@@ -1035,14 +1044,16 @@ static void mgr_handle_create_pointer_cursor_session(struct wl_client *wl_client
 		return;
 	}
 
-	session->resource = wl_resource_create(wl_client, &ext_image_copy_capture_session_v1_interface, 1, id);
+	session->resource = wl_resource_create(wl_client, &ext_image_copy_capture_session_v1_interface, 1,
+		id);
 	if (!session->resource) {
 		free(session);
 		wl_client_post_no_memory(wl_client);
 		return;
 	}
 
-	wl_resource_set_implementation(session->resource, &session_impl, session, session_handle_resource_destroy);
+	wl_resource_set_implementation(session->resource, &session_impl, session,
+		session_handle_resource_destroy);
 
 	ext_image_copy_capture_session_v1_send_stopped(session->resource);
 }
@@ -1053,15 +1064,15 @@ static void mgr_handle_destroy(struct wl_client *wl_client, struct wl_resource *
 }
 
 static const struct ext_image_copy_capture_manager_v1_interface copy_mgr_impl = {
-    .create_session = mgr_handle_create_session,
-    .create_pointer_cursor_session = mgr_handle_create_pointer_cursor_session,
-    .destroy = mgr_handle_destroy,
+	.create_session = mgr_handle_create_session,
+	.create_pointer_cursor_session = mgr_handle_create_pointer_cursor_session,
+	.destroy = mgr_handle_destroy,
 };
 
 static void copy_mgr_bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id) {
 	copy_mgr_t *mgr = data;
-	struct wl_resource *resource = wl_resource_create(
-	    wl_client, &ext_image_copy_capture_manager_v1_interface, version, id);
+	struct wl_resource *resource = wl_resource_create(wl_client,
+		&ext_image_copy_capture_manager_v1_interface, version, id);
 	if (!resource) {
 		wl_client_post_no_memory(wl_client);
 		return;
@@ -1085,8 +1096,8 @@ void image_copy_capture_init(void) {
 	if (!output_mgr)
 		goto err_out;
 
-	output_mgr->global = wl_global_create(
-	    server.wl_display, &ext_output_image_capture_source_manager_v1_interface, 1, output_mgr, output_mgr_bind);
+	output_mgr->global = wl_global_create(server.wl_display,
+		&ext_output_image_capture_source_manager_v1_interface, 1, output_mgr, output_mgr_bind);
 	if (!output_mgr->global)
 		goto err_out;
 
@@ -1097,8 +1108,8 @@ void image_copy_capture_init(void) {
 	if (!copy_mgr)
 		goto err_out;
 
-	copy_mgr->global = wl_global_create(
-	    server.wl_display, &ext_image_copy_capture_manager_v1_interface, 1, copy_mgr, copy_mgr_bind);
+	copy_mgr->global = wl_global_create(server.wl_display, &ext_image_copy_capture_manager_v1_interface,
+		1, copy_mgr, copy_mgr_bind);
 	if (!copy_mgr->global)
 		goto err_out;
 
@@ -1130,6 +1141,10 @@ void image_copy_capture_fini(void) {
 	}
 }
 
-struct wl_global *image_copy_capture_get_global(void) { return copy_mgr ? copy_mgr->global : NULL; }
+struct wl_global *image_copy_capture_get_global(void) {
+	return copy_mgr ? copy_mgr->global : NULL;
+}
 
-struct wl_global *image_capture_source_get_global(void) { return output_mgr ? output_mgr->global : NULL; }
+struct wl_global *image_capture_source_get_global(void) {
+	return output_mgr ? output_mgr->global : NULL;
+}

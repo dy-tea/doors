@@ -1,5 +1,3 @@
-#include "workspace.h"
-
 #include "animation.h"
 #include "ipc.h"
 #include "output.h"
@@ -7,7 +5,7 @@
 #include "transaction.h"
 #include "tree.h"
 #include "types.h"
-
+#include "workspace.h"
 #include <stdint.h>
 #include <string.h>
 #include <wlr/types/wlr_scene.h>
@@ -20,8 +18,9 @@ static void update_all_toplevels_visibility(output_t *m, desktop_t *current_desk
 
 static struct wlr_ext_workspace_handle_v1 *find_workspace_by_name(const char *name) {
 	struct wlr_ext_workspace_handle_v1 *workspace;
-	wl_list_for_each(
-	    workspace, &server.workspace_manager->workspaces, link) if (strcmp(workspace->name, name) == 0) return workspace;
+	wl_list_for_each(workspace, &server.workspace_manager->workspaces, link)
+		if (strcmp(workspace->name, name) == 0)
+			return workspace;
 
 	return NULL;
 }
@@ -68,8 +67,8 @@ void workspace_init(void) {
 	server.workspace_commit.notify = handle_workspace_request;
 	wl_signal_add(&server.workspace_manager->events.commit, &server.workspace_commit);
 
-	struct wlr_ext_workspace_group_handle_v1 *group = wlr_ext_workspace_group_handle_v1_create(
-	    server.workspace_manager, 0);
+	struct wlr_ext_workspace_group_handle_v1 *group =
+		wlr_ext_workspace_group_handle_v1_create(server.workspace_manager, 0);
 	if (!group) {
 		wlr_log(WLR_ERROR, "Failed to create workspace group");
 		return;
@@ -88,15 +87,15 @@ void workspace_sync(void) {
 
 	struct wlr_ext_workspace_handle_v1 *workspace, *tmp;
 	wl_list_for_each_safe(workspace, tmp, &server.workspace_manager->workspaces, link)
-	    wlr_ext_workspace_handle_v1_destroy(workspace);
+		wlr_ext_workspace_handle_v1_destroy(workspace);
 
 	if (!mon_head)
 		return;
 
 	desktop_t *d = mon_head->desk_head;
 	while (d != NULL) {
-		struct wlr_ext_workspace_handle_v1 *workspace = wlr_ext_workspace_handle_v1_create(
-		    server.workspace_manager, NULL, 0);
+		struct wlr_ext_workspace_handle_v1 *workspace =
+			wlr_ext_workspace_handle_v1_create(server.workspace_manager, NULL, 0);
 		if (!workspace) {
 			wlr_log(WLR_ERROR, "Failed to create workspace: %s", d->name);
 			d = d->next;
@@ -122,11 +121,11 @@ void workspace_fini(void) {
 
 	struct wlr_ext_workspace_handle_v1 *workspace, *tmp;
 	wl_list_for_each_safe(workspace, tmp, &server.workspace_manager->workspaces, link)
-	    wlr_ext_workspace_handle_v1_destroy(workspace);
+		wlr_ext_workspace_handle_v1_destroy(workspace);
 
 	struct wlr_ext_workspace_group_handle_v1 *group, *tmp_group;
 	wl_list_for_each_safe(group, tmp_group, &server.workspace_manager->groups, link)
-	    wlr_ext_workspace_group_handle_v1_destroy(group);
+		wlr_ext_workspace_group_handle_v1_destroy(group);
 
 	wl_list_remove(&server.workspace_commit.link);
 }
@@ -144,7 +143,8 @@ void workspace_create_desktop(const char *name) {
 	if (!wl_list_empty(&server.workspace_manager->groups))
 		group = wl_container_of(server.workspace_manager->groups.next, group, link);
 
-	struct wlr_ext_workspace_handle_v1 *workspace = wlr_ext_workspace_handle_v1_create(server.workspace_manager, NULL, 0);
+	struct wlr_ext_workspace_handle_v1 *workspace =
+		wlr_ext_workspace_handle_v1_create(server.workspace_manager, NULL, 0);
 	if (!workspace) {
 		wlr_log(WLR_ERROR, "Failed to create workspace: %s", name);
 		return;
@@ -157,7 +157,8 @@ void workspace_create_desktop(const char *name) {
 	wlr_log(WLR_INFO, "Created workspace: %s", name);
 }
 
-static void update_window_visibility(node_t *node, output_t *m, desktop_t *current_desktop, int *count) {
+static void update_window_visibility(node_t *node, output_t *m, desktop_t *current_desktop,
+		int *count) {
 	if (!node)
 		return;
 
@@ -198,8 +199,8 @@ static void update_window_visibility(node_t *node, output_t *m, desktop_t *curre
 		if (node->scratchpad) {
 			should_show = (node->desktop == current_desktop);
 			found = true;
-		} else if (node->client && (node->client->state == STATE_FLOATING || node->client->state == STATE_FULLSCREEN)
-		    && node->desktop != NULL) {
+		} else if (node->client && (node->client->state == STATE_FLOATING ||
+				node->client->state == STATE_FULLSCREEN) && node->desktop != NULL) {
 			should_show = (node->desktop == current_desktop);
 			found = true;
 		} else {
@@ -253,7 +254,8 @@ static void update_all_toplevels_visibility(output_t *m, desktop_t *current_desk
 		if (!xwayland_view->mapped || !xwayland_view->scene_tree || !xwayland_view->node)
 			continue;
 
-		client_state_t st = xwayland_view->node->client ? xwayland_view->node->client->state : STATE_TILED;
+		client_state_t st = xwayland_view->node->client ? xwayland_view->node->client->state :
+			STATE_TILED;
 		if (st == STATE_FLOATING || st == STATE_FULLSCREEN)
 			update_window_visibility(xwayland_view->node, m, current_desktop, &window_count);
 	}
@@ -309,8 +311,18 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
 			if (n->client) {
 				struct wlr_scene_tree *tree = client_get_scene_tree(n->client);
 				if (tree && tree->node.enabled) {
-					struct wlr_box from = {tree->node.x, tree->node.y, 0, 0};
-					struct wlr_box to = {from.x + num_steps * dx, from.y + num_steps * dy, 0, 0};
+					struct wlr_box from = {
+						tree->node.x,
+						tree->node.y,
+						0,
+						0
+					};
+					struct wlr_box to = {
+						from.x + num_steps * dx,
+						from.y + num_steps * dy,
+						0,
+						0
+					};
 					animation_start_workspace_slide(output, n, tree, from, to, true);
 				}
 			}
@@ -354,8 +366,18 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
 						n->client->shown = true;
 						wlr_scene_node_set_enabled(&tree->node, true);
 						struct wlr_box target = n->client->tiled_rectangle;
-						struct wlr_box from = {target.x - k * dx, target.y - k * dy, 0, 0};
-						struct wlr_box to = {target.x + (num_steps - k) * dx, target.y + (num_steps - k) * dy, 0, 0};
+						struct wlr_box from = {
+							target.x - k * dx,
+							target.y - k * dy,
+							0,
+							0
+						};
+						struct wlr_box to = {
+							target.x + (num_steps - k) * dx,
+							target.y + (num_steps - k) * dy,
+							0,
+							0
+						};
 						wlr_scene_node_set_position(&tree->node, from.x, from.y);
 						animation_start_workspace_slide(output, n, tree, from, to, true);
 					}
@@ -374,7 +396,8 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
 				struct wlr_scene_tree *tree = client_get_scene_tree(n->client);
 				if (tree) {
 					wlr_scene_node_set_enabled(&tree->node, true);
-					wlr_scene_node_set_position(&tree->node, tree->node.x - num_steps * dx, tree->node.y - num_steps * dy);
+					wlr_scene_node_set_position(&tree->node, tree->node.x - num_steps * dx,
+						tree->node.y - num_steps * dy);
 				}
 			}
 			n = next_leaf(n, new_desk->root);
@@ -396,7 +419,12 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
 				struct wlr_scene_tree *tree = client_get_scene_tree(n->client);
 				if (tree) {
 					struct wlr_box target = n->client->tiled_rectangle;
-					struct wlr_box from = {target.x - num_steps * dx, target.y - num_steps * dy, 0, 0};
+					struct wlr_box from = {
+						target.x - num_steps * dx,
+						target.y - num_steps * dy,
+						0,
+						0
+					};
 					wlr_scene_node_set_position(&tree->node, from.x, from.y);
 					animation_start_workspace_slide(output, n, tree, from, target, false);
 				}
@@ -417,8 +445,8 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
 	}
 
 	output_schedule_frame(output);
-	wlr_log(WLR_DEBUG, "Switched from %s to %s (animated slide %s)", old_desk ? old_desk->name : "NULL", new_desk->name,
-	    workspace_anim_direction == WORKSPACE_ANIM_VERTICAL ? "vertical" : "horizontal");
+	wlr_log(WLR_DEBUG, "Switched from %s to %s (animated slide %s)", old_desk ? old_desk->name : "NULL",
+		new_desk->name, workspace_anim_direction == WORKSPACE_ANIM_VERTICAL ? "vertical" : "horizontal");
 }
 
 void workspace_switch_to_desktop(const char *name) {
@@ -537,7 +565,9 @@ struct wlr_ext_workspace_handle_v1 *workspace_get_active(void) {
 		return NULL;
 
 	struct wlr_ext_workspace_handle_v1 *workspace;
-	wl_list_for_each(workspace, &server.workspace_manager->workspaces, link) if (workspace->state == 1) return workspace;
+	wl_list_for_each(workspace, &server.workspace_manager->workspaces, link)
+		if (workspace->state == 1)
+			return workspace;
 
 	return NULL;
 }

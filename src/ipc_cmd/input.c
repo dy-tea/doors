@@ -1,9 +1,7 @@
 #include "input.h"
-
 #include "ipc.h"
 #include "ipc_cmd.h"
 #include "ipc_helpers.h"
-
 #include <stdio.h>
 #include <string.h>
 

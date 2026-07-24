@@ -1,10 +1,8 @@
-#include "tiling_drag.h"
-
 #include "output.h"
 #include "server.h"
+#include "tiling_drag.h"
 #include "tree.h"
 #include "types.h"
-
 #include <math.h>
 #include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_scene.h>
@@ -35,13 +33,17 @@ static enum wlr_edges determine_drop_edge(node_t *target, double lx, double ly) 
 	double dist_top = ly - rect.y;
 	double dist_bottom = (rect.y + rect.height) - ly;
 
-	if (dist_left < threshold && dist_left <= dist_right && dist_left <= dist_top && dist_left <= dist_bottom)
+	if (dist_left < threshold && dist_left <= dist_right && dist_left <= dist_top &&
+		dist_left <= dist_bottom)
 		return WLR_EDGE_LEFT;
-	if (dist_right < threshold && dist_right <= dist_left && dist_right <= dist_top && dist_right <= dist_bottom)
+	if (dist_right < threshold && dist_right <= dist_left && dist_right <= dist_top &&
+		dist_right <= dist_bottom)
 		return WLR_EDGE_RIGHT;
-	if (dist_top < threshold && dist_top <= dist_bottom && dist_top <= dist_left && dist_top <= dist_right)
+	if (dist_top < threshold && dist_top <= dist_bottom && dist_top <= dist_left &&
+		dist_top <= dist_right)
 		return WLR_EDGE_TOP;
-	if (dist_bottom < threshold && dist_bottom <= dist_top && dist_bottom <= dist_left && dist_bottom <= dist_right)
+	if (dist_bottom < threshold && dist_bottom <= dist_top && dist_bottom <= dist_left &&
+		dist_bottom <= dist_right)
 		return WLR_EDGE_BOTTOM;
 
 	return WLR_EDGE_NONE;
@@ -72,7 +74,8 @@ static void update_indicator(enum wlr_edges edge, node_t *target) {
 		iw = 4;
 		ih = rect.height;
 		wlr_scene_rect_set_size(server.tiling_drag_indicator, iw, ih);
-		wlr_scene_node_set_position(&server.tiling_drag_indicator->node, rect.x + rect.width - iw, rect.y);
+		wlr_scene_node_set_position(&server.tiling_drag_indicator->node, rect.x + rect.width - iw,
+			rect.y);
 		break;
 	case WLR_EDGE_TOP:
 		iw = rect.width;
@@ -84,7 +87,8 @@ static void update_indicator(enum wlr_edges edge, node_t *target) {
 		iw = rect.width;
 		ih = 4;
 		wlr_scene_rect_set_size(server.tiling_drag_indicator, iw, ih);
-		wlr_scene_node_set_position(&server.tiling_drag_indicator->node, rect.x, rect.y + rect.height - ih);
+		wlr_scene_node_set_position(&server.tiling_drag_indicator->node, rect.x,
+			rect.y + rect.height - ih);
 		break;
 	default:
 		iw = rect.width;
@@ -130,7 +134,8 @@ void tiling_drag_begin(node_t *node) {
 	server.tiling_drag_threshold_reached = false;
 
 	if (!server.tiling_drag_indicator) {
-		server.tiling_drag_indicator = wlr_scene_rect_create(server.drag_tree, 0, 0, tiling_drag_indicator_color_rgba);
+		server.tiling_drag_indicator = wlr_scene_rect_create(server.drag_tree, 0, 0,
+			tiling_drag_indicator_color_rgba);
 	}
 	wlr_scene_node_set_enabled(&server.tiling_drag_indicator->node, false);
 }
@@ -181,7 +186,7 @@ void tiling_drag_finish(void) {
 	}
 
 	wlr_log(WLR_DEBUG, "tiling_drag_finish: dragged=%u target=%u edge=%d", dragged->id, target->id,
-	    server.tiling_drag_target_edge);
+		server.tiling_drag_target_edge);
 
 	enum wlr_edges edge = server.tiling_drag_target_edge;
 	desktop_t *src_desk = dragged->desktop;

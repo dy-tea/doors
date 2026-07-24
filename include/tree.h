@@ -17,7 +17,8 @@ void free_node(node_t *n);
 
 // Tree layout
 void arrange(struct output_t *m, desktop_t *d, bool use_transaction);
-void apply_layout(struct output_t *m, desktop_t *d, node_t *n, struct wlr_box rect, struct wlr_box root_rect);
+void apply_layout(struct output_t *m, desktop_t *d, node_t *n, struct wlr_box rect,
+	struct wlr_box root_rect);
 
 // node insertion and removal
 node_t *find_public(desktop_t *d);
@@ -47,7 +48,8 @@ node_t *find_fence(node_t *n, direction_t dir);
 bool is_adjacent(node_t *a, node_t *b, direction_t dir);
 
 // node manipulation
-void swap_nodes(struct output_t *m1, desktop_t *d1, node_t *n1, struct output_t *m2, desktop_t *d2, node_t *n2);
+void swap_nodes(struct output_t *m1, desktop_t *d1, node_t *n1, struct output_t *m2, desktop_t *d2,
+	node_t *n2);
 bool set_state(struct output_t *m, desktop_t *d, node_t *n, client_state_t s);
 void set_floating(struct output_t *m, desktop_t *d, node_t *n, bool value);
 void enter_fullscreen(struct output_t *m, desktop_t *d, node_t *n);
@@ -98,11 +100,11 @@ typedef struct {
 border_state_t get_border_state(client_t *client);
 
 // Border helpers
-void create_borders(
-    struct wlr_scene_tree *parent, struct wlr_scene_tree **border_tree, struct wlr_scene_rect *rects[4]);
+void create_borders(struct wlr_scene_tree *parent, struct wlr_scene_tree **border_tree,
+	struct wlr_scene_rect *rects[4]);
 void destroy_borders(struct wlr_scene_tree **border_tree, struct wlr_scene_rect *rects[4]);
-void update_borders(
-    struct wlr_scene_tree *border_tree, struct wlr_scene_rect *rects[4], struct wlr_box geo, unsigned int bw);
+void update_borders(struct wlr_scene_tree *border_tree, struct wlr_scene_rect *rects[4],
+	struct wlr_box geo, unsigned int bw);
 void update_border_colors(client_t *client);
 void refresh_border_colors(void);
 void refresh_border_color_cache(void);

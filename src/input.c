@@ -1,9 +1,7 @@
-#include "input.h"
-
 #include "cursor.h"
+#include "input.h"
 #include "keyboard.h"
 #include "server.h"
-
 #include <float.h>
 #include <libinput.h>
 #include <stdlib.h>
@@ -106,7 +104,8 @@ input_config_t *input_config_get(const char *identifier) {
 	if (!identifier)
 		return NULL;
 	for (size_t i = 0; i < num_input_configs; i++) {
-		if (input_configs[i] && input_configs[i]->identifier && strcmp(input_configs[i]->identifier, identifier) == 0) {
+		if (input_configs[i] && input_configs[i]->identifier && strcmp(input_configs[i]->identifier,
+				identifier) == 0) {
 			return input_configs[i];
 		}
 	}
@@ -310,7 +309,8 @@ bool input_config_set_value(input_config_t *config, const char *name, const char
 	} else if (strcmp(name, "drag") == 0) {
 		config->drag = parse_bool(value, -1);
 	} else if (strcmp(name, "drag_lock") == 0) {
-		config->drag_lock = parse_bool(value, 0) ? INPUT_CONFIG_DRAG_LOCK_ENABLED : INPUT_CONFIG_DRAG_LOCK_DISABLED;
+		config->drag_lock = parse_bool(value,
+			0) ? INPUT_CONFIG_DRAG_LOCK_ENABLED : INPUT_CONFIG_DRAG_LOCK_DISABLED;
 	} else if (strcmp(name, "dwt") == 0) {
 		config->dwt = parse_bool(value, -1);
 	} else if (strcmp(name, "dwtp") == 0) {
@@ -378,7 +378,8 @@ void input_config_apply(const input_config_t *config, struct wlr_input_device *d
 		if (config->xkb_variant)
 			names.variant = config->xkb_variant;
 
-		struct xkb_keymap *keymap = xkb_keymap_new_from_names(context, &names, XKB_KEYMAP_COMPILE_NO_FLAGS);
+		struct xkb_keymap *keymap = xkb_keymap_new_from_names(context, &names,
+			XKB_KEYMAP_COMPILE_NO_FLAGS);
 		if (keymap) {
 			wlr_keyboard_set_keymap(keyboard, keymap);
 			xkb_keymap_unref(keymap);
@@ -414,49 +415,53 @@ void input_config_apply(const input_config_t *config, struct wlr_input_device *d
 
 		if (device_is_touchpad(device)) {
 			if (config->tap != -1) {
-				enum libinput_config_tap_state tap = config->tap ? LIBINPUT_CONFIG_TAP_ENABLED : LIBINPUT_CONFIG_TAP_DISABLED;
+				enum libinput_config_tap_state tap = config->tap ? LIBINPUT_CONFIG_TAP_ENABLED :
+					LIBINPUT_CONFIG_TAP_DISABLED;
 				libinput_device_config_tap_set_enabled(libinput_dev, tap);
 			}
 
 			if (config->drag != -1) {
-				enum libinput_config_drag_state drag = config->drag ? LIBINPUT_CONFIG_DRAG_ENABLED
-				                                                    : LIBINPUT_CONFIG_DRAG_DISABLED;
+				enum libinput_config_drag_state drag = config->drag ? LIBINPUT_CONFIG_DRAG_ENABLED :
+					LIBINPUT_CONFIG_DRAG_DISABLED;
 				libinput_device_config_tap_set_drag_enabled(libinput_dev, drag);
 			}
 
 			if (config->drag_lock == INPUT_CONFIG_DRAG_LOCK_ENABLED)
-				libinput_device_config_tap_set_drag_lock_enabled(libinput_dev, LIBINPUT_CONFIG_DRAG_LOCK_ENABLED);
+				libinput_device_config_tap_set_drag_lock_enabled(libinput_dev,
+					LIBINPUT_CONFIG_DRAG_LOCK_ENABLED);
 			else if (config->drag != -1)
-				libinput_device_config_tap_set_drag_lock_enabled(libinput_dev, LIBINPUT_CONFIG_DRAG_LOCK_DISABLED);
+				libinput_device_config_tap_set_drag_lock_enabled(libinput_dev,
+					LIBINPUT_CONFIG_DRAG_LOCK_DISABLED);
 
 			if ((int)config->tap_button_map != -1) {
-				enum libinput_config_tap_button_map map = (config->tap_button_map == INPUT_CONFIG_TAP_BUTTON_MAP_LMR)
-				    ? LIBINPUT_CONFIG_TAP_MAP_LMR
-				    : LIBINPUT_CONFIG_TAP_MAP_LRM;
+				enum libinput_config_tap_button_map map = (config->tap_button_map ==
+					INPUT_CONFIG_TAP_BUTTON_MAP_LMR) ? LIBINPUT_CONFIG_TAP_MAP_LMR : LIBINPUT_CONFIG_TAP_MAP_LRM;
 				libinput_device_config_tap_set_button_map(libinput_dev, map);
 			}
 		}
 
-		if (config->natural_scroll != -1 && libinput_device_config_scroll_has_natural_scroll(libinput_dev))
+		if (config->natural_scroll != -1 &&
+			libinput_device_config_scroll_has_natural_scroll(libinput_dev))
 			libinput_device_config_scroll_set_natural_scroll_enabled(libinput_dev, config->natural_scroll);
 
 		if (config->dwt != -1 && libinput_device_config_dwt_is_available(libinput_dev)) {
-			enum libinput_config_dwt_state dwt = config->dwt ? LIBINPUT_CONFIG_DWT_ENABLED : LIBINPUT_CONFIG_DWT_DISABLED;
+			enum libinput_config_dwt_state dwt = config->dwt ? LIBINPUT_CONFIG_DWT_ENABLED :
+				LIBINPUT_CONFIG_DWT_DISABLED;
 			libinput_device_config_dwt_set_enabled(libinput_dev, dwt);
 		}
 
 		if (config->left_handed != -1 && libinput_device_config_left_handed_is_available(libinput_dev))
 			libinput_device_config_left_handed_set(libinput_dev, config->left_handed);
 
-		if (config->middle_emulation != -1 && libinput_device_config_middle_emulation_is_available(libinput_dev)) {
-			enum libinput_config_middle_emulation_state mid = config->middle_emulation
-			    ? LIBINPUT_CONFIG_MIDDLE_EMULATION_ENABLED
-			    : LIBINPUT_CONFIG_MIDDLE_EMULATION_DISABLED;
+		if (config->middle_emulation != -1 &&
+				libinput_device_config_middle_emulation_is_available(libinput_dev)) {
+			enum libinput_config_middle_emulation_state mid = config->middle_emulation ?
+				LIBINPUT_CONFIG_MIDDLE_EMULATION_ENABLED : LIBINPUT_CONFIG_MIDDLE_EMULATION_DISABLED;
 			libinput_device_config_middle_emulation_set_enabled(libinput_dev, mid);
 		}
 
-		if ((int)config->scroll_method != -1
-		    && libinput_device_config_scroll_get_methods(libinput_dev) != LIBINPUT_CONFIG_SCROLL_NO_SCROLL) {
+		if ((int)config->scroll_method != -1 &&
+				libinput_device_config_scroll_get_methods(libinput_dev) != LIBINPUT_CONFIG_SCROLL_NO_SCROLL) {
 			enum libinput_config_scroll_method method;
 			switch (config->scroll_method) {
 			case INPUT_CONFIG_SCROLL_METHOD_EDGE:
@@ -477,21 +482,20 @@ void input_config_apply(const input_config_t *config, struct wlr_input_device *d
 			libinput_device_config_scroll_set_method(libinput_dev, method);
 		}
 
-		if (config->scroll_button != -1
-		    && libinput_device_config_scroll_get_methods(libinput_dev) != LIBINPUT_CONFIG_SCROLL_NO_SCROLL) {
+		if (config->scroll_button != -1 &&
+				libinput_device_config_scroll_get_methods(libinput_dev) != LIBINPUT_CONFIG_SCROLL_NO_SCROLL) {
 			libinput_device_config_scroll_set_button(libinput_dev, config->scroll_button);
 		}
 
-		if (config->scroll_button_lock != -1
-		    && libinput_device_config_scroll_get_methods(libinput_dev) != LIBINPUT_CONFIG_SCROLL_NO_SCROLL) {
-			enum libinput_config_scroll_button_lock_state lock = config->scroll_button_lock
-			    ? LIBINPUT_CONFIG_SCROLL_BUTTON_LOCK_ENABLED
-			    : LIBINPUT_CONFIG_SCROLL_BUTTON_LOCK_DISABLED;
+		if (config->scroll_button_lock != -1 &&
+				libinput_device_config_scroll_get_methods(libinput_dev) != LIBINPUT_CONFIG_SCROLL_NO_SCROLL) {
+			enum libinput_config_scroll_button_lock_state lock = config->scroll_button_lock ?
+				LIBINPUT_CONFIG_SCROLL_BUTTON_LOCK_ENABLED : LIBINPUT_CONFIG_SCROLL_BUTTON_LOCK_DISABLED;
 			libinput_device_config_scroll_set_button_lock(libinput_dev, lock);
 		}
 
-		if ((int)config->click_method != -1
-		    && libinput_device_config_click_get_methods(libinput_dev) != LIBINPUT_CONFIG_CLICK_METHOD_NONE) {
+		if ((int)config->click_method != -1 &&
+				libinput_device_config_click_get_methods(libinput_dev) != LIBINPUT_CONFIG_CLICK_METHOD_NONE) {
 			enum libinput_config_click_method method;
 			switch (config->click_method) {
 			case INPUT_CONFIG_CLICK_METHOD_BUTTON_AREAS:
@@ -514,9 +518,9 @@ void input_config_apply(const input_config_t *config, struct wlr_input_device *d
 				libinput_device_config_accel_set_speed(libinput_dev, config->pointer_accel);
 
 			if ((int)config->accel_profile != -1) {
-				enum libinput_config_accel_profile profile = (config->accel_profile == INPUT_CONFIG_ACCEL_PROFILE_FLAT)
-				    ? LIBINPUT_CONFIG_ACCEL_PROFILE_FLAT
-				    : LIBINPUT_CONFIG_ACCEL_PROFILE_ADAPTIVE;
+				enum libinput_config_accel_profile profile = (config->accel_profile ==
+					INPUT_CONFIG_ACCEL_PROFILE_FLAT) ? LIBINPUT_CONFIG_ACCEL_PROFILE_FLAT :
+					LIBINPUT_CONFIG_ACCEL_PROFILE_ADAPTIVE;
 				libinput_device_config_accel_set_profile(libinput_dev, profile);
 			}
 		}
@@ -556,7 +560,8 @@ void input_apply_config_all_keyboards(void) {
 
 void input_apply_config_all_pointers(void) {
 	struct pointer_t *pointer;
-	wl_list_for_each(pointer, &server.pointers, link) input_apply_config(&pointer->wlr_pointer->base);
+	wl_list_for_each(pointer, &server.pointers, link)
+		input_apply_config(&pointer->wlr_pointer->base);
 }
 
 void input_init(void) {

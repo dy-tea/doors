@@ -1,7 +1,6 @@
 # Animations
 - Per-window animation overrides
 - Ensure animations and blur work together without visual artifacts
-- Resize animation is very broken
 - Custom animation shaders for windows (e.g. open/close animations)
 
 # Effects

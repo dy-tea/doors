@@ -1,11 +1,10 @@
-#include "keyboard.h"
-
 #include "config.h"
 #include "fallthrough.h"
 #include "idle_power.h"
 #include "input.h"
 #include "input_method.h"
 #include "ipc.h"
+#include "keyboard.h"
 #include "master_stack.h"
 #include "output.h"
 #include "scroller.h"
@@ -17,7 +16,6 @@
 #include "types.h"
 #include "workspace.h"
 #include "xwayland.h"
-
 #include <stdlib.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
@@ -112,8 +110,8 @@ void keyboard_modifiers(struct wl_listener *listener, void *data) {
 
 	wlr_seat_set_keyboard(wlr_seat, keyboard->wlr_keyboard);
 
-	if (seat->input_method_relay
-	    && !input_method_keyboard_grab_forward_modifiers(keyboard->wlr_keyboard, seat->input_method_relay))
+	if (seat->input_method_relay &&
+		!input_method_keyboard_grab_forward_modifiers(keyboard->wlr_keyboard, seat->input_method_relay))
 		wlr_seat_keyboard_notify_modifiers(wlr_seat, &keyboard->wlr_keyboard->modifiers);
 }
 
@@ -163,7 +161,8 @@ void keyboard_key(struct wl_listener *listener, void *data) {
 
 	if (!handled) {
 		// forward key to input method if grabbed
-		if (!input_method_keyboard_grab_forward_key(keyboard->wlr_keyboard, event, seat->input_method_relay)) {
+		if (!input_method_keyboard_grab_forward_key(keyboard->wlr_keyboard, event,
+				seat->input_method_relay)) {
 			// pass key to focused client
 			wlr_seat_set_keyboard(wlr_seat, keyboard->wlr_keyboard);
 			wlr_seat_keyboard_notify_key(wlr_seat, event->time_msec, event->keycode, event->state);
@@ -233,8 +232,8 @@ bool handle_keybind_raw(uint32_t modifiers, uint32_t keycode, bool pressed) {
 	if (!matched_kb)
 		return false;
 
-	if (matched_kb->action == BIND_INTERACTIVE_MOVE || matched_kb->action == BIND_INTERACTIVE_RESIZE
-	    || matched_kb->action == BIND_TILING_DRAG)
+	if (matched_kb->action == BIND_INTERACTIVE_MOVE || matched_kb->action == BIND_INTERACTIVE_RESIZE ||
+		matched_kb->action == BIND_TILING_DRAG)
 		return false;
 
 	execute_keybind(matched_kb);
@@ -258,12 +257,12 @@ bool handle_keybind(uint32_t modifiers, xkb_keysym_t sym) {
 
 	// check if in submap
 	if (active_submap) {
-		wlr_log(WLR_DEBUG, "In submap '%s' with %zu keybinds, looking for keysym=%u mod=%u", active_submap->name,
-		    active_submap->num_keybinds, sym, modifiers);
+		wlr_log(WLR_DEBUG, "In submap '%s' with %zu keybinds, looking for keysym=%u mod=%u",
+			active_submap->name, active_submap->num_keybinds, sym, modifiers);
 		for (size_t i = 0; i < active_submap->num_keybinds; i++) {
 			keybind_t *kb = &active_submap->keybinds[i];
-			wlr_log(WLR_DEBUG, "  checking submap keybind %zu: keysym=%u mod=%u action=%d", i, kb->keysym, kb->modifiers,
-			    kb->action);
+			wlr_log(WLR_DEBUG, "  checking submap keybind %zu: keysym=%u mod=%u action=%d", i, kb->keysym,
+				kb->modifiers, kb->action);
 			if (!kb->use_keycode && keybind_matches(kb, modifiers, sym, 0)) {
 				execute_keybind(kb);
 				return true;
@@ -537,8 +536,8 @@ void close_focused(void) {
 
 void toggle_block_out_from_screenshare(void) {
 	if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL) {
-		wlr_log(WLR_DEBUG, "toggle_block_out: mon=%p desk=%p focus=%p", (void *)mon, mon ? (void *)mon->desk : NULL,
-		    (mon && mon->desk) ? (void *)mon->desk->focus : NULL);
+		wlr_log(WLR_DEBUG, "toggle_block_out: mon=%p desk=%p focus=%p", (void *)mon,
+			mon ? (void *)mon->desk : NULL, (mon && mon->desk) ? (void *)mon->desk->focus : NULL);
 		return;
 	}
 
@@ -549,7 +548,8 @@ void toggle_block_out_from_screenshare(void) {
 	}
 
 	n->client->block_out_from_screenshare = !n->client->block_out_from_screenshare;
-	wlr_log(WLR_DEBUG, "toggle_block_out: %s -> %d", n->client->app_id, n->client->block_out_from_screenshare);
+	wlr_log(WLR_DEBUG, "toggle_block_out: %s -> %d", n->client->app_id,
+		n->client->block_out_from_screenshare);
 
 	if (n->client->toplevel) {
 		toplevel_t *tl = n->client->toplevel;
@@ -558,7 +558,8 @@ void toggle_block_out_from_screenshare(void) {
 			wlr_scene_node_destroy(&tl->image_capture_surface->buffer->node);
 			tl->image_capture_surface = NULL;
 		} else if (!n->client->block_out_from_screenshare && !tl->image_capture_surface) {
-			tl->image_capture_surface = wlr_scene_surface_create(&tl->image_capture->tree, tl->xdg_toplevel->base->surface);
+			tl->image_capture_surface = wlr_scene_surface_create(&tl->image_capture->tree,
+				tl->xdg_toplevel->base->surface);
 		}
 	} else if (n->client->xwayland_view) {
 		xwayland_toplevel_t *xw = n->client->xwayland_view;
@@ -567,11 +568,13 @@ void toggle_block_out_from_screenshare(void) {
 			wlr_scene_node_destroy(&xw->image_capture_surface->buffer->node);
 			xw->image_capture_surface = NULL;
 		} else if (!n->client->block_out_from_screenshare && !xw->image_capture_surface) {
-			xw->image_capture_surface = wlr_scene_surface_create(&xw->image_capture->tree, xw->xwayland_surface->surface);
+			xw->image_capture_surface = wlr_scene_surface_create(&xw->image_capture->tree,
+				xw->xwayland_surface->surface);
 		}
 	}
 
-	wlr_log(WLR_INFO, "toggle block_out_from_screenshare: %s", n->client->block_out_from_screenshare ? "on" : "off");
+	wlr_log(WLR_INFO, "toggle block_out_from_screenshare: %s",
+		n->client->block_out_from_screenshare ? "on" : "off");
 }
 
 void toggle_floating(void) {
@@ -588,14 +591,14 @@ void toggle_floating(void) {
 		return;
 	}
 
-	wlr_log(WLR_INFO, "toggle_floating: node=%u state=%d hidden=%d parent=%u root=%u focus=%u", n->id, n->client->state,
-	    n->hidden, n->parent ? n->parent->id : 0, mon->desk->root ? mon->desk->root->id : 0,
-	    mon->desk->focus ? mon->desk->focus->id : 0);
+	wlr_log(WLR_INFO, "toggle_floating: node=%u state=%d hidden=%d parent=%u root=%u focus=%u", n->id,
+		n->client->state, n->hidden, n->parent ? n->parent->id : 0,
+		mon->desk->root ? mon->desk->root->id : 0, mon->desk->focus ? mon->desk->focus->id : 0);
 
 	if (n->client->state == STATE_FLOATING) {
 		if (n->parent != NULL)
-			wlr_log(WLR_ERROR, "toggle_floating: floating node %u has non-NULL parent %u, unexpected state", n->id,
-			    n->parent->id);
+			wlr_log(WLR_ERROR, "toggle_floating: floating node %u has non-NULL parent %u, unexpected state",
+				n->id, n->parent->id);
 
 		n->hidden = false;
 		wlr_scene_node_reparent(&scene_tree->node, server.tile_tree);
@@ -608,27 +611,29 @@ void toggle_floating(void) {
 
 		arrange(mon, mon->desk, true);
 
-		ipc_put_status(SUB_MASK_NODE_STATE, "node_state[%s,%s,%u,%c]\n", n->client->app_id[0] ? n->client->app_id : "?",
-		    n->client->title[0] ? n->client->title : "?", n->id,
-		    n->client->state == STATE_TILED            ? 'T'
-		        : n->client->state == STATE_FLOATING   ? 'F'
-		        : n->client->state == STATE_FULLSCREEN ? 'U'
-		                                               : '?');
+		ipc_put_status(SUB_MASK_NODE_STATE, "node_state[%s,%s,%u,%c]\n",
+			n->client->app_id[0] ? n->client->app_id : "?", n->client->title[0] ? n->client->title : "?",
+			n->id,
+			n->client->state == STATE_TILED ? 'T' : n->client->state == STATE_FLOATING ? 'F' :
+			n->client->state == STATE_FULLSCREEN ? 'U' : '?');
 
-		wlr_log(WLR_INFO, "toggle_floating: now tiled, node=%u parent=%u root=%u", n->id, n->parent ? n->parent->id : 0,
-		    mon->desk->root ? mon->desk->root->id : 0);
+		wlr_log(WLR_INFO, "toggle_floating: now tiled, node=%u parent=%u root=%u", n->id,
+			n->parent ? n->parent->id : 0, mon->desk->root ? mon->desk->root->id : 0);
 	} else if (n->client->state == STATE_TILED) {
 		if (n->parent == NULL && mon->desk->root != n)
-			wlr_log(WLR_ERROR, "toggle_floating: tiled node %u has no parent and is not root, already detached", n->id);
+			wlr_log(WLR_ERROR,
+				"toggle_floating: tiled node %u has no parent and is not root, already detached", n->id);
 
 		if (n->client->toplevel) {
 			toplevel_t *tl = n->client->toplevel;
 			int off_x = (n->client->tiled_rectangle.width - tl->geometry.width) / 2;
 			int off_y = (n->client->tiled_rectangle.height - tl->geometry.height) / 2;
-			n->client->floating_rectangle = (struct wlr_box){.x = n->client->tiled_rectangle.x + (off_x > 0 ? off_x : 0),
-			    .y = n->client->tiled_rectangle.y + (off_y > 0 ? off_y : 0),
-			    .width = tl->geometry.width,
-			    .height = tl->geometry.height};
+			n->client->floating_rectangle = (struct wlr_box){
+				.x = n->client->tiled_rectangle.x + (off_x > 0 ? off_x : 0),
+				.y = n->client->tiled_rectangle.y + (off_y > 0 ? off_y : 0),
+				.width = tl->geometry.width,
+				.height = tl->geometry.height
+			};
 		} else
 			n->client->floating_rectangle = n->client->tiled_rectangle;
 
@@ -637,7 +642,8 @@ void toggle_floating(void) {
 
 		struct wlr_scene_tree *st = client_get_scene_tree(n->client);
 		if (st)
-			wlr_scene_node_set_position(&st->node, n->client->floating_rectangle.x, n->client->floating_rectangle.y);
+			wlr_scene_node_set_position(&st->node, n->client->floating_rectangle.x,
+				n->client->floating_rectangle.y);
 
 		wlr_scene_node_reparent(&scene_tree->node, server.float_tree);
 
@@ -656,7 +662,7 @@ void toggle_floating(void) {
 		node_set_dirty(n);
 		transaction_commit_dirty();
 		wlr_log(WLR_INFO, "toggle_floating: now floating, node=%u root=%u focus=%u", n->id,
-		    mon->desk->root ? mon->desk->root->id : 0, mon->desk->focus ? mon->desk->focus->id : 0);
+			mon->desk->root ? mon->desk->root->id : 0, mon->desk->focus ? mon->desk->focus->id : 0);
 	}
 }
 
@@ -757,7 +763,11 @@ void toggle_pseudo_tiled(void) {
 			base_rect = n->rectangle;
 
 		n->client->floating_rectangle = (struct wlr_box){
-		    .x = 0, .y = 0, .width = base_rect.width, .height = base_rect.height};
+			.x = 0,
+			.y = 0,
+			.width = base_rect.width,
+			.height = base_rect.height
+		};
 		set_state(mon, mon->desk, n, STATE_PSEUDO_TILED);
 		wlr_log(WLR_INFO, "Window pseudo_tiled");
 	}
@@ -783,7 +793,9 @@ void focus_prev_desktop(void) {
 	}
 }
 
-void focus_last_desktop(void) { workspace_switch_to_last_desktop(); }
+void focus_last_desktop(void) {
+	workspace_switch_to_last_desktop();
+}
 
 void send_to_desktop(int desktop_index) {
 	if (mon == NULL)
@@ -851,8 +863,8 @@ void send_to_desktop(int desktop_index) {
 
 	n->output = target_mon;
 
-	wlr_log(WLR_INFO, "Sent window to desktop: %s (n->output=%p target_mon=%p)", target->name, (void *)n->output,
-	    (void *)target_mon);
+	wlr_log(WLR_INFO, "Sent window to desktop: %s (n->output=%p target_mon=%p)", target->name,
+		(void *)n->output, (void *)target_mon);
 }
 
 void send_to_desktop_by_name(const char *name) {
@@ -941,8 +953,8 @@ void send_to_desktop_by_name(const char *name) {
 
 	n->output = target_mon;
 
-	wlr_log(WLR_INFO, "Sent window to desktop: %s (n->output=%p target_mon=%p)", target->name, (void *)n->output,
-	    (void *)target_mon);
+	wlr_log(WLR_INFO, "Sent window to desktop: %s (n->output=%p target_mon=%p)", target->name,
+		(void *)n->output, (void *)target_mon);
 }
 
 void send_to_next_desktop(void) {
@@ -1001,7 +1013,8 @@ void toggle_monocle(void) {
 	}
 
 	arrange(mon, d, true);
-	ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name, layout_to_char(d->layout));
+	ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name,
+		layout_to_char(d->layout));
 
 	if (d->focus != NULL)
 		focus_node(mon, d, d->focus);
@@ -1025,7 +1038,8 @@ void set_tiled_layout(void) {
 	}
 
 	arrange(mon, d, true);
-	ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name, layout_to_char(d->layout));
+	ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name,
+		layout_to_char(d->layout));
 
 	if (d->focus != NULL)
 		focus_node(mon, d, d->focus);
@@ -1065,7 +1079,8 @@ void toggle_master_stack(void) {
 	}
 
 	arrange(mon, d, true);
-	ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name, layout_to_char(d->layout));
+	ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name,
+		layout_to_char(d->layout));
 
 	if (d->focus != NULL)
 		focus_node(mon, d, d->focus);
@@ -1107,14 +1122,15 @@ void flip_vertical(void) {
 	wlr_log(WLR_INFO, "Flipped tree vertically");
 }
 
+
 #define RESIZE_AMOUNT 0.05
 
 static bool resize_master_stack_ratio(bool horizontal, float delta) {
 	if (mon->desk->layout != LAYOUT_MASTER_STACK)
 		return false;
 
-	bool horizontal_split = master_stack_orientation == MASTER_LEFT || master_stack_orientation == MASTER_RIGHT
-	    || master_stack_orientation == MASTER_CENTER;
+	bool horizontal_split = master_stack_orientation == MASTER_LEFT ||
+		master_stack_orientation == MASTER_RIGHT || master_stack_orientation == MASTER_CENTER;
 	if (horizontal != horizontal_split)
 		return true;
 
@@ -1129,7 +1145,7 @@ static bool resize_master_stack_ratio(bool horizontal, float delta) {
 void resize_left(void) {
 	if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL) {
 		wlr_log(WLR_ERROR, "resize_left: invalid state mon=%p desk=%p focus=%p", (void *)mon,
-		    mon ? (void *)mon->desk : NULL, mon && mon->desk ? (void *)mon->desk->focus : NULL);
+			mon ? (void *)mon->desk : NULL, mon && mon->desk ? (void *)mon->desk->focus : NULL);
 		return;
 	}
 	if (resize_master_stack_ratio(true, -RESIZE_AMOUNT))
@@ -1147,8 +1163,9 @@ void resize_left(void) {
 	for (child = p; p != NULL && p->split_type != TYPE_VERTICAL; p = p->parent)
 		;
 
-	wlr_log(WLR_INFO, "resize_left: node=%u ancestor=%u split_type=%d is_first=%d ratio_before=%f", n->id, p ? p->id : 0,
-	    p ? (int)p->split_type : -1, p ? is_first_child(child) : -1, p ? p->split_ratio : 0.0f);
+	wlr_log(WLR_INFO, "resize_left: node=%u ancestor=%u split_type=%d is_first=%d ratio_before=%f",
+		n->id, p ? p->id : 0, p ? (int)p->split_type : -1, p ? is_first_child(child) : -1,
+		p ? p->split_ratio : 0.0f);
 
 	if (p != NULL) {
 		p->split_ratio -= RESIZE_AMOUNT;
@@ -1186,8 +1203,9 @@ void resize_right(void) {
 	for (child = p; p != NULL && p->split_type != TYPE_VERTICAL; p = p->parent)
 		;
 
-	wlr_log(WLR_INFO, "resize_right: node=%u ancestor=%u split_type=%d is_first=%d ratio_before=%f", n->id, p ? p->id : 0,
-	    p ? (int)p->split_type : -1, p ? is_first_child(child) : -1, p ? p->split_ratio : 0.0f);
+	wlr_log(WLR_INFO, "resize_right: node=%u ancestor=%u split_type=%d is_first=%d ratio_before=%f",
+		n->id, p ? p->id : 0, p ? (int)p->split_type : -1, p ? is_first_child(child) : -1,
+		p ? p->split_ratio : 0.0f);
 
 	if (p != NULL) {
 		p->split_ratio += RESIZE_AMOUNT;
@@ -1225,8 +1243,9 @@ void resize_up(void) {
 	for (child = p; p != NULL && p->split_type != TYPE_HORIZONTAL; p = p->parent)
 		;
 
-	wlr_log(WLR_INFO, "resize_up: node=%u ancestor=%u split_type=%d is_first=%d ratio_before=%f", n->id, p ? p->id : 0,
-	    p ? (int)p->split_type : -1, p ? is_first_child(child) : -1, p ? p->split_ratio : 0.0f);
+	wlr_log(WLR_INFO, "resize_up: node=%u ancestor=%u split_type=%d is_first=%d ratio_before=%f", n->id,
+		p ? p->id : 0, p ? (int)p->split_type : -1, p ? is_first_child(child) : -1,
+		p ? p->split_ratio : 0.0f);
 
 	if (p != NULL) {
 		p->split_ratio -= RESIZE_AMOUNT;
@@ -1264,8 +1283,9 @@ void resize_down(void) {
 	for (child = p; p != NULL && p->split_type != TYPE_HORIZONTAL; p = p->parent)
 		;
 
-	wlr_log(WLR_INFO, "resize_down: node=%u ancestor=%u split_type=%d is_first=%d ratio_before=%f", n->id, p ? p->id : 0,
-	    p ? (int)p->split_type : -1, p ? is_first_child(child) : -1, p ? p->split_ratio : 0.0f);
+	wlr_log(WLR_INFO, "resize_down: node=%u ancestor=%u split_type=%d is_first=%d ratio_before=%f",
+		n->id, p ? p->id : 0, p ? (int)p->split_type : -1, p ? is_first_child(child) : -1,
+		p ? p->split_ratio : 0.0f);
 
 	if (p != NULL) {
 		p->split_ratio += RESIZE_AMOUNT;
@@ -1376,8 +1396,9 @@ void keyboard_group_remove_invalid(keyboard_t *keyboard) {
 	case KEYBOARD_GROUP_DEFAULT:
 		fallthrough;
 	case KEYBOARD_GROUP_SMART: {
-		if (!wlr_keyboard_keymaps_match(keyboard->wlr_keyboard->keymap, group->wlr_group->keyboard.keymap)
-		    || !repeat_info_match(keyboard->wlr_keyboard, &group->wlr_group->keyboard)) {
+		if (!wlr_keyboard_keymaps_match(keyboard->wlr_keyboard->keymap,
+				group->wlr_group->keyboard.keymap) || !repeat_info_match(keyboard->wlr_keyboard,
+				&group->wlr_group->keyboard)) {
 			should_remove = true;
 		}
 		break;
@@ -1402,9 +1423,11 @@ void keyboard_group_add(keyboard_t *keyboard) {
 
 	keyboard_group_t *group;
 	wl_list_for_each(group, &server.keyboard_groups, link) {
-		if (wlr_keyboard_keymaps_match(keyboard->wlr_keyboard->keymap, group->wlr_group->keyboard.keymap)
-		    && repeat_info_match(keyboard->wlr_keyboard, &group->wlr_group->keyboard)) {
-			wlr_log(WLR_DEBUG, "Adding keyboard %p to existing group %p", (void *)keyboard, (void *)group->wlr_group);
+		if (wlr_keyboard_keymaps_match(keyboard->wlr_keyboard->keymap,
+				group->wlr_group->keyboard.keymap) && repeat_info_match(keyboard->wlr_keyboard,
+				&group->wlr_group->keyboard)) {
+			wlr_log(WLR_DEBUG, "Adding keyboard %p to existing group %p", (void *)keyboard,
+				(void *)group->wlr_group);
 			wlr_keyboard_group_add_keyboard(group->wlr_group, keyboard->wlr_keyboard);
 			keyboard->group = group;
 			if (server.seat->keyboard_state.keyboard == keyboard->wlr_keyboard)
@@ -1428,8 +1451,8 @@ void keyboard_group_add(keyboard_t *keyboard) {
 	new_group->wlr_group->data = new_group;
 
 	wlr_keyboard_set_keymap(&new_group->wlr_group->keyboard, keyboard->wlr_keyboard->keymap);
-	wlr_keyboard_set_repeat_info(&new_group->wlr_group->keyboard, keyboard->wlr_keyboard->repeat_info.rate,
-	    keyboard->wlr_keyboard->repeat_info.delay);
+	wlr_keyboard_set_repeat_info(&new_group->wlr_group->keyboard,
+		keyboard->wlr_keyboard->repeat_info.rate, keyboard->wlr_keyboard->repeat_info.delay);
 
 	keyboard_t *rep = calloc(1, sizeof(*rep));
 	if (!rep) {
@@ -1462,7 +1485,8 @@ void keyboard_group_add(keyboard_t *keyboard) {
 	if (server.seat->keyboard_state.keyboard == keyboard->wlr_keyboard)
 		wlr_seat_set_keyboard(server.seat, new_group->representative->wlr_keyboard);
 
-	wlr_log(WLR_DEBUG, "Created new keyboard group %p for keyboard %p", (void *)new_group, (void *)keyboard);
+	wlr_log(WLR_DEBUG, "Created new keyboard group %p for keyboard %p", (void *)new_group,
+		(void *)keyboard);
 }
 
 void keyboard_reapply_grouping(void) {

@@ -1,13 +1,11 @@
-#include "scratchpad.h"
-
 #include "ipc.h"
 #include "output.h"
+#include "scratchpad.h"
 #include "server.h"
 #include "toplevel.h"
 #include "transaction.h"
 #include "tree.h"
 #include "types.h"
-
 #include <stdlib.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/util/log.h>
@@ -41,19 +39,23 @@ void scratchpad_fini(void) {
 
 static scratchpad_entry_t *scratchpad_find_entry(node_t *n) {
 	scratchpad_entry_t *entry;
-	wl_list_for_each(entry, &scratchpad_list, link) if (entry->node == n) return entry;
+	wl_list_for_each(entry, &scratchpad_list, link)
+		if (entry->node == n)
+			return entry;
 
 	return NULL;
 }
 
-bool scratchpad_has(node_t *n) { return n != NULL && n->scratchpad; }
+bool scratchpad_has(node_t *n) {
+	return n != NULL && n->scratchpad;
+}
 
 void scratchpad_add(node_t *n) {
 	if (!n || !n->client || n->scratchpad)
 		return;
 
 	wlr_log(WLR_INFO, "scratchpad_add: node=%u app_id=%s state=%d", n->id,
-	    n->client->app_id[0] ? n->client->app_id : "(none)", n->client->state);
+		n->client->app_id[0] ? n->client->app_id : "(none)", n->client->state);
 
 	desktop_t *d = n->desktop;
 	client_state_t saved_state = n->client->state;
@@ -167,8 +169,8 @@ void scratchpad_show(node_t *n) {
 		return;
 	}
 
-	wlr_log(WLR_INFO, "scratchpad_show: node=%u on output=%s desktop=%s restoring state=%d", n->id, out->name, d->name,
-	    saved_state);
+	wlr_log(WLR_INFO, "scratchpad_show: node=%u on output=%s desktop=%s restoring state=%d", n->id,
+		out->name, d->name, saved_state);
 
 	n->desktop = d;
 	n->output = out;
@@ -195,8 +197,8 @@ void scratchpad_show(node_t *n) {
 		arrange(out, d, true);
 
 		ipc_put_status(SUB_MASK_NODE_ADD, "node_add[%s,%s,%u]\n",
-		    n->client && n->client->app_id[0] ? n->client->app_id : "?",
-		    n->client && n->client->title[0] ? n->client->title : "?", n->id);
+			n->client && n->client->app_id[0] ? n->client->app_id : "?",
+			n->client && n->client->title[0] ? n->client->title : "?", n->id);
 	} else {
 		// restore as floating
 		n->client->state = STATE_FLOATING;
@@ -204,7 +206,8 @@ void scratchpad_show(node_t *n) {
 
 		if (st) {
 			wlr_scene_node_reparent(&st->node, server.float_tree);
-			wlr_scene_node_set_position(&st->node, n->client->floating_rectangle.x, n->client->floating_rectangle.y);
+			wlr_scene_node_set_position(&st->node, n->client->floating_rectangle.x,
+				n->client->floating_rectangle.y);
 		}
 
 		n->client->shown = true;
@@ -215,8 +218,8 @@ void scratchpad_show(node_t *n) {
 		focus_node(out, d, n);
 
 		ipc_put_status(SUB_MASK_NODE_ADD, "node_add[%s,%s,%u]\n",
-		    n->client && n->client->app_id[0] ? n->client->app_id : "?",
-		    n->client && n->client->title[0] ? n->client->title : "?", n->id);
+			n->client && n->client->app_id[0] ? n->client->app_id : "?",
+			n->client && n->client->title[0] ? n->client->title : "?", n->id);
 	}
 
 	transaction_commit_dirty();
@@ -324,7 +327,8 @@ void scratchpad_toggle(node_t *n) {
 	if (!n || !n->client)
 		return;
 
-	wlr_log(WLR_INFO, "scratchpad_toggle: node=%u scratchpad=%d desktop=%p", n->id, n->scratchpad, (void *)n->desktop);
+	wlr_log(WLR_INFO, "scratchpad_toggle: node=%u scratchpad=%d desktop=%p", n->id, n->scratchpad,
+		(void *)n->desktop);
 
 	if (n->scratchpad && n->desktop == NULL) {
 		scratchpad_show(n);

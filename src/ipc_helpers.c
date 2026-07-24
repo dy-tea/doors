@@ -1,7 +1,5 @@
 #include "ipc_helpers.h"
-
 #include "transaction.h"
-
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,7 +9,9 @@
 void send_success(int client_fd, const char *msg);
 void send_failure(int client_fd, const char *msg);
 
-bool streq(const char *a, const char *b) { return strcmp(a, b) == 0; }
+bool streq(const char *a, const char *b) {
+	return strcmp(a, b) == 0;
+}
 
 // parse a hex-digit character
 static int ipc_parse_hex_digit(char c) {
@@ -36,7 +36,8 @@ bool ipc_parse_color(const char *hex, float *rgba) {
 	rgba[0] = (float)(ipc_parse_hex_digit(hex[0]) * 16 + ipc_parse_hex_digit(hex[1])) / 255.0f;
 	rgba[1] = (float)(ipc_parse_hex_digit(hex[2]) * 16 + ipc_parse_hex_digit(hex[3])) / 255.0f;
 	rgba[2] = (float)(ipc_parse_hex_digit(hex[4]) * 16 + ipc_parse_hex_digit(hex[5])) / 255.0f;
-	rgba[3] = (len == 8) ? (float)(ipc_parse_hex_digit(hex[6]) * 16 + ipc_parse_hex_digit(hex[7])) / 255.0f : 1.0f;
+	rgba[3] = (len == 8) ? (float)(ipc_parse_hex_digit(hex[6]) * 16 + ipc_parse_hex_digit(hex[7])) /
+		255.0f : 1.0f;
 	return true;
 }
 
@@ -52,7 +53,8 @@ void ipc_format_color_float(char *buf, size_t bufsz, const float rgba[4]) {
 	snprintf(buf, bufsz, "%.3f %.3f %.3f %.3f\n", rgba[0], rgba[1], rgba[2], rgba[3]);
 }
 
-bool ipc_parse_gradient(const char *str, float out[BORDER_GRADIENT_MAX_STOPS * 4], int *count, float *angle_out) {
+bool ipc_parse_gradient(const char *str, float out[BORDER_GRADIENT_MAX_STOPS * 4], int *count,
+		float *angle_out) {
 	if (!str)
 		return false;
 	char buf[512];
@@ -115,7 +117,8 @@ bool ipc_handle_bool(char **args, int num, int client_fd, bool *var, int flags) 
 	return false;
 }
 
-bool ipc_handle_int(char **args, int num, int client_fd, int *var, int flags, int min, int max, const char *errmsg) {
+bool ipc_handle_int(char **args, int num, int client_fd, int *var, int flags, int min, int max,
+		const char *errmsg) {
 	if (num >= 2) {
 		int val = atoi(args[1]);
 		if (val < min || val > max) {
@@ -144,8 +147,8 @@ bool ipc_handle_int(char **args, int num, int client_fd, int *var, int flags, in
 	return false;
 }
 
-bool ipc_handle_float(char **args, int num, int client_fd, float *var, int flags, float min, float max, const char *fmt,
-    const char *errmsg) {
+bool ipc_handle_float(char **args, int num, int client_fd, float *var, int flags, float min,
+		float max, const char *fmt, const char *errmsg) {
 	if (num >= 2) {
 		float val = (float)atof(args[1]);
 		if (val < min || val > max) {

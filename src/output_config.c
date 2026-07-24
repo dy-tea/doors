@@ -1,9 +1,7 @@
-#include "output_config.h"
-
 #include "ipc.h"
 #include "output.h"
+#include "output_config.h"
 #include "server.h"
-
 #include <drm_fourcc.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -17,7 +15,9 @@
 
 static struct wl_list output_configs;
 
-void output_config_init(void) { wl_list_init(&output_configs); }
+void output_config_init(void) {
+	wl_list_init(&output_configs);
+}
 
 struct output_config *output_config_create(const char *name) {
 	struct output_config *oc = calloc(1, sizeof(*oc));
@@ -70,7 +70,9 @@ void output_config_destroy(struct output_config *oc) {
 
 struct output_config *output_config_find(const char *name) {
 	struct output_config *oc;
-	wl_list_for_each(oc, &output_configs, link) if (strcmp(oc->name, name) == 0) return oc;
+	wl_list_for_each(oc, &output_configs, link)
+		if (strcmp(oc->name, name) == 0)
+			return oc;
 	return NULL;
 }
 
@@ -200,7 +202,8 @@ void output_config_apply(struct output_config *oc) {
 	}
 
 	if (oc->adaptive_sync != OUTPUT_CONFIG_ADAPTIVE_SYNC_AUTO)
-		wlr_output_state_set_adaptive_sync_enabled(&state, oc->adaptive_sync == OUTPUT_CONFIG_ADAPTIVE_SYNC_ENABLED);
+		wlr_output_state_set_adaptive_sync_enabled(&state,
+			oc->adaptive_sync == OUTPUT_CONFIG_ADAPTIVE_SYNC_ENABLED);
 
 	if (oc->render_bit_depth != OUTPUT_CONFIG_RENDER_BIT_DEPTH_AUTO) {
 		uint32_t render_format = DRM_FORMAT_XRGB8888;
@@ -218,8 +221,8 @@ void output_config_apply(struct output_config *oc) {
 			wlr_log(WLR_ERROR, "Cannot enable HDR on output %s: output does not support HDR", oc->name);
 		} else {
 			const struct wlr_output_image_description image_desc = {
-			    .primaries = WLR_COLOR_NAMED_PRIMARIES_BT2020,
-			    .transfer_function = WLR_COLOR_TRANSFER_FUNCTION_ST2084_PQ,
+				.primaries = WLR_COLOR_NAMED_PRIMARIES_BT2020,
+				.transfer_function = WLR_COLOR_TRANSFER_FUNCTION_ST2084_PQ,
 			};
 			wlr_output_state_set_image_description(&state, &image_desc);
 		}
@@ -261,7 +264,8 @@ void output_config_apply(struct output_config *oc) {
 
 void output_apply_all_config(void) {
 	struct output_config *oc;
-	wl_list_for_each(oc, &output_configs, link) output_config_apply(oc);
+	wl_list_for_each(oc, &output_configs, link)
+		output_config_apply(oc);
 }
 
 void output_config_update_from_wlr_output(output_t *output) {
@@ -280,7 +284,8 @@ void output_update_manager_config(void) {
 	struct wlr_output_configuration_v1 *config = wlr_output_configuration_v1_create();
 
 	for (output_t *output = mon_head; output != NULL; output = output->next) {
-		struct wlr_output_configuration_head_v1 *head = wlr_output_configuration_head_v1_create(config, output->wlr_output);
+		struct wlr_output_configuration_head_v1 *head = wlr_output_configuration_head_v1_create(config,
+			output->wlr_output);
 
 		struct wlr_output_head_v1_state *state = &head->state;
 		state->enabled = output->wlr_output->enabled;
@@ -292,9 +297,11 @@ void output_update_manager_config(void) {
 		}
 		state->scale = output->wlr_output->scale;
 		state->transform = output->wlr_output->transform;
-		state->adaptive_sync_enabled = output->wlr_output->adaptive_sync_status == WLR_OUTPUT_ADAPTIVE_SYNC_ENABLED;
+		state->adaptive_sync_enabled = output->wlr_output->adaptive_sync_status ==
+			WLR_OUTPUT_ADAPTIVE_SYNC_ENABLED;
 
-		struct wlr_output_layout_output *layout_output = wlr_output_layout_get(server.output_layout, output->wlr_output);
+		struct wlr_output_layout_output *layout_output = wlr_output_layout_get(server.output_layout,
+			output->wlr_output);
 		if (layout_output) {
 			state->x = layout_output->x;
 			state->y = layout_output->y;

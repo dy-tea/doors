@@ -6,7 +6,6 @@
 #include "toplevel.h"
 #include "tree.h"
 #include "workspace.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,9 +25,9 @@ void ipc_cmd_query(char **args, int num, int client_fd) {
 	node_t *filter_node = NULL;
 	bool use_names = false;
 
-	while (num > 0
-	    && (streq("-m", *args) || streq("--monitor", *args) || streq("-d", *args) || streq("--desktop", *args)
-	        || streq("-n", *args) || streq("--node", *args) || streq("--names", *args))) {
+	while (num > 0 && (streq("-m", *args) || streq("--monitor", *args) || streq("-d",
+			*args) || streq("--desktop", *args) || streq("-n", *args) || streq("--node",
+			*args) || streq("--names", *args))) {
 		if (streq("-m", *args) || streq("--monitor", *args)) {
 			if (num < 2) {
 				send_failure(client_fd, "query -m: missing monitor\n");
@@ -103,16 +102,16 @@ void ipc_cmd_query(char **args, int num, int client_fd) {
 		output_t *m_start = filter_mon ? filter_mon : mon_head;
 		output_t *m_end = filter_mon ? filter_mon->next : NULL;
 
-		for (output_t *m = m_start; m != m_end;) {
-			offset += snprintf(
-			    buf + offset, sizeof(buf) - offset, "  \"monitor\": {\"name\": \"%s\", \"id\": %u},\n", m->name, m->id);
+		for (output_t *m = m_start; m != m_end; ) {
+			offset += snprintf(buf + offset, sizeof(buf) - offset,
+				"  \"monitor\": {\"name\": \"%s\", \"id\": %u},\n", m->name, m->id);
 
 			desktop_t *d_start = filter_desk ? filter_desk : m->desk;
 			desktop_t *d_end = filter_desk ? filter_desk->next : NULL;
 
-			for (desktop_t *d = d_start; d != d_end;) {
+			for (desktop_t *d = d_start; d != d_end; ) {
 				offset += snprintf(buf + offset, sizeof(buf) - offset,
-				    "  \"desktop\": {\"name\": \"%s\", \"id\": %u, \"layout\": %d},\n", d->name, d->id, d->layout);
+					"  \"desktop\": {\"name\": \"%s\", \"id\": %u, \"layout\": %d},\n", d->name, d->id, d->layout);
 				if (filter_desk)
 					break;
 				d = d->next;
@@ -128,17 +127,18 @@ void ipc_cmd_query(char **args, int num, int client_fd) {
 			bool include = true;
 			if (filter_node && toplevel->node != filter_node)
 				include = false;
-			if (filter_desk && toplevel->node && toplevel->node->output && toplevel->node->output->desk != filter_desk)
+			if (filter_desk && toplevel->node && toplevel->node->output &&
+				toplevel->node->output->desk != filter_desk)
 				include = false;
 			if (filter_mon && toplevel->node && toplevel->node->output != filter_mon)
 				include = false;
 
 			if (include)
 				offset += snprintf(buf + offset, sizeof(buf) - offset,
-				    "  \"toplevel\": {\"app_id\": \"%s\", \"title\": \"%s\", \"identifier\": \"%s\"}\n",
-				    toplevel->node && toplevel->node->client ? toplevel->node->client->app_id : "?",
-				    toplevel->node && toplevel->node->client ? toplevel->node->client->title : "?",
-				    toplevel->foreign_identifier ? toplevel->foreign_identifier : "?");
+					"  \"toplevel\": {\"app_id\": \"%s\", \"title\": \"%s\", \"identifier\": \"%s\"}\n",
+					toplevel->node && toplevel->node->client ? toplevel->node->client->app_id : "?",
+					toplevel->node && toplevel->node->client ? toplevel->node->client->title : "?",
+					toplevel->foreign_identifier ? toplevel->foreign_identifier : "?");
 		}
 
 		struct xwayland_toplevel_t *xwayland_view;
@@ -146,24 +146,25 @@ void ipc_cmd_query(char **args, int num, int client_fd) {
 			bool include = true;
 			if (filter_node && xwayland_view->node != filter_node)
 				include = false;
-			if (filter_desk && xwayland_view->node && xwayland_view->node->output
-			    && xwayland_view->node->output->desk != filter_desk)
+			if (filter_desk && xwayland_view->node && xwayland_view->node->output &&
+				xwayland_view->node->output->desk != filter_desk)
 				include = false;
 			if (filter_mon && xwayland_view->node && xwayland_view->node->output != filter_mon)
 				include = false;
 
 			if (include)
 				offset += snprintf(buf + offset, sizeof(buf) - offset,
-				    "  \"xwayland\": {\"app_id\": \"%s\", \"title\": \"%s\", \"identifier\": \"%s\"}\n",
-				    xwayland_view->node && xwayland_view->node->client ? xwayland_view->node->client->app_id : "?",
-				    xwayland_view->node && xwayland_view->node->client ? xwayland_view->node->client->title : "?",
-				    xwayland_view->foreign_identifier ? xwayland_view->foreign_identifier : "?");
+					"  \"xwayland\": {\"app_id\": \"%s\", \"title\": \"%s\", \"identifier\": \"%s\"}\n",
+					xwayland_view->node && xwayland_view->node->client ? xwayland_view->node->client->app_id : "?",
+					xwayland_view->node && xwayland_view->node->client ? xwayland_view->node->client->title : "?",
+					xwayland_view->foreign_identifier ? xwayland_view->foreign_identifier : "?");
 		}
 
 		offset += snprintf(buf + offset, sizeof(buf) - offset, "}\n");
 		send_success(client_fd, buf);
 	} else if (streq("-M", *args) || streq("--monitors", *args)) {
-		for (output_t *m = filter_mon ? filter_mon : mon_head; m != NULL; m = filter_mon ? NULL : m->next) {
+		for (output_t *m = filter_mon ? filter_mon : mon_head; m != NULL; m = filter_mon ? NULL : m->next)
+				{
 			if (use_names)
 				offset += snprintf(buf + offset, sizeof(buf) - offset, "%s\n", m->name);
 			else
@@ -194,7 +195,8 @@ void ipc_cmd_query(char **args, int num, int client_fd) {
 			bool include = true;
 			if (filter_node && toplevel->node != filter_node)
 				include = false;
-			if (filter_desk && toplevel->node && toplevel->node->output && toplevel->node->output->desk != filter_desk)
+			if (filter_desk && toplevel->node && toplevel->node->output &&
+				toplevel->node->output->desk != filter_desk)
 				include = false;
 			if (filter_mon && toplevel->node && toplevel->node->output != filter_mon)
 				include = false;
@@ -208,8 +210,9 @@ void ipc_cmd_query(char **args, int num, int client_fd) {
 						name = toplevel->node->client->app_id;
 					offset += snprintf(buf + offset, sizeof(buf) - offset, "%s\n", name);
 				} else {
-					offset += snprintf(buf + offset, sizeof(buf) - offset, "%u %s\n", toplevel->node ? toplevel->node->id : 0,
-					    toplevel->foreign_identifier ? toplevel->foreign_identifier : "?");
+					offset += snprintf(buf + offset, sizeof(buf) - offset, "%u %s\n",
+						toplevel->node ? toplevel->node->id : 0,
+						toplevel->foreign_identifier ? toplevel->foreign_identifier : "?");
 				}
 			}
 		}
@@ -219,8 +222,8 @@ void ipc_cmd_query(char **args, int num, int client_fd) {
 			bool include = true;
 			if (filter_node && xwayland_view->node != filter_node)
 				include = false;
-			if (filter_desk && xwayland_view->node && xwayland_view->node->output
-			    && xwayland_view->node->output->desk != filter_desk)
+			if (filter_desk && xwayland_view->node && xwayland_view->node->output &&
+				xwayland_view->node->output->desk != filter_desk)
 				include = false;
 			if (filter_mon && xwayland_view->node && xwayland_view->node->output != filter_mon)
 				include = false;
@@ -228,15 +231,17 @@ void ipc_cmd_query(char **args, int num, int client_fd) {
 			if (include) {
 				if (use_names) {
 					const char *name = "?";
-					if (xwayland_view->node && xwayland_view->node->client && xwayland_view->node->client->title[0])
+					if (xwayland_view->node && xwayland_view->node->client &&
+						xwayland_view->node->client->title[0])
 						name = xwayland_view->node->client->title;
-					else if (xwayland_view->node && xwayland_view->node->client && xwayland_view->node->client->app_id[0])
+					else if (xwayland_view->node && xwayland_view->node->client &&
+						xwayland_view->node->client->app_id[0])
 						name = xwayland_view->node->client->app_id;
 					offset += snprintf(buf + offset, sizeof(buf) - offset, "%s\n", name);
 				} else {
 					offset += snprintf(buf + offset, sizeof(buf) - offset, "%u %s\n",
-					    xwayland_view->node ? xwayland_view->node->id : 0,
-					    xwayland_view->foreign_identifier ? xwayland_view->foreign_identifier : "?");
+						xwayland_view->node ? xwayland_view->node->id : 0,
+						xwayland_view->foreign_identifier ? xwayland_view->foreign_identifier : "?");
 				}
 			}
 		}
@@ -254,37 +259,38 @@ void ipc_cmd_query(char **args, int num, int client_fd) {
 		}
 		char *foreign_id = "?";
 		toplevel_t *toplevel;
-		wl_list_for_each(toplevel, &server.toplevels, link) if (toplevel->node == n) {
-			foreign_id = toplevel->foreign_identifier ? toplevel->foreign_identifier : "?";
+		wl_list_for_each(toplevel, &server.toplevels, link)
+			if (toplevel->node == n) {
+				foreign_id = toplevel->foreign_identifier ? toplevel->foreign_identifier : "?";
 			break;
 		}
 		if (foreign_id[0] == '?') {
 			struct xwayland_toplevel_t *xwayland_view;
-			wl_list_for_each(xwayland_view, &server.xwayland.views, link) if (xwayland_view->node == n) {
-				foreign_id = xwayland_view->foreign_identifier ? xwayland_view->foreign_identifier : "?";
+			wl_list_for_each(xwayland_view, &server.xwayland.views, link)
+				if (xwayland_view->node == n) {
+					foreign_id = xwayland_view->foreign_identifier ? xwayland_view->foreign_identifier : "?";
 				break;
 			}
 		}
 
 		if (use_names) {
 			offset += snprintf(buf + offset, sizeof(buf) - offset,
-			    "{\"monitor\": \"%s\", \"desktop\": \"%s\", \"node\": \"%s\", \"title\": \"%s\", \"type\": %d, "
-			    "\"rect\": {\"x\": %d, \"y\": %d, \"width\": %d, \"height\": %d}, "
-			    "\"client\": \"%s\", \"identifier\": \"%s\"}\n",
-			    m->name, m->desk->name,
-			    n->client && n->client->title[0] ? n->client->title
-			                                     : (n->client && n->client->app_id[0] ? n->client->app_id : "?"),
-			    n->client && n->client->title[0] ? n->client->title : "", n->split_type, n->rectangle.x, n->rectangle.y,
-			    n->rectangle.width, n->rectangle.height, n->client && n->client->app_id[0] ? n->client->app_id : "?",
-			    foreign_id);
+				"{\"monitor\": \"%s\", \"desktop\": \"%s\", \"node\": \"%s\", \"title\": \"%s\", \"type\": %d, "
+				"\"rect\": {\"x\": %d, \"y\": %d, \"width\": %d, \"height\": %d}, "
+				"\"client\": \"%s\", \"identifier\": \"%s\"}\n", m->name, m->desk->name,
+					n->client && n->client->title[0] ? n->client->title : (n->client &&
+					n->client->app_id[0] ? n->client->app_id : "?"),
+					n->client && n->client->title[0] ? n->client->title : "", n->split_type, n->rectangle.x,
+					n->rectangle.y, n->rectangle.width, n->rectangle.height,
+					n->client && n->client->app_id[0] ? n->client->app_id : "?", foreign_id);
 		} else {
 			offset += snprintf(buf + offset, sizeof(buf) - offset,
-			    "{\"monitor\": \"%s\", \"desktop\": \"%s\", \"id\": %u, \"title\": \"%s\", \"type\": %d, "
-			    "\"rect\": {\"x\": %d, \"y\": %d, \"width\": %d, \"height\": %d}, "
-			    "\"client\": \"%s\", \"identifier\": \"%s\"}\n",
-			    m->name, m->desk->name, n->id, n->client && n->client->title[0] ? n->client->title : "", n->split_type,
-			    n->rectangle.x, n->rectangle.y, n->rectangle.width, n->rectangle.height,
-			    n->client && n->client->app_id[0] ? n->client->app_id : "?", foreign_id);
+				"{\"monitor\": \"%s\", \"desktop\": \"%s\", \"id\": %u, \"title\": \"%s\", \"type\": %d, "
+				"\"rect\": {\"x\": %d, \"y\": %d, \"width\": %d, \"height\": %d}, "
+				"\"client\": \"%s\", \"identifier\": \"%s\"}\n", m->name, m->desk->name, n->id,
+					n->client && n->client->title[0] ? n->client->title : "", n->split_type, n->rectangle.x,
+					n->rectangle.y, n->rectangle.width, n->rectangle.height,
+					n->client && n->client->app_id[0] ? n->client->app_id : "?", foreign_id);
 		}
 		send_success(client_fd, buf);
 	} else {

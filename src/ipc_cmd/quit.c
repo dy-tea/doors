@@ -1,7 +1,6 @@
 #include "ipc.h"
 #include "ipc_cmd.h"
 #include "server.h"
-
 #include <wlr/util/log.h>
 
 void ipc_cmd_quit(char **args, int num, int client_fd) {

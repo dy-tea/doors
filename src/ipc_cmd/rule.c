@@ -1,9 +1,7 @@
-#include "rule.h"
-
 #include "ipc.h"
 #include "ipc_cmd.h"
 #include "ipc_helpers.h"
-
+#include "rule.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -200,7 +198,6 @@ void ipc_cmd_rule(char **args, int num, int client_fd) {
 
 		add_rule(r);
 		send_success(client_fd, "rule added\n");
-
 	} else if (streq("-r", subcmd) || streq("--remove", subcmd)) {
 		if (num < 2) {
 			send_failure(client_fd, "rule -r: missing index\n");
@@ -212,7 +209,6 @@ void ipc_cmd_rule(char **args, int num, int client_fd) {
 			send_success(client_fd, "rule removed\n");
 		else
 			send_failure(client_fd, "rule -r: invalid index\n");
-
 	} else if (streq("-l", subcmd) || streq("--list", subcmd)) {
 		char buf[DOORS_BUFSIZ];
 		list_rules(buf, sizeof(buf));

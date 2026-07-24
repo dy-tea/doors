@@ -1,7 +1,6 @@
-#include "config.h"
-
 #include "animation.h"
 #include "bezier.h"
+#include "config.h"
 #include "effects.h"
 #include "idle_power.h"
 #include "ipc.h"
@@ -17,7 +16,6 @@
 #include "text.h"
 #include "transaction.h"
 #include "tree.h"
-
 #include <fcntl.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -97,7 +95,8 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 			else if (strcmp(args[1], "urgent") == 0)
 				focus_on_activate = FOCUS_ON_ACTIVATE_URGENT;
 			else {
-				send_failure(client_fd, "config focus_on_activate: expected \"focus\", \"none\", \"smart\", or \"urgent\"\n");
+				send_failure(client_fd,
+					"config focus_on_activate: expected \"focus\", \"none\", \"smart\", or \"urgent\"\n");
 				return;
 			}
 			transaction_commit_dirty();
@@ -127,14 +126,16 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 			else if (strcmp(args[1], "csd") == 0)
 				decoration_mode = DECORATION_CSD;
 			else {
-				send_failure(client_fd, "config decoration_mode: expected \"none\", \"tabs\", \"always\", or \"csd\"\n");
+				send_failure(client_fd,
+					"config decoration_mode: expected \"none\", \"tabs\", \"always\", or \"csd\"\n");
 				return;
 			}
 			tabs_rebuild_all();
 
 			// refresh decor
 			toplevel_t *tl;
-			wl_list_for_each(tl, &server.toplevels, link) toplevel_apply_decoration_mode(tl);
+			wl_list_for_each(tl, &server.toplevels, link)
+				toplevel_apply_decoration_mode(tl);
 
 			transaction_commit_dirty();
 			send_success(client_fd, "decoration_mode set\n");
@@ -170,7 +171,8 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 				send_failure(client_fd, "workspace_anim_direction: must be 'vertical' or 'horizontal'\n");
 			}
 		} else {
-			send_success(client_fd, workspace_anim_direction == WORKSPACE_ANIM_VERTICAL ? "vertical\n" : "horizontal\n");
+			send_success(client_fd,
+				workspace_anim_direction == WORKSPACE_ANIM_VERTICAL ? "vertical\n" : "horizontal\n");
 		}
 	} else if (streq("workspace_anim_slide_up", *args)) {
 		ipc_handle_bool(args, num, client_fd, &workspace_anim_slide_up, IPC_FLAG_NONE);
@@ -182,12 +184,12 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 			float *color;
 		} tab_cfg_t;
 		static const tab_cfg_t tab_colors[] = {
-		    {"bar_bg", color_bar_bg},
-		    {"bg", color_tab_bg},
-		    {"bg_active", color_tab_bg_active},
-		    {"text", color_tab_text},
-		    {"text_active", color_tab_text_active},
-		    {"sep", color_tab_sep},
+			{"bar_bg", color_bar_bg},
+			{"bg", color_tab_bg},
+			{"bg_active", color_tab_bg_active},
+			{"text", color_tab_text},
+			{"text_active", color_tab_text_active},
+			{"sep", color_tab_sep},
 		};
 		const char *suffix = *args + 10;
 		for (size_t i = 0; i < sizeof(tab_colors) / sizeof(tab_colors[0]); i++) {
@@ -240,7 +242,8 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 			send_success(client_fd, buf);
 		}
 	} else if (streq("scroller_default_proportion", *args)) {
-		ipc_handle_float(args, num, client_fd, &scroller_default_proportion, IPC_FLAG_NONE, 0.1f, 1.0f, "%.2f\n", NULL);
+		ipc_handle_float(args, num, client_fd, &scroller_default_proportion, IPC_FLAG_NONE, 0.1f, 1.0f,
+			"%.2f\n", NULL);
 	} else if (streq("scroller_proportion_preset", *args)) {
 		if (num >= 2) {
 			char *value = args[1];
@@ -277,13 +280,13 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 			int offset = 0;
 			for (int i = 0; i < scroller_proportion_preset_count && offset < 500; i++) {
 				offset += snprintf(buf + offset, sizeof(buf) - offset, "%.2f%s", scroller_proportion_preset[i],
-				    i < scroller_proportion_preset_count - 1 ? "," : "\n");
+					i < scroller_proportion_preset_count - 1 ? "," : "\n");
 			}
 			send_success(client_fd, buf);
 		}
 	} else if (streq("scroller_default_proportion_single", *args)) {
-		ipc_handle_float(
-		    args, num, client_fd, &scroller_default_proportion_single, IPC_FLAG_NONE, 0.1f, 1.0f, "%.2f\n", NULL);
+		ipc_handle_float(args, num, client_fd, &scroller_default_proportion_single, IPC_FLAG_NONE, 0.1f,
+			1.0f, "%.2f\n", NULL);
 	} else if (streq("scroller_focus_center", *args)) {
 		ipc_handle_bool(args, num, client_fd, &scroller_focus_center, IPC_FLAG_NONE);
 	} else if (streq("scroller_prefer_center", *args)) {
@@ -303,7 +306,8 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 			else if (strcmp(args[1], "always") == 0)
 				focus_follows_mouse = FOLLOWS_ALWAYS;
 			else {
-				send_failure(client_fd, "config focus_follows_pointer: expected \"no\", \"yes\", or \"always\"\n");
+				send_failure(client_fd,
+					"config focus_follows_pointer: expected \"no\", \"yes\", or \"always\"\n");
 				return;
 			}
 			transaction_commit_dirty();
@@ -395,11 +399,11 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 			send_success(client_fd, tiling_drag_indicator_color);
 			send_success(client_fd, "\n");
 		}
-	} else if (streq("normal_border_gradient", *args) || streq("active_border_gradient", *args)
-	    || streq("focused_border_gradient", *args) || streq("normal_border_gradient2", *args)
-	    || streq("active_border_gradient2", *args) || streq("focused_border_gradient2", *args)
-	    || streq("normal_border_gradient_lerp", *args) || streq("active_border_gradient_lerp", *args)
-	    || streq("focused_border_gradient_lerp", *args)) {
+	} else if (streq("normal_border_gradient", *args) || streq("active_border_gradient",
+			*args) || streq("focused_border_gradient", *args) || streq("normal_border_gradient2",
+			*args) || streq("active_border_gradient2", *args) || streq("focused_border_gradient2",
+			*args) || streq("normal_border_gradient_lerp", *args) || streq("active_border_gradient_lerp",
+			*args) || streq("focused_border_gradient_lerp", *args)) {
 		border_theme_t *bt;
 		if (args[0][0] == 'n')
 			bt = &normal_border_theme;
@@ -495,13 +499,16 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 			send_success(client_fd, initial_polarity == FIRST_CHILD ? "first_child\n" : "second_child\n");
 		}
 	} else if (streq("directional_focus_tightness", *args)) {
-		ipc_handle_int(args, num, client_fd, &directional_focus_tightness, IPC_FLAG_NONE, 0, 100, "invalid value");
+		ipc_handle_int(args, num, client_fd, &directional_focus_tightness, IPC_FLAG_NONE, 0, 100,
+			"invalid value");
 	} else if (streq("mapping_events_count", *args)) {
-		ipc_handle_int(args, num, client_fd, &mapping_events_count, IPC_FLAG_NONE, 0, 1000000, "invalid value");
+		ipc_handle_int(args, num, client_fd, &mapping_events_count, IPC_FLAG_NONE, 0, 1000000,
+			"invalid value");
 	} else if (streq("minimize_to_scratchpad", *args)) {
 		ipc_handle_bool(args, num, client_fd, &minimize_to_scratchpad, IPC_FLAG_NONE);
 	} else if (streq("ignore_ewmh_fullscreen", *args)) {
-		ipc_handle_int(args, num, client_fd, &ignore_ewmh_fullscreen, IPC_FLAG_NONE, 0, 2, "invalid value (0-2)");
+		ipc_handle_int(args, num, client_fd, &ignore_ewmh_fullscreen, IPC_FLAG_NONE, 0, 2,
+			"invalid value (0-2)");
 	} else if (streq("click_to_focus", *args)) {
 		ipc_handle_bool(args, num, client_fd, &click_to_focus, IPC_FLAG_NONE);
 	} else if (streq("record_history", *args)) {
@@ -543,20 +550,20 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 			send_success(client_fd, buf);
 		}
 	} else if (streq("refraction_strength", *args)) {
-		ipc_handle_float(
-		    args, num, client_fd, &refraction_strength, IPC_FLAG_NONE, 0.0f, 30.0f, "%.3f\n", "value must be 0.0-30.0");
+		ipc_handle_float(args, num, client_fd, &refraction_strength, IPC_FLAG_NONE, 0.0f, 30.0f, "%.3f\n",
+			"value must be 0.0-30.0");
 	} else if (streq("refraction_edge_size_px", *args)) {
-		ipc_handle_float(args, num, client_fd, &refraction_edge_size_px, IPC_FLAG_NONE, 0.0f, 400.0f, "%.3f\n",
-		    "value must be 0.0-400.0");
+		ipc_handle_float(args, num, client_fd, &refraction_edge_size_px, IPC_FLAG_NONE, 0.0f, 400.0f,
+			"%.3f\n", "value must be 0.0-400.0");
 	} else if (streq("refraction_corner_radius_px", *args)) {
-		ipc_handle_float(args, num, client_fd, &refraction_corner_radius_px, IPC_FLAG_NONE, 0.0f, 400.0f, "%.3f\n",
-		    "value must be 0.0-400.0");
+		ipc_handle_float(args, num, client_fd, &refraction_corner_radius_px, IPC_FLAG_NONE, 0.0f, 400.0f,
+			"%.3f\n", "value must be 0.0-400.0");
 	} else if (streq("refraction_normal_pow", *args)) {
-		ipc_handle_float(
-		    args, num, client_fd, &refraction_normal_pow, IPC_FLAG_NONE, 0.0f, 8.0f, "%.3f\n", "value must be 0.0-8.0");
+		ipc_handle_float(args, num, client_fd, &refraction_normal_pow, IPC_FLAG_NONE, 0.0f, 8.0f, "%.3f\n",
+			"value must be 0.0-8.0");
 	} else if (streq("refraction_rgb_fringing", *args)) {
-		ipc_handle_float(
-		    args, num, client_fd, &refraction_rgb_fringing, IPC_FLAG_NONE, 0.0f, 1.0f, "%.6f\n", "value must be 0.0-1.0");
+		ipc_handle_float(args, num, client_fd, &refraction_rgb_fringing, IPC_FLAG_NONE, 0.0f, 1.0f,
+			"%.6f\n", "value must be 0.0-1.0");
 	} else if (streq("refraction_texture_repeat_mode", *args)) {
 		if (num >= 2) {
 			int val = atoi(args[1]);
@@ -564,7 +571,8 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 				refraction_texture_repeat_mode = val;
 				send_success(client_fd, "refraction_texture_repeat_mode set\n");
 			} else {
-				send_failure(client_fd, "config refraction_texture_repeat_mode: value must be 0 (clamp) or 1 (mirror)\n");
+				send_failure(client_fd,
+					"config refraction_texture_repeat_mode: value must be 0 (clamp) or 1 (mirror)\n");
 			}
 		} else {
 			char buf[32];
@@ -572,8 +580,8 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 			send_success(client_fd, buf);
 		}
 	} else if (streq("refraction_offset", *args)) {
-		ipc_handle_float(
-		    args, num, client_fd, &refraction_offset, IPC_FLAG_NONE, 0.0f, 8.0f, "%.3f\n", "value must be 0.0-8.0");
+		ipc_handle_float(args, num, client_fd, &refraction_offset, IPC_FLAG_NONE, 0.0f, 8.0f, "%.3f\n",
+			"value must be 0.0-8.0");
 	} else if (streq("blur_downsample", *args)) {
 		if (num >= 2) {
 			int val = atoi(args[1]);
@@ -593,20 +601,20 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 			send_success(client_fd, buf);
 		}
 	} else if (streq("blur_vibrancy", *args)) {
-		ipc_handle_float(
-		    args, num, client_fd, &blur_vibrancy, IPC_FLAG_NONE, 0.0f, 1.0f, "%.3f\n", "value must be 0.0-1.0");
+		ipc_handle_float(args, num, client_fd, &blur_vibrancy, IPC_FLAG_NONE, 0.0f, 1.0f, "%.3f\n",
+			"value must be 0.0-1.0");
 	} else if (streq("blur_vibrancy_darkness", *args)) {
-		ipc_handle_float(
-		    args, num, client_fd, &blur_vibrancy_darkness, IPC_FLAG_NONE, 0.0f, 1.0f, "%.3f\n", "value must be 0.0-1.0");
+		ipc_handle_float(args, num, client_fd, &blur_vibrancy_darkness, IPC_FLAG_NONE, 0.0f, 1.0f,
+			"%.3f\n", "value must be 0.0-1.0");
 	} else if (streq("blur_noise_strength", *args)) {
-		ipc_handle_float(
-		    args, num, client_fd, &blur_noise_strength, IPC_FLAG_NONE, 0.0f, 1.0f, "%.3f\n", "value must be 0.0-1.0");
+		ipc_handle_float(args, num, client_fd, &blur_noise_strength, IPC_FLAG_NONE, 0.0f, 1.0f, "%.3f\n",
+			"value must be 0.0-1.0");
 	} else if (streq("blur_brightness", *args)) {
-		ipc_handle_float(
-		    args, num, client_fd, &blur_brightness, IPC_FLAG_NONE, 0.5f, 2.0f, "%.3f\n", "value must be 0.5-2.0");
+		ipc_handle_float(args, num, client_fd, &blur_brightness, IPC_FLAG_NONE, 0.5f, 2.0f, "%.3f\n",
+			"value must be 0.5-2.0");
 	} else if (streq("blur_contrast", *args)) {
-		ipc_handle_float(
-		    args, num, client_fd, &blur_contrast, IPC_FLAG_NONE, 0.5f, 2.0f, "%.3f\n", "value must be 0.5-2.0");
+		ipc_handle_float(args, num, client_fd, &blur_contrast, IPC_FLAG_NONE, 0.5f, 2.0f, "%.3f\n",
+			"value must be 0.5-2.0");
 	} else if (streq("mica_enabled", *args)) {
 		if (num >= 2) {
 			mica_enabled = (strcmp(args[1], "true") == 0);
@@ -663,11 +671,11 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 			send_success(client_fd, buf);
 		}
 	} else if (streq("acrylic_tint_strength", *args)) {
-		ipc_handle_float(
-		    args, num, client_fd, &acrylic_tint_strength, IPC_FLAG_NONE, 0.0f, 1.0f, "%.3f\n", "value must be 0.0-1.0");
+		ipc_handle_float(args, num, client_fd, &acrylic_tint_strength, IPC_FLAG_NONE, 0.0f, 1.0f, "%.3f\n",
+			"value must be 0.0-1.0");
 	} else if (streq("acrylic_noise_strength", *args)) {
-		ipc_handle_float(
-		    args, num, client_fd, &acrylic_noise_strength, IPC_FLAG_NONE, 0.0f, 1.0f, "%.3f\n", "value must be 0.0-1.0");
+		ipc_handle_float(args, num, client_fd, &acrylic_noise_strength, IPC_FLAG_NONE, 0.0f, 1.0f,
+			"%.3f\n", "value must be 0.0-1.0");
 	} else if (streq("acrylic_light_anchor", *args)) {
 		if (num >= 2) {
 			float a, b;
@@ -685,12 +693,13 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 			send_success(client_fd, buf);
 		}
 	} else if (streq("acrylic_blur_passes", *args)) {
-		ipc_handle_int(args, num, client_fd, &acrylic_blur_passes, IPC_FLAG_NONE, 0, 10, "value must be 0-10");
+		ipc_handle_int(args, num, client_fd, &acrylic_blur_passes, IPC_FLAG_NONE, 0, 10,
+			"value must be 0-10");
 	} else if (streq("screen_shader", *args)) {
 		if (num >= 2) {
 			if (!screen_shader_set(args[1])) {
-				send_failure(
-				    client_fd, "config screen_shader: unknown shader (builtin: none grayscale invert sepia nightlight)\n");
+				send_failure(client_fd,
+					"config screen_shader: unknown shader (builtin: none grayscale invert sepia nightlight)\n");
 			} else {
 				send_success(client_fd, "screen_shader set\n");
 			}
@@ -740,7 +749,8 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 		}
 	} else if (streq("animation", *args)) {
 		if (num < 2) {
-			send_failure(client_fd, "config animation: expected <type> [bezier|duration|spring|enabled] [value]\n");
+			send_failure(client_fd,
+				"config animation: expected <type> [bezier|duration|spring|enabled] [value]\n");
 		} else if (num >= 3 && streq("spring", args[2])) {
 			const char *sname = num >= 4 ? args[3] : "";
 			if (sname[0] != '\0' && !spring_exists(sname)) {
@@ -799,19 +809,21 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 				} else {
 					off = snprintf(buf, sizeof(buf), "bezier: %s\n", bname ? bname : "(global default)");
 				}
-				off += snprintf(buf + off, sizeof(buf) - off, "duration: %u\n", dur > 0 ? dur : animation_get_duration());
+				off += snprintf(buf + off, sizeof(buf) - off, "duration: %u\n",
+					dur > 0 ? dur : animation_get_duration());
 				snprintf(buf + off, sizeof(buf) - off, "enabled: %s\n", enabled ? "true" : "false");
 				send_success(client_fd, buf);
 			}
 		}
 	} else if (streq("shadow_size", *args)) {
-		ipc_handle_float(args, num, client_fd, &shadow_size, IPC_FLAG_NONE, 0.0f, 100.0f, "%.1f\n", "value must be 0-100");
+		ipc_handle_float(args, num, client_fd, &shadow_size, IPC_FLAG_NONE, 0.0f, 100.0f, "%.1f\n",
+			"value must be 0-100");
 	} else if (streq("shadow_offset_x", *args)) {
-		ipc_handle_float(
-		    args, num, client_fd, &shadow_offset_x, IPC_FLAG_NONE, -100.0f, 100.0f, "%.1f\n", "value must be -100-100");
+		ipc_handle_float(args, num, client_fd, &shadow_offset_x, IPC_FLAG_NONE, -100.0f, 100.0f, "%.1f\n",
+			"value must be -100-100");
 	} else if (streq("shadow_offset_y", *args)) {
-		ipc_handle_float(
-		    args, num, client_fd, &shadow_offset_y, IPC_FLAG_NONE, -100.0f, 100.0f, "%.1f\n", "value must be -100-100");
+		ipc_handle_float(args, num, client_fd, &shadow_offset_y, IPC_FLAG_NONE, -100.0f, 100.0f, "%.1f\n",
+			"value must be -100-100");
 	} else if (streq("shadow_color", *args)) {
 		if (num >= 2) {
 			float rgba[4];
@@ -827,9 +839,11 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 			send_success(client_fd, buf);
 		}
 	} else if (streq("render_unfocused_fps", *args)) {
-		ipc_handle_int(args, num, client_fd, &render_unfocused_fps, IPC_FLAG_NONE, 1, INT_MAX, "value must be >=1");
+		ipc_handle_int(args, num, client_fd, &render_unfocused_fps, IPC_FLAG_NONE, 1, INT_MAX,
+			"value must be >=1");
 	} else if (streq("idle_timeout", *args)) {
-		if (ipc_handle_int(args, num, client_fd, &idle_timeout, IPC_FLAG_NONE, 0, 86400, "value must be 0-86400"))
+		if (ipc_handle_int(args, num, client_fd, &idle_timeout, IPC_FLAG_NONE, 0, 86400,
+			"value must be 0-86400"))
 			idle_power_reset_timer();
 	} else if (streq("idle_dpms", *args)) {
 		if (ipc_handle_bool(args, num, client_fd, &idle_dpms, IPC_FLAG_NONE))

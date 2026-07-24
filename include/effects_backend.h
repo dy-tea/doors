@@ -122,35 +122,37 @@ typedef struct effects_backend_t {
 	void (*output_fini)(be_output_state_t *state);
 	void (*output_resize)(be_output_state_t *state, int width, int height, int blur_w, int blur_h);
 
-	bool (*ensure_buffer)(
-	    struct wlr_buffer **buf, uint64_t native[2], int w, int h, struct wlr_renderer *r, struct wlr_allocator *a);
+	bool (*ensure_buffer)(struct wlr_buffer **buf, uint64_t native[2], int w, int h,
+		struct wlr_renderer *r, struct wlr_allocator *a);
 	void (*destroy_buffer)(struct wlr_buffer *buf, uint64_t native[2]);
 
 	void (*frame_begin)(void);
 	void (*frame_end)(void);
 
-	bool (*blit)(uint64_t src_tex, uint64_t dst_fbo, int w, int h, const pixman_box32_t *scissor, int n_scissor);
+	bool (*blit)(uint64_t src_tex, uint64_t dst_fbo, int w, int h, const pixman_box32_t *scissor,
+		int n_scissor);
 
-	bool (*blur)(be_output_state_t *state, uint64_t src_handle, int src_w, int src_h, struct be_blur_params *p,
-	    uint64_t *out_handle);
+	bool (*blur)(be_output_state_t *state, uint64_t src_handle, int src_w, int src_h,
+		struct be_blur_params *p, uint64_t *out_handle);
 
-	bool (*apply_mica_tint)(
-	    be_output_state_t *state, uint64_t bg_handle, float tint[4], float tint_strength, uint64_t dst_fbo, int w, int h);
+	bool (*apply_mica_tint)(be_output_state_t *state, uint64_t bg_handle, float tint[4],
+		float tint_strength, uint64_t dst_fbo, int w, int h);
 
-	bool (*apply_acrylic)(
-	    be_output_state_t *state, uint64_t bg_handle, struct be_acrylic_params *p, uint64_t dst_fbo, int w, int h);
+	bool (*apply_acrylic)(be_output_state_t *state, uint64_t bg_handle, struct be_acrylic_params *p,
+		uint64_t dst_fbo, int w, int h);
 
 	bool (*render_shadow)(struct be_shadow_params *p, uint64_t dst_fbo);
 
 	bool (*render_border)(struct be_border_params *p, uint64_t dst_fbo);
 
-	bool (*apply_corner_mask)(be_output_state_t *state, uint64_t dst_fbo, int dst_w, int dst_h, uint64_t bg_tex,
-	    struct be_corner_mask_params *p);
+	bool (*apply_corner_mask)(be_output_state_t *state, uint64_t dst_fbo, int dst_w, int dst_h,
+		uint64_t bg_tex, struct be_corner_mask_params *p);
 
-	bool (*apply_screen_shader)(uint64_t src_tex, uint64_t dst_fbo, int w, int h, struct be_screen_shader_params *p);
+	bool (*apply_screen_shader)(uint64_t src_tex, uint64_t dst_fbo, int w, int h,
+		struct be_screen_shader_params *p);
 
-	bool (*capture_readback)(struct wlr_buffer *capture_buffer, be_output_state_t *state, uint64_t dst_fbo, int dst_w,
-	    int dst_h, int src_w, int src_h, uint64_t *out_tex);
+	bool (*capture_readback)(struct wlr_buffer *capture_buffer, be_output_state_t *state,
+		uint64_t dst_fbo, int dst_w, int dst_h, int src_w, int src_h, uint64_t *out_tex);
 
 	bool (*compile_screen_shader)(const char *frag_src);
 	void (*destroy_screen_shader)(void);

@@ -156,7 +156,8 @@ void run_config_idle(void *data);
 void load_hotkeys_idle(void *data);
 void load_hotkeys(const char *config_path);
 void reload_hotkeys(void);
-bool keybind_matches(const keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode);
+bool keybind_matches(const keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysym,
+	uint32_t keycode);
 void execute_keybind(const keybind_t *kb);
 void execute_bell_bind(void);
 int get_hotkey_watch_fd(void);
@@ -186,5 +187,5 @@ uint32_t parse_modifiers(const char *mod_str);
 xkb_keysym_t parse_keysym(const char *name);
 uint32_t parse_keycode(const char *name);
 bind_action_t parse_action(const char *cmd, int *desktop_index, char *submap_name);
-void add_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode, bool use_keycode, bind_action_t action,
-    int desktop_index, const char *external_cmd, const char *submap_name);
+void add_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode, bool use_keycode,
+	bind_action_t action, int desktop_index, const char *external_cmd, const char *submap_name);

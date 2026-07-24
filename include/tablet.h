@@ -53,5 +53,5 @@ void tablet_pad_destroy(tablet_pad_t *pad);
 void tablet_pad_set_focus(tablet_pad_t *pad, struct wlr_surface *surface);
 void tablet_pads_set_focus(struct seat_t *seat, struct wlr_surface *surface);
 
-void handle_tablet_tool_position(
-    struct wlr_tablet_tool *wlr_tool, tablet_t *tablet, bool tip_down, double x, double y, uint32_t time);
+void handle_tablet_tool_position(struct wlr_tablet_tool *wlr_tool, tablet_t *tablet, bool tip_down,
+	double x, double y, uint32_t time);

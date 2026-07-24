@@ -58,6 +58,7 @@ typedef struct gesture_tracker_t {
 
 void gesture_tracker_begin(gesture_tracker_t *tracker, enum gesture_type type, uint8_t fingers);
 bool gesture_tracker_check(gesture_tracker_t *tracker, enum gesture_type type);
-void gesture_tracker_update(gesture_tracker_t *tracker, double dx, double dy, double scale, double rotation);
+void gesture_tracker_update(gesture_tracker_t *tracker, double dx, double dy, double scale,
+	double rotation);
 void gesture_tracker_cancel(gesture_tracker_t *tracker);
 void gesture_tracker_end(gesture_tracker_t *tracker);

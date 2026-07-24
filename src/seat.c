@@ -1,10 +1,8 @@
-#include "seat.h"
-
 #include "cursor.h"
 #include "input_method.h"
+#include "seat.h"
 #include "server.h"
 #include "tablet.h"
-
 #include <stdlib.h>
 #include <string.h>
 #include <wlr/types/wlr_cursor.h>
@@ -113,10 +111,12 @@ void seat_destroy(seat_t *seat) {
 		input_method_relay_finish(seat->input_method_relay);
 
 	tablet_t *tablet, *tmp_tablet;
-	wl_list_for_each_safe(tablet, tmp_tablet, &seat->tablets, link) tablet_destroy(tablet);
+	wl_list_for_each_safe(tablet, tmp_tablet, &seat->tablets, link)
+		tablet_destroy(tablet);
 
 	tablet_pad_t *pad, *tmp_pad;
-	wl_list_for_each_safe(pad, tmp_pad, &seat->tablet_pads, link) tablet_pad_destroy(pad);
+	wl_list_for_each_safe(pad, tmp_pad, &seat->tablet_pads, link)
+		tablet_pad_destroy(pad);
 
 	wl_list_remove(&seat->link);
 
@@ -129,14 +129,18 @@ void seat_destroy(seat_t *seat) {
 
 seat_t *seat_find_by_name(const char *name) {
 	seat_t *seat;
-	wl_list_for_each(seat, &server.seats, link) if (strcmp(seat->name, name) == 0) return seat;
+	wl_list_for_each(seat, &server.seats, link)
+		if (strcmp(seat->name, name) == 0)
+			return seat;
 
 	return NULL;
 }
 
 seat_t *seat_find_by_wlr_seat(struct wlr_seat *wlr_seat) {
 	seat_t *seat;
-	wl_list_for_each(seat, &server.seats, link) if (seat->wlr_seat == wlr_seat) return seat;
+	wl_list_for_each(seat, &server.seats, link)
+		if (seat->wlr_seat == wlr_seat)
+			return seat;
 
 	return NULL;
 }

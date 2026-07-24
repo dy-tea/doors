@@ -90,8 +90,8 @@ static void rotate_log_file(void) {
 	log_file = NULL;
 
 	char rotated_path[sizeof(log_path)];
-	snprintf(
-	    rotated_path, sizeof(rotated_path), "%s/%s.%u.log", log_dir, LOG_FILENAME_BASE, rotation_count++ % MAX_LOG_FILES);
+	snprintf(rotated_path, sizeof(rotated_path), "%s/%s.%u.log", log_dir, LOG_FILENAME_BASE,
+		rotation_count++ % MAX_LOG_FILES);
 
 	// rename current log to rotated version
 	if (rename(log_path, rotated_path) != 0) {
@@ -226,8 +226,8 @@ int log_init(const char *log_file_path) {
 	}
 
 	fprintf(stdout, "Logging to: %s\n", log_path);
-	fprintf(stdout, "Log rotation: %u lines per file, keeping %u files (0-%u)\n", MAX_LOG_LINES, MAX_LOG_FILES,
-	    MAX_LOG_FILES - 1);
+	fprintf(stdout, "Log rotation: %u lines per file, keeping %u files (0-%u)\n", MAX_LOG_LINES,
+		MAX_LOG_FILES, MAX_LOG_FILES - 1);
 
 	// log startup
 	fprintf(log_file, "\n");
@@ -270,4 +270,6 @@ void log_fini(void) {
 	}
 }
 
-const char *log_get_path(void) { return log_path[0] != '\0' ? log_path : NULL; }
+const char *log_get_path(void) {
+	return log_path[0] != '\0' ? log_path : NULL;
+}

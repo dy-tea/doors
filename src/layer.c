@@ -1,15 +1,13 @@
-#include "layer.h"
-
 #include "animation.h"
 #include "effects.h"
 #include "input_method.h"
+#include "layer.h"
 #include "output.h"
 #include "popup.h"
 #include "seat.h"
 #include "server.h"
 #include "tablet.h"
 #include "tree.h"
-
 #include <stdlib.h>
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_buffer.h>
@@ -44,7 +42,7 @@ void layer_surface_set_blur(layer_surface_t *ls, bool enabled) {
 			struct wlr_scene_output *so = wlr_scene_get_scene_output(server.scene, ls->output->wlr_output);
 			if (so) {
 				pixman_region32_union_rect(&so->damage_ring.current, &so->damage_ring.current, 0, 0,
-				    (unsigned int)ls->output->width, (unsigned int)ls->output->height);
+					(unsigned int)ls->output->width, (unsigned int)ls->output->height);
 				output_schedule_frame(ls->output);
 			}
 		}
@@ -58,7 +56,8 @@ void layer_surface_set_blur(layer_surface_t *ls, bool enabled) {
 	}
 }
 
-static void layer_surface_save_buffer_iterator(struct wlr_scene_buffer *buffer, int sx, int sy, void *data) {
+static void layer_surface_save_buffer_iterator(struct wlr_scene_buffer *buffer, int sx, int sy,
+		void *data) {
 	struct wlr_scene_tree *tree = data;
 	if (!buffer || !buffer->buffer)
 		return;
@@ -79,8 +78,10 @@ static void layer_surface_save_buffer(layer_surface_t *layer) {
 	if (!layer || !layer->saved_tree)
 		return;
 
-	wlr_scene_node_for_each_buffer(&layer->scene_tree->node, layer_surface_save_buffer_iterator, layer->saved_tree);
-	wlr_log(WLR_DEBUG, "layer: save_buffer: saved_tree children=%d", wl_list_length(&layer->saved_tree->children));
+	wlr_scene_node_for_each_buffer(&layer->scene_tree->node, layer_surface_save_buffer_iterator,
+		layer->saved_tree);
+	wlr_log(WLR_DEBUG, "layer: save_buffer: saved_tree children=%d",
+		wl_list_length(&layer->saved_tree->children));
 }
 
 static void layer_surface_destroy(struct wl_listener *listener, void *data) {
@@ -129,7 +130,8 @@ static void layer_surface_unmap(struct wl_listener *listener, void *data) {
 		wlr_scene_node_set_enabled(&layer->scene_tree->node, false);
 	} else {
 		struct wlr_scene_node *child;
-		wl_list_for_each(child, &layer->scene_tree->children, link) wlr_scene_node_set_enabled(child, true);
+		wl_list_for_each(child, &layer->scene_tree->children, link)
+			wlr_scene_node_set_enabled(child, true);
 
 		layer->saved_tree = wlr_scene_tree_create(&server.scene->tree);
 		if (!layer->saved_tree || !animation_fade_out_layer(layer)) {
@@ -168,8 +170,8 @@ static void layer_surface_commit(struct wl_listener *listener, void *data) {
 	}
 
 	// check ext_background_effect_v1 state
-	const struct wlr_ext_background_effect_surface_v1_state *fx = wlr_ext_background_effect_v1_get_surface_state(
-	    layer_surface->surface);
+	const struct wlr_ext_background_effect_surface_v1_state *fx =
+		wlr_ext_background_effect_v1_get_surface_state(layer_surface->surface);
 	bool wants_blur = fx && !pixman_region32_empty(&fx->blur_region);
 	bool had_blur = layer->blur_node != NULL;
 	if (wants_blur != had_blur)
@@ -261,7 +263,8 @@ void handle_new_layer_surface(struct wl_listener *listener, void *data) {
 
 	// fractional scale
 	wlr_fractional_scale_v1_notify_scale(layer_surface->surface, layer->output->wlr_output->scale);
-	wlr_surface_set_preferred_buffer_scale(layer_surface->surface, ceil(layer->output->wlr_output->scale));
+	wlr_surface_set_preferred_buffer_scale(layer_surface->surface,
+		ceil(layer->output->wlr_output->scale));
 
 	wlr_surface_send_enter(layer_surface->surface, layer_surface->output);
 
@@ -304,13 +307,14 @@ void arrange_layers(output_t *output) {
 }
 
 void focus_layer_surface(layer_surface_t *layer_surface) {
-	if (!layer_surface->layer_surface || !layer_surface->layer_surface->surface
-	    || !layer_surface->layer_surface->surface->mapped)
+	if (!layer_surface->layer_surface || !layer_surface->layer_surface->surface ||
+		!layer_surface->layer_surface->surface->mapped)
 		return;
 
 	struct wlr_surface *surface = layer_surface->layer_surface->surface;
 
-	if (layer_surface->layer_surface->current.keyboard_interactive == ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE)
+	if (layer_surface->layer_surface->current.keyboard_interactive ==
+		ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE)
 		return;
 	if (layer_surface->scene_layer == NULL)
 		return;
@@ -318,8 +322,8 @@ void focus_layer_surface(layer_surface_t *layer_surface) {
 	// notify keyboard enter
 	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server.seat);
 	if (keyboard)
-		wlr_seat_keyboard_notify_enter(
-		    server.seat, surface, keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
+		wlr_seat_keyboard_notify_enter(server.seat, surface, keyboard->keycodes, keyboard->num_keycodes,
+			&keyboard->modifiers);
 
 	seat_t *s = seat_default();
 	if (s && s->input_method_relay)

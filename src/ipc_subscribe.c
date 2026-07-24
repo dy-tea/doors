@@ -1,13 +1,13 @@
 #include "ipc.h"
 #include "ipc_helpers.h"
-
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
-static subscriber_t *make_subscriber(int client_fd, char *fifo_path, subscriber_mask_t mask, int count) {
+static subscriber_t *make_subscriber(int client_fd, char *fifo_path, subscriber_mask_t mask,
+		int count) {
 	subscriber_t *sb = calloc(1, sizeof(*sb));
 	if (!sb) {
 		return NULL;
@@ -96,7 +96,8 @@ bool ipc_cmd_subscribe(char **args, int num, int client_fd) {
 		} else if (streq("report", *args) || streq("R", *args)) {
 			mask |= SUB_MASK_REPORT;
 		} else if (streq("monitor", *args) || streq("M", *args)) {
-			mask |= SUB_MASK_MONITOR_ADD | SUB_MASK_MONITOR_REMOVE | SUB_MASK_MONITOR_FOCUS | SUB_MASK_MONITOR_CHANGE;
+			mask |= SUB_MASK_MONITOR_ADD | SUB_MASK_MONITOR_REMOVE | SUB_MASK_MONITOR_FOCUS |
+				SUB_MASK_MONITOR_CHANGE;
 		} else if (streq("monitor_add", *args)) {
 			mask |= SUB_MASK_MONITOR_ADD;
 		} else if (streq("monitor_remove", *args)) {
@@ -106,8 +107,8 @@ bool ipc_cmd_subscribe(char **args, int num, int client_fd) {
 		} else if (streq("monitor_change", *args)) {
 			mask |= SUB_MASK_MONITOR_CHANGE;
 		} else if (streq("desktop", *args) || streq("D", *args)) {
-			mask |= SUB_MASK_DESKTOP_ADD | SUB_MASK_DESKTOP_REMOVE | SUB_MASK_DESKTOP_FOCUS | SUB_MASK_DESKTOP_CHANGE
-			    | SUB_MASK_DESKTOP_LAYOUT;
+			mask |= SUB_MASK_DESKTOP_ADD | SUB_MASK_DESKTOP_REMOVE | SUB_MASK_DESKTOP_FOCUS |
+				SUB_MASK_DESKTOP_CHANGE | SUB_MASK_DESKTOP_LAYOUT;
 		} else if (streq("desktop_add", *args)) {
 			mask |= SUB_MASK_DESKTOP_ADD;
 		} else if (streq("desktop_remove", *args)) {
@@ -119,8 +120,8 @@ bool ipc_cmd_subscribe(char **args, int num, int client_fd) {
 		} else if (streq("desktop_layout", *args)) {
 			mask |= SUB_MASK_DESKTOP_LAYOUT;
 		} else if (streq("node", *args) || streq("N", *args)) {
-			mask |= SUB_MASK_NODE_ADD | SUB_MASK_NODE_REMOVE | SUB_MASK_NODE_FOCUS | SUB_MASK_NODE_CHANGE
-			    | SUB_MASK_NODE_STATE | SUB_MASK_NODE_FLAG;
+			mask |= SUB_MASK_NODE_ADD | SUB_MASK_NODE_REMOVE | SUB_MASK_NODE_FOCUS | SUB_MASK_NODE_CHANGE |
+				SUB_MASK_NODE_STATE | SUB_MASK_NODE_FLAG;
 		} else if (streq("node_add", *args)) {
 			mask |= SUB_MASK_NODE_ADD;
 		} else if (streq("node_remove", *args)) {

@@ -1,7 +1,5 @@
 #include "idle.h"
-
 #include "server.h"
-
 #include <stdbool.h>
 #include <stdlib.h>
 #include <wlr/types/wlr_idle_inhibit_v1.h>
@@ -17,7 +15,8 @@ void update_idle_inhibitors(struct wlr_surface *sans) {
 		struct wlr_scene_tree *tree = surface->data;
 
 		int _unused_x, _unused_y;
-		if (sans != surface && (tree == NULL || wlr_scene_node_coords(&tree->node, &_unused_x, &_unused_y))) {
+		if (sans != surface && (tree == NULL || wlr_scene_node_coords(&tree->node, &_unused_x,
+				&_unused_y))) {
 			inhibited = true;
 			break;
 		}

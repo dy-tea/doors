@@ -1,9 +1,7 @@
-#include "scroller.h"
-
 #include "output.h"
+#include "scroller.h"
 #include "toplevel.h"
 #include "tree.h"
-
 #include <math.h>
 #include <stdlib.h>
 #include <wlr/types/wlr_xdg_shell.h>
@@ -77,7 +75,8 @@ int scroller_collect_nodes(desktop_t *d, node_t ***out_nodes) {
 	return count;
 }
 
-static void scroller_arrange_stack(node_t *head_node, struct wlr_box base_geom, int gap, output_t *m) {
+static void scroller_arrange_stack(node_t *head_node, struct wlr_box base_geom, int gap,
+		output_t *m) {
 	if (!head_node || !head_node->client)
 		return;
 
@@ -99,13 +98,13 @@ static void scroller_arrange_stack(node_t *head_node, struct wlr_box base_geom, 
 		r.height = (r.height > (int)(2 * bw)) ? r.height - 2 * bw : 0;
 
 		// clamp to constraints and center within slot
-		if ((int)head_node->constraints.min_width > MIN_WIDTH && r.width < (int)head_node->constraints.min_width
-		    && base_geom.width > 0) {
+		if ((int)head_node->constraints.min_width > MIN_WIDTH &&
+				r.width < (int)head_node->constraints.min_width && base_geom.width > 0) {
 			r.x = base_geom.x + (base_geom.width - (int)head_node->constraints.min_width) / 2;
 			r.width = head_node->constraints.min_width;
 		}
-		if ((int)head_node->constraints.min_height > MIN_HEIGHT && r.height < (int)head_node->constraints.min_height
-		    && base_geom.height > 0) {
+		if ((int)head_node->constraints.min_height > MIN_HEIGHT &&
+				r.height < (int)head_node->constraints.min_height && base_geom.height > 0) {
 			r.y = base_geom.y + (base_geom.height - (int)head_node->constraints.min_height) / 2;
 			r.height = head_node->constraints.min_height;
 		}
@@ -117,8 +116,8 @@ static void scroller_arrange_stack(node_t *head_node, struct wlr_box base_geom, 
 
 		head->tiled_rectangle = r;
 
-		wlr_log(WLR_DEBUG, "scroller_arrange_stack: setting node %u geom=(%d,%d %dx%d)", head_node->id, r.x, r.y, r.width,
-		    r.height);
+		wlr_log(WLR_DEBUG, "scroller_arrange_stack: setting node %u geom=(%d,%d %dx%d)", head_node->id,
+			r.x, r.y, r.width, r.height);
 		node_set_pending_rectangle(head_node, base_geom);
 		head_node->output = m;
 		node_set_dirty(head_node);
@@ -160,8 +159,8 @@ static void scroller_arrange_stack(node_t *head_node, struct wlr_box base_geom, 
 		// find the node for centering
 		node_t *stack_node = (c == head) ? head_node : NULL;
 		if (!stack_node) {
-			for (node_t *n = first_extrema(head_node->output->desk->root); n;
-			    n = next_leaf(n, head_node->output->desk->root)) {
+			for (node_t *n = first_extrema(head_node->output->desk->root); n; n = next_leaf(n,
+					head_node->output->desk->root)) {
 				if (n->client == c) {
 					stack_node = n;
 					break;
@@ -171,13 +170,13 @@ static void scroller_arrange_stack(node_t *head_node, struct wlr_box base_geom, 
 
 		// clamp to constraints and center within slot
 		if (stack_node) {
-			if ((int)stack_node->constraints.min_width > MIN_WIDTH && r.width < (int)stack_node->constraints.min_width
-			    && geom.width > 0) {
+			if ((int)stack_node->constraints.min_width > MIN_WIDTH &&
+					r.width < (int)stack_node->constraints.min_width && geom.width > 0) {
 				r.x = geom.x + (geom.width - (int)stack_node->constraints.min_width) / 2;
 				r.width = stack_node->constraints.min_width;
 			}
-			if ((int)stack_node->constraints.min_height > MIN_HEIGHT && r.height < (int)stack_node->constraints.min_height
-			    && geom.height > 0) {
+			if ((int)stack_node->constraints.min_height > MIN_HEIGHT &&
+					r.height < (int)stack_node->constraints.min_height && geom.height > 0) {
 				r.y = geom.y + (geom.height - (int)stack_node->constraints.min_height) / 2;
 				r.height = stack_node->constraints.min_height;
 			}
@@ -197,8 +196,8 @@ void scroller_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 	if (!d || !d->root)
 		return;
 
-	wlr_log(WLR_DEBUG, "scroller_arrange: starting, available=(%d,%d %dx%d)", available.x, available.y, available.width,
-	    available.height);
+	wlr_log(WLR_DEBUG, "scroller_arrange: starting, available=(%d,%d %dx%d)", available.x, available.y,
+		available.width, available.height);
 
 	node_t **nodes = NULL;
 	int n = scroller_collect_nodes(d, &nodes);
@@ -238,8 +237,9 @@ void scroller_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 					requested_proportion = 1.0f;
 
 				c->scroller_proportion = requested_proportion;
-				wlr_log(WLR_DEBUG, "scroller_arrange: client geom=%dx%d aspect=%.2f scaled=%dx%d proportion=%.2f", geom.width,
-				    geom.height, aspect_ratio, scaled_width, scaled_height, requested_proportion);
+				wlr_log(WLR_DEBUG,
+					"scroller_arrange: client geom=%dx%d aspect=%.2f scaled=%dx%d proportion=%.2f", geom.width,
+					geom.height, aspect_ratio, scaled_width, scaled_height, requested_proportion);
 			} else {
 				c->scroller_proportion = scroller_default_proportion;
 				wlr_log(WLR_DEBUG, "scroller_arrange: client has no geometry, using default proportion");
@@ -275,17 +275,16 @@ void scroller_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 
 	if (n == 1) {
 		struct wlr_box geom;
-		float proportion = scroller_ignore_proportion_single
-		    ? 1.0f
-		    : (focused->scroller_proportion_single > 0.0f ? focused->scroller_proportion_single
-		                                                  : scroller_default_proportion_single);
+		float proportion = scroller_ignore_proportion_single ? 1.0f : (focused->scroller_proportion_single
+			> 0.0f ? focused->scroller_proportion_single : scroller_default_proportion_single);
 
 		geom.height = available.height - 2 * gappov;
 		geom.width = (int)((available.width - 2 * gappoh) * proportion);
 		geom.x = available.x + (available.width - geom.width) / 2;
 		geom.y = available.y + gappov;
 
-		wlr_log(WLR_DEBUG, "scroller_arrange: single window geom=(%d,%d %dx%d)", geom.x, geom.y, geom.width, geom.height);
+		wlr_log(WLR_DEBUG, "scroller_arrange: single window geom=(%d,%d %dx%d)", geom.x, geom.y,
+			geom.width, geom.height);
 		scroller_arrange_stack(focused_node, geom, gappiv, m);
 		free(nodes);
 		return;
@@ -309,8 +308,8 @@ void scroller_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 	if (need_center) {
 		focused_geom.x = available.x + (available.width - focused_geom.width) / 2;
 	} else if (need_overspread) {
-		focused_geom.x = focus_idx == 0 ? available.x + scroller_structs
-		                                : available.x + available.width - focused_geom.width - scroller_structs;
+		focused_geom.x = focus_idx == 0 ? available.x + scroller_structs : available.x + available.width -
+			focused_geom.width - scroller_structs;
 	} else {
 		focused_geom.x = available.x + scroller_structs;
 	}
@@ -452,8 +451,8 @@ void scroller_cycle_proportion_preset(client_t *client) {
 	float new_proportion = scroller_proportion_preset[next_index];
 	head->scroller_proportion = new_proportion;
 
-	wlr_log(WLR_INFO, "scroller_cycle_proportion_preset: %.2f -> %.2f (preset %d/%d)", current_prop, new_proportion,
-	    next_index + 1, scroller_proportion_preset_count);
+	wlr_log(WLR_INFO, "scroller_cycle_proportion_preset: %.2f -> %.2f (preset %d/%d)", current_prop,
+		new_proportion, next_index + 1, scroller_proportion_preset_count);
 }
 
 void scroller_center_window(desktop_t *d, client_t *client) {
@@ -505,7 +504,8 @@ void scroller_apply_client_rules(client_t *c, float rule_proportion, float rule_
 			rule_proportion_single = 1.0f;
 
 		c->scroller_proportion_single = rule_proportion_single;
-		wlr_log(WLR_DEBUG, "scroller_apply_client_rules: set proportion_single to %.2f", rule_proportion_single);
+		wlr_log(WLR_DEBUG, "scroller_apply_client_rules: set proportion_single to %.2f",
+			rule_proportion_single);
 	}
 }
 

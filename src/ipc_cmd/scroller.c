@@ -1,13 +1,11 @@
-#include "scroller.h"
-
 #include "ipc.h"
 #include "ipc_cmd.h"
 #include "ipc_helpers.h"
 #include "master_stack.h"
 #include "output.h"
+#include "scroller.h"
 #include "server.h"
 #include "tree.h"
-
 #include <limits.h>
 #include <stdlib.h>
 
@@ -46,7 +44,6 @@ void ipc_cmd_scroller(char **args, int num, int client_fd) {
 		head->scroller_proportion = value;
 		arrange(mon, desk, true);
 		send_success(client_fd, "proportion set\n");
-
 	} else if (streq("stack", *args)) {
 		if (!desk->focus || !desk->focus->client) {
 			send_failure(client_fd, "scroller stack: no focused client\n");
@@ -63,7 +60,6 @@ void ipc_cmd_scroller(char **args, int num, int client_fd) {
 		scroller_stack_push(head, desk->focus->client);
 		arrange(mon, desk, true);
 		send_success(client_fd, "stacked\n");
-
 	} else if (streq("unstack", *args)) {
 		if (!desk->focus || !desk->focus->client) {
 			send_failure(client_fd, "scroller unstack: no focused client\n");
@@ -73,7 +69,6 @@ void ipc_cmd_scroller(char **args, int num, int client_fd) {
 		scroller_stack_remove(desk->focus->client);
 		arrange(mon, desk, true);
 		send_success(client_fd, "unstacked\n");
-
 	} else if (streq("resize", *args)) {
 		if (num < 2) {
 			send_failure(client_fd, "scroller resize: missing delta\n");
@@ -89,7 +84,6 @@ void ipc_cmd_scroller(char **args, int num, int client_fd) {
 		scroller_resize_width(desk->focus->client, delta);
 		arrange(mon, desk, true);
 		send_success(client_fd, "resized\n");
-
 	} else if (streq("set_proportion", *args)) {
 		if (num < 2) {
 			send_failure(client_fd, "scroller set_proportion: missing value\n");
@@ -105,7 +99,6 @@ void ipc_cmd_scroller(char **args, int num, int client_fd) {
 		scroller_set_proportion(desk->focus->client, value);
 		arrange(mon, desk, true);
 		send_success(client_fd, "proportion set\n");
-
 	} else if (streq("cycle_preset", *args)) {
 		if (!desk->focus || !desk->focus->client) {
 			send_failure(client_fd, "scroller cycle_preset: no focused client\n");
@@ -120,7 +113,6 @@ void ipc_cmd_scroller(char **args, int num, int client_fd) {
 		scroller_cycle_proportion_preset(desk->focus->client);
 		arrange(mon, desk, true);
 		send_success(client_fd, "cycled to next preset\n");
-
 	} else if (streq("center", *args)) {
 		if (!desk->focus || !desk->focus->client) {
 			send_failure(client_fd, "scroller center: no focused client\n");
@@ -129,7 +121,6 @@ void ipc_cmd_scroller(char **args, int num, int client_fd) {
 
 		scroller_center_window(desk, desk->focus->client);
 		send_success(client_fd, "window centered\n");
-
 	} else {
 		send_failure(client_fd, "scroller: unknown subcommand\n");
 	}
@@ -171,7 +162,8 @@ void ipc_cmd_master_stack(char **args, int num, int client_fd) {
 		else if (streq("center", args[1]))
 			orientation = MASTER_CENTER;
 		else {
-			send_failure(client_fd, "master_stack orientation: expected left, right, center, top, or bottom\n");
+			send_failure(client_fd,
+				"master_stack orientation: expected left, right, center, top, or bottom\n");
 			return;
 		}
 

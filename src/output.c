@@ -1,17 +1,15 @@
-#include "output.h"
-
 #include "animation.h"
 #include "effects.h"
 #include "idle.h"
 #include "ipc.h"
 #include "layer.h"
 #include "lock.h"
+#include "output.h"
 #include "output_config.h"
 #include "server.h"
 #include "toplevel.h"
 #include "tree.h"
 #include "types.h"
-
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -33,7 +31,8 @@ bool output_supports_hdr(output_t *output, const char **unsupported_reason_ptr) 
 	const char *unsupported_reason = NULL;
 	if (!(output->wlr_output->supported_primaries & WLR_COLOR_NAMED_PRIMARIES_BT2020)) {
 		unsupported_reason = "BT2020 primaries not supported by output";
-	} else if (!(output->wlr_output->supported_transfer_functions & WLR_COLOR_TRANSFER_FUNCTION_ST2084_PQ)) {
+	} else if (!(output->wlr_output->supported_transfer_functions &
+			WLR_COLOR_TRANSFER_FUNCTION_ST2084_PQ)) {
 		unsupported_reason = "PQ transfer function not supported by output";
 	} else if (!server.renderer->features.output_color_transform) {
 		unsupported_reason = "renderer doesn't support output color transforms";
@@ -44,12 +43,15 @@ bool output_supports_hdr(output_t *output, const char **unsupported_reason_ptr) 
 	return unsupported_reason == NULL;
 }
 
-static bool output_is_hdr_active(output_t *output) { return output->wlr_output->image_description != NULL; }
+static bool output_is_hdr_active(output_t *output) {
+	return output->wlr_output->image_description != NULL;
+}
 
-static enum wlr_scale_filter_mode get_scale_filter(output_t *output, struct wlr_scene_buffer *buffer) {
-	if (buffer->dst_width > 0 && buffer->dst_height > 0
-	    && (buffer->dst_width < buffer->WLR_PRIVATE.buffer_width
-	        || buffer->dst_height < buffer->WLR_PRIVATE.buffer_height))
+static enum wlr_scale_filter_mode get_scale_filter(output_t *output,
+		struct wlr_scene_buffer *buffer) {
+	if (buffer->dst_width > 0 && buffer->dst_height > 0 &&
+		(buffer->dst_width < buffer->WLR_PRIVATE.buffer_width ||
+		buffer->dst_height < buffer->WLR_PRIVATE.buffer_height))
 		return WLR_SCALE_FILTER_BILINEAR;
 
 	switch (output->scale_filter_mode) {
@@ -62,7 +64,8 @@ static enum wlr_scale_filter_mode get_scale_filter(output_t *output, struct wlr_
 	}
 }
 
-static void output_configure_scene_iterator(struct wlr_scene_buffer *buffer, int sx, int sy, void *data) {
+static void output_configure_scene_iterator(struct wlr_scene_buffer *buffer, int sx, int sy,
+		void *data) {
 	(void)sx;
 	(void)sy;
 	output_t *output = data;
@@ -88,16 +91,20 @@ static void output_configure_scene(output_t *output) {
 	wlr_scene_node_for_each_buffer(&server.lock_tree->node, output_configure_scene_iterator, output);
 
 	wlr_scene_node_for_each_buffer(&output->layer_bg->node, output_configure_scene_iterator, output);
-	wlr_scene_node_for_each_buffer(&output->layer_bottom->node, output_configure_scene_iterator, output);
+	wlr_scene_node_for_each_buffer(&output->layer_bottom->node, output_configure_scene_iterator,
+		output);
 	wlr_scene_node_for_each_buffer(&output->layer_top->node, output_configure_scene_iterator, output);
-	wlr_scene_node_for_each_buffer(&output->layer_overlay->node, output_configure_scene_iterator, output);
+	wlr_scene_node_for_each_buffer(&output->layer_overlay->node, output_configure_scene_iterator,
+		output);
 
 	output->applied_scale_filter = output->scale_filter_mode;
 }
 
 static struct wlr_surface *fullscreen_surface(output_t *output);
 
-static bool output_can_tear(output_t *output) { return output->allow_tearing; }
+static bool output_can_tear(output_t *output) {
+	return output->allow_tearing;
+}
 
 static bool output_has_fullscreen_cover(output_t *output) {
 	if (!output || !output->desk || !output->desk->focus)
@@ -148,7 +155,8 @@ static void output_configure_scene_visible(output_t *output) {
 	wlr_scene_node_for_each_buffer(&server.drag_tree->node, output_configure_scene_iterator, output);
 	wlr_scene_node_for_each_buffer(&server.lock_tree->node, output_configure_scene_iterator, output);
 
-	wlr_scene_node_for_each_buffer(&output->layer_overlay->node, output_configure_scene_iterator, output);
+	wlr_scene_node_for_each_buffer(&output->layer_overlay->node, output_configure_scene_iterator,
+		output);
 
 	output->applied_scale_filter = output->scale_filter_mode;
 }
@@ -174,7 +182,8 @@ static bool output_try_direct_scanout(output_t *output) {
 	wlr_output_state_set_buffer(&state, buf);
 
 	pixman_region32_t damage;
-	pixman_region32_init_rect(&damage, 0, 0, (unsigned int)output->width, (unsigned int)output->height);
+	pixman_region32_init_rect(&damage, 0, 0, (unsigned int)output->width,
+		(unsigned int)output->height);
 	wlr_output_state_set_damage(&state, &damage);
 	pixman_region32_fini(&damage);
 
@@ -201,7 +210,8 @@ const long NSEC_PER_MSEC = 1000000;
 const long NSEC_PER_SEC = 1000000000;
 
 static void output_repaint(output_t *output) {
-	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(server.scene, output->wlr_output);
+	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(server.scene,
+		output->wlr_output);
 	if (!scene_output)
 		return;
 
@@ -230,7 +240,7 @@ static void output_repaint(output_t *output) {
 	}
 
 	struct wlr_scene_output_state_options opts = {
-	    .color_transform = output->color_transform,
+		.color_transform = output->color_transform,
 	};
 
 	struct wlr_output_state pending;
@@ -304,8 +314,8 @@ void output_frame(struct wl_listener *listener, void *data) {
 			}
 
 			if (predicted_refresh.tv_sec >= now.tv_sec) {
-				long nsec_until_refresh = (predicted_refresh.tv_sec - now.tv_sec) * NSEC_PER_SEC
-				    + (predicted_refresh.tv_nsec - now.tv_nsec);
+				long nsec_until_refresh = (predicted_refresh.tv_sec - now.tv_sec) * NSEC_PER_SEC +
+					(predicted_refresh.tv_nsec - now.tv_nsec);
 				msec_until_refresh = (int)(nsec_until_refresh / NSEC_PER_MSEC);
 			}
 		}
@@ -346,7 +356,8 @@ static void handle_output_destroy(struct wl_listener *listener, void *data) {
 	layer_surface_t *layer, *tmp;
 
 	for (size_t i = 0; i < 4; i++)
-		wl_list_for_each_safe(layer, tmp, &output->layers[i], link) wlr_layer_surface_v1_destroy(layer->layer_surface);
+		wl_list_for_each_safe(layer, tmp, &output->layers[i], link)
+			wlr_layer_surface_v1_destroy(layer->layer_surface);
 
 	if (output->lock_surface)
 		destroy_lock_surface(&output->destroy_lock_surface, NULL);
@@ -417,7 +428,12 @@ void handle_new_output(struct wl_listener *listener, void *data) {
 	output->id = next_monitor_id++;
 	output->wired = true;
 	output->padding = (padding_t){0};
-	output->rectangle = (struct wlr_box){0, 0, 1920, 1080};
+	output->rectangle = (struct wlr_box){
+		0,
+		0,
+		1920,
+		1080
+	};
 
 	// create default workspace for output
 	desktop_t *d = calloc(1, sizeof(desktop_t));
@@ -478,8 +494,8 @@ void handle_new_output(struct wl_listener *listener, void *data) {
 	output->present.notify = handle_output_present;
 	wl_signal_add(&wlr_output->events.present, &output->present);
 
-	output->repaint_timer = wl_event_loop_add_timer(
-	    wl_display_get_event_loop(server.wl_display), output_repaint_timer_handler, output);
+	output->repaint_timer = wl_event_loop_add_timer(wl_display_get_event_loop(server.wl_display),
+		output_repaint_timer_handler, output);
 
 	output->destroy.notify = handle_output_destroy;
 	wl_signal_add(&wlr_output->events.destroy, &output->destroy);
@@ -492,7 +508,8 @@ void handle_new_output(struct wl_listener *listener, void *data) {
 	output->layer_top = wlr_scene_tree_create(server.top_tree);
 	output->layer_overlay = wlr_scene_tree_create(server.over_tree);
 
-	struct wlr_output_layout_output *l_output = wlr_output_layout_add_auto(server.output_layout, wlr_output);
+	struct wlr_output_layout_output *l_output = wlr_output_layout_add_auto(server.output_layout,
+		wlr_output);
 	struct wlr_scene_output *scene_output = wlr_scene_output_create(server.scene, wlr_output);
 	wlr_scene_output_layout_add_output(server.scene_layout, l_output, scene_output);
 
@@ -575,8 +592,8 @@ output_t *output_get_in_direction(output_t *reference, uint32_t direction) {
 	int lx = output_box.x + output_box.width / 2;
 	int ly = output_box.y + output_box.height / 2;
 
-	struct wlr_output *wlr_adjacent = wlr_output_layout_adjacent_output(
-	    server.output_layout, direction, reference->wlr_output, lx, ly);
+	struct wlr_output *wlr_adjacent = wlr_output_layout_adjacent_output(server.output_layout, direction,
+		reference->wlr_output, lx, ly);
 
 	if (!wlr_adjacent)
 		return NULL;
@@ -605,7 +622,8 @@ void output_set_scale_filter(output_t *output, enum scale_filter_mode mode) {
 void output_get_identifier(char *identifier, size_t len, output_t *output) {
 	struct wlr_output *wlr_output = output->wlr_output;
 	snprintf(identifier, len, "%s %s %s", wlr_output->make ? wlr_output->make : "Unknown",
-	    wlr_output->model ? wlr_output->model : "Unknown", wlr_output->serial ? wlr_output->serial : "Unknown");
+		wlr_output->model ? wlr_output->model : "Unknown",
+		wlr_output->serial ? wlr_output->serial : "Unknown");
 }
 
 void output_update_scale(output_t *output, float scale) {
@@ -628,8 +646,8 @@ void output_update_scale(output_t *output, float scale) {
 
 	toplevel_t *toplevel;
 	wl_list_for_each(toplevel, &server.toplevels, link) {
-		if (!toplevel->xdg_toplevel || !toplevel->xdg_toplevel->base || !toplevel->xdg_toplevel->base->surface
-		    || !toplevel->node)
+		if (!toplevel->xdg_toplevel || !toplevel->xdg_toplevel->base ||
+			!toplevel->xdg_toplevel->base->surface || !toplevel->node)
 			continue;
 
 		node_t *n = toplevel->node;

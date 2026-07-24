@@ -7,7 +7,6 @@
 #include "transaction.h"
 #include "tree.h"
 #include "workspace.h"
-
 #include <stdlib.h>
 #include <string.h>
 
@@ -70,7 +69,8 @@ void ipc_cmd_desktop(char **args, int num, int client_fd) {
 		} else if (num >= 1 && streq("last", *args)) {
 			focus_last_desktop();
 			send_success(client_fd, "focused\n");
-		} else if (num >= 1 && (streq("prev", *args) || streq("prev.local", *args) || streq("previous", *args))) {
+		} else if (num >= 1 && (streq("prev", *args) || streq("prev.local", *args) || streq("previous",
+				*args))) {
 			focus_prev_desktop();
 			send_success(client_fd, "focused\n");
 		} else {
@@ -104,7 +104,8 @@ void ipc_cmd_desktop(char **args, int num, int client_fd) {
 					d->layout = layout;
 					arrange(m, d, true);
 					// extreme hack
-					ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name, layout_to_char(d->layout));
+					ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name,
+						layout_to_char(d->layout));
 				}
 			}
 		} else {
@@ -112,7 +113,8 @@ void ipc_cmd_desktop(char **args, int num, int client_fd) {
 			arrange(mon, desk, true);
 			if (desk->focus != NULL)
 				focus_node(mon, desk, desk->focus);
-			ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", desk->name, layout_to_char(desk->layout));
+			ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", desk->name,
+				layout_to_char(desk->layout));
 		}
 		send_success(client_fd, "layout changed\n");
 	} else if (streq("-n", *args) || streq("--rename", *args)) {

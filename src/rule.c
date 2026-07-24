@@ -1,8 +1,6 @@
 #include "rule.h"
-
 #include "scroller.h"
 #include "types.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -135,55 +133,56 @@ void list_rules(char *buf, size_t buf_size) {
 			offset += snprintf(buf + offset, buf_size - offset, "state=%s ", state_str);
 		}
 		if (r->consequence.has & RULE_TYPE_FOLLOW)
-			offset += snprintf(
-			    buf + offset, buf_size - offset, "follow=%s ", r->consequence.flags & RULE_TYPE_FOLLOW ? "on" : "off");
+			offset += snprintf(buf + offset, buf_size - offset, "follow=%s ",
+				r->consequence.flags & RULE_TYPE_FOLLOW ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_FOCUS)
-			offset += snprintf(
-			    buf + offset, buf_size - offset, "focus=%s ", r->consequence.flags & RULE_TYPE_FOCUS ? "on" : "off");
+			offset += snprintf(buf + offset, buf_size - offset, "focus=%s ",
+				r->consequence.flags & RULE_TYPE_FOCUS ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_MANAGE)
-			offset += snprintf(
-			    buf + offset, buf_size - offset, "manage=%s ", r->consequence.flags & RULE_TYPE_MANAGE ? "on" : "off");
+			offset += snprintf(buf + offset, buf_size - offset, "manage=%s ",
+				r->consequence.flags & RULE_TYPE_MANAGE ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_LOCKED)
-			offset += snprintf(
-			    buf + offset, buf_size - offset, "locked=%s ", r->consequence.flags & RULE_TYPE_LOCKED ? "on" : "off");
+			offset += snprintf(buf + offset, buf_size - offset, "locked=%s ",
+				r->consequence.flags & RULE_TYPE_LOCKED ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_HIDDEN)
-			offset += snprintf(
-			    buf + offset, buf_size - offset, "hidden=%s ", r->consequence.flags & RULE_TYPE_HIDDEN ? "on" : "off");
+			offset += snprintf(buf + offset, buf_size - offset, "hidden=%s ",
+				r->consequence.flags & RULE_TYPE_HIDDEN ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_STICKY)
-			offset += snprintf(
-			    buf + offset, buf_size - offset, "sticky=%s ", r->consequence.flags & RULE_TYPE_STICKY ? "on" : "off");
+			offset += snprintf(buf + offset, buf_size - offset, "sticky=%s ",
+				r->consequence.flags & RULE_TYPE_STICKY ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_SCROLLER_PROPORTION)
-			offset += snprintf(
-			    buf + offset, buf_size - offset, "scroller_proportion=%.2f ", r->consequence.scroller_proportion);
+			offset += snprintf(buf + offset, buf_size - offset, "scroller_proportion=%.2f ",
+				r->consequence.scroller_proportion);
 		if (r->consequence.has & RULE_TYPE_SCROLLER_PROPORTION_SINGLE)
 			offset += snprintf(buf + offset, buf_size - offset, "scroller_proportion_single=%.2f ",
-			    r->consequence.scroller_proportion_single);
+				r->consequence.scroller_proportion_single);
 		if (r->consequence.has & RULE_TYPE_BLUR)
-			offset += snprintf(
-			    buf + offset, buf_size - offset, "blur=%s ", r->consequence.flags & RULE_TYPE_BLUR ? "on" : "off");
+			offset += snprintf(buf + offset, buf_size - offset, "blur=%s ",
+				r->consequence.flags & RULE_TYPE_BLUR ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_MICA)
-			offset += snprintf(
-			    buf + offset, buf_size - offset, "mica=%s ", r->consequence.flags & RULE_TYPE_MICA ? "on" : "off");
+			offset += snprintf(buf + offset, buf_size - offset, "mica=%s ",
+				r->consequence.flags & RULE_TYPE_MICA ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_ACRYLIC)
-			offset += snprintf(
-			    buf + offset, buf_size - offset, "acrylic=%s ", r->consequence.flags & RULE_TYPE_ACRYLIC ? "on" : "off");
+			offset += snprintf(buf + offset, buf_size - offset, "acrylic=%s ",
+				r->consequence.flags & RULE_TYPE_ACRYLIC ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_BORDER_RADIUS)
-			offset += snprintf(buf + offset, buf_size - offset, "border_radius=%.1f ", r->consequence.border_radius);
+			offset += snprintf(buf + offset, buf_size - offset, "border_radius=%.1f ",
+				r->consequence.border_radius);
 		if (r->consequence.has & RULE_TYPE_SHADOW)
-			offset += snprintf(
-			    buf + offset, buf_size - offset, "shadow=%s ", r->consequence.flags & RULE_TYPE_SHADOW ? "on" : "off");
+			offset += snprintf(buf + offset, buf_size - offset, "shadow=%s ",
+				r->consequence.flags & RULE_TYPE_SHADOW ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_BLOCK_OUT_FROM_SCREENSHARE)
 			offset += snprintf(buf + offset, buf_size - offset, "block_out_from_screenshare=%s ",
-			    r->consequence.has & RULE_TYPE_BLOCK_OUT_FROM_SCREENSHARE ? "on" : "off");
+				r->consequence.has & RULE_TYPE_BLOCK_OUT_FROM_SCREENSHARE ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_ALLOW_TEARING)
 			offset += snprintf(buf + offset, buf_size - offset, "allow_tearing=%s ",
-			    r->consequence.flags & RULE_TYPE_ALLOW_TEARING ? "on" : "off");
+				r->consequence.flags & RULE_TYPE_ALLOW_TEARING ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_SHORTCUTS_INHIBITOR)
 			offset += snprintf(buf + offset, buf_size - offset, "shortcuts_inhibitor=%s ",
-			    r->consequence.flags & RULE_TYPE_SHORTCUTS_INHIBITOR ? "on" : "off");
+				r->consequence.flags & RULE_TYPE_SHORTCUTS_INHIBITOR ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_RENDER_UNFOCUSED)
 			offset += snprintf(buf + offset, buf_size - offset, "render_unfocused=%s ",
-			    r->consequence.flags & RULE_TYPE_RENDER_UNFOCUSED ? "on" : "off");
+				r->consequence.flags & RULE_TYPE_RENDER_UNFOCUSED ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_OPACITY)
 			offset += snprintf(buf + offset, buf_size - offset, "opacity=%.1f ", r->consequence.opacity);
 
@@ -246,8 +245,9 @@ void rule_apply_consequence(node_t *node, client_t *client, const rule_consequen
 		node->locked = rule->flags & RULE_TYPE_LOCKED;
 
 	if (rule->has & RULE_TYPE_SCROLLER_PROPORTION || rule->has & RULE_TYPE_SCROLLER_PROPORTION_SINGLE)
-		scroller_apply_client_rules(client, rule->has & RULE_TYPE_SCROLLER_PROPORTION ? rule->scroller_proportion : 0.0f,
-		    rule->has & RULE_TYPE_SCROLLER_PROPORTION_SINGLE ? rule->scroller_proportion_single : 0.0f);
+		scroller_apply_client_rules(client,
+			rule->has & RULE_TYPE_SCROLLER_PROPORTION ? rule->scroller_proportion : 0.0f,
+			rule->has & RULE_TYPE_SCROLLER_PROPORTION_SINGLE ? rule->scroller_proportion_single : 0.0f);
 
 	if (rule->has & RULE_TYPE_BLOCK_OUT_FROM_SCREENSHARE)
 		client->block_out_from_screenshare = rule->flags & RULE_TYPE_BLOCK_OUT_FROM_SCREENSHARE;

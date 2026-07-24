@@ -1,5 +1,3 @@
-#include "server.h"
-
 #include "animation.h"
 #include "bezier.h"
 #include "config.h"
@@ -20,12 +18,12 @@
 #include "scratchpad.h"
 #include "screencopy.h"
 #include "seat.h"
+#include "server.h"
 #include "spring.h"
 #include "toplevel.h"
 #include "transaction.h"
 #include "workspace.h"
 #include "xwayland.h"
-
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -103,23 +101,27 @@ void xdg_toplevel_tag_manager_v1_handle_set_tag(struct wl_listener *listener, vo
 void xdg_dialog_handle_new(struct wl_listener *listener, void *data);
 
 static bool is_privileged(const struct wl_global *global) {
-	return global == server.output_manager->global || global == server.output_power_manager->global
-	    || global == server.input_method_manager->global || global == server.foreign_toplevel_list->global
-	    || global == server.foreign_toplevel_manager->global || global == server.data_control_manager->global
-	    || global == server.ext_data_control_manager->global || global == server.export_dmabuf_manager->global
-	    || global == server.gamma_control_manager->global || global == server.security_context_manager_v1->global
-	    || global == server.layer_shell->global || global == server.session_lock_manager->global
-	    || global == server.keyboard_shortcuts_inhibit_manager->global
-	    || global == server.virtual_keyboard_manager->global || global == server.virtual_pointer_manager->global
-	    || global == server.xdg_output_manager->global || global == server.workspace_manager->global
-	    || global == screencopy_get_global() || global == image_copy_capture_get_global()
-	    || global == image_capture_source_get_global();
+	return global == server.output_manager->global || global == server.output_power_manager->global ||
+		global == server.input_method_manager->global || global == server.foreign_toplevel_list->global ||
+		global == server.foreign_toplevel_manager->global ||
+		global == server.data_control_manager->global ||
+		global == server.ext_data_control_manager->global ||
+		global == server.export_dmabuf_manager->global || global == server.gamma_control_manager->global ||
+		global == server.security_context_manager_v1->global || global == server.layer_shell->global ||
+		global == server.session_lock_manager->global ||
+		global == server.keyboard_shortcuts_inhibit_manager->global ||
+		global == server.virtual_keyboard_manager->global ||
+		global == server.virtual_pointer_manager->global || global == server.xdg_output_manager->global ||
+		global == server.workspace_manager->global || global == screencopy_get_global() ||
+		global == image_copy_capture_get_global() || global == image_capture_source_get_global();
 }
 
-static bool filter_global(const struct wl_client *client, const struct wl_global *global, void *data) {
+static bool filter_global(const struct wl_client *client, const struct wl_global *global,
+		void *data) {
 	(void)data;
-	const struct wlr_security_context_v1_state *security_context = wlr_security_context_manager_v1_lookup_client(
-	    server.security_context_manager_v1, (struct wl_client *)client);
+	const struct wlr_security_context_v1_state *security_context =
+		wlr_security_context_manager_v1_lookup_client(server.security_context_manager_v1,
+		(struct wl_client *)client);
 
 	if (is_privileged(global))
 		return security_context == NULL;
@@ -131,14 +133,16 @@ void server_init(void) {
 	server = (struct server_t){0};
 
 	server.wl_display = wl_display_create();
-	server.backend = wlr_backend_autocreate(wl_display_get_event_loop(server.wl_display), &server.session);
+	server.backend = wlr_backend_autocreate(wl_display_get_event_loop(server.wl_display),
+		&server.session);
 	if (server.backend == NULL) {
 		wlr_log(WLR_ERROR, "Failed to create backend");
 		exit(EXIT_FAILURE);
 	}
 
 	// headless backend for virtual outputs
-	server.headless_backend = wlr_headless_backend_create(wl_display_get_event_loop(server.wl_display));
+	server.headless_backend =
+		wlr_headless_backend_create(wl_display_get_event_loop(server.wl_display));
 	if (server.headless_backend) {
 		wlr_log(WLR_INFO, "Created headless backend for virtual outputs");
 		if (wlr_backend_is_multi(server.backend)) {
@@ -169,8 +173,8 @@ void server_init(void) {
 
 	effects_init();
 
-	server.bg_effect_manager = wlr_ext_background_effect_manager_v1_create(
-	    server.wl_display, 1, EXT_BACKGROUND_EFFECT_MANAGER_V1_CAPABILITY_BLUR);
+	server.bg_effect_manager = wlr_ext_background_effect_manager_v1_create(server.wl_display, 1,
+		EXT_BACKGROUND_EFFECT_MANAGER_V1_CAPABILITY_BLUR);
 
 	server.compositor = wlr_compositor_create(server.wl_display, 6, server.renderer);
 	if (!server.compositor) {
@@ -182,14 +186,16 @@ void server_init(void) {
 	// dmabuf support
 	if (wlr_renderer_get_texture_formats(server.renderer, WLR_BUFFER_CAP_DMABUF)) {
 		wlr_drm_create(server.wl_display, server.renderer);
-		server.linux_dmabuf = wlr_linux_dmabuf_v1_create_with_renderer(server.wl_display, 4, server.renderer);
+		server.linux_dmabuf = wlr_linux_dmabuf_v1_create_with_renderer(server.wl_display, 4,
+			server.renderer);
 		server.export_dmabuf_manager = wlr_export_dmabuf_manager_v1_create(server.wl_display);
 	}
 
 	// drm syncobj
-	if (wlr_renderer_get_drm_fd(server.renderer) >= 0 && server.renderer->features.timeline
-	    && server.backend->features.timeline) {
-		wlr_linux_drm_syncobj_manager_v1_create(server.wl_display, 1, wlr_renderer_get_drm_fd(server.renderer));
+	if (wlr_renderer_get_drm_fd(server.renderer) >= 0 && server.renderer->features.timeline &&
+			server.backend->features.timeline) {
+		wlr_linux_drm_syncobj_manager_v1_create(server.wl_display, 1,
+			wlr_renderer_get_drm_fd(server.renderer));
 	}
 
 	// data device
@@ -206,7 +212,8 @@ void server_init(void) {
 		wlr_log(WLR_ERROR, "Failed to create output layout");
 		exit(EXIT_FAILURE);
 	}
-	server.xdg_output_manager = wlr_xdg_output_manager_v1_create(server.wl_display, server.output_layout);
+	server.xdg_output_manager = wlr_xdg_output_manager_v1_create(server.wl_display,
+		server.output_layout);
 	if (!server.xdg_output_manager) {
 		wlr_log(WLR_ERROR, "Failed to create xdg output manager");
 		exit(EXIT_FAILURE);
@@ -265,14 +272,15 @@ void server_init(void) {
 	wl_signal_add(&server.xdg_shell->events.new_toplevel, &server.new_xdg_toplevel);
 
 	// xdg toplevel tag
-	struct wlr_xdg_toplevel_tag_manager_v1 *xdg_toplevel_tag_manager_v1 = wlr_xdg_toplevel_tag_manager_v1_create(
-	    server.wl_display, 1);
+	struct wlr_xdg_toplevel_tag_manager_v1 *xdg_toplevel_tag_manager_v1 =
+		wlr_xdg_toplevel_tag_manager_v1_create(server.wl_display, 1);
 	if (!xdg_toplevel_tag_manager_v1) {
 		wlr_log(WLR_ERROR, "Failed to create xdg toplevel tag manager");
 		exit(EXIT_FAILURE);
 	}
 	server.xdg_toplevel_tag_manager_v1_set_tag.notify = xdg_toplevel_tag_manager_v1_handle_set_tag;
-	wl_signal_add(&xdg_toplevel_tag_manager_v1->events.set_tag, &server.xdg_toplevel_tag_manager_v1_set_tag);
+	wl_signal_add(&xdg_toplevel_tag_manager_v1->events.set_tag,
+		&server.xdg_toplevel_tag_manager_v1_set_tag);
 
 	// xdg dialog
 	struct wlr_xdg_wm_dialog_v1 *xdg_wm_dialog = wlr_xdg_wm_dialog_v1_create(server.wl_display, 1);
@@ -290,7 +298,8 @@ void server_init(void) {
 		exit(EXIT_FAILURE);
 	}
 	server.new_xdg_decoration.notify = handle_new_xdg_decoration;
-	wl_signal_add(&server.xdg_decoration_manager->events.new_toplevel_decoration, &server.new_xdg_decoration);
+	wl_signal_add(&server.xdg_decoration_manager->events.new_toplevel_decoration,
+		&server.new_xdg_decoration);
 
 	// xdg activation
 	wl_list_init(&server.pending_launcher_ctxs);
@@ -300,7 +309,8 @@ void server_init(void) {
 		exit(EXIT_FAILURE);
 	}
 	server.xdg_activation_request_activate.notify = handle_xdg_activation_request_activate;
-	wl_signal_add(&server.xdg_activation_v1->events.request_activate, &server.xdg_activation_request_activate);
+	wl_signal_add(&server.xdg_activation_v1->events.request_activate,
+		&server.xdg_activation_request_activate);
 	server.xdg_activation_new_token.notify = handle_xdg_activation_new_token;
 	wl_signal_add(&server.xdg_activation_v1->events.new_token, &server.xdg_activation_new_token);
 
@@ -398,7 +408,8 @@ void server_init(void) {
 	}
 
 	server.cursor_request_set_shape.notify = handle_cursor_request_set_shape;
-	wl_signal_add(&server.cursor_shape_manager->events.request_set_shape, &server.cursor_request_set_shape);
+	wl_signal_add(&server.cursor_shape_manager->events.request_set_shape,
+		&server.cursor_request_set_shape);
 
 	// pointer gestures
 	server.pointer_gestures = wlr_pointer_gestures_v1_create(server.wl_display);
@@ -411,7 +422,8 @@ void server_init(void) {
 	}
 
 	server.new_virtual_pointer.notify = handle_new_virtual_pointer;
-	wl_signal_add(&server.virtual_pointer_manager->events.new_virtual_pointer, &server.new_virtual_pointer);
+	wl_signal_add(&server.virtual_pointer_manager->events.new_virtual_pointer,
+		&server.new_virtual_pointer);
 
 	// virtual keyboard
 	server.virtual_keyboard_manager = wlr_virtual_keyboard_manager_v1_create(server.wl_display);
@@ -421,7 +433,8 @@ void server_init(void) {
 	}
 
 	server.new_virtual_keyboard.notify = handle_new_virtual_keyboard;
-	wl_signal_add(&server.virtual_keyboard_manager->events.new_virtual_keyboard, &server.new_virtual_keyboard);
+	wl_signal_add(&server.virtual_keyboard_manager->events.new_virtual_keyboard,
+		&server.new_virtual_keyboard);
 
 	// xwayland support
 	wl_list_init(&server.xwayland.views);
@@ -465,10 +478,16 @@ void server_init(void) {
 
 	server.locked = false;
 	server.current_session_lock = NULL;
-	const float lockcolor[] = {0.1f, 0.1f, 0.1f, 1.0f};
+	const float lockcolor[] = {
+		0.1f,
+		0.1f,
+		0.1f,
+		1.0f
+	};
 	struct wlr_box full_geo = {0};
 	wlr_output_layout_get_box(server.output_layout, NULL, &full_geo);
-	server.lock_background = wlr_scene_rect_create(server.lock_tree, full_geo.width, full_geo.height, lockcolor);
+	server.lock_background = wlr_scene_rect_create(server.lock_tree, full_geo.width, full_geo.height,
+		lockcolor);
 	wlr_scene_node_set_enabled(&server.lock_background->node, false);
 
 	// xdg system bell
@@ -497,14 +516,16 @@ void server_init(void) {
 	}
 
 	// keyboard shortcuts inhibitor
-	server.keyboard_shortcuts_inhibit_manager = wlr_keyboard_shortcuts_inhibit_v1_create(server.wl_display);
+	server.keyboard_shortcuts_inhibit_manager =
+		wlr_keyboard_shortcuts_inhibit_v1_create(server.wl_display);
 	if (!server.keyboard_shortcuts_inhibit_manager) {
 		wlr_log(WLR_ERROR, "Failed to create keyboard shortcuts inhibit manager");
 		exit(EXIT_FAILURE);
 	}
-	server.keyboard_shortcuts_inhibit_new_inhibitor.notify = handle_keyboard_shortcuts_inhibit_new_inhibitor;
+	server.keyboard_shortcuts_inhibit_new_inhibitor.notify =
+		handle_keyboard_shortcuts_inhibit_new_inhibitor;
 	wl_signal_add(&server.keyboard_shortcuts_inhibit_manager->events.new_inhibitor,
-	    &server.keyboard_shortcuts_inhibit_new_inhibitor);
+		&server.keyboard_shortcuts_inhibit_new_inhibitor);
 
 	// drm lease
 #if WLR_HAS_DRM_BACKEND
@@ -520,42 +541,45 @@ void server_init(void) {
 	// color manager
 	if (server.renderer->features.input_color_transform) {
 		const enum wp_color_manager_v1_render_intent render_intents[] = {
-		    WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL,
+			WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL,
 		};
 		size_t transfer_functions_len = 0, primaries_len = 0;
 		enum wp_color_manager_v1_transfer_function *transfer_functions =
-		    wlr_color_manager_v1_transfer_function_list_from_renderer(server.renderer, &transfer_functions_len);
-		enum wp_color_manager_v1_primaries *primaries = wlr_color_manager_v1_primaries_list_from_renderer(
-		    server.renderer, &primaries_len);
+			wlr_color_manager_v1_transfer_function_list_from_renderer(server.renderer,
+			&transfer_functions_len);
+		enum wp_color_manager_v1_primaries *primaries =
+			wlr_color_manager_v1_primaries_list_from_renderer(server.renderer, &primaries_len);
 		struct wlr_color_manager_v1 *cm = wlr_color_manager_v1_create(server.wl_display, 2,
-		    &(struct wlr_color_manager_v1_options){
-		        .features =
-		            {
-		                .parametric = true,
-		                .set_mastering_display_primaries = true,
-		            },
-		        .render_intents = render_intents,
-		        .render_intents_len = sizeof(render_intents) / sizeof(render_intents[0]),
-		        .transfer_functions = transfer_functions,
-		        .transfer_functions_len = transfer_functions_len,
-		        .primaries = primaries,
-		        .primaries_len = primaries_len,
-		    });
+				&(struct wlr_color_manager_v1_options){
+			.features = {
+				.parametric = true,
+				.set_mastering_display_primaries = true,
+			},
+			.render_intents = render_intents,
+			.render_intents_len = sizeof(render_intents) / sizeof(render_intents[0]),
+			.transfer_functions = transfer_functions,
+			.transfer_functions_len = transfer_functions_len,
+			.primaries = primaries,
+			.primaries_len = primaries_len,
+		});
 		free(transfer_functions);
 		free(primaries);
 		wlr_scene_set_color_manager_v1(server.scene, cm);
 	}
 
 	// color representation
-	enum wp_color_representation_surface_v1_alpha_mode color_representation_alpha_modes[] = {
-	    WP_COLOR_REPRESENTATION_SURFACE_V1_ALPHA_MODE_STRAIGHT};
-	const struct wlr_color_representation_v1_coeffs_and_range color_representation_coeffs_and_range[] = {
-	    {WP_COLOR_REPRESENTATION_SURFACE_V1_COEFFICIENTS_IDENTITY, WP_COLOR_REPRESENTATION_SURFACE_V1_RANGE_FULL}};
+	enum wp_color_representation_surface_v1_alpha_mode color_representation_alpha_modes[] =
+		{WP_COLOR_REPRESENTATION_SURFACE_V1_ALPHA_MODE_STRAIGHT};
+	const struct wlr_color_representation_v1_coeffs_and_range color_representation_coeffs_and_range[] =
+			{
+		{WP_COLOR_REPRESENTATION_SURFACE_V1_COEFFICIENTS_IDENTITY,
+			WP_COLOR_REPRESENTATION_SURFACE_V1_RANGE_FULL}
+	};
 	const struct wlr_color_representation_v1_options color_representation_options = {
-	    color_representation_alpha_modes,
-	    sizeof(color_representation_alpha_modes) / sizeof(color_representation_alpha_modes[0]),
-	    color_representation_coeffs_and_range,
-	    sizeof(color_representation_coeffs_and_range) / sizeof(color_representation_coeffs_and_range[0]),
+		color_representation_alpha_modes,
+		sizeof(color_representation_alpha_modes) / sizeof(color_representation_alpha_modes[0]),
+		color_representation_coeffs_and_range,
+		sizeof(color_representation_coeffs_and_range) / sizeof(color_representation_coeffs_and_range[0]),
 	};
 	wlr_color_representation_manager_v1_create(server.wl_display, 1, &color_representation_options);
 
@@ -575,7 +599,7 @@ void server_init(void) {
 
 	// foreign toplevel image capture source
 	server.foreign_toplevel_image_capture_source_manager =
-	    wlr_ext_foreign_toplevel_image_capture_source_manager_v1_create(server.wl_display, 1);
+		wlr_ext_foreign_toplevel_image_capture_source_manager_v1_create(server.wl_display, 1);
 	if (!server.foreign_toplevel_image_capture_source_manager) {
 		wlr_log(WLR_ERROR, "Failed to create foreign toplevel image capture source manager");
 		exit(EXIT_FAILURE);
@@ -583,10 +607,11 @@ void server_init(void) {
 
 	server.new_toplevel_capture_request.notify = handle_new_toplevel_capture_request;
 	wl_signal_add(&server.foreign_toplevel_image_capture_source_manager->events.capture_request,
-	    &server.new_toplevel_capture_request);
+		&server.new_toplevel_capture_request);
 
 	// xdg foreign
-	struct wlr_xdg_foreign_registry *xdg_foreign_registry = wlr_xdg_foreign_registry_create(server.wl_display);
+	struct wlr_xdg_foreign_registry *xdg_foreign_registry =
+		wlr_xdg_foreign_registry_create(server.wl_display);
 	wlr_xdg_foreign_v1_create(server.wl_display, xdg_foreign_registry);
 	wlr_xdg_foreign_v2_create(server.wl_display, xdg_foreign_registry);
 
@@ -724,7 +749,8 @@ void handle_keyboard_shortcuts_inhibit_new_inhibitor(struct wl_listener *listene
 		if (tl)
 			tag = tl->tag;
 	} else {
-		struct wlr_xwayland_surface *xwayland_surface = wlr_xwayland_surface_try_from_wlr_surface(inhibitor->surface);
+		struct wlr_xwayland_surface *xwayland_surface =
+			wlr_xwayland_surface_try_from_wlr_surface(inhibitor->surface);
 		if (xwayland_surface) {
 			app_id = xwayland_surface->class;
 			title = xwayland_surface->title;
@@ -748,15 +774,15 @@ void handle_output_power_set_mode(struct wl_listener *listener, void *data) {
 	output_set_power(event->output, event->mode);
 }
 
-static void build_output_state_from_head(
-    struct wlr_output_configuration_head_v1 *head, struct wlr_output_state *state) {
+static void build_output_state_from_head(struct wlr_output_configuration_head_v1 *head,
+		struct wlr_output_state *state) {
 	wlr_output_state_init(state);
 	wlr_output_state_set_enabled(state, head->state.enabled);
 	if (head->state.mode) {
 		wlr_output_state_set_mode(state, head->state.mode);
 	} else if (head->state.custom_mode.width > 0) {
-		wlr_output_state_set_custom_mode(
-		    state, head->state.custom_mode.width, head->state.custom_mode.height, head->state.custom_mode.refresh);
+		wlr_output_state_set_custom_mode(state, head->state.custom_mode.width,
+			head->state.custom_mode.height, head->state.custom_mode.refresh);
 	}
 	wlr_output_state_set_scale(state, head->state.scale);
 	wlr_output_state_set_transform(state, head->state.transform);
@@ -788,7 +814,9 @@ void handle_output_manager_apply(struct wl_listener *listener, void *data) {
 	struct wlr_output_configuration_v1 *config = data;
 
 	struct wlr_output_configuration_head_v1 *head;
-	wl_list_for_each(head, &config->heads, link) { apply_output_head_config(head); }
+	wl_list_for_each(head, &config->heads, link) {
+		apply_output_head_config(head);
+	}
 
 	wlr_output_configuration_v1_send_succeeded(config);
 	output_update_manager_config();
@@ -839,7 +867,8 @@ int server_run(void) {
 	struct wl_event_loop *event_loop = wl_display_get_event_loop(server.wl_display);
 	int ipc_fd = ipc_get_socket_fd();
 	if (ipc_fd >= 0)
-		server.ipc_event_source = wl_event_loop_add_fd(event_loop, ipc_fd, WL_EVENT_READABLE, ipc_socket_handler, NULL);
+		server.ipc_event_source = wl_event_loop_add_fd(event_loop, ipc_fd, WL_EVENT_READABLE,
+			ipc_socket_handler, NULL);
 
 	// setup hotkey event listener
 	setup_hotkey_event_listener(event_loop);
@@ -933,7 +962,8 @@ void server_fini(void) {
 	wl_list_remove(&server.xdg_activation_new_token.link);
 
 	launcher_ctx_t *ctx, *tmp;
-	wl_list_for_each_safe(ctx, tmp, &server.pending_launcher_ctxs, link) launcher_ctx_destroy(ctx);
+	wl_list_for_each_safe(ctx, tmp, &server.pending_launcher_ctxs, link)
+		launcher_ctx_destroy(ctx);
 
 	wl_list_remove(&server.output_power_set_mode.link);
 
@@ -961,7 +991,8 @@ void server_fini(void) {
 	wl_event_loop_dispatch_idle(wl_display_get_event_loop(server.wl_display));
 
 	seat_t *seat, *tmp_seat;
-	wl_list_for_each_safe(seat, tmp_seat, &server.seats, link) seat_destroy(seat);
+	wl_list_for_each_safe(seat, tmp_seat, &server.seats, link)
+		seat_destroy(seat);
 
 	effects_fini();
 
@@ -987,12 +1018,13 @@ static void handle_ring_system_bell(struct wl_listener *listener, void *data) {
 	if (server.system_bell_timer != NULL)
 		return;
 
-	server.system_bell_timer = wl_event_loop_add_timer(
-	    wl_display_get_event_loop(server.wl_display), handle_system_bell_timer, NULL);
+	server.system_bell_timer = wl_event_loop_add_timer(wl_display_get_event_loop(server.wl_display),
+		handle_system_bell_timer, NULL);
 	wl_event_source_timer_update(server.system_bell_timer, 100);
 
 	execute_bell_bind();
 }
+
 
 #if WLR_HAS_DRM_BACKEND
 static void handle_drm_lease_request(struct wl_listener *listener, void *data) {
@@ -1004,4 +1036,5 @@ static void handle_drm_lease_request(struct wl_listener *listener, void *data) {
 		wlr_drm_lease_request_v1_reject(req);
 	}
 }
+
 #endif

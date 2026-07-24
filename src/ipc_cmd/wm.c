@@ -6,7 +6,6 @@
 #include "server.h"
 #include "toplevel.h"
 #include "tree.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,23 +32,26 @@ void ipc_cmd_wm(char **args, int num, int client_fd) {
 				offset += snprintf(buf + offset, sizeof(buf) - offset, ",\n");
 			first_mon = false;
 			offset += snprintf(buf + offset, sizeof(buf) - offset,
-			    "    {\"name\": \"%s\", \"id\": %u, \"rect\": {\"x\": %d, \"y\": %d, \"width\": %d, \"height\": %d}}",
-			    m->name, m->id, m->rectangle.x, m->rectangle.y, m->rectangle.width, m->rectangle.height);
+				"    {\"name\": \"%s\", \"id\": %u, \"rect\": {\"x\": %d, \"y\": %d, \"width\": %d, \"height\": %d}}", m->name, m->id, m->rectangle.x, m->rectangle.y, m->rectangle.width, m->rectangle.height);
 		}
 		offset += snprintf(buf + offset, sizeof(buf) - offset, "\n  ],\n");
 
 		offset += snprintf(buf + offset, sizeof(buf) - offset, "  \"settings\": {\n");
-		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"border_width\": %d,\n", border_width);
+		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"border_width\": %d,\n",
+			border_width);
 		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"window_gap\": %d,\n", window_gap);
-		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"split_ratio\": %.2f,\n", split_ratio);
-		offset += snprintf(
-		    buf + offset, sizeof(buf) - offset, "    \"single_monocle\": %s,\n", single_monocle ? "true" : "false");
-		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"automatic_scheme\": %d,\n", automatic_scheme);
-		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"smart_gaps\": %s,\n", smart_gaps ? "true" : "false");
-		offset += snprintf(
-		    buf + offset, sizeof(buf) - offset, "    \"smart_borders\": %s,\n", smart_borders ? "true" : "false");
-		offset += snprintf(
-		    buf + offset, sizeof(buf) - offset, "    \"focus_wrapping\": %s,\n", focus_wrapping ? "true" : "false");
+		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"split_ratio\": %.2f,\n",
+			split_ratio);
+		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"single_monocle\": %s,\n",
+			single_monocle ? "true" : "false");
+		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"automatic_scheme\": %d,\n",
+			automatic_scheme);
+		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"smart_gaps\": %s,\n",
+			smart_gaps ? "true" : "false");
+		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"smart_borders\": %s,\n",
+			smart_borders ? "true" : "false");
+		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"focus_wrapping\": %s,\n",
+			focus_wrapping ? "true" : "false");
 
 		const char *m = "focus";
 		if (focus_on_activate == FOCUS_ON_ACTIVATE_NONE)
@@ -65,15 +67,20 @@ void ipc_cmd_wm(char **args, int num, int client_fd) {
 			ffm = "yes";
 		else if (focus_follows_mouse == FOLLOWS_ALWAYS)
 			ffm = "always";
-		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"focus_follows_mouse\": \"%s\",\n", ffm);
+		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"focus_follows_mouse\": \"%s\",\n",
+			ffm);
 
-		offset += snprintf(
-		    buf + offset, sizeof(buf) - offset, "    \"record_history\": %s,\n", record_history ? "true" : "false");
-		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"shadow_size\": %.1f,\n", shadow_size);
-		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"shadow_offset_x\": %.1f,\n", shadow_offset_x);
-		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"shadow_offset_y\": %.1f,\n", shadow_offset_y);
-		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"shadow_color\": [%.3f, %.3f, %.3f, %.3f]\n",
-		    shadow_color[0], shadow_color[1], shadow_color[2], shadow_color[3]);
+		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"record_history\": %s,\n",
+			record_history ? "true" : "false");
+		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"shadow_size\": %.1f,\n",
+			shadow_size);
+		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"shadow_offset_x\": %.1f,\n",
+			shadow_offset_x);
+		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"shadow_offset_y\": %.1f,\n",
+			shadow_offset_y);
+		offset += snprintf(buf + offset, sizeof(buf) - offset,
+			"    \"shadow_color\": [%.3f, %.3f, %.3f, %.3f]\n", shadow_color[0], shadow_color[1],
+			shadow_color[2], shadow_color[3]);
 		offset += snprintf(buf + offset, sizeof(buf) - offset, "  }\n");
 		offset += snprintf(buf + offset, sizeof(buf) - offset, "}\n");
 
@@ -124,19 +131,16 @@ void ipc_cmd_wm(char **args, int num, int client_fd) {
 		for (output_t *m = mon_head; m != NULL; m = m->next)
 			output_count++;
 
-		offset += snprintf(buf + offset, sizeof(buf) - offset,
-		    "status: running\n"
-		    "monitors: %d\n",
-		    output_count);
+		offset += snprintf(buf + offset, sizeof(buf) - offset, "status: running\n"
+			"monitors: %d\n", output_count);
 
 		output_t *m = server.focused_output;
 		if (m && m->desk) {
-			offset += snprintf(buf + offset, sizeof(buf) - offset,
-			    "focused_monitor: %s\n"
-			    "focused_desktop: %s\n",
-			    m->name, m->desk->name);
+			offset += snprintf(buf + offset, sizeof(buf) - offset, "focused_monitor: %s\n"
+				"focused_desktop: %s\n", m->name, m->desk->name);
 			if (m->desk->focus) {
-				offset += snprintf(buf + offset, sizeof(buf) - offset, "focused_node: %u\n", m->desk->focus->id);
+				offset += snprintf(buf + offset, sizeof(buf) - offset, "focused_node: %u\n",
+					m->desk->focus->id);
 			}
 		}
 

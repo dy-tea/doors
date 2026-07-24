@@ -1,10 +1,8 @@
-#include "idle_power.h"
-
 #include "idle.h"
+#include "idle_power.h"
 #include "output.h"
 #include "server.h"
 #include "types.h"
-
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_idle_inhibit_v1.h>
 #include <wlr/types/wlr_output.h>
@@ -107,7 +105,9 @@ static void reset_idle_timer(void) {
 		wl_event_source_timer_update(idle_timer, 0);
 }
 
-static struct wl_event_loop *event_loop(void) { return wl_display_get_event_loop(server.wl_display); }
+static struct wl_event_loop *event_loop(void) {
+	return wl_display_get_event_loop(server.wl_display);
+}
 
 void idle_power_init(void) {
 	idle_timer = wl_event_loop_add_timer(event_loop(), handle_idle_timer, NULL);
@@ -117,7 +117,8 @@ void idle_power_init(void) {
 	if (idle_dpms && idle_timeout > 0 && idle_timer)
 		wl_event_source_timer_update(idle_timer, idle_timeout * 1000);
 
-	wlr_log(WLR_DEBUG, "idle_power: initialized (timeout=%ds, dpms=%s)", idle_timeout, idle_dpms ? "on" : "off");
+	wlr_log(WLR_DEBUG, "idle_power: initialized (timeout=%ds, dpms=%s)", idle_timeout,
+		idle_dpms ? "on" : "off");
 }
 
 void idle_power_fini(void) {
@@ -132,7 +133,9 @@ void idle_power_fini(void) {
 	}
 }
 
-void idle_power_notify_activity(void) { reset_idle_timer(); }
+void idle_power_notify_activity(void) {
+	reset_idle_timer();
+}
 
 void idle_power_check_inhibitors(void) {
 	if (displays_off && is_inhibited())

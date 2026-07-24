@@ -1,9 +1,7 @@
 #include "master_stack.h"
-
 #include "output.h"
 #include "toplevel.h"
 #include "tree.h"
-
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -144,11 +142,13 @@ static void set_node_geom(node_t *n, struct wlr_box geom, output_t *m, desktop_t
 			r.height = MIN_HEIGHT;
 	}
 
-	if ((int)n->constraints.min_width > MIN_WIDTH && r.width < (int)n->constraints.min_width && geom.width > 0) {
+	if ((int)n->constraints.min_width > MIN_WIDTH && r.width < (int)n->constraints.min_width &&
+			geom.width > 0) {
 		r.x = geom.x + (geom.width - (int)n->constraints.min_width) / 2;
 		r.width = n->constraints.min_width;
 	}
-	if ((int)n->constraints.min_height > MIN_HEIGHT && r.height < (int)n->constraints.min_height && geom.height > 0) {
+	if ((int)n->constraints.min_height > MIN_HEIGHT && r.height < (int)n->constraints.min_height &&
+			geom.height > 0) {
 		r.y = geom.y + (geom.height - (int)n->constraints.min_height) / 2;
 		r.height = n->constraints.min_height;
 	}
@@ -159,7 +159,8 @@ static void set_node_geom(node_t *n, struct wlr_box geom, output_t *m, desktop_t
 	node_set_dirty(n);
 }
 
-static void distribute_area(struct wlr_box area, struct wlr_box *out, int count, int gap, bool vertical) {
+static void distribute_area(struct wlr_box area, struct wlr_box *out, int count, int gap,
+		bool vertical) {
 	if (count <= 0)
 		return;
 
@@ -204,15 +205,15 @@ static int master_span_size(int span, int gap_count, int gap) {
 	return size;
 }
 
-static void apply_group(output_t *m, desktop_t *d, node_t **nodes, int count, struct wlr_box area, int gap,
-    bool vertical, struct wlr_box *geoms) {
+static void apply_group(output_t *m, desktop_t *d, node_t **nodes, int count, struct wlr_box area,
+		int gap, bool vertical, struct wlr_box *geoms) {
 	distribute_area(area, geoms, count, gap, vertical);
 	for (int i = 0; i < count; i++)
 		set_node_geom(nodes[i], geoms[i], m, d);
 }
 
-static bool arrange_center(
-    output_t *m, desktop_t *d, node_t **nodes, int mc, int sc, struct wlr_box rect, int gap, struct wlr_box *geoms) {
+static bool arrange_center(output_t *m, desktop_t *d, node_t **nodes, int mc, int sc,
+		struct wlr_box rect, int gap, struct wlr_box *geoms) {
 	if (sc == 0) {
 		apply_group(m, d, nodes, mc, rect, gap, true, geoms);
 		return true;
@@ -221,22 +222,22 @@ static bool arrange_center(
 	int master_width = master_span_size(rect.width, 2, gap);
 	int master_x = rect.x + (rect.width - master_width) / 2;
 	struct wlr_box master_area = {
-	    .x = master_x,
-	    .y = rect.y,
-	    .width = master_width,
-	    .height = rect.height,
+		.x = master_x,
+		.y = rect.y,
+		.width = master_width,
+		.height = rect.height,
 	};
 	struct wlr_box left_area = {
-	    .x = rect.x,
-	    .y = rect.y,
-	    .width = master_x - rect.x - gap,
-	    .height = rect.height,
+		.x = rect.x,
+		.y = rect.y,
+		.width = master_x - rect.x - gap,
+		.height = rect.height,
 	};
 	struct wlr_box right_area = {
-	    .x = master_x + master_width + gap,
-	    .y = rect.y,
-	    .width = rect.x + rect.width - (master_x + master_width + gap),
-	    .height = rect.height,
+		.x = master_x + master_width + gap,
+		.y = rect.y,
+		.width = rect.x + rect.width - (master_x + master_width + gap),
+		.height = rect.height,
 	};
 
 	if (left_area.width < 1)
@@ -377,9 +378,8 @@ bool master_stack_increment(desktop_t *d) {
 		return false;
 	}
 
-	node_t *target = d->focus && d->focus->client && !d->focus->client->master_stack_master && IS_TILED(d->focus->client)
-	    ? d->focus
-	    : nodes[mc];
+	node_t *target = d->focus && d->focus->client && !d->focus->client->master_stack_master &&
+		IS_TILED(d->focus->client) ? d->focus : nodes[mc];
 	target->client->master_stack_master = true;
 	d->master_stack_count = mc + 1;
 	free(nodes);
@@ -395,9 +395,8 @@ bool master_stack_decrement(desktop_t *d) {
 		return false;
 	}
 
-	node_t *target = d->focus && d->focus->client && d->focus->client->master_stack_master && IS_TILED(d->focus->client)
-	    ? d->focus
-	    : nodes[mc - 1];
+	node_t *target = d->focus && d->focus->client && d->focus->client->master_stack_master &&
+		IS_TILED(d->focus->client) ? d->focus : nodes[mc - 1];
 	target->client->master_stack_master = false;
 	d->master_stack_count = mc - 1;
 	free(nodes);
@@ -421,7 +420,8 @@ bool master_stack_promote(desktop_t *d) {
 }
 
 bool master_stack_demote(desktop_t *d) {
-	if (!d || !d->focus || !d->focus->client || !IS_TILED(d->focus->client) || !d->focus->client->master_stack_master)
+	if (!d || !d->focus || !d->focus->client || !IS_TILED(d->focus->client) ||
+		!d->focus->client->master_stack_master)
 		return false;
 
 	node_t **nodes = NULL;
@@ -462,7 +462,8 @@ void master_stack_set_orientation(master_area_orientation_t orientation) {
 		return;
 
 	master_stack_orientation = orientation;
-	master_stack_layout = orientation == MASTER_TOP || orientation == MASTER_BOTTOM ? STACK_HORIZONTAL : STACK_VERTICAL;
+	master_stack_layout = orientation == MASTER_TOP ||
+		orientation == MASTER_BOTTOM ? STACK_HORIZONTAL : STACK_VERTICAL;
 }
 
 void master_stack_flip_orientation(void) {
@@ -485,11 +486,17 @@ void master_stack_flip_orientation(void) {
 	}
 }
 
-void master_stack_cycle_orientation(void) { master_stack_set_orientation((master_stack_orientation + 1) % 5); }
+void master_stack_cycle_orientation(void) {
+	master_stack_set_orientation((master_stack_orientation + 1) % 5);
+}
 
-void master_stack_cycle_stack_layout(void) { master_stack_layout = (master_stack_layout + 1) % 2; }
+void master_stack_cycle_stack_layout(void) {
+	master_stack_layout = (master_stack_layout + 1) % 2;
+}
 
-int master_stack_collect(desktop_t *d, node_t ***out_nodes) { return collect_tiled_nodes(d, out_nodes); }
+int master_stack_collect(desktop_t *d, node_t ***out_nodes) {
+	return collect_tiled_nodes(d, out_nodes);
+}
 
 int master_stack_find_index(desktop_t *d, const node_t *n) {
 	if (!d || !n)
@@ -522,8 +529,8 @@ static struct wlr_box node_layout_box(const node_t *node) {
 	return node->rectangle;
 }
 
-static int directional_target(
-    node_t **nodes, int count, int source_index, master_stack_direction_t direction, bool wrap) {
+static int directional_target(node_t **nodes, int count, int source_index,
+		master_stack_direction_t direction, bool wrap) {
 	struct wlr_box source = node_layout_box(nodes[source_index]);
 	int64_t source_x = (int64_t)source.x * 2 + source.width;
 	int64_t source_y = (int64_t)source.y * 2 + source.height;
@@ -566,7 +573,8 @@ static int directional_target(
 			break;
 		}
 
-		if (eligible && (primary < best_primary || (primary == best_primary && secondary < best_secondary))) {
+		if (eligible && (primary < best_primary || (primary == best_primary &&
+				secondary < best_secondary))) {
 			target = i;
 			best_primary = primary;
 			best_secondary = secondary;
@@ -647,18 +655,34 @@ static bool swap_in_direction(output_t *m, desktop_t *d, master_stack_direction_
 	return true;
 }
 
-bool master_stack_focus_south(desktop_t *d) { return focus_in_direction(d, DIRECTION_SOUTH); }
+bool master_stack_focus_south(desktop_t *d) {
+	return focus_in_direction(d, DIRECTION_SOUTH);
+}
 
-bool master_stack_focus_north(desktop_t *d) { return focus_in_direction(d, DIRECTION_NORTH); }
+bool master_stack_focus_north(desktop_t *d) {
+	return focus_in_direction(d, DIRECTION_NORTH);
+}
 
-bool master_stack_focus_east(desktop_t *d) { return focus_in_direction(d, DIRECTION_EAST); }
+bool master_stack_focus_east(desktop_t *d) {
+	return focus_in_direction(d, DIRECTION_EAST);
+}
 
-bool master_stack_focus_west(desktop_t *d) { return focus_in_direction(d, DIRECTION_WEST); }
+bool master_stack_focus_west(desktop_t *d) {
+	return focus_in_direction(d, DIRECTION_WEST);
+}
 
-bool master_stack_swap_south(output_t *m, desktop_t *d) { return swap_in_direction(m, d, DIRECTION_SOUTH); }
+bool master_stack_swap_south(output_t *m, desktop_t *d) {
+	return swap_in_direction(m, d, DIRECTION_SOUTH);
+}
 
-bool master_stack_swap_north(output_t *m, desktop_t *d) { return swap_in_direction(m, d, DIRECTION_NORTH); }
+bool master_stack_swap_north(output_t *m, desktop_t *d) {
+	return swap_in_direction(m, d, DIRECTION_NORTH);
+}
 
-bool master_stack_swap_east(output_t *m, desktop_t *d) { return swap_in_direction(m, d, DIRECTION_EAST); }
+bool master_stack_swap_east(output_t *m, desktop_t *d) {
+	return swap_in_direction(m, d, DIRECTION_EAST);
+}
 
-bool master_stack_swap_west(output_t *m, desktop_t *d) { return swap_in_direction(m, d, DIRECTION_WEST); }
+bool master_stack_swap_west(output_t *m, desktop_t *d) {
+	return swap_in_direction(m, d, DIRECTION_WEST);
+}

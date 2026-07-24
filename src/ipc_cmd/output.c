@@ -1,18 +1,16 @@
-#include "output.h"
-
 #include "animation.h"
 #include "effects.h"
 #include "ipc.h"
 #include "ipc_cmd.h"
 #include "ipc_helpers.h"
 #include "master_stack.h"
+#include "output.h"
 #include "output_config.h"
 #include "server.h"
 #include "tabs.h"
 #include "transaction.h"
 #include "tree.h"
 #include "workspace.h"
-
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -71,27 +69,26 @@ void ipc_cmd_output(char **args, int num, int client_fd) {
 			if (!first)
 				offset += snprintf(buf + offset, sizeof(buf) - offset, ",\n");
 			first = false;
-			offset += snprintf(buf + offset, sizeof(buf) - offset,
-			    "  {\n"
-			    "    \"name\": \"%s\",\n"
-			    "    \"description\": \"%s\",\n"
-			    "    \"make\": \"%s\",\n"
-			    "    \"model\": \"%s\",\n"
-			    "    \"serial\": \"%s\",\n"
-			    "    \"width\": %d,\n"
-			    "    \"height\": %d,\n"
-			    "    \"refresh\": %.3f,\n"
-			    "    \"scale\": %.6g,\n"
-			    "    \"phys_width\": %d,\n"
-			    "    \"phys_height\": %d,\n"
-			    "    \"hdr\": %s,\n"
-			    "    \"allow_tearing\": %s,\n"
-			    "    \"enabled\": %s\n"
-			    "  }",
-			    wo->name ? wo->name : "", wo->description ? wo->description : "", wo->make ? wo->make : "",
-			    wo->model ? wo->model : "", wo->serial ? wo->serial : "", wo->width, wo->height, wo->refresh / 1000.0f,
-			    wo->scale, wo->phys_width, wo->phys_height, output->hdr ? "true" : "false",
-			    output->allow_tearing ? "true" : "false", wo->enabled ? "true" : "false");
+			offset += snprintf(buf + offset, sizeof(buf) - offset, "  {\n"
+				"    \"name\": \"%s\",\n"
+				"    \"description\": \"%s\",\n"
+				"    \"make\": \"%s\",\n"
+				"    \"model\": \"%s\",\n"
+				"    \"serial\": \"%s\",\n"
+				"    \"width\": %d,\n"
+				"    \"height\": %d,\n"
+				"    \"refresh\": %.3f,\n"
+				"    \"scale\": %.6g,\n"
+				"    \"phys_width\": %d,\n"
+				"    \"phys_height\": %d,\n"
+				"    \"hdr\": %s,\n"
+				"    \"allow_tearing\": %s,\n"
+				"    \"enabled\": %s\n"
+				"  }", wo->name ? wo->name : "", wo->description ? wo->description : "",
+					wo->make ? wo->make : "", wo->model ? wo->model : "", wo->serial ? wo->serial : "", wo->width,
+					wo->height, wo->refresh / 1000.0f, wo->scale, wo->phys_width, wo->phys_height,
+					output->hdr ? "true" : "false", output->allow_tearing ? "true" : "false",
+					wo->enabled ? "true" : "false");
 		}
 		offset += snprintf(buf + offset, sizeof(buf) - offset, "\n]\n");
 		send_success(client_fd, buf);
@@ -103,7 +100,8 @@ void ipc_cmd_output(char **args, int num, int client_fd) {
 		if (done)
 			send_success(client_fd, "created output\n");
 		else
-			send_failure(client_fd, "output create: can only create outputs for wayland, x11 or headless backends");
+			send_failure(client_fd,
+				"output create: can only create outputs for wayland, x11 or headless backends");
 
 		return;
 	}
@@ -199,13 +197,11 @@ void ipc_cmd_output(char **args, int num, int client_fd) {
 				offset += snprintf(buf + offset, sizeof(buf) - offset, ",\n");
 
 			first = false;
-			offset += snprintf(buf + offset, sizeof(buf) - offset,
-			    "  {\n"
-			    "    \"width\": %d,\n"
-			    "    \"height\": %d,\n"
-			    "    \"refresh\": %.3f\n"
-			    "  }",
-			    mode->width, mode->height, mode->refresh / 1000.0f);
+			offset += snprintf(buf + offset, sizeof(buf) - offset, "  {\n"
+				"    \"width\": %d,\n"
+				"    \"height\": %d,\n"
+				"    \"refresh\": %.3f\n"
+				"  }", mode->width, mode->height, mode->refresh / 1000.0f);
 		}
 
 		offset += snprintf(buf + offset, sizeof(buf) - offset, "\n]\n");
@@ -344,7 +340,8 @@ void ipc_cmd_output(char **args, int num, int client_fd) {
 		send_success(client_fd, "output render_bit_depth set\n");
 	} else if (streq("color_profile", subcmd)) {
 		if (num < 2) {
-			send_failure(client_fd, "output color_profile: missing profile type (gamma22|srgb|icc <path>)\n");
+			send_failure(client_fd,
+				"output color_profile: missing profile type (gamma22|srgb|icc <path>)\n");
 			return;
 		}
 		args++;
@@ -354,7 +351,8 @@ void ipc_cmd_output(char **args, int num, int client_fd) {
 		if (streq("gamma22", *args)) {
 			// no transform
 		} else if (streq("srgb", *args)) {
-			new_transform = wlr_color_transform_init_linear_to_inverse_eotf(WLR_COLOR_TRANSFER_FUNCTION_SRGB);
+			new_transform =
+				wlr_color_transform_init_linear_to_inverse_eotf(WLR_COLOR_TRANSFER_FUNCTION_SRGB);
 			if (!new_transform) {
 				send_failure(client_fd, "output color_profile: failed to create sRGB transform\n");
 				return;
@@ -491,7 +489,8 @@ void ipc_cmd_output(char **args, int num, int client_fd) {
 		mon->name[SMALEN - 1] = '\0';
 		transaction_commit_dirty();
 		send_success(client_fd, "renamed\n");
-	} else if (streq("add-desktops", subcmd) || streq("-a", subcmd) || streq("--add-desktops", subcmd)) {
+	} else if (streq("add-desktops", subcmd) || streq("-a", subcmd) || streq("--add-desktops",
+			subcmd)) {
 		if (num < 2) {
 			send_failure(client_fd, "output add-desktops: missing desktop names\n");
 			return;
@@ -557,9 +556,7 @@ void ipc_cmd_output(char **args, int num, int client_fd) {
 				workspace_create_desktop(d->name);
 				args++;
 				num--;
-			}
-
-			while (num > 0) {
+			} while (num > 0) {
 				desktop_t *newd = (desktop_t *)calloc(1, sizeof(desktop_t));
 				if (!newd) {
 					wlr_log(WLR_ERROR, "allocation failed");
@@ -590,9 +587,7 @@ void ipc_cmd_output(char **args, int num, int client_fd) {
 				workspace_create_desktop(newd->name);
 				args++;
 				num--;
-			}
-
-			while (d != NULL) {
+			} while (d != NULL) {
 				if (d == mon->desk) {
 					mon->desk = d->next;
 					if (mon->desk)
@@ -707,7 +702,7 @@ void ipc_cmd_output(char **args, int num, int client_fd) {
 			server.focused_output = next ? next : prev;
 			if (server.focused_output) {
 				focus_node(server.focused_output, server.focused_output->desk,
-				    server.focused_output->desk ? server.focused_output->desk->focus : NULL);
+					server.focused_output->desk ? server.focused_output->desk->focus : NULL);
 			}
 		}
 
@@ -742,7 +737,8 @@ void ipc_cmd_output(char **args, int num, int client_fd) {
 		num--;
 
 		int x, y, width, height;
-		if (sscanf(*args, "%dx%d:%d,%d", &width, &height, &x, &y) != 4 && sscanf(*args, "%dx%d", &width, &height) == 2) {
+		if (sscanf(*args, "%dx%d:%d,%d", &width, &height, &x, &y) != 4 && sscanf(*args, "%dx%d", &width,
+				&height) == 2) {
 			x = mon->rectangle.x;
 			y = mon->rectangle.y;
 		} else if (sscanf(*args, "%d,%d,%d,%d", &x, &y, &width, &height) != 4) {
@@ -758,7 +754,8 @@ void ipc_cmd_output(char **args, int num, int client_fd) {
 		ipc_put_status(SUB_MASK_MONITOR_CHANGE, "monitor_change[%s]\n", mon->name);
 		transaction_commit_dirty();
 		send_success(client_fd, "rectangle set\n");
-	} else if (streq("reorder-desktops", subcmd) || streq("-o", subcmd) || streq("--reorder-desktops", subcmd)) {
+	} else if (streq("reorder-desktops", subcmd) || streq("-o", subcmd) || streq("--reorder-desktops",
+			subcmd)) {
 		if (num < 2) {
 			send_failure(client_fd, "output reorder-desktops: missing desktop names\n");
 			return;
