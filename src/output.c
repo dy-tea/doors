@@ -163,8 +163,24 @@ static void output_configure_scene_visible(output_t *output) {
 	output->applied_scale_filter = output->scale_filter_mode;
 }
 
+// Direct scanout bypasses composition, so a software cursor would not be drawn.
+static bool output_needs_software_cursor(output_t *output) {
+	struct wlr_output *wo = output->wlr_output;
+	if (wo->software_cursor_locks > 0)
+		return true;
+
+	struct wlr_output_cursor *cursor;
+	wl_list_for_each(cursor, &wo->cursors, link) {
+		if (cursor->enabled && cursor->visible && cursor != wo->hardware_cursor)
+			return true;
+	}
+	return false;
+}
+
 static bool output_try_direct_scanout(output_t *output) {
 	if (!output_has_fullscreen_cover(output))
+		return false;
+	if (output_needs_software_cursor(output))
 		return false;
 	if (fullscreen_has_effects(output))
 		return false;
