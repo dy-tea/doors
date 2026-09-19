@@ -482,30 +482,29 @@ static void process_cursor_motion(uint32_t time, double dx, double dy, double dx
 		wlr_relative_pointer_manager_v1_send_relative_motion(server.relative_pointer_manager, server.seat,
 			time * 1000, dx, dy, dx_unaccel, dy_unaccel);
 
-		if (server.active_pointer_constraint != NULL && server.cursor_mode != CURSOR_RESIZE &&
-				server.cursor_mode != CURSOR_MOVE) {
-			struct toplevel_t *toplevel = server.active_pointer_constraint->surface->data;
-			if (toplevel != NULL &&
-					server.active_pointer_constraint->surface == server.seat->pointer_state.focused_surface) {
-				const struct wlr_box geo = toplevel->node->rectangle;
-
-				// calculate constraint
-				double sx = server.cursor->x - geo.x - geo.width;
-				double sy = server.cursor->y - geo.y - geo.height;
-				double cx, cy;
-
-				// apply confine on region
-				if (wlr_region_confine(&server.active_pointer_constraint->region, sx, sy, sx + dx, sy + dy, &cx,
-						&cy)) {
-					dx = cx - sx;
-					dy = cy - sy;
-				}
-
-				// if pointer is locked, do not move it
-				if (server.active_pointer_constraint->type == WLR_POINTER_CONSTRAINT_V1_LOCKED)
-					return;
-			} else {
+		struct wlr_pointer_constraint_v1 *pc = server.active_pointer_constraint;
+		if (pc != NULL && server.cursor_mode != CURSOR_RESIZE && server.cursor_mode != CURSOR_MOVE) {
+			if (pc->surface != server.seat->pointer_state.focused_surface) {
 				pointer_constrain(NULL);
+			} else if (pc->type == WLR_POINTER_CONSTRAINT_V1_LOCKED) {
+				// pointer is locked, do not move it
+				return;
+			} else {
+				node_t *node = pointer_constraint_node(pc->surface);
+				if (node != NULL) {
+					const struct wlr_box geo = node->rectangle;
+
+					// calculate constraint
+					double sx = server.cursor->x - geo.x - geo.width;
+					double sy = server.cursor->y - geo.y - geo.height;
+					double cx, cy;
+
+					// apply confine on region
+					if (wlr_region_confine(&pc->region, sx, sy, sx + dx, sy + dy, &cx, &cy)) {
+						dx = cx - sx;
+						dy = cy - sy;
+					}
+				}
 			}
 		}
 	}

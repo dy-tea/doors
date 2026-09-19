@@ -1,4 +1,5 @@
 #include "input_method.h"
+#include "pointer_constraint.h"
 #include "seat.h"
 #include "server.h"
 #include "tablet.h"
@@ -23,6 +24,7 @@ static void seat_pointer_focus_change(struct wl_listener *listener, void *data) 
 	struct wlr_seat_pointer_focus_change_event *event = data;
 	if (event->new_surface == NULL)
 		wlr_cursor_set_xcursor(server.cursor, server.cursor_mgr, "default");
+	pointer_constraint_focus(event->new_surface);
 }
 
 static void handle_request_set_selection(struct wl_listener *listener, void *data) {

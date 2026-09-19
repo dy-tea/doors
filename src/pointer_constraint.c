@@ -2,8 +2,31 @@
 #include "pointer_constraint.h"
 #include "server.h"
 #include "toplevel.h"
+#include "xwayland.h"
+#include <wlr/types/wlr_xdg_shell.h>
+#include <wlr/xwayland.h>
 #include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_pointer_constraints_v1.h>
+
+// wlr_surface->data is never set by doors: the view hangs off the xdg/xwayland surface instead.
+node_t *pointer_constraint_node(struct wlr_surface *surface) {
+	if (surface == NULL)
+		return NULL;
+
+	struct wlr_xdg_surface *xdg = wlr_xdg_surface_try_from_wlr_surface(surface);
+	if (xdg != NULL) {
+		toplevel_t *toplevel = xdg->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL ? xdg->data : NULL;
+		return toplevel ? toplevel->node : NULL;
+	}
+
+	struct wlr_xwayland_surface *xsurface = wlr_xwayland_surface_try_from_wlr_surface(surface);
+	if (xsurface != NULL) {
+		xwayland_toplevel_t *view = xsurface->data;
+		return view ? view->node : NULL;
+	}
+
+	return NULL;
+}
 
 static void cursor_warp_to_constraint_hint(void) {
 	struct wlr_pointer_constraint_v1 *active = server.active_pointer_constraint;
@@ -14,12 +37,12 @@ static void cursor_warp_to_constraint_hint(void) {
 		double sx = active->current.cursor_hint.x;
 		double sy = active->current.cursor_hint.y;
 
-		toplevel_t *toplevel = active->surface->data;
-		if (!toplevel)
+		node_t *node = pointer_constraint_node(active->surface);
+		if (!node)
 			return;
 
-		double lx = sx - toplevel->node->rectangle.x;
-		double ly = sy - toplevel->node->rectangle.y;
+		double lx = sx - node->rectangle.x;
+		double ly = sy - node->rectangle.y;
 
 		wlr_cursor_warp(server.cursor, NULL, lx, ly);
 		wlr_seat_pointer_warp(active->seat, sx, sy);
@@ -29,12 +52,12 @@ static void cursor_warp_to_constraint_hint(void) {
 static void cursor_check_constraint_region(void) {
 	struct wlr_pointer_constraint_v1 *constraint = server.active_pointer_constraint;
 	pixman_region32_t *region = &constraint->region;
-	toplevel_t *toplevel = constraint->surface->data;
-	if (server.cursor_requires_warp && toplevel) {
+	node_t *node = pointer_constraint_node(constraint->surface);
+	if (server.cursor_requires_warp && node) {
 		server.cursor_requires_warp = false;
 
-		double sx = server.cursor->x + toplevel->node->rectangle.x;
-		double sy = server.cursor->y + toplevel->node->rectangle.y;
+		double sx = server.cursor->x + node->rectangle.x;
+		double sy = server.cursor->y + node->rectangle.y;
 
 		if (!pixman_region32_contains_point(region, floor(sx), floor(sy), NULL)) {
 			int count;
@@ -43,8 +66,8 @@ static void cursor_check_constraint_region(void) {
 				sx = (boxes[0].x1 + boxes[0].x2) / 2.0;
 				sy = (boxes[0].y1 + boxes[0].y2) / 2.0;
 
-				wlr_cursor_warp_closest(server.cursor, NULL, sx + toplevel->node->rectangle.x,
-					sy + toplevel->node->rectangle.y);
+				wlr_cursor_warp_closest(server.cursor, NULL, sx + node->rectangle.x,
+					sy + node->rectangle.y);
 			}
 		}
 	}
@@ -142,7 +165,15 @@ static void handle_pointer_constraint(struct wl_listener *listener, void *data) 
 	wl_signal_add(&constraint->events.destroy, &pointer_constraint->destroy);
 
 	if (constraint->surface == server.seat->pointer_state.focused_surface)
-		server.active_pointer_constraint = constraint;
+		pointer_constrain(constraint);
+}
+
+void pointer_constraint_focus(struct wlr_surface *surface) {
+	struct wlr_pointer_constraint_v1 *constraint = NULL;
+	if (surface != NULL && server.pointer_constraints != NULL)
+		constraint = wlr_pointer_constraints_v1_constraint_for_surface(server.pointer_constraints, surface,
+			server.seat);
+	pointer_constrain(constraint);
 }
 
 void pointer_constraint_init(void) {
