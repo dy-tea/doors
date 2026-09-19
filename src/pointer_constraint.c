@@ -106,8 +106,9 @@ static void handle_constraint_set_region(struct wl_listener *listener, void *dat
 }
 
 static void handle_constraint_destroy(struct wl_listener *listener, void *data) {
+	(void)data;
 	pointer_constraint_t *constraint = wl_container_of(listener, constraint, destroy);
-	struct wlr_pointer_constraint_v1 *wlr_constraint = data;
+	struct wlr_pointer_constraint_v1 *wlr_constraint = constraint->constraint;
 
 	wl_list_remove(&constraint->set_region.link);
 	wl_list_remove(&constraint->destroy.link);
