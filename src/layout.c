@@ -104,10 +104,40 @@ static bool scroller_focus(desktop_t *d, direction_t dir) {
 	return false;
 }
 
+// Pick the leaf of `sub` that is adjacent to `from` in direction `dir`: the one overlapping
+// `from` the most on the perpendicular axis, closest to the shared edge on ties.
+static node_t *closest_leaf(node_t *sub, node_t *from, direction_t dir) {
+	bool horiz = dir == DIR_WEST || dir == DIR_EAST;
+	struct wlr_box f = from->rectangle;
+	node_t *best = NULL;
+	long best_overlap = -1, best_dist = 0;
+
+	FOR_EACH_LEAF(leaf, sub) {
+		struct wlr_box r = leaf->rectangle;
+		long lo, hi, dist;
+		if (horiz) {
+			lo = r.y > f.y ? r.y : f.y;
+			hi = r.y + r.height < f.y + f.height ? r.y + r.height : f.y + f.height;
+			dist = dir == DIR_EAST ? r.x : -(r.x + r.width);
+		} else {
+			lo = r.x > f.x ? r.x : f.x;
+			hi = r.x + r.width < f.x + f.width ? r.x + r.width : f.x + f.width;
+			dist = dir == DIR_SOUTH ? r.y : -(r.y + r.height);
+		}
+		long overlap = hi - lo;
+		if (best == NULL || overlap > best_overlap || (overlap == best_overlap && dist < best_dist)) {
+			best = leaf;
+			best_overlap = overlap;
+			best_dist = dist;
+		}
+	}
+	return best ? best : first_extrema(sub);
+}
+
 static bool tiled_focus(desktop_t *d, direction_t dir) {
 	node_t *n = find_fence(d->focus, dir);
 	if (n != NULL) {
-		n = dir == DIR_EAST || dir == DIR_NORTH ? first_extrema(n) : second_extrema(n);
+		n = closest_leaf(n, d->focus, dir);
 		if (n != NULL)
 			return focus_node(mon, d, n);
 	} else if (settings.focus_wrapping && d->root) {
@@ -122,7 +152,7 @@ static bool tiled_focus(desktop_t *d, direction_t dir) {
 static bool tiled_swap(output_t *m, desktop_t *d, direction_t dir) {
 	node_t *n = find_fence(d->focus, dir);
 	if (n != NULL) {
-		n = first_extrema(n);
+		n = closest_leaf(n, d->focus, dir);
 		if (n != NULL) {
 			swap_nodes(m, d, d->focus, m, d, n);
 			return true;
