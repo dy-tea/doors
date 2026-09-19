@@ -388,7 +388,7 @@ static void handle_new_text_input(struct wl_listener *listener, void *data) {
 
 static void handle_focused_surface_destroy(struct wl_listener *listener, void *data) {
 	ime_relay_t *relay = wl_container_of(listener, relay, focused_surface_destroy);
-	assert(relay->focused_surface == data);
+	(void)data;
 	input_method_relay_set_focus(relay, NULL);
 }
 
