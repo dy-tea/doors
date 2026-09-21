@@ -1086,6 +1086,14 @@ void toplevel_destroy(struct wl_listener *listener, void *data) {
 	wl_list_remove(&toplevel->set_app_id.link);
 	wl_list_remove(&toplevel->outputs_update.link);
 
+	// the decoration object can outlive the toplevel, e.g. when its client is destroyed
+	// together with the toplevel: its listeners must not point into the freed toplevel
+	if (toplevel->xdg_decoration) {
+		wl_list_remove(&toplevel->decoration_destroy.link);
+		wl_list_remove(&toplevel->decoration_request_mode.link);
+		toplevel->xdg_decoration = NULL;
+	}
+
 	if (toplevel->output_handler) {
 		wlr_scene_node_destroy(&toplevel->output_handler->node);
 		toplevel->output_handler = NULL;
