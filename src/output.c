@@ -11,6 +11,7 @@
 #include "toplevel.h"
 #include "tree.h"
 #include "types.h"
+#include "workspace.h"
 #include "xwayland.h"
 #include <stdlib.h>
 #include <string.h>
@@ -28,6 +29,9 @@
 #include <wlr/util/transform.h>
 
 static void handle_output_destroy(struct wl_listener *listener, void *data);
+
+// active desktop of the last removed output, restored when an output comes back
+static desktop_t *orphan_active_desk;
 
 bool output_supports_hdr(output_t *output, const char **unsupported_reason_ptr) {
 	const char *unsupported_reason = NULL;
@@ -396,6 +400,7 @@ static void handle_output_destroy(struct wl_listener *listener, void *data) {
 	if (output->lock_surface)
 		destroy_lock_surface(&output->destroy_lock_surface, NULL);
 
+	desktop_t *active_desk = output->desk;
 	if (output->enabled)
 		output_disable(output);
 
@@ -440,6 +445,8 @@ static void handle_output_destroy(struct wl_listener *listener, void *data) {
 	}
 	wl_list_init(&output->desk_list);
 	output->desk = NULL;
+	if (active_desk)
+		orphan_active_desk = active_desk;
 
 	ipc_put_status(SUB_MASK_MONITOR_REMOVE, "monitor_remove[%s]\n", output->name);
 	free(output);
@@ -475,8 +482,10 @@ void output_create(struct wlr_output *wlr_output) {
 	};
 
 	// restore orphaned desktops or create default workspace
+	bool restored = false;
 	wl_list_init(&output->desk_list);
 	if (!wl_list_empty(&orphan_desk_list)) {
+		restored = true;
 		desktop_t *d, *dtmp;
 		wl_list_for_each_safe(d, dtmp, &orphan_desk_list, link) {
 			wl_list_remove(&d->link);
@@ -493,6 +502,10 @@ void output_create(struct wlr_output *wlr_output) {
 
 		output->desk = wl_list_empty(&output->desk_list) ? NULL : wl_container_of(output->desk_list.next,
 			output->desk, link);
+
+		if (orphan_active_desk && orphan_active_desk->output == output)
+			output->desk = orphan_active_desk;
+		orphan_active_desk = NULL;
 
 		if (output->desk && output->desk->root && output->desk->focus)
 			focus_node(output, output->desk, output->desk->focus);
@@ -575,6 +588,10 @@ void output_create(struct wlr_output *wlr_output) {
 
 	output_enable(output);
 	ipc_put_status(SUB_MASK_MONITOR_ADD, "monitor_add[%s]\n", output->name);
+
+	// re-select the restored desktop so the others get hidden
+	if (restored && output->desk && server.focused_output == output)
+		workspace_switch_to_desktop(output->desk->name);
 	output_update_manager_config();
 }
 
