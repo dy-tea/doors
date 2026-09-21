@@ -743,6 +743,7 @@ void toplevel_unmap(struct wl_listener *listener, void *data) {
 	node_t *n = toplevel->node;
 	output_t *m = mon;
 	desktop_t *d = NULL;
+	bool node_held = false;
 
 	// find the actual desktop this node belongs to by walking up to root
 	if (m && n) {
@@ -797,6 +798,13 @@ void toplevel_unmap(struct wl_listener *listener, void *data) {
 			n->destroying = true;
 		if (n && n->client)
 			n->client->toplevel = NULL;
+
+		// arrange() can commit the transaction right away, which frees a destroying node that
+		// nothing waits for any more, hold a reference until the view is reported as unmapped
+		if (n) {
+			n->ntxnrefs++;
+			node_held = true;
+		}
 		arrange(m, d, true);
 
 		toplevel->node = NULL;
@@ -819,6 +827,12 @@ void toplevel_unmap(struct wl_listener *listener, void *data) {
 	}
 
 	transaction_notify_view_unmapped(n);
+
+	if (node_held) {
+		n->ntxnrefs--;
+		if (n->destroying && n->ntxnrefs == 0)
+			free_node(n);
+	}
 }
 
 void toplevel_commit(struct wl_listener *listener, void *data) {
