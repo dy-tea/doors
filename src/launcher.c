@@ -4,6 +4,8 @@
 #include "server.h"
 #include "toplevel.h"
 #include "tree.h"
+#include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -214,9 +216,28 @@ static void handle_xdg_activation_new_token(struct wl_listener *listener, void *
 	wlr_log(WLR_DEBUG, "xdg_activation: new token for desktop '%s'", desktop_name);
 }
 
+// Ignored signals stay ignored through exec() and the signal mask is inherited too, programs
+// that wait for their own children or write to pipes rely on the defaults, so every forked
+// child gets them back (same as sway). SIGPIPE is ignored by the log setup.
+static void restore_signals(void) {
+	sigset_t set;
+	sigemptyset(&set);
+	sigprocmask(SIG_SETMASK, &set, NULL);
+
+	struct sigaction sa_dfl = {.sa_handler = SIG_DFL};
+	sigaction(SIGCHLD, &sa_dfl, NULL);
+	sigaction(SIGPIPE, &sa_dfl, NULL);
+}
+
 void launcher_init(void) {
 	ONCE();
 	wl_list_init(&server.pending_launcher_ctxs);
+
+	// Commands started by doors are children of the compositor and nothing waits for them.
+	// Ignoring SIGCHLD makes the kernel reap them instead of leaving zombies behind.
+	struct sigaction sa_ign = {.sa_handler = SIG_IGN};
+	sigaction(SIGCHLD, &sa_ign, NULL);
+	pthread_atfork(NULL, NULL, restore_signals);
 
 	// xdg activation
 	server.xdg_activation_v1 = wlr_xdg_activation_v1_create(server.wl_display);
