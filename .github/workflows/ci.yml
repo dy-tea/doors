@@ -3,6 +3,16 @@ name: Build
 on: [push]
 
 jobs:
+  nix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: DeterminateSystems/determinate-nix-action@main
+      - name: Build Doors
+        run: nix build .#doors -L
+      - name: Build Doorsctl
+        run: nix build .#doorsctl -L
+
   arch:
     runs-on: ubuntu-latest
     container:
