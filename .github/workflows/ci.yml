@@ -81,14 +81,14 @@ jobs:
       - name: Build on FreeBSD
         uses: vmactions/freebsd-vm@v1
         with:
-          release: "14.2"
+          release: "15.0"
           usesh: true
           prepare: |
             pkg install -y meson ninja pkgconf git wayland wayland-protocols \
               libxkbcommon pixman cairo libdrm libinput libevdev seatd libepoll-shim \
               pango shaderc vulkan-headers vulkan-loader xcb-util-wm xcb-util-errors hwdata \
-              xcb-util-renderutil xcb-util-cursor xcb-util-image json-c lcms2 evdev-proto freetype2 \
-              libepoll-shim libinotify mesa-libs mesa-devel egl-x11 egl-wayland libudev-devd \
+              xcb-util-renderutil xcb-util-cursor xcb-util-image json-c lcms2 evdev-proto \
+              freetype2 libepoll-shim libinotify mesa-libs egl-x11 egl-wayland libudev-devd \
               gdk-pixbuf2 glslang xwayland libX11 libdisplay-info libliftoff bzip2
           run: |
             # Force-install libinotify: the VM image stripped the base .so,
