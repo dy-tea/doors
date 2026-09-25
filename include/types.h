@@ -130,6 +130,8 @@ typedef struct {
 	uint32_t urgent : 1;
 	uint32_t shown : 1;
 	uint32_t freed : 1;
+	uint32_t maximized : 1;
+	uint32_t minimized : 1;
 	uint32_t master_stack_master : 1;
 	uint32_t cursor_in_left_half : 1;
 	uint32_t cursor_in_upper_half : 1;
@@ -150,6 +152,7 @@ typedef struct client_t {
 	client_state_t state, last_state;
 	stack_layer_t layer, last_layer;
 	struct wlr_box floating_rectangle, tiled_rectangle, committed_tiled_rectangle, arranged_rectangle;
+	struct wlr_box pre_maximize_rectangle;
 	struct toplevel_t *toplevel;
 	struct xwayland_toplevel_t *xwayland_view;
 
@@ -206,9 +209,14 @@ typedef struct desktop_t {
 	struct wl_list link;
 	padding_t padding;
 	int window_gap;
-	int master_stack_count;
 	struct output_t *output;
 	uint32_t fullscreen_recreate_pending_window_id;
+	struct {
+		float ratio;
+		int orientation; // master_area_orientation_t
+		int stack_layout; // stack_layout_t
+		int count;
+	} master_stack;
 } desktop_t;
 
 typedef struct {
@@ -233,7 +241,6 @@ typedef struct {
 typedef struct {
 	automatic_scheme_t automatic_scheme;
 	child_polarity_t initial_polarity;
-	bool single_monocle;
 	bool borderless_monocle;
 	bool borderless_singleton;
 	bool gapless_monocle;
@@ -268,6 +275,10 @@ typedef struct {
 
 	// Scratchpad behavior
 	bool minimize_to_scratchpad;
+
+	// when a minimized window is restored, put it back on the desktop it came from
+	// instead of the currently focused one
+	bool scratchpad_restore_to_origin;
 
 	// Shadow settings
 	float shadow_size;

@@ -59,6 +59,8 @@ scroller_state_t *scroller_create(void) {
 		return NULL;
 	s->view_offset = 0.0;
 	s->activate_prev_column_on_removal = false;
+	s->default_proportion = scroller_default_proportion;
+	s->default_proportion_single = scroller_default_proportion_single;
 	return s;
 }
 
@@ -70,6 +72,15 @@ void scroller_destroy(scroller_state_t *s) {
 	}
 	free(s->columns);
 	free(s);
+}
+
+void scroller_leave(struct output_t *m, desktop_t *d) {
+	(void)m;
+	if (d == NULL)
+		return;
+
+	scroller_destroy(d->scroller_state);
+	d->scroller_state = NULL;
 }
 
 static double resolve_column_width(scroller_state_t *s, int col_idx, double gap, double area_w) {
@@ -105,7 +116,7 @@ static int create_column(scroller_state_t *s, client_t *client, bool activate) {
 
 	memset(col, 0, sizeof(*col));
 	col->width.type = SCROLLER_WIDTH_PROPORTION;
-	col->width.value = scroller_default_proportion;
+	col->width.value = s->default_proportion;
 	col->active_tile_idx = 0;
 
 	scroller_tile_t *t = tile_grow(col);
@@ -159,7 +170,7 @@ bool scroller_add_tile(scroller_state_t *s, client_t *client, bool activate) {
 	scroller_column_t *new_col = &s->columns[insert_col];
 	memset(new_col, 0, sizeof(*new_col));
 	new_col->width.type = SCROLLER_WIDTH_PROPORTION;
-	new_col->width.value = scroller_default_proportion;
+	new_col->width.value = s->default_proportion;
 	new_col->active_tile_idx = 0;
 	new_col->tiles = NULL;
 	new_col->tile_count = 0;
@@ -177,8 +188,6 @@ bool scroller_add_tile(scroller_state_t *s, client_t *client, bool activate) {
 	// adjust active_column_idx
 	if (activate) {
 		s->active_column_idx = insert_col;
-		// Track that we should activate the previous column if this one is
-		// removed, matching niri's activate_prev_column_on_removal.
 		s->activate_prev_column_on_removal = true;
 	} else if (s->active_column_idx >= insert_col)
 		s->active_column_idx++;
@@ -398,6 +407,20 @@ void scroller_arrange(struct output_t *m, desktop_t *d, struct wlr_box available
 	// set pending rectangles on tree nodes.
 	unsigned int bw = (unsigned int)effective_border_width(d);
 
+	int maximized_col = -1, maximized_tile = -1;
+	for (int i = 0; i < s->column_count && maximized_col < 0; i++) {
+		for (int j = 0; j < s->columns[i].tile_count; j++) {
+			if (client_is_maximized(s->columns[i].tiles[j].client)) {
+				maximized_col = i;
+				maximized_tile = j;
+				break;
+			}
+		}
+	}
+
+	if (maximized_col >= 0)
+		view_pos = col_xs[maximized_col];
+
 	for (int i = 0; i < s->column_count; i++) {
 		scroller_column_t *col = &s->columns[i];
 		double screen_x = (double)available.x + col_xs[i] - view_pos;
@@ -409,12 +432,34 @@ void scroller_arrange(struct output_t *m, desktop_t *d, struct wlr_box available
 
 			node_t *node = c->toplevel->node;
 
-			struct wlr_box outer = {
-				.x = (int)(screen_x + 0.5),
-				.y = (int)((double)available.y + col->tiles[j].rect.y + 0.5),
-				.width = max_i(1, (int)(col->resolved_width + 0.5)),
-				.height = max_i(1, col->tiles[j].rect.height),
-			};
+			bool is_maximized = (i == maximized_col && j == maximized_tile);
+			if (maximized_col >= 0 && !is_maximized) {
+				c->tiled_rectangle = (struct wlr_box){0};
+				c->arranged_rectangle = (struct wlr_box){0};
+				node_set_pending_rectangle(node, (struct wlr_box){0});
+				node->output = m;
+				node_set_dirty(node);
+				continue;
+			}
+
+			struct wlr_box outer;
+			if (is_maximized) {
+				int mx = available.x + (int)gap;
+				int my = available.y + (int)gap;
+				outer = (struct wlr_box){
+					.x = mx,
+					.y = my,
+					.width = max_i(1, available.width - (int)gap * 2),
+					.height = max_i(1, available.height - (int)gap * 2),
+				};
+			} else {
+				outer = (struct wlr_box){
+					.x = (int)(screen_x + 0.5),
+					.y = (int)((double)available.y + col->tiles[j].rect.y + 0.5),
+					.width = max_i(1, (int)(col->resolved_width + 0.5)),
+					.height = max_i(1, col->tiles[j].rect.height),
+				};
+			}
 
 			struct wlr_box inner = apply_bleed(outer, (int)bw, 0);
 			if (inner.width < SCROLLER_MIN_WIDTH)
@@ -435,6 +480,28 @@ void scroller_arrange(struct output_t *m, desktop_t *d, struct wlr_box available
 	}
 
 	free(col_xs);
+}
+
+// promote a tile into the camera and make it its own view while it is maximized
+void scroller_set_maximized(desktop_t *d, node_t *n, bool value) {
+	scroller_state_t *s = d != NULL ? d->scroller_state : NULL;
+	if (s == NULL || n == NULL || n->client == NULL)
+		return;
+
+	int col_idx, tile_idx;
+	if (!find_tile(s, n->client, &col_idx, &tile_idx))
+		return;
+
+	if (value) {
+		s->active_column_idx = col_idx;
+		s->columns[col_idx].active_tile_idx = tile_idx;
+		s->view_offset = 0.0;
+		s->columns[col_idx].width.type = SCROLLER_WIDTH_PROPORTION;
+		s->columns[col_idx].width.value = 1.0;
+	} else {
+		s->columns[col_idx].width.type = SCROLLER_WIDTH_PROPORTION;
+		s->columns[col_idx].width.value = s->default_proportion;
+	}
 }
 
 void scroller_apply_active_focus(desktop_t *d, struct output_t *m) {

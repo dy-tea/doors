@@ -6,7 +6,6 @@
 doors_settings_t settings = {
 	.automatic_scheme = SCHEME_SPIRAL,
 	.initial_polarity = FIRST_CHILD,
-	.single_monocle = false,
 	.borderless_monocle = false,
 	.borderless_singleton = false,
 	.gapless_monocle = false,
@@ -39,6 +38,7 @@ doors_settings_t settings = {
 	.focus_on_activate = FOCUS_ON_ACTIVATE_FOCUS,
 	.split_ratio = 0.5,
 	.minimize_to_scratchpad = false,
+	.scratchpad_restore_to_origin = true,
 
 	// transaction settings
 	.txn_timeout_ms = 200,

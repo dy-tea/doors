@@ -192,7 +192,7 @@ void ipc_cmd_master_stack(char **args, int num, int client_fd) {
 	desktop_t *desk = mon->desk;
 
 	if (streq("cycle_orientation", *args)) {
-		master_stack_cycle_orientation();
+		master_stack_cycle_orientation(desk);
 		arrange(mon, desk, true);
 		send_success(client_fd, "orientation cycled\n");
 	} else if (streq("orientation", *args)) {
@@ -218,11 +218,11 @@ void ipc_cmd_master_stack(char **args, int num, int client_fd) {
 			return;
 		}
 
-		master_stack_set_orientation(orientation);
+		master_stack_set_orientation(desk, orientation);
 		arrange(mon, desk, true);
 		send_success(client_fd, "orientation set\n");
 	} else if (streq("cycle_stack_layout", *args)) {
-		master_stack_cycle_stack_layout();
+		master_stack_cycle_stack_layout(desk);
 		arrange(mon, desk, true);
 		send_success(client_fd, "stack layout cycled\n");
 	} else if (streq("inc", *args)) {
@@ -248,7 +248,7 @@ void ipc_cmd_master_stack(char **args, int num, int client_fd) {
 		arrange(mon, desk, true);
 		send_success(client_fd, "focused window demoted\n");
 	} else if (streq("flip", *args)) {
-		master_stack_flip_orientation();
+		master_stack_flip_orientation(desk);
 		arrange(mon, desk, true);
 		send_success(client_fd, "orientation flipped\n");
 	} else if (streq("set_count", *args)) {
@@ -275,7 +275,7 @@ void ipc_cmd_master_stack(char **args, int num, int client_fd) {
 			send_failure(client_fd, "master_stack set_ratio: ratio must be between 0.1 and 0.9\n");
 			return;
 		}
-		master_stack_ratio = val;
+		desk->master_stack.ratio = val;
 		arrange(mon, desk, true);
 		send_success(client_fd, "ratio set\n");
 	} else {

@@ -2,6 +2,7 @@
 #include "rule.h"
 #include "scroller.h"
 #include "settings.h"
+#include "tree.h"
 #include "types.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -104,6 +105,12 @@ void list_rules(char *buf, size_t buf_size) {
 		if (r->consequence.has & RULE_TYPE_HIDDEN)
 			offset += snprintf(buf + offset, buf_size - offset, "hidden=%s ",
 				r->consequence.flags & RULE_TYPE_HIDDEN ? "on" : "off");
+		if (r->consequence.has & RULE_TYPE_MAXIMIZED)
+			offset += snprintf(buf + offset, buf_size - offset, "maximized=%s ",
+				r->consequence.flags & RULE_TYPE_MAXIMIZED ? "on" : "off");
+		if (r->consequence.has & RULE_TYPE_MINIMIZED)
+			offset += snprintf(buf + offset, buf_size - offset, "minimized=%s ",
+				r->consequence.flags & RULE_TYPE_MINIMIZED ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_STICKY)
 			offset += snprintf(buf + offset, buf_size - offset, "sticky=%s ",
 				r->consequence.flags & RULE_TYPE_STICKY ? "on" : "off");
@@ -212,7 +219,11 @@ void rule_apply_consequence(node_t *node, client_t *client, const rule_consequen
 		client->state = rule->state;
 
 	if (rule->has & RULE_TYPE_HIDDEN)
-		node->hidden = rule->flags & RULE_TYPE_HIDDEN;
+		node_set_hidden(node, rule->flags & RULE_TYPE_HIDDEN);
+	if (rule->has & RULE_TYPE_MAXIMIZED)
+		client->flags.maximized = rule->flags & RULE_TYPE_MAXIMIZED;
+	if (rule->has & RULE_TYPE_MINIMIZED)
+		client->flags.minimized = rule->flags & RULE_TYPE_MINIMIZED;
 	if (rule->has & RULE_TYPE_STICKY)
 		node->sticky = rule->flags & RULE_TYPE_STICKY;
 	if (rule->has & RULE_TYPE_LOCKED)

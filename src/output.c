@@ -1,5 +1,6 @@
 #include "animation.h"
 #include "effects.h"
+#include "floating.h"
 #include "idle.h"
 #include "ipc.h"
 #include "layer.h"
@@ -113,38 +114,64 @@ static bool output_can_tear(output_t *output) {
 	return output->allow_tearing;
 }
 
+static client_t *output_fullscreen_client(output_t *output) {
+	if (output == NULL || output->desk == NULL)
+		return NULL;
+
+	// floating and fullscreen toplevels live outside the split tree
+	node_t **toplevels = NULL;
+	int count = desktop_toplevels(output->desk, &toplevels);
+	if (toplevels != NULL) {
+		client_t *found = NULL;
+		for (int i = 0; i < count && found == NULL; i++) {
+			node_t *n = toplevels[i];
+			if (n == NULL || n->client == NULL || n->output != output)
+				continue;
+			if (n->client->state == STATE_FULLSCREEN)
+				found = n->client;
+		}
+		free(toplevels);
+		if (found != NULL)
+			return found;
+	}
+
+	if (output->desk->root != NULL) {
+		FOR_EACH_LEAF(n, output->desk->root) {
+			if (n->client != NULL && n->client->state == STATE_FULLSCREEN && n->output == output)
+				return n->client;
+		}
+	}
+
+	return NULL;
+}
+
+static bool client_is_mapped(const client_t *client) {
+	if (client == NULL)
+		return false;
+	if (client->toplevel != NULL)
+		return client->toplevel->mapped;
+	return client->xwayland_view != NULL && client->xwayland_view->mapped;
+}
+
 static bool output_has_fullscreen_cover(output_t *output) {
-	if (!output || !output->desk || !output->desk->focus)
-		return false;
-
-	node_t *node = output->desk->focus;
-	client_t *client = node->client;
-	if (!client || client->state != STATE_FULLSCREEN)
-		return false;
-	if (client->toplevel && client->toplevel->mapped)
-		return true;
-
-	return (client->xwayland_view && client->xwayland_view->mapped);
+	return client_is_mapped(output_fullscreen_client(output));
 }
 
 static bool fullscreen_has_effects(output_t *output) {
-	node_t *node = output->desk->focus;
-	client_t *client = node->client;
+	client_t *client = output_fullscreen_client(output);
+	if (client == NULL)
+		return false;
 	return client->flags.blur || client->flags.mica || client->flags.acrylic;
 }
 
 static struct wlr_surface *fullscreen_surface(output_t *output) {
-	if (!output || !output->desk || !output->desk->focus)
+	client_t *client = output_fullscreen_client(output);
+	if (!client_is_mapped(client))
 		return NULL;
 
-	node_t *node = output->desk->focus;
-	client_t *client = node->client;
-	if (!client || client->state != STATE_FULLSCREEN)
-		return NULL;
-
-	if (client->toplevel && client->toplevel->mapped)
+	if (client->toplevel != NULL)
 		return client->toplevel->xdg_toplevel->base->surface;
-	if (client->xwayland_view && client->xwayland_view->mapped)
+	if (client->xwayland_view != NULL)
 		return client->xwayland_view->xwayland_surface->surface;
 
 	return NULL;
@@ -432,14 +459,7 @@ static void handle_output_destroy(struct wl_listener *listener, void *data) {
 	desktop_t *d, *dtmp;
 	wl_list_for_each_safe(d, dtmp, &output->desk_list, link) {
 		wl_list_remove(&d->link);
-
-		if (d->root) {
-			node_t *n = first_extrema(d->root);
-			while (n) {
-				n->output = NULL;
-				n = next_leaf(n, d->root);
-			}
-		}
+		desktop_clear_output(d, NULL);
 
 		d->output = NULL;
 		wl_list_insert(orphan_desk_list.prev, &d->link);
@@ -492,13 +512,7 @@ void output_create(struct wlr_output *wlr_output) {
 			wl_list_remove(&d->link);
 			wl_list_insert(output->desk_list.prev, &d->link);
 			d->output = output;
-			if (d->root) {
-				node_t *n = first_extrema(d->root);
-				while (n) {
-					n->output = output;
-					n = next_leaf(n, d->root);
-				}
-			}
+			desktop_clear_output(d, output);
 		}
 
 		output->desk = wl_list_empty(&output->desk_list) ? NULL : wl_container_of(output->desk_list.next,

@@ -32,10 +32,20 @@ void render_leaf(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect, stru
 	struct wlr_box slot = {0};
 	bool use_centering = false;
 
+	if (rect.width < 1 || rect.height < 1) {
+		n->client->arranged_rectangle = (struct wlr_box){0};
+		return;
+	}
+
 	if (IS_FLOATING(n->client)) {
 		r = n->client->floating_rectangle;
 	} else if (n->client->state == STATE_FULLSCREEN) {
 		r = m->rectangle;
+	} else if (client_is_maximized(n->client)) {
+		r = root_rect;
+		slot = root_rect;
+		use_centering = true;
+		r = apply_bleed(r, bw, omit_window_gap ? 0 : compute_window_gap(d));
 	} else if (d->layout == LAYOUT_MONOCLE && IS_TILED(n->client) && !omit_window_gap) {
 		r = root_rect;
 		slot = root_rect;
@@ -161,30 +171,56 @@ static void split_dimension(int total, double split_ratio, uint16_t first_min, u
 		*second_out = 0;
 }
 
+// what a split child does with the slot the layout hands it
+typedef enum {
+	CHILD_ACTIVE, // takes part in the split normally
+	CHILD_HIDDEN, // slot collapses
+	CHILD_EXPANDED,// covers the output, fills slot
+	CHILD_MAXIMIZED // hides sibling, fills slot
+} child_slot_t;
+
+static child_slot_t child_slot(node_t *c) {
+	if (c == NULL)
+		return CHILD_HIDDEN;
+	if (c->client != NULL && c->client->state == STATE_FULLSCREEN)
+		return CHILD_EXPANDED;
+	if (c->client != NULL && client_is_maximized(c->client))
+		return CHILD_MAXIMIZED;
+	if (c->hidden || node_is_detached(c))
+		return CHILD_HIDDEN;
+	return CHILD_ACTIVE;
+}
+
 static void compute_split_rects(node_t *n, desktop_t *d, struct wlr_box rect,
 		struct wlr_box *first_rect, struct wlr_box *second_rect) {
-	bool first_fullscreen = n->first_child && n->first_child->client &&
-		n->first_child->client->state == STATE_FULLSCREEN;
-	bool second_fullscreen = n->second_child && n->second_child->client &&
-		n->second_child->client->state == STATE_FULLSCREEN;
-	bool first_hidden = n->first_child && n->first_child->hidden;
-	bool second_hidden = n->second_child && n->second_child->hidden;
-
 	if (d->layout == LAYOUT_MONOCLE) {
 		*first_rect = rect;
 		*second_rect = rect;
 		return;
 	}
 
-	if ((first_hidden || first_fullscreen) && n->second_child && !(second_hidden ||
-			second_fullscreen)) {
+	child_slot_t a = child_slot(n->first_child);
+	child_slot_t b = child_slot(n->second_child);
+
+	if (a == CHILD_EXPANDED || b == CHILD_EXPANDED) {
+		*first_rect = a == CHILD_HIDDEN ? (struct wlr_box){0} : rect;
+		*second_rect = b == CHILD_HIDDEN ? (struct wlr_box){0} : rect;
+		return;
+	}
+
+	if (a == CHILD_MAXIMIZED || b == CHILD_MAXIMIZED) {
+		*first_rect = a == CHILD_MAXIMIZED ? rect : (struct wlr_box){0};
+		*second_rect = b == CHILD_MAXIMIZED ? rect : (struct wlr_box){0};
+		return;
+	}
+
+	if (a != CHILD_ACTIVE && b == CHILD_ACTIVE) {
 		*first_rect = (struct wlr_box){0};
 		*second_rect = rect;
 		return;
 	}
 
-	if ((second_hidden || second_fullscreen) && n->first_child && !(first_hidden ||
-			first_fullscreen)) {
+	if (b != CHILD_ACTIVE && a == CHILD_ACTIVE) {
 		*first_rect = rect;
 		*second_rect = (struct wlr_box){0};
 		return;
@@ -216,10 +252,7 @@ void apply_layout(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect,
 	if (n == NULL)
 		return;
 
-	// skip hidden or floating nodes from tiled layout
-	if (n->hidden)
-		return;
-	if (n->client && n->client->state == STATE_FLOATING)
+	if (n->hidden || node_is_detached(n))
 		return;
 
 	// set pending
@@ -261,6 +294,8 @@ int tiled_count(node_t *n, bool include_receptacles) {
 	if (is_leaf(n)) {
 		if (n->client == NULL)
 			return include_receptacles ? 1 : 0;
+		if (node_is_minimized(n) || n->hidden)
+			return 0;
 
 		return IS_TILED(n->client) ? 1 : 0;
 	}

@@ -148,6 +148,24 @@ bool is_floating(client_t *c) {
 	return c != NULL && c->state == STATE_FLOATING;
 }
 
+bool client_is_maximized(const client_t *c) {
+	return c != NULL && c->flags.maximized;
+}
+
+bool client_reports_maximized(const client_t *c, desktop_t *d) {
+	if (c == NULL)
+		return false;
+	if (c->flags.maximized)
+		return true;
+	if (d == NULL || d->layout != LAYOUT_MONOCLE)
+		return false;
+	return d->focus != NULL && d->focus->client == c;
+}
+
+bool node_is_minimized(const node_t *n) {
+	return n != NULL && n->client != NULL && n->client->flags.minimized;
+}
+
 bool is_first_child(node_t *n) {
 	return n != NULL && n->parent != NULL && n->parent->first_child == n;
 }
@@ -704,57 +722,194 @@ void swap_nodes(output_t *m1, desktop_t *d1, node_t *n1, output_t *m2, desktop_t
 		arrange(m2, d2, true);
 }
 
+char client_state_to_char(const client_t *c) {
+	if (c == NULL)
+		return '?';
+	if (c->flags.minimized)
+		return 'I';
+	if (c->state == STATE_FULLSCREEN)
+		return 'U';
+	if (c->state == STATE_FLOATING)
+		return c->flags.maximized ? 'X' : 'F';
+	if (c->flags.maximized)
+		return 'X';
+	if (c->state == STATE_PSEUDO_TILED)
+		return 'P';
+	if (c->state == STATE_TILED)
+		return 'T';
+	return '?';
+}
+
+static void announce_state(node_t *n) {
+	ipc_put_status(SUB_MASK_NODE_STATE, "node_state[%s,%s,%u,%c]\n",
+		n->client->app_id[0] ? n->client->app_id : "?", n->client->title[0] ? n->client->title : "?",
+		n->id, client_state_to_char(n->client));
+}
+
 bool set_state(output_t *m, desktop_t *d, node_t *n, client_state_t s) {
 	if (n == NULL || n->client == NULL)
 		return false;
 
-	n->client->last_state = n->client->state;
+	client_state_t old = n->client->state;
+	if (old == s)
+		return true;
+
+	n->client->last_state = old;
 	n->client->state = s;
 	node_set_dirty(n);
 
+	layout_client_state_changed(m, d, n, old);
 	arrange(m, d, true);
-	ipc_put_status(SUB_MASK_NODE_STATE, "node_state[%s,%s,%u,%c]\n",
-		n->client->app_id[0] ? n->client->app_id : "?", n->client->title[0] ? n->client->title : "?",
-		n->id,
-		s == STATE_TILED ? 'T' : s == STATE_FLOATING ? 'F' : s == STATE_FULLSCREEN ? 'U' : s ==
-		STATE_PSEUDO_TILED ? 'P' : '?');
+	announce_state(n);
 	return true;
 }
 
-void enter_fullscreen(output_t *m, desktop_t *d, node_t *n) {
-	if (!n || !n->client)
-		return;
-
-	struct wlr_scene_tree *scene_tree = client_get_scene_tree(n->client);
-	if (!scene_tree) {
-		wlr_log(WLR_ERROR, "cannot enter fullscreen, no scene tree");
-		return;
-	}
-
-	wlr_scene_node_reparent(&scene_tree->node, server.full_tree);
-
-	if (n->client->toplevel && n->client->toplevel->xdg_toplevel)
-		wlr_xdg_toplevel_set_fullscreen(n->client->toplevel->xdg_toplevel, true);
-	else if (n->client->xwayland_view)
-		wlr_xwayland_surface_set_fullscreen(n->client->xwayland_view->xwayland_surface, true);
-
-	set_state(m, d, n, STATE_FULLSCREEN);
-
-	if (n->client->toplevel)
-		update_foreign_toplevel_state(n->client->toplevel);
+static void tell_client_fullscreen(node_t *n, bool value) {
+	if (n->client->toplevel != NULL && n->client->toplevel->xdg_toplevel != NULL)
+		wlr_xdg_toplevel_set_fullscreen(n->client->toplevel->xdg_toplevel, value);
+	else if (n->client->xwayland_view != NULL)
+		wlr_xwayland_surface_set_fullscreen(n->client->xwayland_view->xwayland_surface, value);
 }
 
-void set_floating(output_t *m, desktop_t *d, node_t *n, bool value) {
+static void tell_client_maximized(node_t *n, bool value) {
+	if (n->client->toplevel != NULL && n->client->toplevel->xdg_toplevel != NULL)
+		wlr_xdg_toplevel_set_maximized(n->client->toplevel->xdg_toplevel, value);
+}
+
+void client_set_fullscreen(output_t *m, desktop_t *d, node_t *n, bool value) {
 	if (n == NULL || n->client == NULL)
 		return;
 
-	if (value) {
-		n->hidden = true;
-		set_state(m, d, n, STATE_FLOATING);
-	} else {
-		n->hidden = false;
-		set_state(m, d, n, STATE_TILED);
+	struct wlr_scene_tree *scene_tree = client_get_scene_tree(n->client);
+	if (scene_tree == NULL) {
+		wlr_log(WLR_ERROR, "client_set_fullscreen: node %u has no scene tree", n->id);
+		return;
 	}
+
+	bool was = n->client->state == STATE_FULLSCREEN;
+	if (was == value)
+		return;
+
+	// leaving fullscreen returns the window to whatever it was before
+	client_state_t restore = STATE_TILED;
+	if (!value) {
+		restore = n->client->last_state;
+		if (restore == STATE_FULLSCREEN)
+			restore = STATE_TILED;
+		if (restore == STATE_FLOATING && n->parent != NULL)
+			restore = STATE_TILED;
+	}
+
+	if (value) {
+		wlr_scene_node_reparent(&scene_tree->node, server.full_tree);
+	} else if (restore == STATE_FLOATING) {
+		wlr_scene_node_reparent(&scene_tree->node, server.float_tree);
+	} else {
+		wlr_scene_node_reparent(&scene_tree->node, server.tile_tree);
+	}
+
+	tell_client_fullscreen(n, value);
+	set_state(m, d, n, value ? STATE_FULLSCREEN : restore);
+
+	if (!value)
+		node_set_hidden(n, false);
+
+	if (n->client->toplevel != NULL)
+		update_foreign_toplevel_state(n->client->toplevel);
+}
+
+bool client_set_maximized(output_t *m, desktop_t *d, node_t *n, bool value) {
+	if (n == NULL || n->client == NULL)
+		return false;
+
+	client_t *c = n->client;
+	if (c->flags.maximized == value)
+		return false;
+
+	if (value && c->state == STATE_FULLSCREEN)
+		return false;
+
+	const layout_impl_t *impl = layout_get_impl(d != NULL ? d->layout : LAYOUT_TILED);
+	bool layout_places_floating = impl != NULL && impl->places_floating != NULL &&
+		impl->places_floating(d, c);
+
+	if (value && IS_FLOATING(c) && !layout_places_floating) {
+		if (d == NULL)
+			return false;
+		focus_node(m, d, n);
+		tile_node(m, d, n);
+	}
+
+	// remember where the window was, so un-maximizing can put it back
+	if (value)
+		c->pre_maximize_rectangle = IS_FLOATING(c) ? c->floating_rectangle : c->arranged_rectangle;
+	else if (IS_FLOATING(c) && c->pre_maximize_rectangle.width > 0 &&
+		c->pre_maximize_rectangle.height > 0)
+		c->floating_rectangle = c->pre_maximize_rectangle;
+
+	c->flags.maximized = value;
+	node_set_dirty(n);
+
+	tell_client_maximized(n, value);
+
+	layout_client_state_changed(m, d, n, c->state);
+	arrange(m, d, true);
+	announce_state(n);
+
+	if (c->toplevel != NULL)
+		update_foreign_toplevel_state(c->toplevel);
+
+	return true;
+}
+
+bool client_set_minimized(output_t *m, desktop_t *d, node_t *n, bool value) {
+	if (n == NULL || n->client == NULL)
+		return false;
+
+	client_t *c = n->client;
+	if (c->flags.minimized == value)
+		return false;
+
+	if (value && c->state == STATE_FULLSCREEN)
+		client_set_fullscreen(m, d, n, false);
+
+	if (settings.minimize_to_scratchpad) {
+		if (value) {
+			scratchpad_add(n);
+		} else {
+			scratchpad_show(n);
+			announce_state(n);
+		}
+	} else {
+		c->flags.minimized = value;
+		node_set_hidden(n, value);
+
+		if (value) {
+			if (d != NULL && d->focus == n) {
+				node_t *next = desktop_fallback_focus(d, n);
+				d->focus = next;
+				if (next != NULL && m != NULL)
+					focus_node(m, d, next);
+			}
+			c->flags.shown = false;
+			struct wlr_scene_tree *st = client_get_scene_tree(c);
+			if (st != NULL)
+				wlr_scene_node_set_enabled(&st->node, false);
+		} else {
+			c->flags.shown = true;
+			struct wlr_scene_tree *st = client_get_scene_tree(c);
+			if (st != NULL)
+				wlr_scene_node_set_enabled(&st->node, true);
+		}
+
+		arrange(m, d, true);
+		announce_state(n);
+	}
+
+	if (c->toplevel != NULL)
+		update_foreign_toplevel_state(c->toplevel);
+
+	return true;
 }
 
 presel_t *make_presel(void) {
@@ -897,6 +1052,15 @@ void node_set_pending_rectangle(node_t *n, struct wlr_box rect) {
 		return;
 
 	n->pending.rectangle = rect;
+	node_set_dirty(n);
+}
+
+void node_set_hidden(node_t *n, bool hidden) {
+	if (!n || n->hidden == hidden)
+		return;
+
+	n->hidden = hidden;
+	n->pending.hidden = hidden;
 	node_set_dirty(n);
 }
 

@@ -1,6 +1,8 @@
 #include "animation.h"
+#include "floating.h"
 #include "ipc.h"
 #include "layout.h"
+#include "master_stack.h"
 #include "once.h"
 #include "output.h"
 #include "server.h"
@@ -191,7 +193,10 @@ void desktop_init(desktop_t *d, output_t *output, const char *name) {
 	layout_set(d, LAYOUT_TILED);
 	d->user_layout = LAYOUT_TILED;
 	d->window_gap = settings.window_gap;
-	d->master_stack_count = 1;
+	d->master_stack.ratio = 0.5f;
+	d->master_stack.orientation = MASTER_LEFT;
+	d->master_stack.stack_layout = STACK_VERTICAL;
+	d->master_stack.count = 1;
 	d->padding = (padding_t){0};
 	d->output = output;
 	wl_list_init(&d->link);
@@ -474,10 +479,14 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
 	}
 
 	// arrange new desktop
-	if (new_desk->root) {
+	if (desktop_has_toplevels(new_desk)) {
 		arrange(output, new_desk, true);
-		if (new_desk->focus)
-			focus_node(output, new_desk, new_desk->focus);
+		node_t *target = new_desk->focus != NULL ? new_desk->focus : desktop_fallback_focus(new_desk,
+			NULL);
+		if (target != NULL) {
+			new_desk->focus = target;
+			focus_node(output, new_desk, target);
+		}
 	}
 
 	// override transaction's animation for new windows
@@ -566,20 +575,20 @@ void workspace_switch_to_desktop(const char *name) {
 
 	struct wlr_ext_workspace_handle_v1 *old = workspace_get_active();
 
-	if (d->root == NULL) {
-		wlr_log(WLR_DEBUG, "Desktop %s has no root, skipping arrange/focus", name);
-		wlr_log(WLR_INFO, "Switched to desktop: %s", name);
-		goto finish;
+	if (desktop_has_toplevels(d)) {
+		arrange(output, d, true);
+
+		node_t *target = d->focus != NULL ? d->focus : desktop_fallback_focus(d, NULL);
+		if (target != NULL) {
+			d->focus = target;
+			focus_node(output, d, target);
+		}
+	} else {
+		wlr_log(WLR_DEBUG, "Desktop %s has no toplevels, skipping arrange/focus", name);
 	}
-
-	arrange(output, d, true);
-
-	if (d->focus != NULL)
-		focus_node(output, d, d->focus);
 
 	wlr_log(WLR_INFO, "Switched to desktop: %s", name);
 
-finish:
 	if (old)
 		wlr_ext_workspace_handle_v1_set_active(old, false);
 

@@ -168,6 +168,8 @@ static const action_entry_t action_table[] = {
 	ENTRY2("resize", "down", BIND_RESIZE_DOWN),
 	ENTRY2("toggle", "floating", BIND_TOGGLE_FLOATING),
 	ENTRY2("toggle", "fullscreen", BIND_TOGGLE_FULLSCREEN),
+	ENTRY2("toggle", "maximize", BIND_TOGGLE_MAXIMIZE),
+	ENTRY2("toggle", "minimize", BIND_TOGGLE_MINIMIZE),
 	ENTRY2("toggle", "pseudo_tiled", BIND_TOGGLE_PSEUDO_TILED),
 	ENTRY2("toggle", "monocle", BIND_TOGGLE_MONOCLE),
 	ENTRY2("toggle", "floating_layout", BIND_TOGGLE_FLOATING_LAYOUT),
@@ -181,10 +183,14 @@ static const action_entry_t action_table[] = {
 	ENTRY("node", "-t", "tiled", BIND_NODE_STATE_TILED),
 	ENTRY("node", "-t", "floating", BIND_NODE_STATE_FLOATING),
 	ENTRY("node", "-t", "fullscreen", BIND_NODE_STATE_FULLSCREEN),
+	ENTRY("node", "-t", "maximized", BIND_NODE_STATE_MAXIMIZED),
+	ENTRY("node", "-t", "minimized", BIND_NODE_STATE_MINIMIZED),
 	ENTRY("node", "-t", "pseudo_tiled", BIND_TOGGLE_PSEUDO_TILED),
 	ENTRY("node", "--state", "tiled", BIND_NODE_STATE_TILED),
 	ENTRY("node", "--state", "floating", BIND_NODE_STATE_FLOATING),
 	ENTRY("node", "--state", "fullscreen", BIND_NODE_STATE_FULLSCREEN),
+	ENTRY("node", "--state", "maximized", BIND_NODE_STATE_MAXIMIZED),
+	ENTRY("node", "--state", "minimized", BIND_NODE_STATE_MINIMIZED),
 	ENTRY("node", "--state", "pseudo_tiled", BIND_TOGGLE_PSEUDO_TILED),
 	ENTRY("desktop", "-l", "tiled", BIND_DESKTOP_LAYOUT_TILED),
 	ENTRY("desktop", "-l", "monocle", BIND_DESKTOP_LAYOUT_MONOCLE),
@@ -1120,6 +1126,12 @@ void execute_bind(bind_t b) {
 	case BIND_NODE_STATE_FULLSCREEN:
 		toggle_fullscreen();
 		break;
+	case BIND_NODE_STATE_MAXIMIZED:
+		toggle_maximize();
+		break;
+	case BIND_NODE_STATE_MINIMIZED:
+		toggle_minimize();
+		break;
 	case BIND_NODE_TO_DESKTOP:
 		if (b.desktop_index > 0) {
 			send_to_desktop(b.desktop_index - 1);
@@ -1166,6 +1178,12 @@ void execute_bind(bind_t b) {
 	case BIND_TOGGLE_FULLSCREEN:
 		toggle_fullscreen();
 		break;
+	case BIND_TOGGLE_MAXIMIZE:
+		toggle_maximize();
+		break;
+	case BIND_TOGGLE_MINIMIZE:
+		toggle_minimize();
+		break;
 	case BIND_TOGGLE_PSEUDO_TILED:
 		toggle_pseudo_tiled();
 		break;
@@ -1195,19 +1213,25 @@ void execute_bind(bind_t b) {
 		}
 		break;
 	case BIND_MASTER_STACK_FLIP:
-		master_stack_flip_orientation();
-		if (mon && mon->desk && mon->desk->layout == LAYOUT_MASTER_STACK)
-			arrange(mon, mon->desk, true);
+		if (mon && mon->desk) {
+			master_stack_flip_orientation(mon->desk);
+			if (mon->desk->layout == LAYOUT_MASTER_STACK)
+				arrange(mon, mon->desk, true);
+		}
 		break;
 	case BIND_MASTER_STACK_CYCLE_ORIENTATION:
-		master_stack_cycle_orientation();
-		if (mon && mon->desk && mon->desk->layout == LAYOUT_MASTER_STACK)
-			arrange(mon, mon->desk, true);
+		if (mon && mon->desk) {
+			master_stack_cycle_orientation(mon->desk);
+			if (mon->desk->layout == LAYOUT_MASTER_STACK)
+				arrange(mon, mon->desk, true);
+		}
 		break;
 	case BIND_MASTER_STACK_CYCLE_STACK_LAYOUT:
-		master_stack_cycle_stack_layout();
-		if (mon && mon->desk && mon->desk->layout == LAYOUT_MASTER_STACK)
-			arrange(mon, mon->desk, true);
+		if (mon && mon->desk) {
+			master_stack_cycle_stack_layout(mon->desk);
+			if (mon->desk->layout == LAYOUT_MASTER_STACK)
+				arrange(mon, mon->desk, true);
+		}
 		break;
 	case BIND_ROTATE_CW:
 		rotate_clockwise();
@@ -1415,6 +1439,8 @@ const char *bind_action_name(bind_action_t action) {
 		"node_state_tiled",
 		"node_state_floating",
 		"node_state_fullscreen",
+		"node_state_maximized",
+		"node_state_minimized",
 		"node_to_desktop",
 		"desktop_focus",
 		"desktop_layout_tiled",
@@ -1434,6 +1460,8 @@ const char *bind_action_name(bind_action_t action) {
 		"presel_cancel",
 		"toggle_floating",
 		"toggle_fullscreen",
+		"toggle_maximize",
+		"toggle_minimize",
 		"toggle_pseudo_tiled",
 		"toggle_monocle",
 		"toggle_master_stack",
@@ -1537,6 +1565,8 @@ bind_action_t bind_action_from_name(const char *name) {
 
 	ACTION_IF_MATCH("toggle_floating", BIND_TOGGLE_FLOATING);
 	ACTION_IF_MATCH("toggle_fullscreen", BIND_TOGGLE_FULLSCREEN);
+	ACTION_IF_MATCH("toggle_maximize", BIND_TOGGLE_MAXIMIZE);
+	ACTION_IF_MATCH("toggle_minimize", BIND_TOGGLE_MINIMIZE);
 	ACTION_IF_MATCH("toggle_pseudo_tiled", BIND_TOGGLE_PSEUDO_TILED);
 	ACTION_IF_MATCH("toggle_monocle", BIND_TOGGLE_MONOCLE);
 	ACTION_IF_MATCH("toggle_master_stack", BIND_TOGGLE_MASTER_STACK);

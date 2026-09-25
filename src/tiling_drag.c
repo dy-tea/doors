@@ -103,7 +103,7 @@ static void update_indicator(enum wlr_edges edge, node_t *target) {
 }
 
 static node_t *find_leaf_at(node_t *node, double lx, double ly, node_t *exclude) {
-	if (!node || node->hidden)
+	if (!node || node->hidden || node_is_detached(node) || node_is_minimized(node))
 		return NULL;
 
 	if (is_leaf(node)) {

@@ -5,7 +5,6 @@
 #include "floating.h"
 #include "input_method.h"
 #include "ipc.h"
-#include "keyboard.h"
 #include "layout.h"
 #include "output.h"
 #include "popup.h"
@@ -148,12 +147,13 @@ void update_foreign_toplevel_state(toplevel_t *toplevel) {
 		return;
 
 	client_t *c = toplevel->node->client;
-	bool maximized = (c->state == STATE_TILED || c->state == STATE_PSEUDO_TILED);
+	bool maximized = client_reports_maximized(c, toplevel->node->desktop);
 	bool fullscreen = (c->state == STATE_FULLSCREEN);
+	bool minimized = c->flags.minimized;
 
 	wlr_foreign_toplevel_handle_v1_set_fullscreen(toplevel->foreign_toplevel, fullscreen);
 	wlr_foreign_toplevel_handle_v1_set_maximized(toplevel->foreign_toplevel, maximized);
-	wlr_foreign_toplevel_handle_v1_set_minimized(toplevel->foreign_toplevel, false);
+	wlr_foreign_toplevel_handle_v1_set_minimized(toplevel->foreign_toplevel, minimized);
 }
 
 static void handle_foreign_activate_request(struct wl_listener *listener, void *data) {
@@ -173,6 +173,10 @@ static void handle_foreign_activate_request(struct wl_listener *listener, void *
 
 	if (m->desk != toplevel_desk)
 		workspace_switch_to_desktop(toplevel_desk->name);
+
+	// activating a minimized window brings it back
+	if (toplevel->node->client->flags.minimized)
+		client_set_minimized(m, toplevel_desk, toplevel->node, false);
 
 	if (toplevel_desk->focus == toplevel->node)
 		return;
@@ -199,21 +203,7 @@ static void handle_foreign_fullscreen_request(struct wl_listener *listener, void
 	output_t *m = toplevel->node->output;
 	desktop_t *d = m ? m->desk : NULL;
 
-	if (event->fullscreen) {
-		set_state(m, d, toplevel->node, STATE_FULLSCREEN);
-		wlr_scene_node_reparent(&toplevel->scene_tree->node, server.full_tree);
-	} else {
-		client_state_t last = toplevel->node->client->last_state;
-		if (last == STATE_FLOATING) {
-			set_state(m, d, toplevel->node, STATE_FLOATING);
-			wlr_scene_node_reparent(&toplevel->scene_tree->node, server.float_tree);
-		} else {
-			set_state(m, d, toplevel->node, STATE_TILED);
-			wlr_scene_node_reparent(&toplevel->scene_tree->node, server.tile_tree);
-		}
-	}
-
-	wlr_xdg_toplevel_set_fullscreen(toplevel->xdg_toplevel, event->fullscreen);
+	client_set_fullscreen(m, d, toplevel->node, event->fullscreen);
 }
 
 static void handle_foreign_close_request(struct wl_listener *listener, void *data) {
@@ -423,7 +413,7 @@ static void toplevel_set_floating(toplevel_t *toplevel, node_t *n, output_t *out
 	effects_dirty_corner_masks(output);
 	n->client->last_state = STATE_TILED;
 	n->client->state = STATE_FLOATING;
-	n->hidden = true;
+	node_set_hidden(n, false);
 	n->client->flags.shown = true;
 	wlr_scene_node_set_enabled(&toplevel->scene_tree->node, true);
 }
@@ -670,10 +660,10 @@ void toplevel_map(struct wl_listener *listener, void *data) {
 
 	bool rule_has_state = rule && (rule->has & RULE_TYPE_STATE);
 	if (rule && rule->state == STATE_FULLSCREEN) {
-		enter_fullscreen(target_output, target_desktop, n);
+		client_set_fullscreen(target_output, target_desktop, n, true);
 	} else if (!rule_has_state && toplevel->xdg_toplevel->requested.fullscreen) {
 		// client requested fullscreen before map
-		enter_fullscreen(target_output, target_desktop, n);
+		client_set_fullscreen(target_output, target_desktop, n, true);
 	}
 
 	// a client can ask to be maximized before the window is mapped
@@ -1154,8 +1144,6 @@ void toplevel_request_resize(struct wl_listener *listener, void *data) {
 		wlr_xdg_surface_schedule_configure(toplevel->xdg_toplevel->base);
 }
 
-// a client asking to be maximized expects its toplevel to fill the desktop, so a floating
-// toplevel joins the tree first and the desktop switches to monocle
 static void toplevel_handle_maximize(toplevel_t *toplevel, bool requested_maximized) {
 	node_t *n = toplevel->node;
 	if (n == NULL || n->client == NULL)
@@ -1166,14 +1154,7 @@ static void toplevel_handle_maximize(toplevel_t *toplevel, bool requested_maximi
 	if (d == NULL)
 		return;
 
-	toplevel->client_maximized = requested_maximized;
-
-	if (requested_maximized && IS_FLOATING(n->client)) {
-		focus_node(m, d, n);
-		tile_node(m, d, n);
-	}
-
-	monocle_toggle(m, d, n);
+	client_set_maximized(m, d, n, requested_maximized);
 }
 
 void toplevel_request_maximize(struct wl_listener *listener, void *data) {
@@ -1188,7 +1169,7 @@ void toplevel_request_maximize(struct wl_listener *listener, void *data) {
 		return;
 
 	bool requested_maximized = toplevel->xdg_toplevel->requested.maximized;
-	if (requested_maximized == toplevel->client_maximized)
+	if (requested_maximized == toplevel->node->client->flags.maximized)
 		return;
 
 	toplevel_handle_maximize(toplevel, requested_maximized);
@@ -1210,23 +1191,7 @@ void toplevel_request_fullscreen(struct wl_listener *listener, void *data) {
 	output_t *m = toplevel->node->output;
 	desktop_t *d = m ? m->desk : NULL;
 
-	if (requested_fullscreen) {
-		set_state(m, d, toplevel->node, STATE_FULLSCREEN);
-		wlr_scene_node_reparent(&toplevel->scene_tree->node, server.full_tree);
-	} else {
-		client_state_t last = toplevel->node->client->last_state;
-
-		if (last == STATE_FLOATING) {
-			set_state(m, d, toplevel->node, STATE_FLOATING);
-			wlr_scene_node_reparent(&toplevel->scene_tree->node, server.float_tree);
-		} else {
-			set_state(m, d, toplevel->node, STATE_TILED);
-			wlr_scene_node_reparent(&toplevel->scene_tree->node, server.tile_tree);
-		}
-	}
-
-	wlr_xdg_toplevel_set_fullscreen(toplevel->xdg_toplevel, requested_fullscreen);
-	update_foreign_toplevel_state(toplevel);
+	client_set_fullscreen(m, d, toplevel->node, requested_fullscreen);
 }
 
 void toplevel_request_minimize(struct wl_listener *listener, void *data) {
@@ -1236,8 +1201,10 @@ void toplevel_request_minimize(struct wl_listener *listener, void *data) {
 	if (!toplevel_is_ready(toplevel))
 		return;
 
-	if (settings.minimize_to_scratchpad)
-		scratchpad_add(toplevel->node);
+	output_t *m = toplevel->node != NULL ? toplevel->node->output : NULL;
+	desktop_t *d = m != NULL ? m->desk : NULL;
+
+	client_set_minimized(m, d, toplevel->node, true);
 }
 
 void toplevel_set_title(struct wl_listener *listener, void *data) {
@@ -1498,7 +1465,6 @@ toplevel_t *toplevel_create(struct wlr_xdg_toplevel *xdg_toplevel) {
 	toplevel->xdg_toplevel = xdg_toplevel;
 	toplevel->mapped = false;
 	toplevel->configured = false;
-	toplevel->client_maximized = false;
 
 	// create parent scene tree container
 	toplevel->scene_tree = wlr_scene_tree_create(server.tile_tree);

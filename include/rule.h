@@ -32,7 +32,9 @@ typedef enum {
 	RULE_TYPE_RENDER_UNFOCUSED_FPS = 1 << 19,
 	RULE_TYPE_OPACITY = 1 << 20,
 	RULE_TYPE_ANIM_DISABLE = 1 << 21,
-	RULE_TYPE_LAST = 1 << 22,
+	RULE_TYPE_MAXIMIZED = 1 << 22,
+	RULE_TYPE_MINIMIZED = 1 << 23,
+	RULE_TYPE_LAST = 1 << 24,
 } rule_type_t;
 
 typedef struct {

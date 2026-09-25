@@ -48,12 +48,15 @@ typedef struct scroller_state_t {
 	double view_offset;
 	struct wlr_box working_area;
 	bool activate_prev_column_on_removal;
+	float default_proportion, default_proportion_single;
 } scroller_state_t;
 
 scroller_state_t *scroller_create(void);
 void scroller_destroy(scroller_state_t *s);
 
+void scroller_leave(struct output_t *m, desktop_t *d);
 void scroller_arrange(struct output_t *m, desktop_t *d, struct wlr_box available);
+void scroller_set_maximized(desktop_t *d, node_t *n, bool value);
 
 bool scroller_add_tile(scroller_state_t *s, client_t *client, bool activate);
 bool scroller_add_tile_to_column(scroller_state_t *s, client_t *client, int col_idx, bool activate);

@@ -19,3 +19,10 @@ void scratchpad_toggle_auto(void);
 
 node_t *scratchpad_find_by_app_id(const char *app_id);
 node_t *scratchpad_find_by_title(const char *title);
+
+// entry currently parked in the scratchpad, or NULL
+node_t *scratchpad_find(const char *app_id, const char *title);
+
+// number of parked entries, and the nth one in registration order
+int scratchpad_count(void);
+node_t *scratchpad_nth(int index);

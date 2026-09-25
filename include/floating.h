@@ -20,6 +20,7 @@ void floating_arrange(output_t *m, desktop_t *d, struct wlr_box available);
 void floating_on_focus(output_t *m, desktop_t *d, node_t *n);
 bool floating_focus(desktop_t *d, direction_t dir);
 int floating_collect(desktop_t *d, node_t ***out_nodes);
+bool floating_places_floating(desktop_t *d, client_t *c);
 
 // toplevel state transitions
 void float_node(output_t *m, desktop_t *d, node_t *n, const struct wlr_box *rect);
@@ -33,4 +34,11 @@ void float_node_clamp(output_t *m, desktop_t *d, node_t *n);
 
 // toplevels of a desktop
 int desktop_toplevels(desktop_t *d, node_t ***out_nodes);
+
+// true when the desktop holds any toplevel
+bool desktop_has_toplevels(desktop_t *d);
+
+// clears the output of every toplevel of a desktop
+void desktop_clear_output(desktop_t *d, output_t *m);
+
 struct wlr_box node_current_rect(node_t *n);

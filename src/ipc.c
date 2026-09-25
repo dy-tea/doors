@@ -1,3 +1,4 @@
+#include "floating.h"
 #include "ipc.h"
 #include "once.h"
 #include "output.h"
@@ -37,14 +38,22 @@ static bool ipc_write_all(int fd, const void *data, size_t len) {
 }
 
 static bool desktop_has_urgent(desktop_t *d) {
-	if (!d || !d->root)
+	if (d == NULL)
 		return false;
 
-	FOR_EACH_LEAF(n, d->root)
-		if (n->client && n->client->flags.urgent)
-			return true;
+	node_t **toplevels = NULL;
+	int count = desktop_toplevels(d, &toplevels);
+	if (toplevels == NULL)
+		return false;
 
-	return false;
+	bool found = false;
+	for (int i = 0; i < count && !found; i++) {
+		if (toplevels[i] != NULL && toplevels[i]->client != NULL && toplevels[i]->client->flags.urgent)
+			found = true;
+	}
+
+	free(toplevels);
+	return found;
 }
 
 int ipc_get_socket_fd(void) {
@@ -119,17 +128,7 @@ bool ipc_print_report(int fd) {
 			offset += snprintf(buf + offset, sizeof(buf) - offset, ":L%c", layout_to_char(m->desk->layout));
 
 			if (m->desk->focus) {
-				char state_char = 'T';
-				client_state_t state = STATE_TILED;
-				if (m->desk->focus->client) {
-					state = m->desk->focus->client->state;
-				}
-				if (state == STATE_FLOATING)
-					state_char = 'F';
-				else if (state == STATE_FULLSCREEN)
-					state_char = 'U';
-				else if (state == STATE_PSEUDO_TILED)
-					state_char = 'P';
+				char state_char = client_state_to_char(m->desk->focus->client);
 
 				offset += snprintf(buf + offset, sizeof(buf) - offset, ":T%c", state_char);
 

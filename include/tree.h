@@ -27,6 +27,11 @@ bool is_leaf(node_t *n);
 bool is_tiled(client_t *c);
 bool is_floating(client_t *c);
 bool is_first_child(node_t *n);
+
+static inline bool node_is_detached(node_t *n) {
+	return n != NULL && is_floating(n->client);
+}
+
 node_t *first_extrema(node_t *n);
 node_t *second_extrema(node_t *n);
 node_t *next_leaf(node_t *n, node_t *r);
@@ -42,8 +47,12 @@ void swap_nodes(struct output_t *m1, desktop_t *d1, node_t *n1, struct output_t 
 	node_t *n2);
 int collect_tiled_leaves(desktop_t *d, node_t ***out_nodes);
 bool set_state(struct output_t *m, desktop_t *d, node_t *n, client_state_t s);
-void set_floating(struct output_t *m, desktop_t *d, node_t *n, bool value);
-void enter_fullscreen(struct output_t *m, desktop_t *d, node_t *n);
+void client_set_fullscreen(struct output_t *m, desktop_t *d, node_t *n, bool value);
+bool client_set_maximized(struct output_t *m, desktop_t *d, node_t *n, bool value);
+bool client_is_maximized(const client_t *c);
+bool client_reports_maximized(const client_t *c, desktop_t *d);
+bool node_is_minimized(const node_t *n);
+bool client_set_minimized(struct output_t *m, desktop_t *d, node_t *n, bool value);
 
 // preselection
 presel_t *make_presel(void);
@@ -59,6 +68,7 @@ void balance_tree(node_t *n);
 // Transaction helpers
 void node_set_dirty(node_t *n);
 void node_set_pending_rectangle(node_t *n, struct wlr_box rect);
+void node_set_hidden(node_t *n, bool hidden);
 
 // Debug helpers
 void validate_tree(const char *context, desktop_t *d);

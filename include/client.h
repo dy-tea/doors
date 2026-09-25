@@ -17,3 +17,4 @@ surface_rounded_t *client_get_rounded(client_t *client);
 void client_set_visible(client_t *client, bool show);
 node_t *client_get_node(client_t *client);
 output_t *client_get_output(client_t *client);
+char client_state_to_char(const client_t *c);

@@ -100,8 +100,6 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 			snprintf(buf, sizeof(buf), "%d\n", settings.window_gap);
 			send_success(client_fd, buf);
 		}
-	} else if (streq("single_monocle", *args)) {
-		ipc_handle_bool(args, num, client_fd, &settings.single_monocle, IPC_FLAG_COMMIT);
 	} else if (streq("borderless_monocle", *args)) {
 		ipc_handle_bool(args, num, client_fd, &settings.borderless_monocle, IPC_FLAG_COMMIT);
 	} else if (streq("borderless_singleton", *args)) {
@@ -506,6 +504,8 @@ void ipc_cmd_config(char **args, int num, int client_fd) {
 			"invalid value");
 	} else if (streq("minimize_to_scratchpad", *args)) {
 		ipc_handle_bool(args, num, client_fd, &settings.minimize_to_scratchpad, IPC_FLAG_NONE);
+	} else if (streq("scratchpad_restore_to_origin", *args)) {
+		ipc_handle_bool(args, num, client_fd, &settings.scratchpad_restore_to_origin, IPC_FLAG_NONE);
 	} else if (streq("ignore_ewmh_fullscreen", *args)) {
 		ipc_handle_int(args, num, client_fd, &settings.ignore_ewmh_fullscreen, IPC_FLAG_NONE, 0, 2,
 			"invalid value (0-2)");

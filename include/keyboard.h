@@ -55,6 +55,8 @@ void close_focused(void);
 void toggle_floating(void);
 void tile_focused(void);
 void toggle_fullscreen(void);
+void toggle_maximize(void);
+void toggle_minimize(void);
 void toggle_pseudo_tiled(void);
 void toggle_block_out_from_screenshare(void);
 
@@ -72,7 +74,7 @@ void send_to_prev_desktop(void);
 void send_all_to_desktop(int desktop_index);
 void set_tiled_layout(void);
 void toggle_monocle(void);
-void monocle_toggle(struct output_t *m, desktop_t *d, node_t *focus_hint);
+void monocle_toggle(struct output_t *m, desktop_t *d);
 void toggle_master_stack(void);
 void toggle_floating_layout(void);
 

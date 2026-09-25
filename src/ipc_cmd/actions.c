@@ -120,6 +120,8 @@ static const struct {
 } toggle_props[] = {
 	{"floating", toggle_floating},
 	{"fullscreen", toggle_fullscreen},
+	{"maximize", toggle_maximize},
+	{"minimize", toggle_minimize},
 	{"pseudo_tiled", toggle_pseudo_tiled},
 	{"monocle", toggle_monocle},
 	{"floating_layout", toggle_floating_layout},

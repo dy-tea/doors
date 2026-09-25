@@ -411,47 +411,34 @@ void toggle_fullscreen(void) {
 	if (n->client == NULL)
 		return;
 
-	struct wlr_scene_tree *scene_tree = client_get_scene_tree(n->client);
-	if (!scene_tree) {
-		wlr_log(WLR_ERROR, "Cannot toggle fullscreen: no scene tree");
+	bool entering = n->client->state != STATE_FULLSCREEN;
+	client_set_fullscreen(mon, mon->desk, n, entering);
+	wlr_log(WLR_INFO, "Fullscreen %s", entering ? "enabled" : "disabled");
+}
+
+void toggle_maximize(void) {
+	if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL)
 		return;
-	}
 
-	if (n->client->state == STATE_FULLSCREEN) {
-		client_state_t restore = n->client->last_state;
-		// fallback to tiled if node should probably be
-		if (restore == STATE_FULLSCREEN)
-			restore = STATE_TILED;
-		if (restore == STATE_FLOATING && n->parent != NULL)
-			restore = STATE_TILED;
+	node_t *n = mon->desk->focus;
+	if (n->client == NULL)
+		return;
 
-		if (restore == STATE_FLOATING)
-			wlr_scene_node_reparent(&scene_tree->node, server.float_tree);
-		else
-			wlr_scene_node_reparent(&scene_tree->node, server.tile_tree);
+	if (n->client->state == STATE_FULLSCREEN)
+		client_set_fullscreen(mon, mon->desk, n, false);
 
-		if (n->client->toplevel && n->client->toplevel->xdg_toplevel)
-			wlr_xdg_toplevel_set_fullscreen(n->client->toplevel->xdg_toplevel, false);
-		else if (n->client->xwayland_view)
-			wlr_xwayland_surface_set_fullscreen(n->client->xwayland_view->xwayland_surface, false);
+	client_set_maximized(mon, mon->desk, n, !n->client->flags.maximized);
+}
 
-		set_state(mon, mon->desk, n, restore);
-		n->hidden = (restore == STATE_FLOATING);
-		wlr_log(WLR_INFO, "Fullscreen disabled");
-	} else {
-		wlr_scene_node_reparent(&scene_tree->node, server.full_tree);
+void toggle_minimize(void) {
+	if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL)
+		return;
 
-		if (n->client->toplevel && n->client->toplevel->xdg_toplevel)
-			wlr_xdg_toplevel_set_fullscreen(n->client->toplevel->xdg_toplevel, true);
-		else if (n->client->xwayland_view)
-			wlr_xwayland_surface_set_fullscreen(n->client->xwayland_view->xwayland_surface, true);
+	node_t *n = mon->desk->focus;
+	if (n->client == NULL)
+		return;
 
-		set_state(mon, mon->desk, n, STATE_FULLSCREEN);
-		wlr_log(WLR_INFO, "Fullscreen enabled");
-	}
-
-	if (n->client->toplevel)
-		update_foreign_toplevel_state(n->client->toplevel);
+	client_set_minimized(mon, mon->desk, n, !n->client->flags.minimized);
 }
 
 void toggle_pseudo_tiled(void) {
@@ -713,52 +700,33 @@ void send_to_prev_desktop(void) {
 	}
 }
 
-// toggles monocle on a specific desktop. `focus_hint` is the toplevel that triggered the toggle
-void monocle_toggle(output_t *m, desktop_t *d, node_t *focus_hint) {
+void monocle_toggle(output_t *m, desktop_t *d) {
 	if (m == NULL || d == NULL)
 		return;
 
-	if (d->layout == LAYOUT_MONOCLE) {
-		layout_set(d, d->user_layout);
-
-		if (d->root) {
-			FOR_EACH_LEAF(n, d->root) {
-				if (n->client && n->client->toplevel && n->client->state != STATE_FULLSCREEN) {
-					n->client->toplevel->client_maximized = false;
-					wlr_xdg_toplevel_set_maximized(n->client->toplevel->xdg_toplevel, false);
-				}
-			}
-		}
-	} else {
-		layout_toggle(d, LAYOUT_MONOCLE);
-
-		if (d->root) {
-			FOR_EACH_LEAF(n, d->root) {
-				if (n->client && n->client->toplevel && n->client->state != STATE_FULLSCREEN) {
-					n->client->toplevel->client_maximized = true;
-					wlr_xdg_toplevel_set_maximized(n->client->toplevel->xdg_toplevel, true);
-				}
-			}
-		}
-	}
+	layout_toggle(d, LAYOUT_MONOCLE);
 
 	arrange(m, d, true);
 	ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name,
 		layout_to_char(d->layout));
 
-	// monocle only shows the focused window, make sure it is the one asking for it
-	if (focus_hint != NULL && d->layout == LAYOUT_MONOCLE && node_focusable(focus_hint)) {
-		d->focus = focus_hint;
-		focus_node(m, d, focus_hint);
-	} else if (d->focus != NULL)
+	if (d->focus != NULL)
 		focus_node(m, d, d->focus);
+
+	// tell clients which window now counts as maximized
+	if (d->root != NULL) {
+		FOR_EACH_LEAF(n, d->root) {
+			if (n->client != NULL && n->client->toplevel != NULL)
+				update_foreign_toplevel_state(n->client->toplevel);
+		}
+	}
 }
 
 void toggle_monocle(void) {
 	if (mon == NULL || mon->desk == NULL)
 		return;
 
-	monocle_toggle(mon, mon->desk, NULL);
+	monocle_toggle(mon, mon->desk);
 }
 
 void set_tiled_layout(void) {
@@ -768,15 +736,6 @@ void set_tiled_layout(void) {
 
 	layout_set(d, LAYOUT_TILED);
 	d->user_layout = LAYOUT_TILED;
-
-	if (d->root) {
-		FOR_EACH_LEAF(n, d->root) {
-			if (n->client && n->client->toplevel && n->client->state != STATE_FULLSCREEN) {
-				n->client->toplevel->client_maximized = false;
-				wlr_xdg_toplevel_set_maximized(n->client->toplevel->xdg_toplevel, false);
-			}
-		}
-	}
 
 	arrange(mon, d, true);
 	ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name,
@@ -792,20 +751,7 @@ void toggle_master_stack(void) {
 
 	desktop_t *d = mon->desk;
 
-	if (d->layout == LAYOUT_MASTER_STACK) {
-		layout_set(d, d->user_layout);
-	} else {
-		layout_toggle(d, LAYOUT_MASTER_STACK);
-	}
-
-	if (d->root) {
-		FOR_EACH_LEAF(n, d->root) {
-			if (n->client && n->client->toplevel && n->client->state != STATE_FULLSCREEN) {
-				n->client->toplevel->client_maximized = false;
-				wlr_xdg_toplevel_set_maximized(n->client->toplevel->xdg_toplevel, false);
-			}
-		}
-	}
+	layout_toggle(d, LAYOUT_MASTER_STACK);
 
 	arrange(mon, d, true);
 	ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name,
@@ -869,15 +815,18 @@ static bool resize_master_stack_ratio(bool horizontal, float delta) {
 	if (mon->desk->layout != LAYOUT_MASTER_STACK)
 		return false;
 
-	bool horizontal_split = master_stack_orientation == MASTER_LEFT ||
-		master_stack_orientation == MASTER_RIGHT || master_stack_orientation == MASTER_CENTER;
+	master_area_orientation_t orientation =
+		(master_area_orientation_t)mon->desk->master_stack.orientation;
+
+	bool horizontal_split = orientation == MASTER_LEFT || orientation == MASTER_RIGHT ||
+		orientation == MASTER_CENTER;
 	if (horizontal != horizontal_split)
 		return true;
 
-	if (master_stack_orientation == MASTER_RIGHT || master_stack_orientation == MASTER_BOTTOM)
+	if (orientation == MASTER_RIGHT || orientation == MASTER_BOTTOM)
 		delta = -delta;
 
-	if (master_stack_adjust_ratio(delta))
+	if (master_stack_adjust_ratio(mon->desk, delta))
 		arrange(mon, mon->desk, true);
 	return true;
 }

@@ -80,6 +80,50 @@ int desktop_toplevels(desktop_t *d, node_t ***out_nodes) {
 	return count;
 }
 
+bool desktop_has_toplevels(desktop_t *d) {
+	if (d == NULL)
+		return false;
+
+	if (d->root != NULL) {
+		FOR_EACH_LEAF(n, d->root)
+			if (n->client != NULL)
+				return true;
+	}
+
+	toplevel_t *toplevel;
+	wl_list_for_each(toplevel, &server.toplevels, link) {
+		if (toplevel->mapped && toplevel->node != NULL && toplevel->node->client != NULL &&
+			toplevel->node->desktop == d)
+			return true;
+	}
+
+	xwayland_toplevel_t *xwayland_view;
+	wl_list_for_each(xwayland_view, &server.xwayland.views, link) {
+		if (xwayland_view->mapped && xwayland_view->node != NULL && xwayland_view->node->client != NULL &&
+			xwayland_view->node->desktop == d)
+			return true;
+	}
+
+	return false;
+}
+
+void desktop_clear_output(desktop_t *d, output_t *m) {
+	if (d == NULL)
+		return;
+
+	node_t **toplevels = NULL;
+	int count = desktop_toplevels(d, &toplevels);
+	if (toplevels == NULL)
+		return;
+
+	for (int i = 0; i < count; i++) {
+		if (toplevels[i] != NULL)
+			toplevels[i]->output = m;
+	}
+
+	free(toplevels);
+}
+
 struct wlr_box node_current_rect(node_t *n) {
 	if (n == NULL || n->client == NULL)
 		return (struct wlr_box){0};
@@ -179,6 +223,11 @@ void float_node_set_rect(node_t *n, struct wlr_box r) {
 	if (n == NULL || n->client == NULL)
 		return;
 
+	if (client_is_maximized(n->client)) {
+		wlr_log(WLR_DEBUG, "float_node_set_rect: ignoring, node %u is maximized", n->id);
+		return;
+	}
+
 	struct wlr_scene_tree *scene_tree = client_get_scene_tree(n->client);
 	apply_float_rect(n, r);
 	if (scene_tree != NULL)
@@ -263,7 +312,8 @@ static void float_node_impl(output_t *m, desktop_t *d, node_t *n, const struct w
 		n->output = m;
 	if (d != NULL)
 		n->desktop = d;
-	n->hidden = true;
+
+	node_set_hidden(n, false);
 
 	wlr_scene_node_reparent(&scene_tree->node, server.float_tree);
 	wlr_scene_node_set_position(&scene_tree->node, target.x, target.y);
@@ -307,7 +357,7 @@ void tile_node(output_t *m, desktop_t *d, node_t *n) {
 	}
 
 	if (c->state == STATE_FLOATING) {
-		n->hidden = false;
+		node_set_hidden(n, false);
 		wlr_scene_node_reparent(&scene_tree->node, server.tile_tree);
 
 		c->last_state = c->state;
@@ -335,7 +385,7 @@ void tile_node(output_t *m, desktop_t *d, node_t *n) {
 			c->floating_rectangle = c->tiled_rectangle;
 
 		remove_node(d, n);
-		n->hidden = true;
+		node_set_hidden(n, false);
 
 		wlr_scene_node_set_position(&scene_tree->node, c->floating_rectangle.x, c->floating_rectangle.y);
 		wlr_scene_node_reparent(&scene_tree->node, server.float_tree);
@@ -423,16 +473,21 @@ static bool rect_on_any_output(struct wlr_box r) {
 	return false;
 }
 
+static struct wlr_box gapped_area(struct wlr_box area, int wg) {
+	area.x += wg;
+	area.y += wg;
+	area.width -= wg;
+	area.height -= wg;
+	return area;
+}
+
 void floating_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 	if (d == NULL)
 		return;
 
+	struct wlr_box usable = available;
 	if (d->root != NULL) {
-		int wg = compute_window_gap(d);
-		available.x += wg;
-		available.y += wg;
-		available.width -= wg;
-		available.height -= wg;
+		available = gapped_area(available, compute_window_gap(d));
 		apply_layout(m, d, d->root, available, available);
 	}
 
@@ -451,6 +506,15 @@ void floating_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 		if (n->output != NULL && m != NULL && n->output != m)
 			continue;
 
+		// a maximized window fills the usable area, with the gaps and border still applied
+		if (client_is_maximized(c)) {
+			int wg = compute_window_gap(d);
+			struct wlr_box maxed = apply_bleed(gapped_area(usable, wg), (int)effective_border_width(d), wg);
+			apply_float_rect(n, maxed);
+			n->output = m;
+			continue;
+		}
+
 		struct wlr_box r = c->floating_rectangle;
 
 		if (r.width < MIN_WIDTH || r.height < MIN_HEIGHT) {
@@ -460,8 +524,10 @@ void floating_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 			size.width = r.width < available.width ? r.width : available.width;
 			size.height = r.height < available.height ? r.height : available.height;
 			apply_float_rect(n, cascade_rect(available, size, 0));
-		} else
+		} else {
+			apply_float_rect(n, r);
 			continue;
+		}
 
 		index++;
 	}
@@ -574,6 +640,11 @@ bool floating_focus(desktop_t *d, direction_t dir) {
 		return false;
 
 	return focus_node(mon, d, best);
+}
+
+bool floating_places_floating(desktop_t *d, client_t *c) {
+	(void)d;
+	return IS_FLOATING(c);
 }
 
 int floating_collect(desktop_t *d, node_t ***out_nodes) {

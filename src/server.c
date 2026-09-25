@@ -90,6 +90,8 @@
 #include <wlr/util/log.h>
 #include <wlr/xwayland.h>
 
+struct server_t server = {0};
+
 void server_init(void) {
 	server = (struct server_t){0};
 

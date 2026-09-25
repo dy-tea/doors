@@ -7,9 +7,21 @@
 #include <stdlib.h>
 #include <wlr/util/log.h>
 
-float master_stack_ratio = 0.5f;
-master_area_orientation_t master_stack_orientation = MASTER_LEFT;
-stack_layout_t master_stack_layout = STACK_VERTICAL;
+static float ms_ratio(const desktop_t *d) {
+	return d != NULL && d->master_stack.ratio > 0.0f ? d->master_stack.ratio : 0.5f;
+}
+
+static master_area_orientation_t ms_orientation(const desktop_t *d) {
+	return d != NULL ? (master_area_orientation_t)d->master_stack.orientation : MASTER_LEFT;
+}
+
+static stack_layout_t ms_stack_layout(const desktop_t *d) {
+	return d != NULL ? (stack_layout_t)d->master_stack.stack_layout : STACK_VERTICAL;
+}
+
+static int ms_count(const desktop_t *d) {
+	return d != NULL ? d->master_stack.count : 0;
+}
 
 static int compare_node_order(const void *lhs, const void *rhs) {
 	const node_t *a = *(node_t *const *)lhs;
@@ -38,11 +50,11 @@ static int compare_master_then_order(const void *lhs, const void *rhs) {
 static int master_count_clamped(const desktop_t *d, int total_nodes) {
 	if (!d || total_nodes <= 0)
 		return 0;
-	if (d->master_stack_count < 0)
+	if (ms_count(d) < 0)
 		return 0;
-	if (d->master_stack_count > total_nodes)
+	if (ms_count(d) > total_nodes)
 		return total_nodes;
-	return d->master_stack_count;
+	return ms_count(d);
 }
 
 static void reconcile_master_membership(desktop_t *d, node_t **nodes, int count) {
@@ -90,6 +102,15 @@ static int collect_tiled_nodes(desktop_t *d, node_t ***out_nodes) {
 static void set_node_geom(node_t *n, struct wlr_box geom, output_t *m, desktop_t *d) {
 	if (!n || !n->client)
 		return;
+
+	if (geom.width < 1 || geom.height < 1) {
+		n->client->tiled_rectangle = (struct wlr_box){0};
+		n->client->arranged_rectangle = (struct wlr_box){0};
+		n->output = m;
+		node_set_pending_rectangle(n, geom);
+		node_set_dirty(n);
+		return;
+	}
 
 	unsigned int bw = effective_border_width(d);
 	struct wlr_box r = geom;
@@ -168,12 +189,12 @@ static void distribute_area(struct wlr_box area, struct wlr_box *out, int count,
 	}
 }
 
-static int master_span_size(int span, int gap_count, int gap) {
+static int master_span_size(const desktop_t *d, int span, int gap_count, int gap) {
 	int usable = span - gap_count * (gap > 0 ? gap : 0);
 	if (usable < 1)
 		usable = 1;
 
-	int size = (int)(usable * master_stack_ratio);
+	int size = (int)(usable * ms_ratio(d));
 	if (size < 1)
 		size = 1;
 	if (size > usable)
@@ -195,7 +216,7 @@ static bool arrange_center(output_t *m, desktop_t *d, node_t **nodes, int mc, in
 		return true;
 	}
 
-	int master_width = master_span_size(rect.width, 2, gap);
+	int master_width = master_span_size(d, rect.width, 2, gap);
 	int master_x = rect.x + (rect.width - master_width) / 2;
 	struct wlr_box master_area = {
 		.x = master_x,
@@ -266,8 +287,6 @@ void master_stack_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 	if (rect.height < 1)
 		rect.height = 1;
 
-	int mc = master_count_clamped(d, count);
-	int sc = count - mc;
 	struct wlr_box *geoms = calloc((size_t)count, sizeof(*geoms));
 	if (!geoms) {
 		wlr_log(WLR_ERROR, "master-stack geometry allocation failed");
@@ -275,14 +294,35 @@ void master_stack_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 		return;
 	}
 
-	if (mc == 0) {
-		apply_group(m, d, nodes, count, rect, gap, master_stack_layout == STACK_VERTICAL, geoms);
+	int maximized_index = -1;
+	for (int i = 0; i < count; i++) {
+		if (client_is_maximized(nodes[i]->client)) {
+			maximized_index = i;
+			break;
+		}
+	}
+
+	if (maximized_index >= 0) {
+		for (int i = 0; i < count; i++)
+			geoms[i] = i == maximized_index ? rect : (struct wlr_box){0};
+		for (int i = 0; i < count; i++)
+			set_node_geom(nodes[i], geoms[i], m, d);
 		free(geoms);
 		free(nodes);
 		return;
 	}
 
-	master_area_orientation_t orientation = master_stack_orientation;
+	int mc = master_count_clamped(d, count);
+	int sc = count - mc;
+
+	if (mc == 0) {
+		apply_group(m, d, nodes, count, rect, gap, ms_stack_layout(d) == STACK_VERTICAL, geoms);
+		free(geoms);
+		free(nodes);
+		return;
+	}
+
+	master_area_orientation_t orientation = ms_orientation(d);
 	if (orientation == MASTER_CENTER && sc < 2)
 		orientation = MASTER_LEFT;
 
@@ -304,7 +344,7 @@ void master_stack_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 	}
 
 	int span = horizontal_split ? rect.width : rect.height;
-	int master_size = master_span_size(span, 1, gap);
+	int master_size = master_span_size(d, span, 1, gap);
 	struct wlr_box master_area = rect;
 	struct wlr_box stack_area = rect;
 
@@ -332,7 +372,7 @@ void master_stack_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 		stack_area.height = 1;
 
 	apply_group(m, d, nodes, mc, master_area, gap, horizontal_split, geoms);
-	apply_group(m, d, nodes + mc, sc, stack_area, gap, master_stack_layout == STACK_VERTICAL, geoms);
+	apply_group(m, d, nodes + mc, sc, stack_area, gap, ms_stack_layout(d) == STACK_VERTICAL, geoms);
 
 	free(geoms);
 	free(nodes);
@@ -357,7 +397,7 @@ bool master_stack_increment(desktop_t *d) {
 	node_t *target = d->focus && d->focus->client && !d->focus->client->flags.master_stack_master &&
 		IS_TILED(d->focus->client) ? d->focus : nodes[mc];
 	target->client->flags.master_stack_master = true;
-	d->master_stack_count = mc + 1;
+	d->master_stack.count = mc + 1;
 	free(nodes);
 	return true;
 }
@@ -374,7 +414,7 @@ bool master_stack_decrement(desktop_t *d) {
 	node_t *target = d->focus && d->focus->client && d->focus->client->flags.master_stack_master &&
 		IS_TILED(d->focus->client) ? d->focus : nodes[mc - 1];
 	target->client->flags.master_stack_master = false;
-	d->master_stack_count = mc - 1;
+	d->master_stack.count = mc - 1;
 	free(nodes);
 	return true;
 }
@@ -390,7 +430,7 @@ bool master_stack_promote(desktop_t *d) {
 	}
 
 	nodes[focus_index]->client->flags.master_stack_master = true;
-	d->master_stack_count = mc + 1;
+	d->master_stack.count = mc + 1;
 	free(nodes);
 	return true;
 }
@@ -409,7 +449,7 @@ bool master_stack_demote(desktop_t *d) {
 	}
 
 	d->focus->client->flags.master_stack_master = false;
-	d->master_stack_count = mc - 1;
+	d->master_stack.count = mc - 1;
 	free(nodes);
 	return true;
 }
@@ -417,57 +457,67 @@ bool master_stack_demote(desktop_t *d) {
 void master_stack_set_count(desktop_t *d, int count) {
 	if (!d)
 		return;
-	d->master_stack_count = count < 0 ? 0 : count;
+	d->master_stack.count = count < 0 ? 0 : count;
 }
 
-bool master_stack_adjust_ratio(float delta) {
-	float ratio = master_stack_ratio + delta;
+bool master_stack_adjust_ratio(desktop_t *d, float delta) {
+	if (d == NULL)
+		return false;
+
+	float ratio = ms_ratio(d) + delta;
 	if (ratio < 0.1f)
 		ratio = 0.1f;
 	if (ratio > 0.9f)
 		ratio = 0.9f;
-	if (ratio == master_stack_ratio)
+	if (ratio == ms_ratio(d))
 		return false;
 
-	master_stack_ratio = ratio;
+	d->master_stack.ratio = ratio;
 	return true;
 }
 
-void master_stack_set_orientation(master_area_orientation_t orientation) {
-	if (orientation < MASTER_LEFT || orientation > MASTER_CENTER)
+void master_stack_set_orientation(desktop_t *d, master_area_orientation_t orientation) {
+	if (d == NULL || orientation < MASTER_LEFT || orientation > MASTER_CENTER)
 		return;
 
-	master_stack_orientation = orientation;
-	master_stack_layout = orientation == MASTER_TOP ||
+	d->master_stack.orientation = orientation;
+	d->master_stack.stack_layout = orientation == MASTER_TOP ||
 		orientation == MASTER_BOTTOM ? STACK_HORIZONTAL : STACK_VERTICAL;
 }
 
-void master_stack_flip_orientation(void) {
-	switch (master_stack_orientation) {
+void master_stack_flip_orientation(desktop_t *d) {
+	if (d == NULL)
+		return;
+
+	switch (ms_orientation(d)) {
 	case MASTER_LEFT:
-		master_stack_orientation = MASTER_RIGHT;
+		d->master_stack.orientation = MASTER_RIGHT;
 		break;
 	case MASTER_RIGHT:
-		master_stack_orientation = MASTER_LEFT;
+		d->master_stack.orientation = MASTER_LEFT;
 		break;
 	case MASTER_TOP:
-		master_stack_orientation = MASTER_BOTTOM;
+		d->master_stack.orientation = MASTER_BOTTOM;
 		break;
 	case MASTER_BOTTOM:
-		master_stack_orientation = MASTER_TOP;
+		d->master_stack.orientation = MASTER_TOP;
 		break;
 	case MASTER_CENTER:
-		master_stack_orientation = MASTER_CENTER;
+		d->master_stack.orientation = MASTER_CENTER;
 		break;
 	}
 }
 
-void master_stack_cycle_orientation(void) {
-	master_stack_set_orientation((master_stack_orientation + 1) % 5);
+void master_stack_cycle_orientation(desktop_t *d) {
+	if (d == NULL)
+		return;
+	master_stack_set_orientation(d, (master_area_orientation_t)((ms_orientation(d) + 1) % 5));
 }
 
-void master_stack_cycle_stack_layout(void) {
-	master_stack_layout = (master_stack_layout + 1) % 2;
+void master_stack_cycle_stack_layout(desktop_t *d) {
+	if (d == NULL)
+		return;
+	d->master_stack.stack_layout = (ms_stack_layout(d) + 1) % 2;
 }
 
 int master_stack_collect(desktop_t *d, node_t ***out_nodes) {

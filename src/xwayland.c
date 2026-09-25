@@ -387,6 +387,31 @@ static void xwayland_view_configure(xwayland_toplevel_t *xwayland_view, int x, i
 	}
 }
 
+// push the geometry the layout chosen by layout to an X11 client
+static void xwayland_sync_configure(xwayland_toplevel_t *xwayland_view) {
+	node_t *node = xwayland_view->node;
+	struct wlr_xwayland_surface *xsurface = xwayland_view->xwayland_surface;
+
+	if (node == NULL || node->client == NULL || xsurface == NULL)
+		return;
+
+	client_t *c = node->client;
+	struct wlr_box rect = c->arranged_rectangle;
+
+	if (c->state == STATE_FULLSCREEN && node->output != NULL) {
+		rect = node->output->rectangle;
+	} else if (rect.width < 1 || rect.height < 1) {
+		rect = c->tiled_rectangle;
+	}
+
+	if (rect.width < 1 || rect.height < 1)
+		return;
+
+	wlr_xwayland_surface_configure(xsurface, rect.x, rect.y, rect.width, rect.height);
+	xwayland_view->geometry.width = rect.width;
+	xwayland_view->geometry.height = rect.height;
+}
+
 static void xwayland_view_apply_disable_decorations(xwayland_toplevel_t *xwayland_view) {
 	(void)xwayland_view;
 }
@@ -623,7 +648,7 @@ static void handle_map(struct wl_listener *listener, void *data) {
 		wlr_scene_node_set_position(&xwayland_view->scene_tree->node, client->floating_rectangle.x,
 			client->floating_rectangle.y);
 
-		node->hidden = true;
+		node_set_hidden(node, false);
 		client->flags.shown = true;
 		wlr_scene_node_set_enabled(&xwayland_view->scene_tree->node, true);
 	} else if (!(rule && rule->has & RULE_TYPE_STATE) && layout_init_client(target_monitor,
@@ -669,10 +694,13 @@ static void handle_map(struct wl_listener *listener, void *data) {
 		target_desktop->fullscreen_recreate_pending_window_id = 0;
 	} else if (rule && rule->has & RULE_TYPE_STATE && rule->state == STATE_FULLSCREEN) {
 		target_desktop->fullscreen_recreate_pending_window_id = 0;
-		enter_fullscreen(target_monitor, target_desktop, node);
+		client_set_fullscreen(target_monitor, target_desktop, node, true);
 	} else if (xsurface->fullscreen && settings.ignore_ewmh_fullscreen != 1) {
 		target_desktop->fullscreen_recreate_pending_window_id = 0;
-		enter_fullscreen(target_monitor, target_desktop, node);
+		client_set_fullscreen(target_monitor, target_desktop, node, true);
+	} else if (xsurface->maximized_vert || xsurface->maximized_horz) {
+		client_set_maximized(target_monitor, target_desktop, node, true);
+		wlr_xwayland_surface_set_maximized(xsurface, true, true);
 	}
 
 	xwayland_view_apply_disable_decorations(xwayland_view);
@@ -834,6 +862,7 @@ static void handle_destroy(struct wl_listener *listener, void *data) {
 	wl_list_remove(&xwayland_view->request_configure.link);
 	wl_list_remove(&xwayland_view->request_fullscreen.link);
 	wl_list_remove(&xwayland_view->request_minimize.link);
+	wl_list_remove(&xwayland_view->request_maximize.link);
 	wl_list_remove(&xwayland_view->request_activate.link);
 	wl_list_remove(&xwayland_view->request_move.link);
 	wl_list_remove(&xwayland_view->request_resize.link);
@@ -882,7 +911,8 @@ static void handle_request_configure(struct wl_listener *listener, void *data) {
 
 	// honor floating window request
 	if (xwayland_view->node && xwayland_view->node->client &&
-			xwayland_view->node->client->state == STATE_FLOATING) {
+			xwayland_view->node->client->state == STATE_FLOATING &&
+			!client_is_maximized(xwayland_view->node->client)) {
 		xwayland_view_configure(xwayland_view, ev->x, ev->y, ev->width, ev->height);
 		if (xwayland_view->node) {
 			xwayland_view->node->client->floating_rectangle.x = ev->x;
@@ -891,15 +921,7 @@ static void handle_request_configure(struct wl_listener *listener, void *data) {
 			xwayland_view->node->client->floating_rectangle.height = ev->height;
 		}
 	} else {
-		if (xwayland_view->node && xwayland_view->node->client) {
-			client_t *client = xwayland_view->node->client;
-			struct wlr_box rect;
-			if (client->state == STATE_FULLSCREEN && xwayland_view->node->output)
-				rect = xwayland_view->node->output->rectangle;
-			else
-				rect = client->tiled_rectangle;
-			wlr_xwayland_surface_configure(xsurface, rect.x, rect.y, rect.width, rect.height);
-		}
+		xwayland_sync_configure(xwayland_view);
 	}
 }
 
@@ -931,26 +953,32 @@ static void handle_request_fullscreen(struct wl_listener *listener, void *data) 
 
 	d->fullscreen_recreate_pending_window_id = 0;
 
-	if (requested_fullscreen) {
-		wlr_scene_node_reparent(&scene_tree->node, server.full_tree);
-		wlr_xwayland_surface_set_fullscreen(xsurface, true);
-		set_state(m, d, node, STATE_FULLSCREEN);
-	} else {
-		client_state_t last = client->last_state;
-		if (last == STATE_FULLSCREEN)
-			last = STATE_TILED;
-		if (last == STATE_FLOATING && node->parent != NULL)
-			last = STATE_TILED;
+	client_set_fullscreen(m, d, node, requested_fullscreen);
+}
 
-		if (last == STATE_FLOATING)
-			wlr_scene_node_reparent(&scene_tree->node, server.float_tree);
-		else
-			wlr_scene_node_reparent(&scene_tree->node, server.tile_tree);
+static void handle_request_maximize(struct wl_listener *listener, void *data) {
+	(void)data;
+	xwayland_toplevel_t *xwayland_view = wl_container_of(listener, xwayland_view, request_maximize);
+	struct wlr_xwayland_surface *xsurface = xwayland_view->xwayland_surface;
 
-		wlr_xwayland_surface_set_fullscreen(xsurface, false);
-		set_state(m, d, node, last);
-		node->hidden = (last == STATE_FLOATING);
-	}
+	node_t *node = xwayland_view->node;
+	if (node == NULL || node->client == NULL)
+		return;
+
+	if (node->client->state == STATE_FULLSCREEN)
+		return;
+
+	bool requested = xsurface->maximized_vert || xsurface->maximized_horz;
+	if (requested == client_is_maximized(node->client))
+		return;
+
+	output_t *m = node->output;
+	desktop_t *d = node->desktop;
+
+	client_set_maximized(m, d, node, requested);
+
+	wlr_xwayland_surface_set_maximized(xsurface, requested, requested);
+	xwayland_sync_configure(xwayland_view);
 }
 
 static void handle_request_minimize(struct wl_listener *listener, void *data) {
@@ -958,14 +986,11 @@ static void handle_request_minimize(struct wl_listener *listener, void *data) {
 	struct wlr_xwayland_surface *xsurface = xwayland_view->xwayland_surface;
 	struct wlr_xwayland_minimize_event *ev = data;
 
-	if (settings.minimize_to_scratchpad && xwayland_view->node) {
-		if (ev->minimize)
-			scratchpad_add(xwayland_view->node);
-		return;
+	if (xwayland_view->node != NULL) {
+		output_t *m = xwayland_view->node->output;
+		desktop_t *d = xwayland_view->node->desktop;
+		client_set_minimized(m, d, xwayland_view->node, ev->minimize);
 	}
-
-	if (xwayland_view->node)
-		xwayland_view->node->hidden = ev->minimize;
 
 	wlr_xwayland_surface_set_minimized(xsurface, ev->minimize);
 }
@@ -1185,6 +1210,9 @@ static xwayland_toplevel_t *create_xwayland_view(struct wlr_xwayland_surface *xs
 	wl_signal_add(&xsurface->events.request_minimize, &xwayland_view->request_minimize);
 	xwayland_view->request_minimize.notify = handle_request_minimize;
 
+	wl_signal_add(&xsurface->events.request_maximize, &xwayland_view->request_maximize);
+	xwayland_view->request_maximize.notify = handle_request_maximize;
+
 	wl_signal_add(&xsurface->events.request_activate, &xwayland_view->request_activate);
 	xwayland_view->request_activate.notify = handle_request_activate;
 
@@ -1243,6 +1271,7 @@ static void xwayland_view_destroy(xwayland_toplevel_t *xwayland_view) {
 	wl_list_remove(&xwayland_view->request_configure.link);
 	wl_list_remove(&xwayland_view->request_fullscreen.link);
 	wl_list_remove(&xwayland_view->request_minimize.link);
+	wl_list_remove(&xwayland_view->request_maximize.link);
 	wl_list_remove(&xwayland_view->request_activate.link);
 	wl_list_remove(&xwayland_view->request_move.link);
 	wl_list_remove(&xwayland_view->request_resize.link);

@@ -126,6 +126,10 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
 			toggle_floating();
 		} else if (streq("fullscreen", *args)) {
 			toggle_fullscreen();
+		} else if (streq("maximized", *args)) {
+			toggle_maximize();
+		} else if (streq("minimized", *args)) {
+			toggle_minimize();
 		} else {
 			send_failure(client_fd, "node -t: unknown state\n");
 			return;
@@ -253,7 +257,7 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
 		}
 
 		if (strcmp(key, "hidden") == 0) {
-			n->hidden = has_value ? set_value : !n->hidden;
+			node_set_hidden(n, has_value ? set_value : !n->hidden);
 			transaction_commit_dirty();
 			send_success(client_fd, "flag changed\n");
 		} else if (strcmp(key, "sticky") == 0) {

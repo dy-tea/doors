@@ -13,20 +13,16 @@
 #include <wlr/util/log.h>
 
 void arrange(output_t *m, desktop_t *d, bool use_transaction) {
-	if (d->root == NULL) {
-		if (use_transaction)
-			transaction_commit_dirty();
+	if (d == NULL)
 		return;
+
+	if (m != NULL) {
+		struct wlr_box rect = desktop_usable_area(m, d);
+
+		const layout_impl_t *impl = layout_get_impl(d->layout);
+		if (impl && impl->arrange)
+			impl->arrange(m, d, rect);
 	}
-
-	if (m == NULL)
-		return;
-
-	struct wlr_box rect = desktop_usable_area(m, d);
-
-	const layout_impl_t *impl = layout_get_impl(d->layout);
-	if (impl && impl->arrange)
-		impl->arrange(m, d, rect);
 
 	if (use_transaction)
 		transaction_commit_dirty();
@@ -67,6 +63,30 @@ static void monocle_on_focus(output_t *m, desktop_t *d, node_t *n) {
 		client_set_visible(node->client, node == n);
 }
 
+static void monocle_on_client_state(output_t *m, desktop_t *d, node_t *n, client_state_t old) {
+	(void)n;
+	(void)old;
+
+	if (d->root == NULL)
+		return;
+
+	node_t *reveal = d->focus;
+	FOR_EACH_LEAF(node, d->root) {
+		if (node->client != NULL && (client_is_maximized(node->client) ||
+				node->client->state == STATE_FULLSCREEN)) {
+			reveal = node;
+			break;
+		}
+	}
+
+	FOR_EACH_LEAF(node, d->root)
+		client_set_visible(node->client, node == reveal);
+
+	if (m != NULL && reveal != NULL && reveal->client != NULL && reveal->client->toplevel != NULL &&
+		reveal->client->toplevel->configured)
+		arrange(m, d, true);
+}
+
 static void scroller_on_focus(output_t *m, desktop_t *d, node_t *n) {
 	if (!d)
 		return;
@@ -98,6 +118,16 @@ static void scroller_on_focus(output_t *m, desktop_t *d, node_t *n) {
 	} else {
 		wlr_log(WLR_DEBUG, "scroller_on_focus: skipping arrange (initial map)");
 	}
+}
+
+static void scroller_on_client_state(output_t *m, desktop_t *d, node_t *n, client_state_t old) {
+	(void)m;
+	(void)old;
+
+	if (n == NULL || n->client == NULL)
+		return;
+
+	scroller_set_maximized(d, n, client_is_maximized(n->client));
 }
 
 static int tiled_collect(desktop_t *d, node_t ***out_nodes) {
@@ -186,7 +216,10 @@ static const layout_impl_t tiled_impl = {
 	.focus = tiled_focus,
 	.swap = tiled_swap,
 	.enter = NULL,
+	.leave = NULL,
 	.init_client = NULL,
+	.on_client_state = NULL,
+	.places_floating = NULL,
 	.collect = tiled_collect,
 	.single_visible = false,
 	.has_directional_nav = false,
@@ -199,7 +232,10 @@ static const layout_impl_t monocle_impl = {
 	.focus = tiled_focus,
 	.swap = NULL,
 	.enter = NULL,
+	.leave = NULL,
 	.init_client = NULL,
+	.on_client_state = monocle_on_client_state,
+	.places_floating = NULL,
 	.collect = tiled_collect,
 	.single_visible = true,
 	.has_directional_nav = false,
@@ -212,7 +248,10 @@ static const layout_impl_t scroller_impl = {
 	.focus = scroller_focus,
 	.swap = scroller_swap,
 	.enter = NULL,
+	.leave = scroller_leave,
 	.init_client = NULL,
+	.on_client_state = scroller_on_client_state,
+	.places_floating = NULL,
 	.collect = scroller_collect_fn,
 	.single_visible = false,
 	.has_directional_nav = true,
@@ -225,7 +264,10 @@ static const layout_impl_t master_stack_impl = {
 	.focus = master_stack_focus,
 	.swap = master_stack_swap,
 	.enter = NULL,
+	.leave = NULL,
 	.init_client = NULL,
+	.on_client_state = NULL,
+	.places_floating = NULL,
 	.collect = master_stack_collect,
 	.single_visible = false,
 	.has_directional_nav = true,
@@ -238,7 +280,10 @@ static const layout_impl_t floating_impl = {
 	.focus = floating_focus,
 	.swap = NULL,
 	.enter = floating_enter,
+	.leave = NULL,
 	.init_client = floating_init_client,
+	.on_client_state = NULL,
+	.places_floating = floating_places_floating,
 	.collect = floating_collect,
 	.single_visible = false,
 	.has_directional_nav = true,
@@ -269,41 +314,61 @@ bool layout_init_client(output_t *m, desktop_t *d, client_t *c) {
 	return false;
 }
 
-void layout_set(desktop_t *d, layout_t new_layout) {
-	if (!d)
+void layout_client_state_changed(output_t *m, desktop_t *d, node_t *n, client_state_t old_state) {
+	if (d == NULL)
 		return;
 
-	// destroy scroller state when leaving scroller layout
-	if (d->layout == LAYOUT_SCROLLER && new_layout != LAYOUT_SCROLLER) {
-		scroller_destroy(d->scroller_state);
-		d->scroller_state = NULL;
-	}
+	const layout_impl_t *impl = layout_get_impl(d->layout);
+	if (impl != NULL && impl->on_client_state != NULL)
+		impl->on_client_state(m, d, n, old_state);
+}
+
+void layout_desktop_changed(output_t *m, desktop_t *d) {
+	if (d == NULL)
+		return;
+
+	layout_client_state_changed(m, d, NULL, STATE_TILED);
+}
+
+void layout_set(desktop_t *d, layout_t new_layout) {
+	if (d == NULL || new_layout >= sizeof(registry) / sizeof(registry[0]) ||
+		registry[new_layout] == NULL)
+		return;
 
 	layout_t old_layout = d->layout;
+
+	if (old_layout == new_layout) {
+		layout_desktop_changed(d->output ? d->output : mon, d);
+		return;
+	}
+
+	d->user_layout = old_layout;
+	output_t *m = d->output != NULL ? d->output : mon;
+
+	// let the outgoing layout drop the per-desktop state it owns
+	const layout_impl_t *old_impl = layout_get_impl(old_layout);
+	if (m != NULL && old_impl != NULL && old_impl->leave != NULL)
+		old_impl->leave(m, d);
+
 	d->layout = new_layout;
 
 	// let the incoming layout adopt the toplevels already on the desktop
-	if (old_layout != new_layout) {
-		output_t *m = d->output ? d->output : mon;
-		const layout_impl_t *impl = layout_get_impl(new_layout);
-		if (m != NULL && impl != NULL && impl->enter != NULL)
-			impl->enter(m, d);
-	}
+	const layout_impl_t *impl = registry[new_layout];
+	if (m != NULL && impl != NULL && impl->enter != NULL)
+		impl->enter(m, d);
+
+	layout_desktop_changed(m, d);
 }
 
 void layout_toggle(desktop_t *d, layout_t target) {
-	if (!d)
+	if (d == NULL)
 		return;
-	if (d->layout == target) {
-		layout_set(d, d->user_layout);
-	} else {
-		d->user_layout = d->layout;
-		layout_set(d, target);
-	}
+
+	layout_set(d, d->layout == target ? d->user_layout : target);
 }
 
 void layout_cycle(output_t *m, desktop_t *d, int direction) {
-	if (!d)
+	if (d == NULL)
 		return;
 
 	int num_layouts = sizeof(registry) / sizeof(registry[0]);
@@ -312,7 +377,6 @@ void layout_cycle(output_t *m, desktop_t *d, int direction) {
 	if (next < 0)
 		next += num_layouts;
 
-	d->user_layout = d->layout;
 	layout_set(d, (layout_t)next);
 	arrange(m, d, true);
 	if (d->focus)

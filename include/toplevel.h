@@ -41,7 +41,7 @@ typedef struct toplevel_t {
 
 	struct wlr_box geometry, last_requested;
 
-	bool mapped, configured, wants_fade, client_maximized;
+	bool mapped, configured, wants_fade;
 	int max_render_time;
 
 	// tearing control

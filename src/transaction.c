@@ -147,7 +147,6 @@ static void copy_node_current_state(node_t *node, transaction_inst_t *instructio
 	node->rectangle = instruction->rectangle;
 	node->split_ratio = instruction->split_ratio;
 	node->split_type = instruction->split_type;
-	node->hidden = instruction->hidden;
 
 	if (!node->client) {
 		wlr_log(WLR_DEBUG, "Skipping state copy for node %u - client is NULL", node->id);

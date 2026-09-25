@@ -8,8 +8,6 @@
 #include <string.h>
 #include <wlr/util/log.h>
 
-struct server_t server = {0};
-
 static void usage(const char *argv0) {
 	printf("Usage: %s [-c <config-dir>]\n", argv0);
 	printf("  -c, --config <dir>  Use specified config directory instead of default\n");

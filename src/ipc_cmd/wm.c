@@ -44,8 +44,6 @@ void ipc_cmd_wm(char **args, int num, int client_fd) {
 			settings.window_gap);
 		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"split_ratio\": %.2f,\n",
 			settings.split_ratio);
-		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"single_monocle\": %s,\n",
-			settings.single_monocle ? "true" : "false");
 		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"automatic_scheme\": %d,\n",
 			settings.automatic_scheme);
 		offset += snprintf(buf + offset, sizeof(buf) - offset, "    \"smart_gaps\": %s,\n",
