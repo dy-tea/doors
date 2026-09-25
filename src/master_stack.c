@@ -1,3 +1,4 @@
+#include "layout.h"
 #include "master_stack.h"
 #include "output.h"
 #include "tree.h"

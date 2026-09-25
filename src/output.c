@@ -25,6 +25,7 @@
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_xdg_shell.h>
+#include <wlr/util/box.h>
 #include <wlr/util/log.h>
 #include <wlr/util/transform.h>
 
@@ -759,5 +760,27 @@ output_t *output_get_valid(void) {
 		if (m->enabled && m->wlr_output)
 			return m;
 
+	return NULL;
+}
+
+void output_set_focused(output_t *m) {
+	mon = m;
+	server.focused_output = m;
+}
+
+output_t *output_at(double x, double y) {
+	output_t *m;
+	wl_list_for_each(m, &mon_list, link)
+		if (wlr_box_contains_point(&m->rectangle, (int)x, (int)y))
+			return m;
+
+	return NULL;
+}
+
+output_t *find_output_by_name(const char *name) {
+	output_t *m;
+	wl_list_for_each(m, &mon_list, link)
+		if (strcmp(m->name, name) == 0)
+			return m;
 	return NULL;
 }

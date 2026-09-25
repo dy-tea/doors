@@ -1,3 +1,4 @@
+#include "layout.h"
 #include "output.h"
 #include "server.h"
 #include "tiling_drag.h"

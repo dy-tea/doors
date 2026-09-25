@@ -5,6 +5,7 @@
 #include "ipc_cmd.h"
 #include "ipc_helpers.h"
 #include "keyboard.h"
+#include "layout.h"
 #include "output.h"
 #include "scratchpad.h"
 #include "server.h"

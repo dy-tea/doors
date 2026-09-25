@@ -19,8 +19,6 @@ struct xwayland_toplevel_t;
 struct tab_bar_t;
 struct scroller_state_t;
 
-struct output_t *output_at(double x, double y);
-
 // enums
 typedef enum {
 	TYPE_HORIZONTAL,
@@ -303,13 +301,3 @@ typedef struct {
 	border_theme_t active_border_theme;
 	border_theme_t focused_border_theme;
 } doors_settings_t;
-
-extern doors_settings_t settings;
-
-// global state
-extern struct output_t *mon;
-extern struct wl_list mon_list;
-extern uint32_t next_node_id;
-extern uint32_t next_desktop_id;
-extern uint32_t next_monitor_id;
-extern struct wl_list orphan_desk_list;

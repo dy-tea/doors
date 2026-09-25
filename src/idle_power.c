@@ -3,7 +3,7 @@
 #include "once.h"
 #include "output.h"
 #include "server.h"
-#include "types.h"
+#include "settings.h"
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_idle_inhibit_v1.h>
 #include <wlr/types/wlr_output.h>

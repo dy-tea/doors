@@ -1,6 +1,7 @@
 #include "once.h"
 #include "rule.h"
 #include "scroller.h"
+#include "settings.h"
 #include "types.h"
 #include <stdio.h>
 #include <stdlib.h>

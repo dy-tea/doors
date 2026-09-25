@@ -30,6 +30,7 @@
 #include "seat.h"
 #include "security_ctx.h"
 #include "server.h"
+#include "settings.h"
 #include "shortcuts_inhibit.h"
 #include "spring.h"
 #include "tearing.h"

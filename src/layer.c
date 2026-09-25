@@ -2,6 +2,7 @@
 #include "effects.h"
 #include "input_method.h"
 #include "layer.h"
+#include "layout.h"
 #include "once.h"
 #include "output.h"
 #include "popup.h"

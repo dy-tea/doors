@@ -1,6 +1,7 @@
 #include "ipc.h"
 #include "ipc_cmd.h"
 #include "ipc_helpers.h"
+#include "layout.h"
 #include "master_stack.h"
 #include "output.h"
 #include "scroller.h"

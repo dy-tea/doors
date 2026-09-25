@@ -1,3 +1,4 @@
+#include "layout.h"
 #include "output.h"
 #include "scroller.h"
 #include "toplevel.h"

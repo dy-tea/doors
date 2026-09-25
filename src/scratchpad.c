@@ -1,4 +1,5 @@
 #include "ipc.h"
+#include "layout.h"
 #include "once.h"
 #include "output.h"
 #include "scratchpad.h"

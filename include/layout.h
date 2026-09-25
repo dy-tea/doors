@@ -44,6 +44,7 @@ typedef struct layout_impl_t {
 
 const layout_impl_t *layout_get_impl(layout_t layout);
 
+void arrange(output_t *m, desktop_t *d, bool use_transaction);
 void layout_set(desktop_t *d, layout_t new_layout);
 void layout_toggle(desktop_t *d, layout_t target);
 void layout_cycle(output_t *m, desktop_t *d, int direction);

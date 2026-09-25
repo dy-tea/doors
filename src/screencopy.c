@@ -2,6 +2,7 @@
 #include "output.h"
 #include "screencopy.h"
 #include "server.h"
+#include "settings.h"
 #include "toplevel.h"
 #include "types.h"
 #include "wlr-screencopy-unstable-v1-protocol.h"

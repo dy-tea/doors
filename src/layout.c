@@ -1,13 +1,36 @@
+#include "client.h"
 #include "floating.h"
 #include "layout.h"
 #include "master_stack.h"
 #include "scroller.h"
 #include "toplevel.h"
+#include "transaction.h"
 #include "tree.h"
+#include "tree_layout.h"
 #include "types.h"
 #include <stdlib.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/util/log.h>
+
+void arrange(output_t *m, desktop_t *d, bool use_transaction) {
+	if (d->root == NULL) {
+		if (use_transaction)
+			transaction_commit_dirty();
+		return;
+	}
+
+	if (m == NULL)
+		return;
+
+	struct wlr_box rect = desktop_usable_area(m, d);
+
+	const layout_impl_t *impl = layout_get_impl(d->layout);
+	if (impl && impl->arrange)
+		impl->arrange(m, d, rect);
+
+	if (use_transaction)
+		transaction_commit_dirty();
+}
 
 static void tiled_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 	int wg = compute_window_gap(d);
@@ -33,21 +56,15 @@ static void monocle_arrange(output_t *m, desktop_t *d, struct wlr_box available)
 	apply_layout(m, d, d->root, available, available);
 }
 
+// monocle keeps exactly one window on screen, so focusing reveals n and hides
+// every other leaf on the desktop
 static void monocle_on_focus(output_t *m, desktop_t *d, node_t *n) {
 	(void)m;
 	if (!d->root)
 		return;
 
-	FOR_EACH_LEAF(node, d->root) {
-		if (!node->client)
-			continue;
-
-		bool should_show = (node == n);
-		node->client->flags.shown = should_show;
-		struct wlr_scene_tree *st = client_get_scene_tree(node->client);
-		if (st)
-			wlr_scene_node_set_enabled(&st->node, should_show);
-	}
+	FOR_EACH_LEAF(node, d->root)
+		client_set_visible(node->client, node == n);
 }
 
 static void scroller_on_focus(output_t *m, desktop_t *d, node_t *n) {

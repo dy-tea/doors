@@ -6,6 +6,7 @@
 #include "input_method.h"
 #include "keyboard.h"
 #include "layer.h"
+#include "layout.h"
 #include "once.h"
 #include "output.h"
 #include "pointer_constraint.h"

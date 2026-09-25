@@ -2,6 +2,7 @@
 #include "log.h"
 #include "realtime.h"
 #include "server.h"
+#include "settings.h"
 #include "types.h"
 #include <stdio.h>
 #include <string.h>

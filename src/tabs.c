@@ -1,7 +1,11 @@
+#include "animation.h"
+#include "client.h"
 #include "server.h"
 #include "tabs.h"
 #include "text.h"
+#include "toplevel.h"
 #include "tree.h"
+#include "tree_layout.h"
 #include "types.h"
 #include "xwayland.h"
 #include <stdint.h>
@@ -404,4 +408,83 @@ node_t *tabs_hit_test_desktop(desktop_t *d, double lx, double ly) {
 		return NULL;
 
 	return hit_test_subtree(d->root, lx, ly);
+}
+
+// shows only `active` among the leaves of a tab group, hiding the rest
+void tabs_set_active_leaf(node_t *tabbed, node_t *active) {
+	FOR_EACH_LEAF_SANS_ROOT(leaf, tabbed) {
+		if (leaf->client == NULL || IS_FLOATING(leaf->client))
+			continue;
+
+		client_set_visible(leaf->client, leaf == active);
+	}
+}
+
+static void arrange_tabbed_subtree(output_t *m, desktop_t *d, node_t *n, struct wlr_box content_rect,
+		struct wlr_box root_rect) {
+	if (n == NULL)
+		return;
+	if (n->client && n->client->state == STATE_FLOATING)
+		return;
+
+	n->pending.rectangle = content_rect;
+	n->output = m;
+	node_set_dirty(n);
+
+	if (is_leaf(n)) {
+		render_leaf(m, d, n, content_rect, root_rect, false);
+		return;
+	}
+
+	arrange_tabbed_subtree(m, d, n->first_child, content_rect, root_rect);
+	arrange_tabbed_subtree(m, d, n->second_child, content_rect, root_rect);
+}
+
+// lays out the bar of a tab group and the subtree below it, then reveals the
+// active tab
+void tabs_arrange_group(output_t *m, desktop_t *d, node_t *tabbed, struct wlr_box rect,
+		struct wlr_box root_rect) {
+	bool show_deco = settings.decoration_mode == DECORATION_ALWAYS ||
+		settings.decoration_mode == DECORATION_TABS;
+
+	int bar_h = 0;
+	if (show_deco) {
+		bar_h = tab_bar_height(tabbed);
+		int wg = compute_window_gap(d);
+		struct wlr_box bar_rect = {
+			.x = rect.x,
+			.y = rect.y,
+			.width = (wg < rect.width) ? rect.width - wg : 0,
+			.height = bar_h,
+		};
+
+		if (tabbed->tab_bar == NULL)
+			tabs_create(tabbed);
+		tabs_arrange(tabbed, bar_rect);
+		tabs_show(tabbed, true);
+		tabs_update_focus(tabbed, d->focus);
+	} else if (tabbed->tab_bar) {
+		tabs_show(tabbed, false);
+	}
+
+	struct wlr_box content_rect = rect;
+	if (show_deco) {
+		content_rect.y += bar_h;
+		content_rect.height = (bar_h < content_rect.height) ? content_rect.height - bar_h : 0;
+	}
+
+	arrange_tabbed_subtree(m, d, tabbed->first_child, content_rect, root_rect);
+	arrange_tabbed_subtree(m, d, tabbed->second_child, content_rect, root_rect);
+
+	node_t *active = tab_focus_leaf(tabbed, d->focus);
+	tabs_set_active_leaf(tabbed, active);
+
+	// the active tab has just been laid out, so push its new geometry out
+	if (active != NULL && active->client != NULL && !IS_FLOATING(active->client) &&
+			active->client->toplevel != NULL) {
+		struct wlr_scene_tree *st = client_get_scene_tree(active->client);
+		animation_apply_geometry(active, st, active->client->tiled_rectangle, true);
+		toplevel_center_and_clip_surface(active->client->toplevel);
+		toplevel_send_frame_done(active->client->toplevel);
+	}
 }

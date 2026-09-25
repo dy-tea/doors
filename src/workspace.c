@@ -711,3 +711,12 @@ void workspace_fini(void) {
 
 	wl_list_remove(&server.workspace_commit.link);
 }
+
+desktop_t *find_desktop_by_name_in_monitor(output_t *mon, const char *name) {
+	desktop_t *d;
+	wl_list_for_each(d, &mon->desk_list, link) {
+		if (strcmp(d->name, name) == 0)
+			return d;
+	}
+	return NULL;
+}

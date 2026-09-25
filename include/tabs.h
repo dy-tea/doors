@@ -6,6 +6,7 @@
 
 typedef struct node_t node_t;
 typedef struct desktop_t desktop_t;
+typedef struct output_t output_t;
 
 #define TAB_BAR_HEIGHT 22
 #define TAB_BAR_BORDER 1
@@ -55,3 +56,7 @@ node_t *tabs_hit_test(const node_t *n, double lx, double ly);
 node_t *tabs_hit_test_desktop(desktop_t *d, double lx, double ly);
 
 void tabs_show(node_t *n, bool show);
+
+void tabs_set_active_leaf(node_t *tabbed, node_t *active);
+void tabs_arrange_group(output_t *m, desktop_t *d, node_t *tabbed, struct wlr_box rect,
+	struct wlr_box root_rect);

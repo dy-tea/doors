@@ -12,8 +12,10 @@ void workspace_switch_to_desktop_by_index(int index);
 void workspace_switch_to_last_desktop(void);
 struct wlr_ext_workspace_handle_v1 *workspace_get_active(void);
 
-struct desktop_t;
-struct output_t;
-struct desktop_t *find_desktop_by_name(const char *name);
+typedef struct desktop_t desktop_t;
+typedef struct output_t output_t;
 
-void desktop_init(struct desktop_t *d, struct output_t *output, const char *name);
+desktop_t *find_desktop_by_name(const char *name);
+desktop_t *find_desktop_by_name_in_monitor(output_t *mon, const char *name);
+
+void desktop_init(desktop_t *d, output_t *output, const char *name);
