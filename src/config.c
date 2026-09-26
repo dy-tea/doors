@@ -170,6 +170,7 @@ static const action_entry_t action_table[] = {
 	ENTRY2("toggle", "fullscreen", BIND_TOGGLE_FULLSCREEN),
 	ENTRY2("toggle", "maximize", BIND_TOGGLE_MAXIMIZE),
 	ENTRY2("toggle", "minimize", BIND_TOGGLE_MINIMIZE),
+	ENTRY2("toggle", "restore_minimized", BIND_RESTORE_MINIMIZED),
 	ENTRY2("toggle", "pseudo_tiled", BIND_TOGGLE_PSEUDO_TILED),
 	ENTRY2("toggle", "monocle", BIND_TOGGLE_MONOCLE),
 	ENTRY2("toggle", "floating_layout", BIND_TOGGLE_FLOATING_LAYOUT),
@@ -1184,6 +1185,9 @@ void execute_bind(bind_t b) {
 	case BIND_TOGGLE_MINIMIZE:
 		toggle_minimize();
 		break;
+	case BIND_RESTORE_MINIMIZED:
+		restore_minimized();
+		break;
 	case BIND_TOGGLE_PSEUDO_TILED:
 		toggle_pseudo_tiled();
 		break;
@@ -1510,6 +1514,7 @@ const char *bind_action_name(bind_action_t action) {
 		"interactive_resize",
 		"tiling_drag",
 		"external",
+		"restore_minimized",
 		"portal_shortcut"
 	};
 	if (action >= 0 && action < (int)(sizeof(names) / sizeof(names[0])))
@@ -1567,6 +1572,7 @@ bind_action_t bind_action_from_name(const char *name) {
 	ACTION_IF_MATCH("toggle_fullscreen", BIND_TOGGLE_FULLSCREEN);
 	ACTION_IF_MATCH("toggle_maximize", BIND_TOGGLE_MAXIMIZE);
 	ACTION_IF_MATCH("toggle_minimize", BIND_TOGGLE_MINIMIZE);
+	ACTION_IF_MATCH("restore_minimized", BIND_RESTORE_MINIMIZED);
 	ACTION_IF_MATCH("toggle_pseudo_tiled", BIND_TOGGLE_PSEUDO_TILED);
 	ACTION_IF_MATCH("toggle_monocle", BIND_TOGGLE_MONOCLE);
 	ACTION_IF_MATCH("toggle_master_stack", BIND_TOGGLE_MASTER_STACK);

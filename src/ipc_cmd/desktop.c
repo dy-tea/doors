@@ -233,6 +233,7 @@ void ipc_cmd_desktop(char **args, int num, int client_fd) {
 			mon->last_desk = next ? next : prev;
 
 		ipc_put_status(SUB_MASK_DESKTOP_REMOVE, "desktop_remove[%s]\n", desk->name);
+		desktop_minimized_clear(desk);
 		free(desk);
 		transaction_commit_dirty();
 		send_success(client_fd, "removed\n");

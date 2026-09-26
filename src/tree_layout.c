@@ -171,12 +171,11 @@ static void split_dimension(int total, double split_ratio, uint16_t first_min, u
 		*second_out = 0;
 }
 
-// what a split child does with the slot the layout hands it
 typedef enum {
-	CHILD_ACTIVE, // takes part in the split normally
-	CHILD_HIDDEN, // slot collapses
-	CHILD_EXPANDED,// covers the output, fills slot
-	CHILD_MAXIMIZED // hides sibling, fills slot
+	CHILD_ACTIVE,
+	CHILD_HIDDEN,
+	CHILD_EXPANDED,
+	CHILD_MAXIMIZED
 } child_slot_t;
 
 static child_slot_t child_slot(node_t *c) {

@@ -98,15 +98,18 @@ static void scroller_on_focus(output_t *m, desktop_t *d, node_t *n) {
 	if (!s)
 		return;
 
+	if (n != NULL && n->client != NULL)
+		scroller_sync_focus(s, n->client);
+
 	if (s->column_count == 0 && d->root) {
 		FOR_EACH_LEAF(leaf, d->root)
-			if (leaf->client)
+			if (leaf->client && !node_is_minimized(leaf))
 				leaf->client->flags.shown = true;
 	} else {
 		for (int i = 0; i < s->column_count; i++) {
 			for (int j = 0; j < s->columns[i].tile_count; j++) {
 				client_t *c = s->columns[i].tiles[j].client;
-				if (c)
+				if (c && !c->flags.minimized)
 					c->flags.shown = true;
 			}
 		}
@@ -152,8 +155,7 @@ static bool scroller_focus(desktop_t *d, direction_t dir) {
 	return false;
 }
 
-// pick the leaf of `sub` that is adjacent to `from` in direction `dir`: the one overlapping
-// `from` the most on the perpendicular axis, closest to the shared edge on ties
+// pick the leaf of `sub` that is adjacent to `from` in direction `dir`
 static node_t *closest_leaf(node_t *sub, node_t *from, direction_t dir) {
 	bool horiz = dir == DIR_WEST || dir == DIR_EAST;
 	struct wlr_box f = from->rectangle;
@@ -161,6 +163,9 @@ static node_t *closest_leaf(node_t *sub, node_t *from, direction_t dir) {
 	long best_overlap = -1, best_dist = 0;
 
 	FOR_EACH_LEAF(leaf, sub) {
+		if (node_is_invisible(leaf))
+			continue;
+
 		struct wlr_box r = leaf->rectangle;
 		long lo, hi, dist;
 		if (horiz) {
@@ -179,32 +184,68 @@ static node_t *closest_leaf(node_t *sub, node_t *from, direction_t dir) {
 			best_dist = dist;
 		}
 	}
-	return best ? best : first_extrema(sub);
+	return best;
+}
+
+static node_t *focus_fence_leaf(node_t *from, direction_t dir) {
+	node_t *cursor = from;
+
+	while (cursor != NULL) {
+		node_t *sub = find_fence_from(cursor, dir);
+		if (sub == NULL)
+			return NULL;
+
+		node_t *leaf = closest_leaf(sub, from, dir);
+		if (leaf != NULL)
+			return leaf;
+
+		cursor = sub;
+	}
+
+	return NULL;
+}
+
+static node_t *wrapped_focus_leaf(desktop_t *d, direction_t dir) {
+	if (!settings.focus_wrapping || d->root == NULL)
+		return NULL;
+
+	node_t *first = NULL, *last = NULL;
+	FOR_EACH_LEAF(leaf, d->root) {
+		if (node_is_invisible(leaf))
+			continue;
+
+		if (first == NULL)
+			first = leaf;
+		last = leaf;
+	}
+
+	node_t *w = dir == DIR_EAST || dir == DIR_SOUTH ? first : last;
+	return w != NULL && w != d->focus ? w : NULL;
 }
 
 static bool tiled_focus(desktop_t *d, direction_t dir) {
-	node_t *n = find_fence(d->focus, dir);
-	if (n != NULL) {
-		n = closest_leaf(n, d->focus, dir);
-		if (n != NULL)
-			return focus_node(mon, d, n);
-	} else if (settings.focus_wrapping && d->root) {
-		node_t *w = dir == DIR_EAST ||
-			dir == DIR_SOUTH ? first_extrema(d->root) : second_extrema(d->root);
-		if (w && w != d->focus)
-			return focus_node(mon, d, w);
-	}
+	if (d->focus == NULL)
+		return false;
+
+	node_t *n = focus_fence_leaf(d->focus, dir);
+	if (n != NULL)
+		return focus_node(mon, d, n);
+
+	n = wrapped_focus_leaf(d, dir);
+	if (n != NULL)
+		return focus_node(mon, d, n);
+
 	return false;
 }
 
 static bool tiled_swap(output_t *m, desktop_t *d, direction_t dir) {
-	node_t *n = find_fence(d->focus, dir);
+	if (d->focus == NULL)
+		return false;
+
+	node_t *n = focus_fence_leaf(d->focus, dir);
 	if (n != NULL) {
-		n = closest_leaf(n, d->focus, dir);
-		if (n != NULL) {
-			swap_nodes(m, d, d->focus, m, d, n);
-			return true;
-		}
+		swap_nodes(m, d, d->focus, m, d, n);
+		return true;
 	}
 	return false;
 }

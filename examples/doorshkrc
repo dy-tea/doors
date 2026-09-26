@@ -22,6 +22,14 @@ alt + f
 alt + shift + space
 	doorsctl node --state floating
 
+# minimize the focused window
+alt + shift + m
+	doorsctl node --state minimized
+
+# bring back the window that was minimized last
+alt + shift + r
+	doorsctl toggle restore_minimized
+
 # toggle monocle
 alt + m
 	doorsctl desktop --layout monocle

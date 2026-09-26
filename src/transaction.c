@@ -363,7 +363,7 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 		}
 	}
 
-	if (node->client->flags.shown) {
+	if (node->client->flags.shown && !node->client->flags.minimized) {
 		wlr_scene_node_set_enabled(&scene_tree->node, true);
 		wlr_log(WLR_INFO, "Arranged layout for node %u [already shown]", node->id);
 	} else {

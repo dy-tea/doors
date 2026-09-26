@@ -527,13 +527,25 @@ int master_stack_collect(desktop_t *d, node_t ***out_nodes) {
 static node_t **gather_focused(desktop_t *d, int *out_total, int *out_index) {
 	node_t **nodes = NULL;
 	int count = collect_tiled_nodes(d, &nodes);
-	int index = find_node_index(nodes, count, d ? d->focus : NULL);
+
+	int visible = 0;
+	for (int i = 0; i < count; i++) {
+		if (node_is_invisible(nodes[i]))
+			continue;
+
+		if (visible != i)
+			nodes[visible] = nodes[i];
+
+		visible++;
+	}
+
+	int index = visible > 0 ? find_node_index(nodes, visible, d ? d->focus : NULL) : -1;
 	if (index < 0) {
 		free(nodes);
 		return NULL;
 	}
 
-	*out_total = count;
+	*out_total = visible;
 	*out_index = index;
 	return nodes;
 }

@@ -41,6 +41,9 @@ void client_set_visible(client_t *client, bool show) {
 	if (client == NULL)
 		return;
 
+	if (show && client->flags.minimized)
+		return;
+
 	client->flags.shown = show;
 
 	struct wlr_scene_tree *st = client_get_scene_tree(client);

@@ -275,7 +275,7 @@ When true, windows that advertise themselves as dialogs via the `xdg-dialog-v1` 
 doorsctl config minimize_to_scratchpad true|false
 ```
 
-When true, clicking the minimize button in the toplevel's decorations sends it to the scratchpad.
+When true, minimizing a window (the decoration button, `doorsctl node --state minimized` or `doorsctl toggle minimize`) sends it to the scratchpad instead of just hiding it. Minimized windows are then restored either with `doorsctl scratchpad show` or with `doorsctl toggle restore_minimized`, Default: false.
 
 ```
 doorsctl config directional_focus_tightness <0-100>
@@ -494,6 +494,7 @@ doorsctl node --focus                  						# Focus most recently focused windo
 doorsctl node --state tiled            						# Set focused window to tiled
 doorsctl node --state floating         						# Set focused window to floating
 doorsctl node --state fullscreen       						# Set focused window to fullscreen
+doorsctl node --state minimized        						# Minimize focused window
 doorsctl node --to-desktop <n>         						# Send window to desktop n (1-10)
 doorsctl node --to-desktop <name>      						# Send window to named desktop
 doorsctl node --flag hidden=true       						# Toggle hidden flag on window
@@ -566,10 +567,10 @@ floating       New windows spawn floating in a cascade, and windows you tile by 
 #### Focus Commands
 
 ```
-doorsctl focus west|w                  # Focus window to the left
-doorsctl focus east|e                  # Focus window to the right
-doorsctl focus north|n                 # Focus window above
-doorsctl focus south|s                  # Focus window below
+doorsctl focus west|w                    # Focus window to the left
+doorsctl focus east|e                    # Focus window to the right
+doorsctl focus north|n                   # Focus window above
+doorsctl focus south|s                   # Focus window below
 ```
 
 #### Swap Commands
@@ -596,10 +597,22 @@ doorsctl presel cancel                   # Cancel current preselection
 ```
 doorsctl toggle floating                # Toggle focused window floating/tiled
 doorsctl toggle fullscreen              # Toggle focused window fullscreen
+doorsctl toggle minimize                # Minimize focused window
+doorsctl toggle restore_minimized       # Restore the window that was minimized last
 doorsctl toggle pseudo_tiled            # Toggle focused window pseudo-tiled
 doorsctl toggle monocle                 # Toggle monocle layout on desktop
 doorsctl toggle master_stack            # Toggle master-stack layout on desktop
 doorsctl toggle floating_layout         # Toggle floating layout on desktop
+```
+
+#### Minimizing and Restoring Windows
+
+A minimized window is hidden and gives up its space in the layout: its tile collapses in tiled and scroller layouts, so the remaining windows grow into it.
+
+```
+doorsctl node --state minimized   # Minimize the focused window
+doorsctl toggle minimize          # Toggles minimize
+doorsctl toggle restore_minimized # Restore the most recently minimized window
 ```
 
 #### Scratchpad Commands
@@ -673,6 +686,7 @@ doorsctl rule -a vesktop desktop=III
 - `manage=on|off` - Whether the window is managed by the compositor
 - `locked=on|off` - Lock window to its desktop
 - `hidden=on|off` - Start window hidden
+- `minimized=on|off` - Start window minimized
 - `sticky=on|off` - Make window sticky (visible on all desktops)
 - `one_shot` - Remove rule after first match
 - `blur=on|off` - Whether a window should have the blur effect set

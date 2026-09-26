@@ -41,7 +41,7 @@ node_t *desktop_fallback_focus(desktop_t *d, node_t *skip) {
 
 		for (int i = 0; i < count; i++) {
 			node_t *n = toplevels[i];
-			if (n == skip || !IS_FLOATING(n->client) || !n->client->flags.shown)
+			if (n == skip || !IS_FLOATING(n->client) || node_is_invisible(n) || !n->client->flags.shown)
 				continue;
 
 			struct wlr_scene_tree *st = client_get_scene_tree(n->client);
@@ -52,10 +52,10 @@ node_t *desktop_fallback_focus(desktop_t *d, node_t *skip) {
 		link = link->prev;
 	}
 
-	// no toplevel above tree, take the first one of it
+	// no toplevel above tree, take the first one of it that the user can see
 	if (best == NULL && d->root != NULL) {
 		FOR_EACH_LEAF(n, d->root) {
-			if (n != skip && n->client != NULL) {
+			if (n != skip && !node_is_invisible(n)) {
 				best = n;
 				break;
 			}
@@ -91,7 +91,7 @@ static bool focus_node_impl(output_t *m, desktop_t *d, node_t *n, bool give_keyb
 		impl->on_focus(m, d, n);
 	} else if (d->root != NULL) {
 		FOR_EACH_LEAF(node, d->root)
-			if (node->client != NULL)
+			if (node->client != NULL && !node_is_minimized(node))
 				node->client->flags.shown = true;
 	}
 
@@ -162,7 +162,7 @@ bool activate_node(output_t *m, desktop_t *d, node_t *n) {
 	return focus_node_impl(m, d, n, on_current_desktop);
 }
 
-node_t *find_fence(node_t *n, direction_t dir) {
+node_t *find_fence_from(node_t *n, direction_t dir) {
 	if (n == NULL)
 		return NULL;
 
@@ -189,4 +189,8 @@ node_t *find_fence(node_t *n, direction_t dir) {
 	}
 
 	return NULL;
+}
+
+node_t *find_fence(node_t *n, direction_t dir) {
+	return find_fence_from(n, dir);
 }

@@ -649,8 +649,11 @@ static void handle_map(struct wl_listener *listener, void *data) {
 			client->floating_rectangle.y);
 
 		node_set_hidden(node, false);
-		client->flags.shown = true;
-		wlr_scene_node_set_enabled(&xwayland_view->scene_tree->node, true);
+		// a rule can ask for the toplevel to start out minimized
+		if (!client->flags.minimized) {
+			client->flags.shown = true;
+			wlr_scene_node_set_enabled(&xwayland_view->scene_tree->node, true);
+		}
 	} else if (!(rule && rule->has & RULE_TYPE_STATE) && layout_init_client(target_monitor,
 			target_desktop, client)) {
 		layout_floated = true;
@@ -664,9 +667,12 @@ static void handle_map(struct wl_listener *listener, void *data) {
 
 		node->rectangle.width = xsurface->width;
 		node->rectangle.height = xsurface->height;
-		client->flags.shown = true;
-		wlr_scene_node_set_enabled(&xwayland_view->scene_tree->node, true);
-		wlr_scene_node_set_enabled(&xwayland_view->content_tree->node, true);
+		// a rule can ask for the toplevel to start out minimized
+		if (!client->flags.minimized) {
+			client->flags.shown = true;
+			wlr_scene_node_set_enabled(&xwayland_view->scene_tree->node, true);
+			wlr_scene_node_set_enabled(&xwayland_view->content_tree->node, true);
+		}
 
 		wlr_log(WLR_DEBUG, "XWayland window will be tiled, scene_tree=%p enabled=%d",
 			(void *)xwayland_view->scene_tree, xwayland_view->scene_tree->node.enabled);
@@ -711,6 +717,9 @@ static void handle_map(struct wl_listener *listener, void *data) {
 		wlr_fractional_scale_v1_notify_scale(xsurface->surface, scale);
 		wlr_surface_set_preferred_buffer_scale(xsurface->surface, ceil(scale));
 	}
+
+	if (client->flags.minimized)
+		desktop_minimized_push(target_desktop, node);
 
 	arrange(target_monitor, target_desktop, true);
 

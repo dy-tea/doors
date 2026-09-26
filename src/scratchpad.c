@@ -229,6 +229,7 @@ void scratchpad_show(node_t *n) {
 	n->client->flags.minimized = false;
 	n->scratchpad = false;
 	node_set_hidden(n, false);
+	desktop_minimized_forget(n);
 
 	wl_list_remove(&entry->link);
 	free(entry);

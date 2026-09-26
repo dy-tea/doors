@@ -51,8 +51,15 @@ void client_set_fullscreen(struct output_t *m, desktop_t *d, node_t *n, bool val
 bool client_set_maximized(struct output_t *m, desktop_t *d, node_t *n, bool value);
 bool client_is_maximized(const client_t *c);
 bool client_reports_maximized(const client_t *c, desktop_t *d);
-bool node_is_minimized(const node_t *n);
 bool client_set_minimized(struct output_t *m, desktop_t *d, node_t *n, bool value);
+
+bool node_is_minimized(const node_t *n);
+bool node_is_invisible(const node_t *n);
+
+void desktop_minimized_forget(node_t *n);
+void desktop_minimized_clear(desktop_t *d);
+void desktop_minimized_push(desktop_t *d, node_t *n);
+bool client_restore_last_minimized(struct output_t *m, desktop_t *d);
 
 // preselection
 presel_t *make_presel(void);

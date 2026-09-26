@@ -550,6 +550,8 @@ void floating_on_focus(output_t *m, desktop_t *d, node_t *n) {
 		node_t *w = toplevels[i];
 		if (w->client == NULL || w->client->state == STATE_FULLSCREEN)
 			continue;
+		if (node_is_minimized(w))
+			continue;
 
 		w->client->flags.shown = true;
 		struct wlr_scene_tree *st = client_get_scene_tree(w->client);
@@ -578,7 +580,7 @@ bool floating_focus(desktop_t *d, direction_t dir) {
 	if (d->focus->client != NULL && d->focus->client->state == STATE_FULLSCREEN) {
 		for (int i = 0; i < count; i++) {
 			node_t *n = toplevels[i];
-			if (n == d->focus || n->client == NULL || n->client->state == STATE_FULLSCREEN)
+			if (n == d->focus || node_is_invisible(n) || n->client->state == STATE_FULLSCREEN)
 				continue;
 			if (dir == DIR_EAST || dir == DIR_SOUTH)
 				best = n;
@@ -593,7 +595,7 @@ bool floating_focus(desktop_t *d, direction_t dir) {
 
 	for (int i = 0; i < count; i++) {
 		node_t *n = toplevels[i];
-		if (n == d->focus || n->client == NULL || n->client->state == STATE_FULLSCREEN)
+		if (n == d->focus || node_is_invisible(n) || n->client->state == STATE_FULLSCREEN)
 			continue;
 
 		struct wlr_box r = node_current_rect(n);
@@ -624,7 +626,7 @@ bool floating_focus(desktop_t *d, direction_t dir) {
 		node_t *wrapped = NULL;
 		for (int i = 0; i < count; i++) {
 			node_t *n = toplevels[i];
-			if (n == d->focus || n->client == NULL || n->client->state == STATE_FULLSCREEN)
+			if (n == d->focus || node_is_invisible(n) || n->client->state == STATE_FULLSCREEN)
 				continue;
 			if (dir == DIR_EAST || dir == DIR_SOUTH)
 				wrapped = n;

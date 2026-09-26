@@ -563,6 +563,7 @@ void ipc_cmd_output(char **args, int num, int client_fd) {
 						focus_node(mon, mon->desk, mon->desk->focus);
 				}
 				wl_list_remove(&d->link);
+				desktop_minimized_clear(d);
 				free(d);
 				d = next;
 			}

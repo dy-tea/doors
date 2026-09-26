@@ -260,10 +260,19 @@ bool handle_keybind(uint32_t modifiers, xkb_keysym_t sym) {
 }
 
 void focus_dir(direction_t dir) {
-	if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL)
+	if (mon == NULL || mon->desk == NULL)
 		return;
 
 	desktop_t *d = mon->desk;
+
+	if (node_is_invisible(d->focus)) {
+		node_t *next = desktop_fallback_focus(d, NULL);
+		if (next == NULL || !focus_node(mon, d, next))
+			return;
+	}
+
+	if (d->focus == NULL)
+		return;
 
 	node_t *tab_anc = tabbed_ancestor(d->focus);
 	if (tab_anc != NULL) {
@@ -439,6 +448,13 @@ void toggle_minimize(void) {
 		return;
 
 	client_set_minimized(mon, mon->desk, n, !n->client->flags.minimized);
+}
+
+void restore_minimized(void) {
+	if (mon == NULL || mon->desk == NULL)
+		return;
+
+	client_restore_last_minimized(mon, mon->desk);
 }
 
 void toggle_pseudo_tiled(void) {

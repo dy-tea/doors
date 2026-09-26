@@ -20,3 +20,4 @@ bool activate_node(output_t *m, desktop_t *d, node_t *n);
 
 // the node on the other side of the first split in `dir` between n and the root
 node_t *find_fence(node_t *n, direction_t dir);
+node_t *find_fence_from(node_t *n, direction_t dir);

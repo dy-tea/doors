@@ -57,6 +57,7 @@ void tile_focused(void);
 void toggle_fullscreen(void);
 void toggle_maximize(void);
 void toggle_minimize(void);
+void restore_minimized(void);
 void toggle_pseudo_tiled(void);
 void toggle_block_out_from_screenshare(void);
 

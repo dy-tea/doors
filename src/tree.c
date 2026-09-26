@@ -12,7 +12,9 @@
 #include "toplevel.h"
 #include "transaction.h"
 #include "tree.h"
+#include "tree_focus.h"
 #include "types.h"
+#include "workspace.h"
 #include "xwayland.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -46,6 +48,7 @@ node_t *make_node(uint32_t id) {
 	n->client = NULL;
 	n->constraints.min_width = MIN_WIDTH;
 	n->constraints.min_height = MIN_HEIGHT;
+	wl_list_init(&n->minimize_link);
 
 	// init transaction
 	n->instruction = NULL;
@@ -107,6 +110,8 @@ void free_node(node_t *n) {
 		}
 	}
 
+	desktop_minimized_forget(n);
+
 	animation_cancel_node(n);
 
 	if (n->scratchpad)
@@ -164,6 +169,10 @@ bool client_reports_maximized(const client_t *c, desktop_t *d) {
 
 bool node_is_minimized(const node_t *n) {
 	return n != NULL && n->client != NULL && n->client->flags.minimized;
+}
+
+bool node_is_invisible(const node_t *n) {
+	return n == NULL || n->client == NULL || n->hidden || node_is_minimized(n);
 }
 
 bool is_first_child(node_t *n) {
@@ -862,6 +871,71 @@ bool client_set_maximized(output_t *m, desktop_t *d, node_t *n, bool value) {
 	return true;
 }
 
+// drop a toplevel from whichever minimize history holds it
+void desktop_minimized_forget(node_t *n) {
+	if (n == NULL || n->minimize_link.prev == NULL)
+		return;
+
+	wl_list_remove(&n->minimize_link);
+}
+
+// a desktop is going away, its toplevels stay minimized but are no longer tracked
+void desktop_minimized_clear(desktop_t *d) {
+	if (d == NULL)
+		return;
+
+	node_t *n, *tmp;
+	wl_list_for_each_safe(n, tmp, &d->minimized, minimize_link)
+		wl_list_remove(&n->minimize_link);
+}
+
+// remember a toplevel so the restore bind can bring it back later
+void desktop_minimized_push(desktop_t *d, node_t *n) {
+	if (d == NULL || n == NULL)
+		return;
+
+	desktop_minimized_forget(n);
+
+	wl_list_insert(d->minimized.prev, &n->minimize_link);
+}
+
+// brings back the toplevel that was minimized last, so a minimized window never becomes
+// unreachable from the keyboard
+bool client_restore_last_minimized(output_t *m, desktop_t *d) {
+	if (d == NULL)
+		return false;
+
+	while (!wl_list_empty(&d->minimized)) {
+		node_t *n = NULL;
+		n = wl_container_of(d->minimized.prev, n, minimize_link);
+		wl_list_remove(&n->minimize_link);
+
+		if (!node_focusable(n) || !n->client->flags.minimized)
+			continue;
+
+		if (n->scratchpad) {
+			scratchpad_show(n);
+			return true;
+		}
+
+		output_t *out = n->output != NULL ? n->output : m;
+		desktop_t *target = n->desktop != NULL ? n->desktop : d;
+		if (out == NULL)
+			return false;
+
+		if (out->desk != target)
+			workspace_switch_to_desktop(target->name);
+
+		client_set_minimized(out, target, n, false);
+
+		target->focus = n;
+		focus_node(out, target, n);
+		return true;
+	}
+
+	return false;
+}
+
 bool client_set_minimized(output_t *m, desktop_t *d, node_t *n, bool value) {
 	if (n == NULL || n->client == NULL)
 		return false;
@@ -872,6 +946,11 @@ bool client_set_minimized(output_t *m, desktop_t *d, node_t *n, bool value) {
 
 	if (value && c->state == STATE_FULLSCREEN)
 		client_set_fullscreen(m, d, n, false);
+
+	if (value)
+		desktop_minimized_push(d, n);
+	else
+		desktop_minimized_forget(n);
 
 	if (settings.minimize_to_scratchpad) {
 		if (value) {
@@ -884,22 +963,16 @@ bool client_set_minimized(output_t *m, desktop_t *d, node_t *n, bool value) {
 		c->flags.minimized = value;
 		node_set_hidden(n, value);
 
-		if (value) {
-			if (d != NULL && d->focus == n) {
-				node_t *next = desktop_fallback_focus(d, n);
-				d->focus = next;
-				if (next != NULL && m != NULL)
-					focus_node(m, d, next);
-			}
-			c->flags.shown = false;
-			struct wlr_scene_tree *st = client_get_scene_tree(c);
-			if (st != NULL)
-				wlr_scene_node_set_enabled(&st->node, false);
-		} else {
-			c->flags.shown = true;
-			struct wlr_scene_tree *st = client_get_scene_tree(c);
-			if (st != NULL)
-				wlr_scene_node_set_enabled(&st->node, true);
+		c->flags.shown = !value;
+		struct wlr_scene_tree *st = client_get_scene_tree(c);
+		if (st != NULL)
+			wlr_scene_node_set_enabled(&st->node, !value);
+
+		if (value && d != NULL && d->focus == n) {
+			node_t *next = desktop_fallback_focus(d, n);
+			d->focus = next;
+			if (next != NULL && m != NULL)
+				focus_node(m, d, next);
 		}
 
 		arrange(m, d, true);

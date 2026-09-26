@@ -122,6 +122,7 @@ static const struct {
 	{"fullscreen", toggle_fullscreen},
 	{"maximize", toggle_maximize},
 	{"minimize", toggle_minimize},
+	{"restore_minimized", restore_minimized},
 	{"pseudo_tiled", toggle_pseudo_tiled},
 	{"monocle", toggle_monocle},
 	{"floating_layout", toggle_floating_layout},

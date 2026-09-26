@@ -200,6 +200,7 @@ void desktop_init(desktop_t *d, output_t *output, const char *name) {
 	d->padding = (padding_t){0};
 	d->output = output;
 	wl_list_init(&d->link);
+	wl_list_init(&d->minimized);
 	if (wl_list_empty(&output->desk_list))
 		output->desk = d;
 	wl_list_insert(output->desk_list.prev, &d->link);
@@ -286,6 +287,9 @@ found_desktop:
 	// in monocle layout, only the focused node should be visible
 	if (should_show && current_desktop->layout == LAYOUT_MONOCLE)
 		should_show = (node == current_desktop->focus);
+
+	if (should_show && node_is_minimized(node))
+		should_show = false;
 
 	if (should_show) {
 		node->client->flags.shown = true;
@@ -386,6 +390,8 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
 		while (desktop_window_iter_advance(&it, &n, &tree)) {
 			if (!tree || !tree->node.enabled)
 				continue;
+			if (node_is_minimized(n))
+				continue;
 			struct wlr_box target = window_target_rect(n);
 			struct wlr_box from = {
 				tree->node.x,
@@ -419,6 +425,8 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
 		while (desktop_window_iter_advance(&it, &n, &tree)) {
 			if (!tree)
 				continue;
+			if (node_is_minimized(n))
+				continue;
 			n->client->flags.shown = true;
 			wlr_scene_node_set_enabled(&tree->node, true);
 		}
@@ -438,6 +446,8 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
 		struct wlr_scene_tree *tree;
 		while (desktop_window_iter_advance(&it, &n, &tree)) {
 			if (!tree)
+				continue;
+			if (node_is_minimized(n))
 				continue;
 			n->client->flags.shown = true;
 			wlr_scene_node_set_enabled(&tree->node, true);
@@ -472,6 +482,8 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
 		while (desktop_window_iter_advance(&it, &n, &tree)) {
 			if (!tree)
 				continue;
+			if (node_is_minimized(n))
+				continue;
 			wlr_scene_node_set_enabled(&tree->node, true);
 			wlr_scene_node_set_position(&tree->node, tree->node.x - num_steps * dx,
 				tree->node.y - num_steps * dy);
@@ -497,6 +509,8 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
 		struct wlr_scene_tree *tree;
 		while (desktop_window_iter_advance(&it, &n, &tree)) {
 			if (!tree)
+				continue;
+			if (node_is_minimized(n))
 				continue;
 			struct wlr_box target = window_target_rect(n);
 			struct wlr_box from = {

@@ -46,6 +46,8 @@ static void unhide_leaves(desktop_t *desk) {
 	for (node_t *ni = first_extrema(desk->root); ni; ni = next_leaf(ni, desk->root)) {
 		if (!ni->client)
 			continue;
+		if (node_is_minimized(ni))
+			continue;
 
 		ni->client->flags.shown = true;
 		bool configured = true;
@@ -194,6 +196,8 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
 			for (node_t *n_iter = first_extrema(src_desk->root); n_iter != NULL; n_iter = next_leaf(n_iter,
 					src_desk->root)) {
 				if (n_iter->client) {
+					if (node_is_minimized(n_iter))
+						continue;
 					n_iter->client->flags.shown = true;
 					bool already_configured = true;
 					if (n_iter->client->toplevel)
@@ -769,6 +773,8 @@ void ipc_cmd_node(char **args, int num, int client_fd) {
 					if (leaf->client == NULL)
 						continue;
 					if (leaf->client->state == STATE_FLOATING)
+						continue;
+					if (node_is_minimized(leaf))
 						continue;
 					leaf->client->flags.shown = true;
 					struct wlr_scene_tree *stree = client_get_scene_tree(leaf->client);

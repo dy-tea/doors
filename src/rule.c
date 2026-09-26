@@ -223,7 +223,7 @@ void rule_apply_consequence(node_t *node, client_t *client, const rule_consequen
 	if (rule->has & RULE_TYPE_MAXIMIZED)
 		client->flags.maximized = rule->flags & RULE_TYPE_MAXIMIZED;
 	if (rule->has & RULE_TYPE_MINIMIZED)
-		client->flags.minimized = rule->flags & RULE_TYPE_MINIMIZED;
+		client->flags.minimized = (rule->flags & RULE_TYPE_MINIMIZED) != 0;
 	if (rule->has & RULE_TYPE_STICKY)
 		node->sticky = rule->flags & RULE_TYPE_STICKY;
 	if (rule->has & RULE_TYPE_LOCKED)

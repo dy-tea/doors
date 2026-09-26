@@ -414,8 +414,11 @@ static void toplevel_set_floating(toplevel_t *toplevel, node_t *n, output_t *out
 	n->client->last_state = STATE_TILED;
 	n->client->state = STATE_FLOATING;
 	node_set_hidden(n, false);
-	n->client->flags.shown = true;
-	wlr_scene_node_set_enabled(&toplevel->scene_tree->node, true);
+	// a rule can ask for the toplevel to start out minimized
+	if (!n->client->flags.minimized) {
+		n->client->flags.shown = true;
+		wlr_scene_node_set_enabled(&toplevel->scene_tree->node, true);
+	}
 }
 
 void toplevel_map(struct wl_listener *listener, void *data) {
@@ -669,6 +672,9 @@ void toplevel_map(struct wl_listener *listener, void *data) {
 	// a client can ask to be maximized before the window is mapped
 	if (!rule_has_state && toplevel->xdg_toplevel->requested.maximized)
 		toplevel_handle_maximize(toplevel, true);
+
+	if (n->client->flags.minimized)
+		desktop_minimized_push(target_desktop, n);
 
 	toplevel->wants_fade = true;
 	arrange(target_output, target_desktop, true);

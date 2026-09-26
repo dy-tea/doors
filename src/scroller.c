@@ -83,6 +83,28 @@ void scroller_leave(struct output_t *m, desktop_t *d) {
 	d->scroller_state = NULL;
 }
 
+static bool scroller_tile_shown(const scroller_tile_t *t) {
+	if (t == NULL || t->client == NULL)
+		return false;
+
+	if (t->client->flags.minimized)
+		return false;
+
+	node_t *n = client_get_node(t->client);
+	if (n != NULL && (n->hidden || node_is_detached(n)))
+		return false;
+
+	return true;
+}
+
+static bool scroller_column_shown(const scroller_column_t *col) {
+	for (int j = 0; j < col->tile_count; j++)
+		if (scroller_tile_shown(&col->tiles[j]))
+			return true;
+
+	return false;
+}
+
 static double resolve_column_width(scroller_state_t *s, int col_idx, double gap, double area_w) {
 	scroller_column_t *col = &s->columns[col_idx];
 	switch (col->width.type) {
@@ -92,6 +114,34 @@ static double resolve_column_width(scroller_state_t *s, int col_idx, double gap,
 		return max_d(1.0, col->width.value);
 	}
 	return 1.0;
+}
+
+static int scroller_camera_column(scroller_state_t *s) {
+	if (s->active_column_idx >= 0 && s->active_column_idx < s->column_count &&
+		scroller_column_shown(&s->columns[s->active_column_idx]))
+		return s->active_column_idx;
+
+	for (int dist = 1; dist < s->column_count; dist++) {
+		int right = s->active_column_idx + dist;
+		if (right < s->column_count && scroller_column_shown(&s->columns[right]))
+			return right;
+
+		int left = s->active_column_idx - dist;
+		if (left >= 0 && scroller_column_shown(&s->columns[left]))
+			return left;
+	}
+
+	return s->active_column_idx;
+}
+
+static void scroller_column_positions(scroller_state_t *s, double gap, double *out) {
+	double wx = 0.0;
+	for (int i = 0; i < s->column_count; i++) {
+		out[i] = wx;
+		if (s->columns[i].resolved_width > 0.0)
+			wx += s->columns[i].resolved_width + gap;
+	}
+	out[s->column_count] = wx;
 }
 
 static bool find_tile(scroller_state_t *s, client_t *c, int *out_col_idx, int *out_tile_idx) {
@@ -334,9 +384,14 @@ void scroller_arrange(struct output_t *m, desktop_t *d, struct wlr_box available
 	double area_w = max_d(1.0, (double)available.width);
 	double area_h = max_d(1.0, (double)available.height);
 
-	// resolve column widths
-	for (int i = 0; i < s->column_count; i++)
+	for (int i = 0; i < s->column_count; i++) {
+		if (!scroller_column_shown(&s->columns[i])) {
+			s->columns[i].resolved_width = 0.0;
+			continue;
+		}
+
 		s->columns[i].resolved_width = resolve_column_width(s, i, (double)gap, area_w);
+	}
 
 	// compute tile heights and positions (world space, relative to area origin)
 	for (int i = 0; i < s->column_count; i++) {
@@ -344,11 +399,16 @@ void scroller_arrange(struct output_t *m, desktop_t *d, struct wlr_box available
 		if (col->tile_count == 0)
 			continue;
 
+		int shown_count = 0;
 		double col_avail_h = area_h;
 		double total_weight = 0.0;
 		double fixed_h = 0.0;
 
 		for (int j = 0; j < col->tile_count; j++) {
+			if (!scroller_tile_shown(&col->tiles[j]))
+				continue;
+
+			shown_count++;
 			if (col->tiles[j].height.type == SCROLLER_HEIGHT_FIXED) {
 				fixed_h += col->tiles[j].height.value;
 			} else {
@@ -356,16 +416,22 @@ void scroller_arrange(struct output_t *m, desktop_t *d, struct wlr_box available
 			}
 		}
 
-		double gaps_total = (double)gap * (col->tile_count + 1);
+		if (shown_count == 0)
+			continue;
+
+		double gaps_total = (double)gap * (shown_count + 1);
 		double auto_avail = col_avail_h - gaps_total - fixed_h;
 
 		// distribute auto height
-		double *tile_heights = malloc((size_t)col->tile_count * sizeof(*tile_heights));
+		double *tile_heights = calloc((size_t)col->tile_count, sizeof(*tile_heights));
 		if (!tile_heights)
 			return;
 
 		double total_weight_safe = total_weight > 0.0 ? total_weight : 1.0;
 		for (int j = 0; j < col->tile_count; j++) {
+			if (!scroller_tile_shown(&col->tiles[j]))
+				continue;
+
 			if (col->tiles[j].height.type == SCROLLER_HEIGHT_FIXED) {
 				tile_heights[j] = col->tiles[j].height.value;
 			} else {
@@ -378,6 +444,11 @@ void scroller_arrange(struct output_t *m, desktop_t *d, struct wlr_box available
 		// compute y positions
 		double y = (double)gap;
 		for (int j = 0; j < col->tile_count; j++) {
+			if (!scroller_tile_shown(&col->tiles[j])) {
+				col->tiles[j].rect = (struct wlr_box){0};
+				continue;
+			}
+
 			col->tiles[j].rect.x = 0; // local X within column (centering not yet)
 			col->tiles[j].rect.y = (int)y;
 			col->tiles[j].rect.width = (int)col->resolved_width;
@@ -393,15 +464,10 @@ void scroller_arrange(struct output_t *m, desktop_t *d, struct wlr_box available
 	if (!col_xs)
 		return;
 
-	double wx = 0.0;
-	for (int i = 0; i < s->column_count; i++) {
-		col_xs[i] = wx;
-		wx += s->columns[i].resolved_width + (double)gap;
-	}
-	col_xs[s->column_count] = wx; // sentinel
+	scroller_column_positions(s, (double)gap, col_xs);
 
 	// view position (camera in world space)
-	double active_col_x = col_xs[s->active_column_idx];
+	double active_col_x = col_xs[scroller_camera_column(s)];
 	double view_pos = active_col_x + s->view_offset;
 
 	// set pending rectangles on tree nodes.
@@ -410,6 +476,9 @@ void scroller_arrange(struct output_t *m, desktop_t *d, struct wlr_box available
 	int maximized_col = -1, maximized_tile = -1;
 	for (int i = 0; i < s->column_count && maximized_col < 0; i++) {
 		for (int j = 0; j < s->columns[i].tile_count; j++) {
+			if (!scroller_tile_shown(&s->columns[i].tiles[j]))
+				continue;
+
 			if (client_is_maximized(s->columns[i].tiles[j].client)) {
 				maximized_col = i;
 				maximized_tile = j;
@@ -431,6 +500,16 @@ void scroller_arrange(struct output_t *m, desktop_t *d, struct wlr_box available
 				continue;
 
 			node_t *node = c->toplevel->node;
+
+			if (!scroller_tile_shown(&col->tiles[j])) {
+				col->tiles[j].rect = (struct wlr_box){0};
+				c->tiled_rectangle = (struct wlr_box){0};
+				c->arranged_rectangle = (struct wlr_box){0};
+				node_set_pending_rectangle(node, (struct wlr_box){0});
+				node->output = m;
+				node_set_dirty(node);
+				continue;
+			}
 
 			bool is_maximized = (i == maximized_col && j == maximized_tile);
 			if (maximized_col >= 0 && !is_maximized) {
@@ -504,6 +583,18 @@ void scroller_set_maximized(desktop_t *d, node_t *n, bool value) {
 	}
 }
 
+void scroller_sync_focus(scroller_state_t *s, client_t *c) {
+	if (s == NULL || c == NULL)
+		return;
+
+	int col_idx, tile_idx;
+	if (!find_tile(s, c, &col_idx, &tile_idx))
+		return;
+
+	s->active_column_idx = col_idx;
+	s->columns[col_idx].active_tile_idx = tile_idx;
+}
+
 void scroller_apply_active_focus(desktop_t *d, struct output_t *m) {
 	scroller_state_t *s = d->scroller_state;
 	if (!s || s->column_count == 0) {
@@ -558,14 +649,9 @@ void scroller_view_offset_gesture_update(desktop_t *d, double delta_x) {
 	if (!col_xs)
 		return;
 
-	double wx = 0.0;
-	for (int i = 0; i < s->column_count; i++) {
-		col_xs[i] = wx;
-		wx += s->columns[i].resolved_width + gap;
-	}
-	col_xs[s->column_count] = wx;
+	scroller_column_positions(s, gap, col_xs);
 
-	double active_col_x = col_xs[s->active_column_idx];
+	double active_col_x = col_xs[scroller_camera_column(s)];
 	double total_width = col_xs[s->column_count];
 	double min_offset = -active_col_x;
 	double max_offset = total_width - active_col_x - area_w;
@@ -593,19 +679,18 @@ bool scroller_view_offset_gesture_end(desktop_t *d) {
 	if (!col_xs)
 		return false;
 
-	double wx = 0.0;
-	for (int i = 0; i < s->column_count; i++) {
-		col_xs[i] = wx;
-		wx += s->columns[i].resolved_width + gap;
-	}
-	col_xs[s->column_count] = wx;
+	scroller_column_positions(s, gap, col_xs);
 
-	double active_col_x = col_xs[s->active_column_idx];
+	int camera_col = scroller_camera_column(s);
+	double active_col_x = col_xs[camera_col];
 	double view_pos = active_col_x + s->view_offset;
 
-	int nearest = s->active_column_idx;
+	int nearest = camera_col;
 	double nearest_dist = fabs(view_pos - active_col_x);
 	for (int i = 0; i < s->column_count; i++) {
+		if (s->columns[i].resolved_width <= 0.0)
+			continue;
+
 		double dist = fabs(view_pos - col_xs[i]);
 		if (dist < nearest_dist) {
 			nearest_dist = dist;
@@ -626,17 +711,38 @@ bool scroller_view_offset_gesture_end(desktop_t *d) {
 	return true;
 }
 
+static bool scroller_tile_focusable(const scroller_tile_t *t) {
+	return scroller_tile_shown(t) && t->client->toplevel != NULL;
+}
+
+static bool scroller_column_focusable(const scroller_column_t *col) {
+	for (int j = 0; j < col->tile_count; j++)
+		if (scroller_tile_focusable(&col->tiles[j]))
+			return true;
+
+	return false;
+}
+
 bool scroller_focus_next(desktop_t *d) {
 	scroller_state_t *s = d->scroller_state;
 	if (!s || s->column_count == 0)
 		return false;
-	if (s->active_column_idx >= s->column_count - 1) {
-		if (!settings.focus_wrapping)
+
+	int idx = s->active_column_idx;
+	for (int step = 0; step < s->column_count; step++) {
+		idx = idx >= s->column_count - 1 ? 0 : idx + 1;
+		if (!scroller_column_focusable(&s->columns[idx]))
+			continue;
+		if (idx == s->active_column_idx)
 			return false;
-		s->active_column_idx = 0;
-	} else {
-		s->active_column_idx++;
+
+		s->active_column_idx = idx;
+		break;
 	}
+
+	if (idx == s->active_column_idx)
+		return false;
+
 	s->view_offset = 0.0; // reset scroll for now
 	s->activate_prev_column_on_removal = false;
 	scroller_apply_active_focus(d, NULL);
@@ -647,13 +753,22 @@ bool scroller_focus_prev(desktop_t *d) {
 	scroller_state_t *s = d->scroller_state;
 	if (!s || s->column_count == 0)
 		return false;
-	if (s->active_column_idx == 0) {
-		if (!settings.focus_wrapping)
+
+	int idx = s->active_column_idx;
+	for (int step = 0; step < s->column_count; step++) {
+		idx = idx == 0 ? s->column_count - 1 : idx - 1;
+		if (!scroller_column_focusable(&s->columns[idx]))
+			continue;
+		if (idx == s->active_column_idx)
 			return false;
-		s->active_column_idx = s->column_count - 1;
-	} else {
-		s->active_column_idx--;
+
+		s->active_column_idx = idx;
+		break;
 	}
+
+	if (idx == s->active_column_idx)
+		return false;
+
 	s->view_offset = 0.0;
 	s->activate_prev_column_on_removal = false;
 	scroller_apply_active_focus(d, NULL);
@@ -671,7 +786,16 @@ bool scroller_focus_down(desktop_t *d) {
 	if (col->active_tile_idx >= col->tile_count - 1)
 		return false;
 
-	col->active_tile_idx++;
+	int idx = col->active_tile_idx;
+	for (int step = 0; step < col->tile_count; step++) {
+		idx++;
+		if (idx >= col->tile_count)
+			return false;
+		if (scroller_tile_focusable(&col->tiles[idx]))
+			break;
+	}
+
+	col->active_tile_idx = idx;
 	scroller_apply_active_focus(d, NULL);
 	return true;
 }
@@ -692,28 +816,42 @@ bool scroller_swap(struct output_t *m, desktop_t *d, direction_t dir) {
 
 	switch (dir) {
 	case DIR_WEST:
-		if (src_col == 0)
+		for (dst_col = src_col - 1; dst_col >= 0; dst_col--) {
+			if (!scroller_column_focusable(&s->columns[dst_col]))
+				continue;
+			for (dst_tile = s->columns[dst_col].tile_count - 1; dst_tile >= 0; dst_tile--)
+				if (scroller_tile_focusable(&s->columns[dst_col].tiles[dst_tile]))
+					break;
+			break;
+		}
+		if (dst_col < 0)
 			return false;
-		dst_col = src_col - 1;
-		dst_tile = s->columns[dst_col].tile_count - 1;
 		break;
 	case DIR_EAST:
-		if (src_col >= s->column_count - 1)
+		for (dst_col = src_col + 1; dst_col < s->column_count; dst_col++) {
+			if (!scroller_column_focusable(&s->columns[dst_col]))
+				continue;
+			for (dst_tile = 0; dst_tile < s->columns[dst_col].tile_count; dst_tile++)
+				if (scroller_tile_focusable(&s->columns[dst_col].tiles[dst_tile]))
+					break;
+			break;
+		}
+		if (dst_col >= s->column_count)
 			return false;
-		dst_col = src_col + 1;
-		dst_tile = 0;
 		break;
 	case DIR_NORTH:
-		if (src_tile == 0)
+		for (dst_tile = src_tile - 1; dst_tile >= 0; dst_tile--)
+			if (scroller_tile_focusable(&s->columns[src_col].tiles[dst_tile]))
+				break;
+		if (dst_tile < 0)
 			return false;
-		dst_col = src_col;
-		dst_tile = src_tile - 1;
 		break;
 	case DIR_SOUTH:
-		if (src_tile >= s->columns[src_col].tile_count - 1)
+		for (dst_tile = src_tile + 1; dst_tile < s->columns[src_col].tile_count; dst_tile++)
+			if (scroller_tile_focusable(&s->columns[src_col].tiles[dst_tile]))
+				break;
+		if (dst_tile >= s->columns[src_col].tile_count)
 			return false;
-		dst_col = src_col;
-		dst_tile = src_tile + 1;
 		break;
 	default:
 		return false;
@@ -750,7 +888,16 @@ bool scroller_focus_up(desktop_t *d) {
 	if (col->active_tile_idx == 0)
 		return false;
 
-	col->active_tile_idx--;
+	int idx = col->active_tile_idx;
+	for (int step = 0; step < col->tile_count; step++) {
+		idx--;
+		if (idx < 0)
+			return false;
+		if (scroller_tile_focusable(&col->tiles[idx]))
+			break;
+	}
+
+	col->active_tile_idx = idx;
 	scroller_apply_active_focus(d, NULL);
 	return true;
 }

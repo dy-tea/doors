@@ -182,6 +182,8 @@ typedef struct node_t {
 	struct output_t *output;
 	struct desktop_t *desktop;
 
+	struct wl_list minimize_link;
+
 	// transaction support
 	struct transaction_inst_t *instruction, *pending_inst;
 	size_t ntxnrefs;
@@ -217,6 +219,9 @@ typedef struct desktop_t {
 		int stack_layout; // stack_layout_t
 		int count;
 	} master_stack;
+
+	// minimize history
+	struct wl_list minimized;
 } desktop_t;
 
 typedef struct {
