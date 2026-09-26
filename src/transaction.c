@@ -95,7 +95,6 @@ static void copy_node_state(node_t *node, transaction_inst_t *instruction) {
 		instruction->tiled_rectangle = node->client->arranged_rectangle;
 		instruction->floating_rectangle = node->client->floating_rectangle;
 		instruction->content_rect = node->pending.rectangle;
-		instruction->scene_tree = client_get_scene_tree(node->client);
 	}
 }
 
@@ -173,13 +172,8 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 		return;
 	}
 
-	if (node->destroying) {
-		if (instruction->scene_tree)
-			if (!animation_has_fade_out(instruction->scene_tree))
-				wlr_scene_node_set_enabled(&instruction->scene_tree->node, false);
-
+	if (node->destroying)
 		return;
-	}
 
 	if (!node->client->toplevel && !node->client->xwayland_view) {
 		wlr_log(WLR_DEBUG, "Skipping arrange for node %u - no toplevel or xwayland_view", node->id);

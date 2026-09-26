@@ -747,6 +747,9 @@ void toplevel_unmap(struct wl_listener *listener, void *data) {
 	if (!animation_fade_out(toplevel))
 		animation_cancel_node(toplevel->node);
 
+	if (toplevel->scene_tree && !animation_has_fade_out(toplevel->scene_tree))
+		wlr_scene_node_set_enabled(&toplevel->scene_tree->node, false);
+
 	if (settings.enable_animations && toplevel->node->client && toplevel->node->client->flags.shown)
 		toplevel_save_buffer(toplevel);
 
