@@ -1,60 +1,55 @@
-#include "ipc/cmd.h"
-#include <stdbool.h>
+#include "ipc/args.h"
+#include "ipc/registry.h"
 #include <stdlib.h>
 #include <string.h>
-
-void send_success(int client_fd, const char *msg);
-void send_failure(int client_fd, const char *msg);
 
 static bool valid_env_name(const char *name) {
 	return name[0] != '\0' && strchr(name, '=') == NULL;
 }
 
-void ipc_cmd_env(char **args, int num, int client_fd) {
-	if (num < 1) {
-		send_failure(client_fd, "env: usage: set <name> <value> | unset <name>\n");
+static void env_set(ipc_args_t *a) {
+	const char *name, *value;
+	if (!ipc_need(a, "name", &name) || !ipc_need(a, "value", &value))
+		return;
+	if (!ipc_end(a))
+		return;
+
+	if (!valid_env_name(name)) {
+		ipc_fail(a, "Invalid variable name \"%s\"\n", name);
+		return;
+	}
+	if (setenv(name, value, 1) != 0) {
+		ipc_fail(a, "Failed to set variable\n");
 		return;
 	}
 
-	if (strcmp(args[0], "set") == 0) {
-		if (num != 3) {
-			send_failure(client_fd, "env set: usage: set <name> <value>\n");
-			return;
-		}
+	ipc_ok(a, "Environment variable set\n");
+}
 
-		if (!valid_env_name(args[1])) {
-			send_failure(client_fd, "env set: invalid variable name\n");
-			return;
-		}
+static void env_unset(ipc_args_t *a) {
+	const char *name;
+	if (!ipc_need(a, "name", &name) || !ipc_end(a))
+		return;
 
-		if (setenv(args[1], args[2], 1) != 0) {
-			send_failure(client_fd, "env set: failed to set variable\n");
-			return;
-		}
-
-		send_success(client_fd, "environment variable set\n");
+	if (!valid_env_name(name)) {
+		ipc_fail(a, "Invalid variable name \"%s\"\n", name);
+		return;
+	}
+	if (unsetenv(name) != 0) {
+		ipc_fail(a, "Failed to unset variable\n");
 		return;
 	}
 
-	if (strcmp(args[0], "unset") == 0) {
-		if (num != 2) {
-			send_failure(client_fd, "env unset: usage: unset <name>\n");
-			return;
-		}
+	ipc_ok(a, "Environment variable unset\n");
+}
 
-		if (!valid_env_name(args[1])) {
-			send_failure(client_fd, "env unset: invalid variable name\n");
-			return;
-		}
+const ipc_sub_t env_subs[] = {
+	IPC_SUB("set", NULL, "env set <name> <value>", env_set),
+	IPC_SUB("unset", NULL, "env unset <name>", env_unset),
+	IPC_SUB_END,
+};
 
-		if (unsetenv(args[1]) != 0) {
-			send_failure(client_fd, "env unset: failed to unset variable\n");
-			return;
-		}
-
-		send_success(client_fd, "environment variable unset\n");
-		return;
-	}
-
-	send_failure(client_fd, "env: unknown subcommand (use set or unset)\n");
+void ipc_cmd_env(ipc_args_t *a) {
+	if (!ipc_sub_dispatch(a, env_subs))
+		ipc_fail_unknown(a, env_subs);
 }

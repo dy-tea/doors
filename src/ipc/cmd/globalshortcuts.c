@@ -1,11 +1,10 @@
-#include "ipc/cmd.h"
+#include "ipc/args.h"
 #include "ipc/ipc.h"
+#include "ipc/registry.h"
 #include "protocol/global_shortcuts.h"
 
-void ipc_cmd_globalshortcuts(char **args, int num, int client_fd) {
-	(void)args;
-	(void)num;
+void ipc_cmd_globalshortcuts(ipc_args_t *a) {
 	char buf[DOORS_BUFSIZ];
 	global_shortcuts_list(buf, sizeof(buf));
-	send_success(client_fd, buf);
+	ipc_ok(a, buf);
 }

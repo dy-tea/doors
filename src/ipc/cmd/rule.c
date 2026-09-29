@@ -1,15 +1,13 @@
-#include "ipc/cmd.h"
+#include "ipc/args.h"
 #include "ipc/helpers.h"
-#include "ipc/ipc.h"
+#include "ipc/registry.h"
 #include "rule.h"
-#include <stdbool.h>
+#include <limits.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static const struct {
-	const char *key;
-	unsigned flag;
-} rule_flag_names[] = {
+static const cfg_enum_value_t rule_flag_names[] = {
 	{"follow", RULE_TYPE_FOLLOW},
 	{"focus", RULE_TYPE_FOCUS},
 	{"manage", RULE_TYPE_MANAGE},
@@ -26,164 +24,205 @@ static const struct {
 	{"allow_tearing", RULE_TYPE_ALLOW_TEARING},
 	{"shortcuts_inhibitor", RULE_TYPE_SHORTCUTS_INHIBITOR},
 	{"animations_disable", RULE_TYPE_ANIM_DISABLE},
+	IPC_ENUM_END,
 };
 
-static bool rule_flag_apply(rule_t *r, const char *arg) {
-	for (size_t i = 0; i < sizeof(rule_flag_names) / sizeof(rule_flag_names[0]); i++) {
-		size_t klen = strlen(rule_flag_names[i].key);
-		if (strncmp(arg, rule_flag_names[i].key, klen) != 0 || arg[klen] != '=')
+static const cfg_enum_value_t rule_state_names[] = {
+	{"tiled", STATE_TILED},
+	{"floating", STATE_FLOATING},
+	{"fullscreen", STATE_FULLSCREEN},
+	{"pseudo_tiled", STATE_PSEUDO_TILED},
+	IPC_ENUM_END,
+};
+
+static const cfg_enum_value_t rule_onoff_names[] = {
+	{"on", 1},
+	{"off", 0},
+	IPC_ENUM_END,
+};
+
+static size_t key_prefix_len(const char *arg, const char *name) {
+	size_t n = strlen(name);
+	return (strncmp(arg, name, n) == 0 && arg[n] == '=') ? n + 1 : 0;
+}
+
+static bool rule_apply_flag(ipc_args_t *a, rule_t *r, const char *arg, bool *ok) {
+	*ok = true;
+
+	for (const cfg_enum_value_t *e = rule_flag_names; e->name; e++) {
+		size_t len = key_prefix_len(arg, e->name);
+		if (!len)
 			continue;
-		const char *val = arg + klen + 1;
-		if (streq(val, "on")) {
-			r->consequence.flags |= rule_flag_names[i].flag;
-			r->consequence.has |= rule_flag_names[i].flag;
-		} else if (streq(val, "off")) {
-			r->consequence.flags &= ~rule_flag_names[i].flag;
-			r->consequence.has |= rule_flag_names[i].flag;
-		} else {
-			return false;
+
+		long on;
+		if (!ipc_enum_names(a, e->name, arg + len, rule_onoff_names, &on)) {
+			*ok = false;
+			return true;
 		}
+
+		if (on)
+			r->consequence.flags |= e->value;
+		else
+			r->consequence.flags &= ~e->value;
+		r->consequence.has |= e->value;
 		return true;
 	}
 	return false;
 }
 
-void ipc_cmd_rule(char **args, int num, int client_fd) {
-	if (num < 1) {
-		send_failure(client_fd, "rule: missing arguments\n");
+static bool rule_apply_key(ipc_args_t *a, rule_t *r, const char *arg) {
+	if (key_prefix_len(arg, "title")) {
+		snprintf(r->match.title, MAXLEN, "%s", arg + 6);
+		return true;
+	}
+	if (key_prefix_len(arg, "tag")) {
+		snprintf(r->match.tag, MAXLEN, "%s", arg + 4);
+		return true;
+	}
+	if (key_prefix_len(arg, "app_id")) {
+		snprintf(r->match.app_id, MAXLEN, "%s", arg + 7);
+		return true;
+	}
+	if (key_prefix_len(arg, "desktop")) {
+		snprintf(r->consequence.desktop, SMALEN, "%s", arg + 8);
+		r->consequence.has |= RULE_TYPE_DESKTOP;
+		return true;
+	}
+	if (key_prefix_len(arg, "state")) {
+		long state;
+		if (!ipc_enum_names(a, "state", arg + 6, rule_state_names, &state))
+			return false;
+
+		r->consequence.state = (client_state_t)state;
+		r->consequence.has |= RULE_TYPE_STATE;
+		return true;
+	}
+	if (key_prefix_len(arg, "opacity")) {
+		float v;
+		if (!ipc_float_str(a, arg + 8, "opacity", 0.0f, 1.0f, &v))
+			return false;
+
+		r->consequence.opacity = v;
+		r->consequence.has |= RULE_TYPE_OPACITY;
+		return true;
+	}
+	if (key_prefix_len(arg, "border_radius")) {
+		r->consequence.border_radius = atof(arg + 14);
+		r->consequence.has |= RULE_TYPE_BORDER_RADIUS;
+		return true;
+	}
+	if (key_prefix_len(arg, "render_unfocused_fps")) {
+		int v;
+		if (!ipc_int_str(a, arg + 21, "render_unfocused_fps", 0, 1000, &v))
+			return false;
+
+		r->consequence.render_unfocused_fps = v;
+		r->consequence.has |= RULE_TYPE_RENDER_UNFOCUSED_FPS;
+		return true;
+	}
+	if (key_prefix_len(arg, "scroller_proportion_single")) {
+		float v;
+		if (!ipc_float_str(a, arg + 27, "scroller_proportion_single", 0.0f, 1.0f, &v))
+			return false;
+
+		r->consequence.scroller_proportion_single = v;
+		r->consequence.has |= RULE_TYPE_SCROLLER_PROPORTION_SINGLE;
+		return true;
+	}
+	if (key_prefix_len(arg, "scroller_proportion")) {
+		float v;
+		if (!ipc_float_str(a, arg + 20, "scroller_proportion", 0.0f, 1.0f, &v))
+			return false;
+
+		r->consequence.scroller_proportion = v;
+		r->consequence.has |= RULE_TYPE_SCROLLER_PROPORTION;
+		return true;
+	}
+
+	ipc_fail(a, "unknown rule option \"%s\"\n", arg);
+	return false;
+}
+
+static void rule_add(ipc_args_t *a) {
+	rule_t *r = make_rule();
+	if (!r) {
+		ipc_fail(a, "failed to create rule\n");
 		return;
 	}
 
-	char *subcmd = *args;
+	r->consequence.has = RULE_TYPE_FOLLOW | RULE_TYPE_FOCUS | RULE_TYPE_MANAGE;
+	r->consequence.flags = RULE_TYPE_FOLLOW | RULE_TYPE_FOCUS | RULE_TYPE_MANAGE;
 
-	if (streq("-a", subcmd) || streq("--add", subcmd)) {
-		if (num < 2) {
-			send_failure(client_fd, "rule -a: missing app_id\n");
-			return;
+	bool have_app_id = false;
+
+	ipc_foreach(a, arg) {
+		if (streq(arg, "one_shot")) {
+			r->match.one_shot = true;
+			continue;
 		}
 
-		args++;
-		num--;
-
-		rule_t *r = make_rule();
-		if (!r) {
-			send_failure(client_fd, "rule: failed to create rule\n");
-			return;
-		}
-
-		char *app_id = NULL;
-		char *title = NULL;
-		r->consequence.has = RULE_TYPE_FOLLOW | RULE_TYPE_FOCUS | RULE_TYPE_MANAGE;
-		r->consequence.flags = RULE_TYPE_FOLLOW | RULE_TYPE_FOCUS | RULE_TYPE_MANAGE;
-
-		while (num > 0) {
-			char *arg = *args;
-
-			if (rule_flag_apply(r, arg)) {
-				// handled in function
-			} else if (strncmp(arg, "title=", 6) == 0) {
-				title = arg + 6;
-				strncpy(r->match.title, title, MAXLEN - 1);
-				r->match.title[MAXLEN - 1] = '\0';
-			} else if (strncmp(arg, "tag=", 4) == 0) {
-				strncpy(r->match.tag, arg + 4, MAXLEN - 1);
-				r->match.tag[MAXLEN - 1] = '\0';
-			} else if (strncmp(arg, "app_id=", 7) == 0) {
-				app_id = arg + 7;
-				strncpy(r->match.app_id, app_id, MAXLEN - 1);
-				r->match.app_id[MAXLEN - 1] = '\0';
-			} else if (arg[0] != '-' && app_id == NULL && strchr(arg, '=') == NULL) {
-				app_id = arg;
-				strncpy(r->match.app_id, app_id, MAXLEN - 1);
-				r->match.app_id[MAXLEN - 1] = '\0';
-			} else if (streq("state=tiled", arg)) {
-				r->consequence.state = STATE_TILED;
-				r->consequence.has |= RULE_TYPE_STATE;
-			} else if (streq("state=floating", arg)) {
-				r->consequence.state = STATE_FLOATING;
-				r->consequence.has |= RULE_TYPE_STATE;
-			} else if (streq("state=fullscreen", arg)) {
-				r->consequence.state = STATE_FULLSCREEN;
-				r->consequence.has |= RULE_TYPE_STATE;
-			} else if (streq("state=pseudo_tiled", arg)) {
-				r->consequence.state = STATE_PSEUDO_TILED;
-				r->consequence.has |= RULE_TYPE_STATE;
-			} else if (streq("desktop=^", arg) || (strlen(arg) > 8 && strncmp(arg, "desktop=", 8) == 0)) {
-				char *desk = arg + 8;
-				strncpy(r->consequence.desktop, desk, SMALEN - 1);
-				r->consequence.desktop[SMALEN - 1] = '\0';
-				r->consequence.has |= RULE_TYPE_DESKTOP;
-			} else if (streq("one_shot", arg)) {
-				r->match.one_shot = true;
-			} else if (strncmp(arg, "scroller_proportion=", 20) == 0) {
-				float val = atof(arg + 20);
-				if (val > 0.0f && val <= 1.0f) {
-					r->consequence.scroller_proportion = val;
-					r->consequence.has |= RULE_TYPE_SCROLLER_PROPORTION;
-				} else {
-					send_failure(client_fd, "scroller_proportion must be between 0.0 and 1.0");
-					return;
-				}
-			} else if (strncmp(arg, "scroller_proportion_single=", 27) == 0) {
-				float val = atof(arg + 27);
-				if (val > 0.0f && val <= 1.0f) {
-					r->consequence.scroller_proportion_single = val;
-					r->consequence.has |= RULE_TYPE_SCROLLER_PROPORTION_SINGLE;
-				} else {
-					send_failure(client_fd, "scroller_proportion_single must be between 0.0 and 1.0");
-					return;
-				}
-			} else if (strncmp("border_radius=", arg, 14) == 0) {
-				r->consequence.border_radius = atof(arg + 14);
-				r->consequence.has |= RULE_TYPE_BORDER_RADIUS;
-			} else if (strncmp("render_unfocused_fps=", arg, 21) == 0) {
-				int val = atoi(arg + 21);
-				if (val >= 0 && val <= 1000) {
-					r->consequence.render_unfocused_fps = val;
-					r->consequence.has |= RULE_TYPE_RENDER_UNFOCUSED_FPS;
-				} else {
-					send_failure(client_fd, "render_unfocused_fps must be between 0 and 1000");
-					return;
-				}
-			} else if (strncmp("opacity=", arg, 8) == 0) {
-				float val = atof(arg + 8);
-				if (val >= 0.0f && val <= 1.0f) {
-					r->consequence.has |= RULE_TYPE_OPACITY;
-					r->consequence.opacity = val;
-				} else {
-					send_failure(client_fd, "opacity must be between 0.0 and 1.0 inclusive");
-					return;
-				}
+		// a bare word is the app_id shorthand, and only the first one wins
+		if (arg[0] != '-' && !strchr(arg, '=')) {
+			if (!have_app_id) {
+				snprintf(r->match.app_id, MAXLEN, "%s", arg);
+				have_app_id = true;
 			}
-
-			args++;
-			num--;
+			continue;
 		}
 
-		if (!app_id && !title && r->match.tag[0] == '\0') {
+		bool applied;
+		if (rule_apply_flag(a, r, arg, &applied)) {
+			if (!applied) {
+				free(r);
+				return;
+			}
+			continue;
+		}
+
+		if (!rule_apply_key(a, r, arg)) {
 			free(r);
-			send_failure(client_fd, "rule -a: must specify app_id, title, or tag\n");
 			return;
 		}
 
-		add_rule(r);
-		send_success(client_fd, "rule added\n");
-	} else if (streq("-r", subcmd) || streq("--remove", subcmd)) {
-		if (num < 2) {
-			send_failure(client_fd, "rule -r: missing index\n");
-			return;
-		}
-		args++;
-		int idx = atoi(*args);
-		if (remove_rule_by_index(idx))
-			send_success(client_fd, "rule removed\n");
-		else
-			send_failure(client_fd, "rule -r: invalid index\n");
-	} else if (streq("-l", subcmd) || streq("--list", subcmd)) {
-		char buf[DOORS_BUFSIZ];
-		list_rules(buf, sizeof(buf));
-		send_success(client_fd, buf);
-	} else {
-		send_failure(client_fd, "rule: unknown subcommand (use -a, -r, or -l)\n");
+		if (key_prefix_len(arg, "app_id"))
+			have_app_id = true;
 	}
+
+	if (!have_app_id && r->match.title[0] == '\0' && r->match.tag[0] == '\0') {
+		free(r);
+		ipc_fail(a, "must specify an app_id, title= or tag=\n");
+		return;
+	}
+
+	add_rule(r);
+	ipc_ok(a, "rule added\n");
+}
+
+static void rule_remove(ipc_args_t *a) {
+	int idx;
+	if (!ipc_int(a, "index", 0, INT_MAX, &idx))
+		return;
+
+	if (remove_rule_by_index(idx))
+		ipc_ok(a, "rule removed\n");
+	else
+		ipc_fail(a, "invalid index %d\n", idx);
+}
+
+static void rule_show_list(ipc_args_t *a) {
+	char buf[DOORS_BUFSIZ];
+	list_rules(buf, sizeof(buf));
+	ipc_ok(a, buf);
+}
+
+const ipc_sub_t rule_subs[] = {
+	IPC_SUB("-a", "--add", "rule -a | --add <app_id> [one_shot] [key=value ...]", rule_add),
+	IPC_SUB("-r", "--remove", "rule -r | --remove <index>", rule_remove),
+	IPC_SUB("-l", "--list", "rule -l | --list", rule_show_list),
+	IPC_SUB_END,
+};
+
+void ipc_cmd_rule(ipc_args_t *a) {
+	if (!ipc_sub_dispatch(a, rule_subs))
+		ipc_fail_unknown(a, rule_subs);
 }

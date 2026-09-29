@@ -1,8 +1,8 @@
 #include "animation.h"
 #include "effects/effects.h"
-#include "ipc/cmd.h"
+#include "ipc/args.h"
 #include "ipc/helpers.h"
-#include "ipc/ipc.h"
+#include "ipc/registry.h"
 #include "output/config.h"
 #include "output/output.h"
 #include "protocol/workspace.h"
@@ -13,8 +13,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
-#include <stdarg.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -24,729 +22,711 @@
 #include <wlr/backend/multi.h>
 #include <wlr/backend/wayland.h>
 #include <wlr/backend/x11.h>
-#include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/box.h>
 #include <wlr/util/log.h>
-#include <wlr/xwayland.h>
+
+typedef struct {
+	const char *name;
+	struct output_config *oc;
+	output_t *mon;
+} out_ctx_t;
+
+static out_ctx_t *ctx_of(ipc_args_t *a) {
+	return a->ctx;
+}
+
+static bool need_output(ipc_args_t *a) {
+	out_ctx_t *c = ctx_of(a);
+	if (c->mon)
+		return true;
+
+	ipc_fail(a, "No such output \"%s\"\n", c->name);
+	return false;
+}
+
+static void apply_ok(ipc_args_t *a, const char *what) {
+	output_config_apply(ctx_of(a)->oc);
+	ipc_okf(a, "%s set\n", what);
+}
+
+static const cfg_enum_value_t onoff_values[] = {
+	{"on", 1},
+	{"enable", 1},
+	{"true", 1},
+	{"off", 0},
+	{"disable", 0},
+	{"false", 0},
+	IPC_ENUM_END,
+};
+
+static const cfg_enum_value_t transform_values[] = {
+	{"normal", WL_OUTPUT_TRANSFORM_NORMAL},
+	{"0", WL_OUTPUT_TRANSFORM_NORMAL},
+	{"90", WL_OUTPUT_TRANSFORM_90},
+	{"180", WL_OUTPUT_TRANSFORM_180},
+	{"270", WL_OUTPUT_TRANSFORM_270},
+	{"flipped", WL_OUTPUT_TRANSFORM_FLIPPED_180},
+	{"flipped-180", WL_OUTPUT_TRANSFORM_FLIPPED_180},
+	{"flipped-90", WL_OUTPUT_TRANSFORM_FLIPPED_90},
+	{"flipped-270", WL_OUTPUT_TRANSFORM_FLIPPED_270},
+	IPC_ENUM_END,
+};
+
+static const cfg_enum_value_t bit_depth_values[] = {
+	{"8", OUTPUT_CONFIG_RENDER_BIT_DEPTH_8},
+	{"8-bit", OUTPUT_CONFIG_RENDER_BIT_DEPTH_8},
+	{"10", OUTPUT_CONFIG_RENDER_BIT_DEPTH_10},
+	{"10-bit", OUTPUT_CONFIG_RENDER_BIT_DEPTH_10},
+	IPC_ENUM_END,
+};
+
+static void out_list(ipc_args_t *a) {
+	char buf[DOORS_BUFSIZ];
+	ipc_buf_t b;
+	ipc_buf_init(&b, buf, sizeof(buf));
+
+	ipc_buff(&b, "[");
+	output_t *o;
+	bool first = true;
+	wl_list_for_each(o, &mon_list, link) {
+		struct wlr_output *wo = o->wlr_output;
+		if (!first)
+			ipc_buff(&b, ",");
+		first = false;
+		ipc_buff(&b, "\n  {\n"
+			"    \"name\": \"%s\",\n"
+			"    \"description\": \"%s\",\n"
+			"    \"make\": \"%s\",\n"
+			"    \"model\": \"%s\",\n"
+			"    \"serial\": \"%s\",\n"
+			"    \"width\": %d,\n"
+			"    \"height\": %d,\n"
+			"    \"refresh\": %.3f,\n"
+			"    \"scale\": %.6g,\n"
+			"    \"phys_width\": %d,\n"
+			"    \"phys_height\": %d,\n"
+			"    \"hdr\": %s,\n"
+			"    \"allow_tearing\": %s,\n"
+			"    \"enabled\": %s\n"
+			"  }", wo->name ? wo->name : "", wo->description ? wo->description : "", wo->make ? wo->make : "",
+				wo->model ? wo->model : "", wo->serial ? wo->serial : "", wo->width, wo->height,
+				wo->refresh / 1000.0f, wo->scale, wo->phys_width, wo->phys_height, o->hdr ? "true" : "false",
+				o->allow_tearing ? "true" : "false", wo->enabled ? "true" : "false");
+	}
+	ipc_buff(&b, "\n]\n");
+
+	ipc_buf_send(a, &b);
+}
 
 static void create_output(struct wlr_backend *backend, void *data) {
 	bool *done = data;
 	if (*done)
 		return;
 
-	do {
-		if (wlr_backend_is_wl(backend)) {
-			wlr_wl_output_create(backend);
-			break;
-		} else if (wlr_backend_is_headless(backend)) {
-			wlr_headless_add_output(backend, 1920, 1080);
-			break;
-		} else if (wlr_backend_is_x11(backend)) {
-			wlr_x11_output_create(backend);
-			break;
-		}
-
-		return;
-	} while (0);
-
-	*done = true;
+	if (wlr_backend_is_wl(backend)) {
+		wlr_wl_output_create(backend);
+		*done = true;
+	} else if (wlr_backend_is_headless(backend)) {
+		wlr_headless_add_output(backend, 1920, 1080);
+		*done = true;
+	} else if (wlr_backend_is_x11(backend)) {
+		wlr_x11_output_create(backend);
+		*done = true;
+	}
 }
 
-void ipc_cmd_output(char **args, int num, int client_fd) {
-	if (num < 1) {
-		send_failure(client_fd, "output: missing arguments\n");
+static void out_create(ipc_args_t *a) {
+	bool done = false;
+	wlr_multi_for_each_backend(server.backend, create_output, &done);
+
+	if (done)
+		ipc_ok(a, "Created output\n");
+	else
+		ipc_fail(a, "Can only create outputs for wayland, x11 or headless backends\n");
+}
+
+static const ipc_sub_t output_global_subs[] = {
+	IPC_SUBA("list", "--list", "-l", "output list", out_list),
+	IPC_SUB("create", NULL, "output create", out_create),
+	IPC_SUB_END,
+};
+
+static void out_enable(ipc_args_t *a) {
+	ctx_of(a)->oc->enable = OUTPUT_CONFIG_ENABLE;
+	apply_ok(a, "Output enable");
+}
+
+static void out_disable(ipc_args_t *a) {
+	ctx_of(a)->oc->enable = OUTPUT_CONFIG_DISABLE;
+	apply_ok(a, "Output disable");
+}
+
+static void out_mode(ipc_args_t *a) {
+	const char *spec;
+	if (!ipc_need(a, "resolution", &spec))
+		return;
+
+	int width, height;
+	float refresh = -1;
+
+	const char *at = strchr(spec, '@');
+	size_t res_len = at ? (size_t)(at - spec) : strlen(spec);
+	if (at) {
+		char *end;
+		double v = strtod(at + 1, &end);
+		if (end == at + 1 || *end != '\0' || v <= 0) {
+			ipc_fail(a, "Invalid refresh rate in \"%s\"\n", spec);
+			return;
+		}
+		refresh = (float)v;
+	}
+
+	char res[64];
+	if (res_len >= sizeof(res)) {
+		ipc_fail(a, "Invalid resolution \"%s\"\n", spec);
+		return;
+	}
+	memcpy(res, spec, res_len);
+	res[res_len] = '\0';
+
+	if (sscanf(res, "%dx%d", &width, &height) != 2 || width <= 0 || height <= 0) {
+		ipc_fail(a, "Expected WIDTHxHEIGHT[@REFRESH], got \"%s\"\n", spec);
 		return;
 	}
 
-	if (streq("list", *args) || streq("--list", *args) || streq("-l", *args)) {
+	out_ctx_t *c = ctx_of(a);
+	c->oc->width = width;
+	c->oc->height = height;
+	c->oc->refresh_rate = refresh;
+	apply_ok(a, "Output mode");
+}
+
+static void out_position(ipc_args_t *a) {
+	int x, y;
+	if (!ipc_int(a, "x", INT_MIN, INT_MAX, &x) || !ipc_int(a, "y", INT_MIN, INT_MAX, &y))
+		return;
+
+	out_ctx_t *c = ctx_of(a);
+	c->oc->x = x;
+	c->oc->y = y;
+	apply_ok(a, "Output position");
+}
+
+static void out_scale(ipc_args_t *a) {
+	// -1 is the default (auto scale)
+	float scale;
+	if (!ipc_float(a, "scale", -1.0f, 16.0f, &scale))
+		return;
+
+	ctx_of(a)->oc->scale = scale;
+	apply_ok(a, "Output scale");
+}
+
+static void out_transform(ipc_args_t *a) {
+	long value;
+	if (!ipc_enum(a, "transform", transform_values, &value))
+		return;
+
+	ctx_of(a)->oc->transform = (int)value;
+	apply_ok(a, "Output transform");
+}
+
+static void out_dpms(ipc_args_t *a) {
+	long value;
+	if (!ipc_enum(a, "state", onoff_values, &value))
+		return;
+
+	ctx_of(a)->oc->dpms_state = value ? OUTPUT_CONFIG_DPMS_ON : OUTPUT_CONFIG_DPMS_OFF;
+	apply_ok(a, "Output dpms");
+}
+
+static void out_adaptive_sync(ipc_args_t *a) {
+	long value;
+	if (!ipc_enum(a, "state", onoff_values, &value))
+		return;
+
+	ctx_of(a)->oc->adaptive_sync = value ? OUTPUT_CONFIG_ADAPTIVE_SYNC_ENABLED :
+		OUTPUT_CONFIG_ADAPTIVE_SYNC_DISABLED;
+	apply_ok(a, "Output adaptive_sync");
+}
+
+static void out_render_bit_depth(ipc_args_t *a) {
+	long value;
+	if (!ipc_enum(a, "value", bit_depth_values, &value))
+		return;
+
+	ctx_of(a)->oc->render_bit_depth = (enum output_config_render_bit_depth)value;
+	apply_ok(a, "Output render_bit_depth");
+}
+
+static void out_hdr(ipc_args_t *a) {
+	long value;
+	if (!ipc_enum(a, "state", onoff_values, &value))
+		return;
+
+	out_ctx_t *c = ctx_of(a);
+	c->oc->hdr_enabled = value != 0;
+	c->oc->hdr_set = true;
+	apply_ok(a, "Output hdr");
+}
+
+static void out_tearing(ipc_args_t *a) {
+	long value;
+	if (!ipc_enum(a, "state", onoff_values, &value))
+		return;
+
+	ctx_of(a)->oc->allow_tearing = value ? 1 : 0;
+	apply_ok(a, "Output tearing");
+}
+
+static struct wlr_color_transform *load_icc(const char *path) {
+	int fd = open(path, O_RDONLY | O_NOCTTY | O_CLOEXEC);
+	if (fd == -1)
+		return NULL;
+
+	struct stat info;
+	if (fstat(fd, &info) == -1 || !S_ISREG(info.st_mode) || info.st_size <= 0) {
+		close(fd);
+		return NULL;
+	}
+
+	void *data = malloc(info.st_size);
+	if (!data) {
+		close(fd);
+		return NULL;
+	}
+
+	size_t nread = 0;
+	while (nread < (size_t)info.st_size) {
+		ssize_t r = read(fd, (char *)data + nread, (size_t)info.st_size - nread);
+		if (r == -1 && errno == EINTR)
+			continue;
+		if (r <= 0) {
+			free(data);
+			close(fd);
+			return NULL;
+		}
+		nread += (size_t)r;
+	}
+	close(fd);
+
+	struct wlr_color_transform *transform = wlr_color_transform_init_linear_to_icc(data,
+		(size_t)info.st_size);
+	free(data);
+	return transform;
+}
+
+static void out_color_profile(ipc_args_t *a) {
+	static const cfg_enum_value_t kinds[] = {
+		{"gamma22", 0},
+		{"srgb", 1},
+		{"icc", 2},
+	};
+
+	long kind;
+	if (!ipc_enum(a, "profile type", kinds, &kind))
+		return;
+
+	struct wlr_color_transform *transform = NULL;
+	if (kind == 1) {
+		transform = wlr_color_transform_init_linear_to_inverse_eotf(WLR_COLOR_TRANSFER_FUNCTION_SRGB);
+		if (!transform) {
+			ipc_fail(a, "Failed to create sRGB transform\n");
+			return;
+		}
+	} else if (kind == 2) {
+		const char *path;
+		if (!ipc_need(a, "ICC file path", &path))
+			return;
+
+		transform = load_icc(path);
+		if (!transform) {
+			ipc_fail(a, "Cannot read ICC profile \"%s\"\n", path);
+			return;
+		}
+	}
+
+	out_ctx_t *c = ctx_of(a);
+	wlr_color_transform_unref(c->oc->color_transform);
+	c->oc->color_transform = transform;
+	apply_ok(a, "Output color_profile");
+}
+
+static void out_max_render_time(ipc_args_t *a) {
+	const char *arg;
+	if (!ipc_need(a, "value", &arg))
+		return;
+
+	int ms;
+	if (streq(arg, "off")) {
+		ms = 0;
+	} else {
+		char *end;
+		long v = strtol(arg, &end, 10);
+		if (*end != '\0' || v <= 0) {
+			ipc_fail(a, "Expected \"off\" or a positive number of milliseconds\n");
+			return;
+		}
+		ms = (int)v;
+	}
+
+	ctx_of(a)->oc->max_render_time = ms;
+	apply_ok(a, "Output max_render_time");
+}
+
+static void out_modes(ipc_args_t *a) {
+	if (!need_output(a))
+		return;
+
+	char buf[DOORS_BUFSIZ];
+	ipc_buf_t b;
+	ipc_buf_init(&b, buf, sizeof(buf));
+
+	ipc_buff(&b, "[");
+	struct wlr_output *wo = ctx_of(a)->mon->wlr_output;
+	struct wlr_output_mode *mode;
+	bool first = true;
+	wl_list_for_each(mode, &wo->modes, link) {
+		if (!first)
+			ipc_buff(&b, ",");
+		first = false;
+		ipc_buff(&b, "\n  {\n    \"width\": %d,\n    \"height\": %d,\n    \"refresh\": %.3f\n  }",
+			mode->width, mode->height, mode->refresh / 1000.0f);
+	}
+	ipc_buff(&b, "\n]\n");
+
+	ipc_buf_send(a, &b);
+}
+
+static void out_focus(ipc_args_t *a) {
+	if (!need_output(a))
+		return;
+
+	output_t *mon = ctx_of(a)->mon;
+	server.focused_output = mon;
+	focus_node(mon, mon->desk, mon->desk ? mon->desk->focus : NULL);
+	ipc_ok(a, "Focused\n");
+}
+
+static void out_rename(ipc_args_t *a) {
+	if (!need_output(a))
+		return;
+
+	output_t *mon = ctx_of(a)->mon;
+	if (!ipc_str(a, "name", mon->name, SMALEN))
+		return;
+
+	transaction_commit_dirty();
+	ipc_ok(a, "Renamed\n");
+}
+
+static void out_add_desktops(ipc_args_t *a) {
+	if (!need_output(a))
+		return;
+
+	output_t *mon = ctx_of(a)->mon;
+	ipc_foreach(a, name) {
+		desktop_t *d = calloc(1, sizeof(desktop_t));
+		if (!d) {
+			wlr_log(WLR_ERROR, "Allocation failed");
+			ipc_fail(a, "Allocation failed\n");
+			return;
+		}
+		desktop_init(d, mon, name);
+		workspace_create_desktop(d->name);
+		ipc_put_status(SUB_MASK_DESKTOP_ADD, "desktop_add[%s]\n", d->name);
+	}
+
+	transaction_commit_dirty();
+	ipc_ok(a, "Desktops added\n");
+}
+
+// with no arguments lists desktops, otherwise renames them in order
+static void out_desktops(ipc_args_t *a) {
+	if (!need_output(a))
+		return;
+
+	output_t *mon = ctx_of(a)->mon;
+	if (!ipc_peek(a)) {
 		char buf[DOORS_BUFSIZ];
-		int offset = 0;
-		offset += snprintf(buf + offset, sizeof(buf) - offset, "[\n");
-		bool first = true;
-		output_t *output;
-		wl_list_for_each(output, &mon_list, link) {
-			struct wlr_output *wo = output->wlr_output;
-			if (!first)
-				offset += snprintf(buf + offset, sizeof(buf) - offset, ",\n");
-			first = false;
-			offset += snprintf(buf + offset, sizeof(buf) - offset, "  {\n"
-				"    \"name\": \"%s\",\n"
-				"    \"description\": \"%s\",\n"
-				"    \"make\": \"%s\",\n"
-				"    \"model\": \"%s\",\n"
-				"    \"serial\": \"%s\",\n"
-				"    \"width\": %d,\n"
-				"    \"height\": %d,\n"
-				"    \"refresh\": %.3f,\n"
-				"    \"scale\": %.6g,\n"
-				"    \"phys_width\": %d,\n"
-				"    \"phys_height\": %d,\n"
-				"    \"hdr\": %s,\n"
-				"    \"allow_tearing\": %s,\n"
-				"    \"enabled\": %s\n"
-				"  }", wo->name ? wo->name : "", wo->description ? wo->description : "",
-					wo->make ? wo->make : "", wo->model ? wo->model : "", wo->serial ? wo->serial : "", wo->width,
-					wo->height, wo->refresh / 1000.0f, wo->scale, wo->phys_width, wo->phys_height,
-					output->hdr ? "true" : "false", output->allow_tearing ? "true" : "false",
-					wo->enabled ? "true" : "false");
-		}
-		offset += snprintf(buf + offset, sizeof(buf) - offset, "\n]\n");
-		send_success(client_fd, buf);
-		return;
-	} else if (streq("create", *args)) {
-		bool done = false;
-		wlr_multi_for_each_backend(server.backend, create_output, &done);
+		ipc_buf_t b;
+		ipc_buf_init(&b, buf, sizeof(buf));
 
-		if (done)
-			send_success(client_fd, "created output\n");
-		else
-			send_failure(client_fd,
-				"output create: can only create outputs for wayland, x11 or headless backends");
+		desktop_t *d;
+		wl_list_for_each(d, &mon->desk_list, link)
+			ipc_buff(&b, "%s\n", d->name);
 
+		ipc_buf_send(a, &b);
 		return;
 	}
 
-	char *output_name = *args;
-	args++;
-	num--;
-
-	if (num < 1) {
-		send_failure(client_fd, "output: missing subcommand\n");
-		return;
-	}
-
-	struct output_config *oc = output_config_find(output_name);
-	bool oc_new = false;
-	if (!oc) {
-		oc = output_config_create(output_name);
-		if (!oc) {
-			send_failure(client_fd, "output: failed to create config\n");
-			return;
-		}
-		oc_new = true;
-	}
-
-	if (oc_new)
-		output_config_add(oc);
-
-	output_t *mon = find_output_by_name(output_name);
-	char *subcmd = *args;
-
-	if (streq("enable", subcmd)) {
-		oc->enable = OUTPUT_CONFIG_ENABLE;
-		output_config_apply(oc);
-		send_success(client_fd, "output enabled\n");
-	} else if (streq("disable", subcmd)) {
-		oc->enable = OUTPUT_CONFIG_DISABLE;
-		output_config_apply(oc);
-		send_success(client_fd, "output disabled\n");
-	} else if (streq("mode", subcmd) || streq("resolution", subcmd) || streq("res", subcmd)) {
-		if (num < 2) {
-			send_failure(client_fd, "output mode: missing resolution\n");
-			return;
-		}
-		args++;
-		num--;
-
-		char *res = *args;
-		int width, height;
-		float refresh_rate = -1;
-
-		char *at = strchr(res, '@');
-		if (at) {
-			*at = '\0';
-			if (sscanf(at + 1, "%f", &refresh_rate) != 1) {
-				send_failure(client_fd, "output mode: invalid refresh rate\n");
+	desktop_t *d = wl_list_empty(&mon->desk_list) ? NULL : wl_container_of(mon->desk_list.next, d,
+		link);
+	ipc_foreach(a, name) {
+		if (d) {
+			snprintf(d->name, SMALEN, "%s", name);
+			d->name[SMALEN - 1] = '\0';
+			workspace_create_desktop(d->name);
+			d = d->link.next == &mon->desk_list ? NULL : wl_container_of(d->link.next, d, link);
+		} else {
+			desktop_t *newd = calloc(1, sizeof(desktop_t));
+			if (!newd) {
+				wlr_log(WLR_ERROR, "Allocation failed");
+				ipc_fail(a, "Allocation failed\n");
 				return;
 			}
+			desktop_init(newd, mon, name);
+			workspace_create_desktop(newd->name);
 		}
+	}
 
-		if (sscanf(res, "%dx%d", &width, &height) != 2) {
-			send_failure(client_fd, "output mode: invalid resolution format\n");
-			return;
-		}
+	// desktops beyond given list are dropped
+	while (d) {
+		desktop_t *next = d->link.next == &mon->desk_list ? NULL : wl_container_of(d->link.next, d, link);
+		if (d == mon->desk)
+			mon->desk = next;
+		wl_list_remove(&d->link);
+		desktop_minimized_clear(d);
+		free(d);
+		d = next;
+	}
 
-		oc->width = width;
-		oc->height = height;
-		oc->refresh_rate = refresh_rate;
-		output_config_apply(oc);
-		send_success(client_fd, "output mode set\n");
-	} else if (streq("modes", subcmd)) {
-		output_t *target = NULL;
-		output_t *o;
-		wl_list_for_each(o, &mon_list, link) {
-			if (streq(o->name, output_name) || streq(o->wlr_output->name, output_name)) {
-				target = o;
+	transaction_commit_dirty();
+	workspace_sync();
+
+	if (mon->desk)
+		focus_node(mon, mon->desk, mon->desk->focus);
+
+	ipc_ok(a, "Desktops reset\n");
+}
+
+static void out_reorder_desktops(ipc_args_t *a) {
+	if (!need_output(a))
+		return;
+
+	const char *first;
+	if (!ipc_need(a, "desktop name", &first))
+		return;
+
+	output_t *mon = ctx_of(a)->mon;
+	desktop_t *d = mon->desk;
+	while (d != NULL && ipc_peek(a) != NULL) {
+		desktop_t *next = d->link.next == &mon->desk_list ? NULL : wl_container_of(d->link.next, d, link);
+
+		ipc_foreach(a, name) {
+			if (streq(name, d->name)) {
+				snprintf(d->name, SMALEN, "%s", name);
+				d->name[SMALEN - 1] = '\0';
 				break;
 			}
 		}
 
-		if (!target) {
-			send_failure(client_fd, "output modes: no such output\n");
-			return;
-		}
-
-		struct wlr_output *wo = target->wlr_output;
-		char buf[DOORS_BUFSIZ];
-		int offset = 0;
-		offset += snprintf(buf + offset, sizeof(buf) - offset, "[\n");
-		bool first = true;
-
-		struct wlr_output_mode *mode;
-		wl_list_for_each(mode, &wo->modes, link) {
-			if (!first)
-				offset += snprintf(buf + offset, sizeof(buf) - offset, ",\n");
-
-			first = false;
-			offset += snprintf(buf + offset, sizeof(buf) - offset, "  {\n"
-				"    \"width\": %d,\n"
-				"    \"height\": %d,\n"
-				"    \"refresh\": %.3f\n"
-				"  }", mode->width, mode->height, mode->refresh / 1000.0f);
-		}
-
-		offset += snprintf(buf + offset, sizeof(buf) - offset, "\n]\n");
-		send_success(client_fd, buf);
-	} else if (streq("position", subcmd) || streq("pos", subcmd)) {
-		if (num < 3) {
-			send_failure(client_fd, "output position: missing coordinates\n");
-			return;
-		}
-		args++;
-		num--;
-
-		int x, y;
-		if (sscanf(*args, "%d", &x) != 1) {
-			send_failure(client_fd, "output position: invalid x\n");
-			return;
-		}
-		args++;
-		num--;
-
-		if (sscanf(*args, "%d", &y) != 1) {
-			send_failure(client_fd, "output position: invalid y\n");
-			return;
-		}
-
-		oc->x = x;
-		oc->y = y;
-		output_config_apply(oc);
-		send_success(client_fd, "output position set\n");
-	} else if (streq("scale", subcmd)) {
-		if (num < 2) {
-			send_failure(client_fd, "output scale: missing scale factor\n");
-			return;
-		}
-		args++;
-		num--;
-
-		float scale;
-		if (sscanf(*args, "%f", &scale) != 1) {
-			send_failure(client_fd, "output scale: invalid scale\n");
-			return;
-		}
-
-		oc->scale = scale;
-		output_config_apply(oc);
-		send_success(client_fd, "output scale set\n");
-	} else if (streq("transform", subcmd)) {
-		if (num < 2) {
-			send_failure(client_fd, "output transform: missing transform\n");
-			return;
-		}
-		args++;
-		num--;
-
-		int transform = -1;
-		if (streq("normal", *args) || streq("0", *args)) {
-			transform = WL_OUTPUT_TRANSFORM_NORMAL;
-		} else if (streq("90", *args)) {
-			transform = WL_OUTPUT_TRANSFORM_90;
-		} else if (streq("180", *args)) {
-			transform = WL_OUTPUT_TRANSFORM_180;
-		} else if (streq("270", *args)) {
-			transform = WL_OUTPUT_TRANSFORM_270;
-		} else if (streq("flipped", *args) || streq("flipped-180", *args)) {
-			transform = WL_OUTPUT_TRANSFORM_FLIPPED_180;
-		} else if (streq("flipped-90", *args)) {
-			transform = WL_OUTPUT_TRANSFORM_FLIPPED_90;
-		} else if (streq("flipped-270", *args)) {
-			transform = WL_OUTPUT_TRANSFORM_FLIPPED_270;
-		}
-
-		if (transform < 0) {
-			send_failure(client_fd, "output transform: invalid transform\n");
-			return;
-		}
-
-		oc->transform = transform;
-		output_config_apply(oc);
-		send_success(client_fd, "output transform set\n");
-	} else if (streq("dpms", subcmd)) {
-		if (num < 2) {
-			send_failure(client_fd, "output dpms: missing state\n");
-			return;
-		}
-		args++;
-		num--;
-
-		if (streq("on", *args)) {
-			oc->dpms_state = OUTPUT_CONFIG_DPMS_ON;
-		} else if (streq("off", *args)) {
-			oc->dpms_state = OUTPUT_CONFIG_DPMS_OFF;
-		} else {
-			send_failure(client_fd, "output dpms: invalid state (on/off)\n");
-			return;
-		}
-
-		output_config_apply(oc);
-		send_success(client_fd, "output dpms set\n");
-	} else if (streq("adaptive_sync", subcmd) || streq("vrr", subcmd)) {
-		if (num < 2) {
-			send_failure(client_fd, "output adaptive_sync: missing state\n");
-			return;
-		}
-		args++;
-		num--;
-
-		if (streq("on", *args) || streq("enable", *args)) {
-			oc->adaptive_sync = OUTPUT_CONFIG_ADAPTIVE_SYNC_ENABLED;
-		} else if (streq("off", *args) || streq("disable", *args)) {
-			oc->adaptive_sync = OUTPUT_CONFIG_ADAPTIVE_SYNC_DISABLED;
-		} else {
-			send_failure(client_fd, "output adaptive_sync: invalid state (on/off)\n");
-			return;
-		}
-
-		output_config_apply(oc);
-		send_success(client_fd, "output adaptive_sync set\n");
-	} else if (streq("render_bit_depth", subcmd)) {
-		if (num < 2) {
-			send_failure(client_fd, "output render_bit_depth: missing value\n");
-			return;
-		}
-		args++;
-		num--;
-
-		if (streq("8", *args) || streq("8-bit", *args)) {
-			oc->render_bit_depth = OUTPUT_CONFIG_RENDER_BIT_DEPTH_8;
-		} else if (streq("10", *args) || streq("10-bit", *args)) {
-			oc->render_bit_depth = OUTPUT_CONFIG_RENDER_BIT_DEPTH_10;
-		} else {
-			send_failure(client_fd, "output render_bit_depth: invalid value (8/10)\n");
-			return;
-		}
-
-		output_config_apply(oc);
-		send_success(client_fd, "output render_bit_depth set\n");
-	} else if (streq("color_profile", subcmd)) {
-		if (num < 2) {
-			send_failure(client_fd,
-				"output color_profile: missing profile type (gamma22|srgb|icc <path>)\n");
-			return;
-		}
-		args++;
-		num--;
-
-		struct wlr_color_transform *new_transform = NULL;
-		if (streq("gamma22", *args)) {
-			// no transform
-		} else if (streq("srgb", *args)) {
-			new_transform =
-				wlr_color_transform_init_linear_to_inverse_eotf(WLR_COLOR_TRANSFER_FUNCTION_SRGB);
-			if (!new_transform) {
-				send_failure(client_fd, "output color_profile: failed to create sRGB transform\n");
-				return;
-			}
-		} else if (streq("icc", *args)) {
-			if (num < 2) {
-				send_failure(client_fd, "output color_profile icc: missing file path\n");
-				return;
-			}
-			args++;
-			num--;
-
-			int fd = open(*args, O_RDONLY | O_NOCTTY | O_CLOEXEC);
-			if (fd == -1) {
-				send_failure(client_fd, "output color_profile icc: cannot open file\n");
-				return;
-			}
-			struct stat info;
-			if (fstat(fd, &info) == -1 || !S_ISREG(info.st_mode) || info.st_size <= 0) {
-				close(fd);
-				send_failure(client_fd, "output color_profile icc: invalid file\n");
-				return;
-			}
-			void *icc_data = malloc(info.st_size);
-			if (!icc_data) {
-				close(fd);
-				send_failure(client_fd, "output color_profile icc: out of memory\n");
-				return;
-			}
-			size_t nread = 0;
-			while (nread < (size_t)info.st_size) {
-				ssize_t r = read(fd, (char *)icc_data + nread, (size_t)info.st_size - nread);
-				if ((r == -1 && errno != EINTR) || r == 0) {
-					free(icc_data);
-					close(fd);
-					send_failure(client_fd, "output color_profile icc: read error\n");
-					return;
-				}
-				nread += (size_t)r;
-			}
-			close(fd);
-
-			new_transform = wlr_color_transform_init_linear_to_icc(icc_data, (size_t)info.st_size);
-			free(icc_data);
-			if (!new_transform) {
-				send_failure(client_fd, "output color_profile icc: failed to initialize ICC transform\n");
-				return;
-			}
-		} else {
-			send_failure(client_fd, "output color_profile: invalid type (gamma22|srgb|icc <path>)\n");
-			return;
-		}
-
-		wlr_color_transform_unref(oc->color_transform);
-		oc->color_transform = new_transform;
-		output_config_apply(oc);
-		send_success(client_fd, "output color_profile set\n");
-	} else if (streq("hdr", subcmd)) {
-		if (num < 2) {
-			send_failure(client_fd, "output hdr: missing state (on/off)\n");
-			return;
-		}
-		args++;
-		num--;
-
-		if (streq("on", *args) || streq("enable", *args) || streq("true", *args)) {
-			oc->hdr_enabled = true;
-			oc->hdr_set = true;
-		} else if (streq("off", *args) || streq("disable", *args) || streq("false", *args)) {
-			oc->hdr_enabled = false;
-			oc->hdr_set = true;
-		} else {
-			send_failure(client_fd, "output hdr: invalid state (on/off)\n");
-			return;
-		}
-
-		output_config_apply(oc);
-		send_success(client_fd, "output hdr set\n");
-	} else if (streq("tearing", subcmd)) {
-		if (num < 2) {
-			send_failure(client_fd, "output tearing: missing state\n");
-			return;
-		}
-		args++;
-		num--;
-
-		if (streq("on", *args) || streq("enable", *args) || streq("true", *args)) {
-			oc->allow_tearing = true;
-		} else if (streq("off", *args) || streq("disable", *args) || streq("false", *args)) {
-			oc->allow_tearing = false;
-		} else {
-			send_failure(client_fd, "output tearing: invalid state (on/off)\n");
-			return;
-		}
-
-		output_config_apply(oc);
-		send_success(client_fd, "output tearing set\n");
-	} else if (streq("max_render_time", subcmd)) {
-		if (num < 2) {
-			send_failure(client_fd, "output max_render_time: missing value\n");
-			return;
-		}
-		args++;
-		num--;
-
-		if (streq("off", *args)) {
-			oc->max_render_time = 0;
-		} else {
-			char *end;
-			int val = (int)strtol(*args, &end, 10);
-			if (*end || val <= 0) {
-				send_failure(client_fd, "output max_render_time: invalid value (off or <ms>)\n");
-				return;
-			}
-			oc->max_render_time = val;
-		}
-
-		output_config_apply(oc);
-		send_success(client_fd, "output max_render_time set\n");
-	} else if (streq("focus", subcmd) || streq("-f", subcmd) || streq("--focus", subcmd)) {
-		if (!mon) {
-			send_failure(client_fd, "output focus: no such output\n");
-			return;
-		}
-		server.focused_output = mon;
-		focus_node(mon, mon->desk, mon->desk ? mon->desk->focus : NULL);
-		send_success(client_fd, "focused\n");
-	} else if (streq("rename", subcmd) || streq("-n", subcmd) || streq("--rename", subcmd)) {
-		if (!mon) {
-			send_failure(client_fd, "output rename: no such output\n");
-			return;
-		}
-		if (num < 2) {
-			send_failure(client_fd, "output rename: missing name argument\n");
-			return;
-		}
-		args++;
-		num--;
-		strncpy(mon->name, *args, SMALEN - 1);
-		mon->name[SMALEN - 1] = '\0';
-		transaction_commit_dirty();
-		send_success(client_fd, "renamed\n");
-	} else if (streq("add-desktops", subcmd) || streq("-a", subcmd) || streq("--add-desktops",
-			subcmd)) {
-		if (!mon) {
-			send_failure(client_fd, "output add-desktops: no such output\n");
-			return;
-		}
-		if (num < 2) {
-			send_failure(client_fd, "output add-desktops: missing desktop names\n");
-			return;
-		}
-		args++;
-		num--;
-		while (num > 0) {
-			desktop_t *d = (desktop_t *)calloc(1, sizeof(desktop_t));
-			if (!d) {
-				wlr_log(WLR_ERROR, "Allocation failed");
-				return;
-			}
-			desktop_init(d, mon, *args);
-
-			workspace_create_desktop(d->name);
-			ipc_put_status(SUB_MASK_DESKTOP_ADD, "desktop_add[%s]\n", d->name);
-
-			args++;
-			num--;
-		}
-		transaction_commit_dirty();
-		send_success(client_fd, "desktops added\n");
-	} else if (streq("desktops", subcmd) || streq("-d", subcmd) || streq("--desktops", subcmd)) {
-		if (!mon) {
-			send_failure(client_fd, "output desktops: no such output\n");
-			return;
-		}
-		if (num < 2) {
-			char buf[DOORS_BUFSIZ];
-			size_t offset = 0;
-			desktop_t *d;
-			wl_list_for_each(d, &mon->desk_list, link) {
-				offset += snprintf(buf + offset, sizeof(buf) - offset, "%s\n", d->name);
-			}
-			send_success(client_fd, buf);
-		} else {
-			args++;
-			num--;
-
-			desktop_t *d = wl_list_empty(&mon->desk_list) ? NULL : wl_container_of(mon->desk_list.next, d,
-				link);
-			for (; num > 0 &&
-					d != NULL; d = d->link.next == &mon->desk_list ? NULL : wl_container_of(d->link.next, d,
-					link)) {
-				strncpy(d->name, *args, SMALEN - 1);
-				d->name[SMALEN - 1] = '\0';
-				workspace_create_desktop(d->name);
-				args++;
-				num--;
-			} while (num > 0) {
-				desktop_t *newd = (desktop_t *)calloc(1, sizeof(desktop_t));
-				if (!newd) {
-					wlr_log(WLR_ERROR, "Allocation failed");
-					return;
-				}
-				desktop_init(newd, mon, *args);
-
-				workspace_create_desktop(newd->name);
-				args++;
-				num--;
-			} while (d != NULL) {
-				desktop_t *next = d->link.next == &mon->desk_list ? NULL : wl_container_of(d->link.next, d,
-					link);
-				if (d == mon->desk) {
-					mon->desk = next;
-					if (mon->desk)
-						focus_node(mon, mon->desk, mon->desk->focus);
-				}
-				wl_list_remove(&d->link);
-				desktop_minimized_clear(d);
-				free(d);
-				d = next;
-			}
-
-			transaction_commit_dirty();
-			workspace_sync();
-
-			if (mon->desk) {
-				focus_node(mon, mon->desk, mon->desk->focus);
-			}
-
-			send_success(client_fd, "desktops reset\n");
-		}
-	} else if (streq("swap-desktops", subcmd) || streq("-s", subcmd) || streq("--swap", subcmd)) {
-		if (!mon) {
-			send_failure(client_fd, "output swap-desktops: no such output\n");
-			return;
-		}
-		if (num < 2) {
-			send_failure(client_fd, "output swap-desktops: missing target output\n");
-			return;
-		}
-		args++;
-		num--;
-
-		output_t *target = find_output_by_name(*args);
-		if (!target) {
-			send_failure(client_fd, "output swap-desktops: target output not found\n");
-			return;
-		}
-
-		if (target == mon) {
-			send_failure(client_fd, "output swap-desktops: cannot swap with self\n");
-			return;
-		}
-
-		output_t *m0 = mon;
-		output_t *m1 = target;
-
-		desktop_t *d0 = m0->desk;
-		desktop_t *d1 = m1->desk;
-
-		struct wl_list *a = &m0->desk_list;
-		struct wl_list *b = &m1->desk_list;
-
-		if (wl_list_empty(a)) {
-			wl_list_insert_list(a, b);
-			wl_list_init(b);
-		} else if (wl_list_empty(b)) {
-			wl_list_insert_list(b, a);
-			wl_list_init(a);
-		} else {
-			struct wl_list *a_first = a->next;
-			struct wl_list *a_last = a->prev;
-			struct wl_list *b_first = b->next;
-			struct wl_list *b_last = b->prev;
-			a->next = b_first;
-			b_first->prev = a;
-			a->prev = b_last;
-			b_last->next = a;
-			b->next = a_first;
-			a_first->prev = b;
-			b->prev = a_last;
-			a_last->next = b;
-		}
-
-		m0->desk = d1;
-		m1->desk = d0;
-
-		desktop_t *d;
-		wl_list_for_each(d, &m0->desk_list, link)
-			d->output = m0;
-		wl_list_for_each(d, &m1->desk_list, link)
-			d->output = m1;
-
-		if (server.focused_output == m0)
-			server.focused_output = m1;
-		else if (server.focused_output == m1)
-			server.focused_output = m0;
-
-		transaction_commit_dirty();
-		send_success(client_fd, "swapped\n");
-	} else if (streq("remove", subcmd) || streq("-r", subcmd) || streq("--remove", subcmd)) {
-		if (!mon) {
-			send_failure(client_fd, "output remove: no such output\n");
-			return;
-		}
-		if (wl_list_length(&mon_list) == 1) {
-			send_failure(client_fd, "output remove: cannot remove the only output\n");
-			return;
-		}
-
-		if (mon->desk) {
-			send_failure(client_fd, "output remove: cannot remove output with desktops\n");
-			return;
-		}
-
-		output_t *remove_next = mon->link.next != &mon_list ? wl_container_of(mon->link.next, mon,
-			link) : NULL;
-		output_t *remove_prev = mon->link.prev != &mon_list ? wl_container_of(mon->link.prev, mon,
-			link) : NULL;
-		wl_list_remove(&mon->link);
-
-		if (server.focused_output == mon) {
-			server.focused_output = remove_next ? remove_next : remove_prev;
-			if (server.focused_output) {
-				focus_node(server.focused_output, server.focused_output->desk,
-					server.focused_output->desk ? server.focused_output->desk->focus : NULL);
-			}
-		}
-
-		ipc_put_status(SUB_MASK_MONITOR_REMOVE, "monitor_remove[%s]\n", mon->name);
-		free(mon);
-		transaction_commit_dirty();
-		send_success(client_fd, "removed\n");
-	} else if (streq("rectangle", subcmd) || streq("-g", subcmd) || streq("--rectangle", subcmd)) {
-		if (num < 2) {
-			send_failure(client_fd, "output rectangle: missing rectangle\n");
-			return;
-		}
-		if (!mon) {
-			send_failure(client_fd, "output rectangle: no such output\n");
-			return;
-		}
-		args++;
-		num--;
-
-		int x, y, width, height;
-		if (sscanf(*args, "%dx%d:%d,%d", &width, &height, &x, &y) != 4 && sscanf(*args, "%dx%d", &width,
-				&height) == 2) {
-			x = mon->rectangle.x;
-			y = mon->rectangle.y;
-		} else if (sscanf(*args, "%d,%d,%d,%d", &x, &y, &width, &height) != 4) {
-			send_failure(client_fd, "output rectangle: invalid rectangle format\n");
-			return;
-		}
-
-		mon->rectangle.x = x;
-		mon->rectangle.y = y;
-		mon->rectangle.width = width;
-		mon->rectangle.height = height;
-
-		ipc_put_status(SUB_MASK_MONITOR_CHANGE, "monitor_change[%s]\n", mon->name);
-		transaction_commit_dirty();
-		send_success(client_fd, "rectangle set\n");
-	} else if (streq("reorder-desktops", subcmd) || streq("-o", subcmd) || streq("--reorder-desktops",
-			subcmd)) {
-		if (num < 2) {
-			send_failure(client_fd, "output reorder-desktops: missing desktop names\n");
-			return;
-		}
-		if (!mon) {
-			send_failure(client_fd, "output reorder-desktops: no such output\n");
-			return;
-		}
-		args++;
-		num--;
-
-		desktop_t *d = mon->desk;
-		while (d != NULL && num > 0) {
-			desktop_t *next = d->link.next == &mon->desk_list ? NULL : wl_container_of(d->link.next, d,
-				link);
-			for (int i = 0; i < num; i++) {
-				if (strcmp(d->name, args[i]) == 0) {
-					strncpy(d->name, args[i], SMALEN - 1);
-					d->name[SMALEN - 1] = '\0';
-					break;
-				}
-			}
-			d = next;
-		}
-
-		transaction_commit_dirty();
-		send_success(client_fd, "desktops reordered\n");
-	} else {
-		send_failure(client_fd, "output: unknown subcommand\n");
+		d = next;
 	}
+
+	transaction_commit_dirty();
+	ipc_ok(a, "Desktops reordered\n");
+}
+
+static void out_swap_desktops(ipc_args_t *a) {
+	if (!need_output(a))
+		return;
+
+	const char *name;
+	if (!ipc_need(a, "target output", &name))
+		return;
+
+	output_t *mon = ctx_of(a)->mon;
+	output_t *target = find_output_by_name(name);
+	if (!target) {
+		ipc_fail(a, "Target output \"%s\" not found\n", name);
+		return;
+	}
+	if (target == mon) {
+		ipc_fail(a, "Cannot swap with self\n");
+		return;
+	}
+
+	output_t *m0 = mon;
+	output_t *m1 = target;
+	desktop_t *d0 = m0->desk;
+	desktop_t *d1 = m1->desk;
+
+	struct wl_list *a_list = &m0->desk_list;
+	struct wl_list *b_list = &m1->desk_list;
+
+	if (wl_list_empty(a_list)) {
+		wl_list_insert_list(a_list, b_list);
+		wl_list_init(b_list);
+	} else if (wl_list_empty(b_list)) {
+		wl_list_insert_list(b_list, a_list);
+		wl_list_init(a_list);
+	} else {
+		struct wl_list *a_first = a_list->next;
+		struct wl_list *a_last = a_list->prev;
+		struct wl_list *b_first = b_list->next;
+		struct wl_list *b_last = b_list->prev;
+		a_list->next = b_first;
+		b_first->prev = a_list;
+		a_list->prev = b_last;
+		b_last->next = a_list;
+		b_list->next = a_first;
+		a_first->prev = b_list;
+		b_list->prev = a_last;
+		a_last->next = b_list;
+	}
+
+	m0->desk = d1;
+	m1->desk = d0;
+
+	desktop_t *d;
+	wl_list_for_each(d, &m0->desk_list, link)
+		d->output = m0;
+	wl_list_for_each(d, &m1->desk_list, link)
+		d->output = m1;
+
+	if (server.focused_output == m0)
+		server.focused_output = m1;
+	else if (server.focused_output == m1)
+		server.focused_output = m0;
+
+	transaction_commit_dirty();
+	ipc_ok(a, "Swapped\n");
+}
+
+static void out_remove(ipc_args_t *a) {
+	if (!need_output(a))
+		return;
+
+	output_t *mon = ctx_of(a)->mon;
+	if (wl_list_length(&mon_list) == 1) {
+		ipc_fail(a, "Cannot remove the only output\n");
+		return;
+	}
+	if (mon->desk) {
+		ipc_fail(a, "Cannot remove output with desktops\n");
+		return;
+	}
+
+	output_t *next = mon->link.next != &mon_list ? wl_container_of(mon->link.next, mon, link) : NULL;
+	output_t *prev = mon->link.prev != &mon_list ? wl_container_of(mon->link.prev, mon, link) : NULL;
+	wl_list_remove(&mon->link);
+
+	if (server.focused_output == mon) {
+		server.focused_output = next ? next : prev;
+		if (server.focused_output) {
+			focus_node(server.focused_output, server.focused_output->desk,
+				server.focused_output->desk ? server.focused_output->desk->focus : NULL);
+		}
+	}
+
+	ipc_put_status(SUB_MASK_MONITOR_REMOVE, "monitor_remove[%s]\n", mon->name);
+	free(mon);
+	transaction_commit_dirty();
+	ipc_ok(a, "Removed\n");
+}
+
+static void out_rectangle(ipc_args_t *a) {
+	const char *spec;
+	if (!ipc_need(a, "rectangle", &spec))
+		return;
+
+	if (!need_output(a))
+		return;
+
+	output_t *mon = ctx_of(a)->mon;
+	int x = mon->rectangle.x;
+	int y = mon->rectangle.y;
+	int width, height;
+
+	int px, py;
+	if (sscanf(spec, "%dx%d:%d,%d", &width, &height, &px, &py) == 4) {
+		x = px;
+		y = py;
+	} else if (sscanf(spec, "%d,%d,%d,%d", &x, &y, &width, &height) != 4) {
+		if (sscanf(spec, "%dx%d", &width, &height) != 2) {
+			ipc_fail(a, "Expected WIDTHxHEIGHT[:X,Y], X,Y,WIDTH,HEIGHT, or WIDTHxHEIGHT\n");
+			return;
+		}
+	}
+
+	mon->rectangle.x = x;
+	mon->rectangle.y = y;
+	mon->rectangle.width = width;
+	mon->rectangle.height = height;
+
+	ipc_put_status(SUB_MASK_MONITOR_CHANGE, "monitor_change[%s]\n", mon->name);
+	transaction_commit_dirty();
+	ipc_ok(a, "Rectangle set\n");
+}
+
+const ipc_sub_t output_subs[] = {
+	IPC_SUB("enable", NULL, "output <name> enable", out_enable),
+	IPC_SUB("disable", NULL, "output <name> disable", out_disable),
+	IPC_SUBA("mode", "resolution", "res\0--res", "output <name> mode|resolution|res <WxH[@hz]>",
+		out_mode),
+	IPC_SUB("modes", NULL, "output <name> modes", out_modes),
+	IPC_SUBA("position", "pos", "--pos", "output <name> position|pos <x> <y>", out_position),
+	IPC_SUB("scale", NULL, "output <name> scale <factor>", out_scale),
+	IPC_SUB("transform", NULL, "output <name> transform <transform>", out_transform),
+	IPC_SUB("dpms", NULL, "output <name> dpms <on|off>", out_dpms),
+	IPC_SUBA("adaptive_sync", "vrr", "--vrr", "output <name> adaptive_sync|vrr <on|off>",
+		out_adaptive_sync),
+	IPC_SUB("render_bit_depth", NULL, "output <name> render_bit_depth <8|10>", out_render_bit_depth),
+	IPC_SUB("color_profile", NULL, "output <name> color_profile <gamma22|srgb|icc <path>>",
+		out_color_profile),
+	IPC_SUB("hdr", NULL, "output <name> hdr <on|off>", out_hdr),
+	IPC_SUB("tearing", NULL, "output <name> tearing <on|off>", out_tearing),
+	IPC_SUB("max_render_time", NULL, "output <name> max_render_time <off|ms>", out_max_render_time),
+	IPC_SUBA("focus", "-f", "--focus", "output <name> focus|-f|--focus", out_focus),
+	IPC_SUBA("rename", "-n", "--rename", "output <name> rename|-n|--rename <name>", out_rename),
+	IPC_SUBA("add-desktops", "-a", "--add-desktops",
+		"output <name> add-desktops|-a|--add-desktops <names...>", out_add_desktops),
+	IPC_SUBA("desktops", "-d", "--desktops", "output <name> desktops|-d|--desktops [names...]",
+		out_desktops),
+	IPC_SUBA("reorder-desktops", "-o", "--reorder-desktops",
+		"output <name> reorder-desktops|-o|--reorder-desktops <names...>", out_reorder_desktops),
+	IPC_SUBA("swap-desktops", "-s", "--swap", "output <name> swap-desktops|-s|--swap <output>",
+		out_swap_desktops),
+	IPC_SUBA("remove", "-r", "--remove", "output <name> remove|-r|--remove", out_remove),
+	IPC_SUBA("rectangle", "-g", "--rectangle", "output <name> rectangle|-g|--rectangle <rect>",
+		out_rectangle),
+	IPC_SUB_END,
+};
+
+void ipc_cmd_output(ipc_args_t *a) {
+	if (ipc_sub_dispatch(a, output_global_subs))
+		return;
+
+	const char *arg = ipc_peek(a);
+	if (!arg) {
+		ipc_fail_unknown(a, output_global_subs);
+		return;
+	}
+
+	const char *name = ipc_take(a);
+	if (!ipc_peek(a)) {
+		ipc_fail_unknown(a, output_subs);
+		return;
+	}
+
+	out_ctx_t ctx = {
+		.name = name,
+		.mon = find_output_by_name(name)
+	};
+
+	ctx.oc = output_config_find(name);
+	if (!ctx.oc) {
+		ctx.oc = output_config_create(name);
+		if (!ctx.oc) {
+			ipc_fail(a, "Failed to create config for \"%s\"\n", name);
+			return;
+		}
+		output_config_add(ctx.oc);
+	}
+
+	a->ctx = &ctx;
+
+	if (!ipc_sub_dispatch(a, output_subs))
+		ipc_fail_unknown(a, output_subs);
 }

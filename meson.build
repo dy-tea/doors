@@ -115,6 +115,7 @@ executable(
 		'src' / 'input' / 'seat.c',
 		'src' / 'input' / 'tablet.c',
 		'src' / 'input' / 'touch.c',
+		'src' / 'ipc' / 'args.c',
 		'src' / 'ipc' / 'helpers.c',
 		'src' / 'ipc' / 'ipc.c',
 		'src' / 'ipc' / 'subscribe.c',

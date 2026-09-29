@@ -1,9 +1,9 @@
 #include "animation.h"
 #include "bezier.h"
 #include "effects/effects.h"
-#include "ipc/cmd.h"
+#include "ipc/args.h"
 #include "ipc/helpers.h"
-#include "ipc/ipc.h"
+#include "ipc/registry.h"
 #include "layout/scroller.h"
 #include "output/output.h"
 #include "protocol/idle_power.h"
@@ -14,23 +14,47 @@
 #include "text.h"
 #include "transaction.h"
 #include "tree.h"
-#include <fcntl.h>
+#include <assert.h>
+#include <errno.h>
 #include <limits.h>
-#include <stdarg.h>
-#include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <wayland-server-core.h>
-#include <wlr/backend/headless.h>
-#include <wlr/backend/multi.h>
-#include <wlr/backend/wayland.h>
-#include <wlr/backend/x11.h>
-#include <wlr/types/wlr_xdg_shell.h>
-#include <wlr/util/box.h>
-#include <wlr/util/log.h>
-#include <wlr/xwayland.h>
+
+typedef enum {
+	CFG_BOOL,
+	CFG_INT,
+	CFG_FLOAT,
+	CFG_DOUBLE,
+	CFG_ENUM,
+	CFG_STR,
+	CFG_RGBA,
+} cfg_type_t;
+
+// transaction_commit_dirty() after a successful write
+#define CFG_COMMIT (1 << 0)
+
+// clamp out-of-range values instead of rejecting them
+#define CFG_CLAMP (1 << 1)
+
+// value must be greater than min, with no upper bound
+#define CFG_POSITIVE (1 << 2)
+
+// both bounds are exclusive
+#define CFG_EXCLUSIVE (1 << 3)
+
+typedef struct cfg_setting {
+	const char *name;
+	const char *alias;
+	cfg_type_t type;
+	void *ptr;
+	size_t size; // capacity for CFG_STR
+	double min, max;
+	const char *fmt; // get format for the numeric types
+	const cfg_enum_value_t *values; // CFG_ENUM
+	unsigned flags;
+	void (*on_set)(void); // side effects of a successful write
+} cfg_setting_t;
 
 static void tabs_rebuild_all(void) {
 	output_t *m;
@@ -46,22 +70,58 @@ static void tabs_rebuild_all(void) {
 	}
 }
 
-static void ipc_handle_border_color(char **args, int num, int client_fd, char *field,
-		size_t field_size, const char *name, bool refresh_colors, bool commit_dirty) {
-	if (num >= 2) {
-		strncpy(field, args[1], field_size - 1);
-		field[field_size - 1] = '\0';
-		if (refresh_colors)
-			refresh_border_colors();
-		if (commit_dirty)
-			transaction_commit_dirty();
-		char msg[128];
-		snprintf(msg, sizeof(msg), "%s set\n", name);
-		send_success(client_fd, msg);
-	} else {
-		send_success(client_fd, field);
-		send_success(client_fd, "\n");
+static void on_border_color(void) {
+	refresh_border_colors();
+}
+
+static void on_window_gap(void) {
+	output_t *m;
+	wl_list_for_each(m, &mon_list, link) {
+		desktop_t *d;
+		wl_list_for_each(d, &m->desk_list, link)
+			d->window_gap = settings.window_gap;
 	}
+}
+
+static void on_decoration_mode(void) {
+	tabs_rebuild_all();
+
+	// refresh decor
+	view_t *tl;
+	wl_list_for_each(tl, &server.views, link)
+		tl->impl->set_decorations(tl);
+}
+
+static void on_text(void) {
+	tabs_rebuild_all();
+}
+
+static void on_blur_downsample(void) {
+	output_t *m;
+	wl_list_for_each(m, &mon_list, link) {
+		if (m && m->effects)
+			effects_output_resize(m->effects, m->width, m->height, m);
+	}
+}
+
+static void on_mica(void) {
+	output_t *m;
+	wl_list_for_each(m, &mon_list, link)
+		effects_invalidate_mica(m->effects);
+}
+
+static void on_screen_shader_enabled(void) {
+	if (!screen_shader_enabled)
+		screen_shader_hide_nodes();
+}
+
+static void on_realtime_scheduling(void) {
+	if (settings.realtime_scheduling)
+		set_rr_scheduling();
+}
+
+static void on_idle(void) {
+	idle_power_reset_timer();
 }
 
 static const cfg_enum_value_t focus_on_activate_values[] = {
@@ -69,6 +129,7 @@ static const cfg_enum_value_t focus_on_activate_values[] = {
 	{"none", FOCUS_ON_ACTIVATE_NONE},
 	{"smart", FOCUS_ON_ACTIVATE_SMART},
 	{"urgent", FOCUS_ON_ACTIVATE_URGENT},
+	IPC_ENUM_END,
 };
 
 static const cfg_enum_value_t decoration_mode_values[] = {
@@ -76,6 +137,7 @@ static const cfg_enum_value_t decoration_mode_values[] = {
 	{"tabs", DECORATION_TABS},
 	{"always", DECORATION_ALWAYS},
 	{"csd", DECORATION_CSD},
+	IPC_ENUM_END,
 };
 
 static const cfg_enum_value_t focus_follows_pointer_values[] = {
@@ -84,701 +146,864 @@ static const cfg_enum_value_t focus_follows_pointer_values[] = {
 	{"yes", FOLLOWS_YES},
 	{"true", FOLLOWS_YES},
 	{"always", FOLLOWS_ALWAYS},
+	IPC_ENUM_END,
 };
 
-void ipc_cmd_config(char **args, int num, int client_fd) {
-	if (num < 1) {
-		send_failure(client_fd, "config: Missing arguments\n");
+static const cfg_enum_value_t workspace_anim_direction_values[] = {
+	{"vertical", WORKSPACE_ANIM_VERTICAL},
+	{"horizontal", WORKSPACE_ANIM_HORIZONTAL},
+	IPC_ENUM_END,
+};
+
+static const cfg_enum_value_t automatic_scheme_values[] = {
+	{"longest_side", SCHEME_LONGEST_SIDE},
+	{"longest-side", SCHEME_LONGEST_SIDE},
+	{"alternate", SCHEME_ALTERNATE},
+	{"spiral", SCHEME_SPIRAL},
+	IPC_ENUM_END,
+};
+
+static const cfg_enum_value_t initial_polarity_values[] = {
+	{"first_child", FIRST_CHILD},
+	{"first-child", FIRST_CHILD},
+	{"second_child", SECOND_CHILD},
+	{"second-child", SECOND_CHILD},
+	IPC_ENUM_END,
+};
+
+#define B(n, a, p, fl, on) {n, a, CFG_BOOL, &(p), 0, 0, 0, NULL, NULL, fl, on}
+#define I(n, a, p, lo, hi, f, fl, on) \
+	{n, a, CFG_INT, &(p), 0, lo, hi, f, NULL, fl, on}
+#define F(n, a, p, lo, hi, f, fl, on) \
+	{n, a, CFG_FLOAT, &(p), 0, lo, hi, f, NULL, fl, on}
+#define D(n, a, p, lo, hi, f, fl, on) \
+	{n, a, CFG_DOUBLE, &(p), 0, lo, hi, f, NULL, fl, on}
+#define E(n, a, p, vals, fl, on) {n, a, CFG_ENUM, &(p), 0, 0, 0, NULL, vals, fl, on}
+#define S(n, a, p, sz, fl, on) {n, a, CFG_STR, (p), sz, 0, 0, NULL, NULL, fl, on}
+#define C(n, a, p, fl, on) {n, a, CFG_RGBA, (p), 0, 0, 0, NULL, NULL, fl, on}
+
+static const cfg_setting_t settings_table[] = {
+	/* geometry */
+	I("border_width", NULL, settings.border_width, INT_MIN, INT_MAX, "%d\n", CFG_COMMIT, NULL),
+	I("window_gap", NULL, settings.window_gap, INT_MIN, INT_MAX, "%d\n", CFG_COMMIT, on_window_gap),
+
+	/* layout behaviour */
+	B("borderless_monocle", NULL, settings.borderless_monocle, CFG_COMMIT, NULL),
+	B("borderless_singleton", NULL, settings.borderless_singleton, CFG_COMMIT, NULL),
+	B("smart_gaps", NULL, settings.smart_gaps, CFG_COMMIT, NULL),
+	B("smart_borders", NULL, settings.smart_borders, CFG_COMMIT, NULL),
+	B("respect_tiled_min_size", NULL, settings.respect_tiled_min_size, CFG_COMMIT, NULL),
+	B("focus_wrapping", NULL, settings.focus_wrapping, CFG_COMMIT, NULL),
+	B("hide_lone_tab", NULL, settings.hide_lone_tab, CFG_COMMIT, NULL),
+	B("gapless_monocle", NULL, settings.gapless_monocle, CFG_COMMIT, NULL),
+	B("pointer_follows_focus", NULL, settings.pointer_follows_focus, CFG_COMMIT, NULL),
+	B("click_to_focus", NULL, settings.click_to_focus, 0, NULL),
+	B("record_history", NULL, settings.record_history, 0, NULL),
+	B("allow_tearing", NULL, settings.allow_tearing, CFG_COMMIT, NULL),
+	B("auto_float_dialogs", NULL, settings.auto_float_dialogs, 0, NULL),
+	B("minimize_to_scratchpad", NULL, settings.minimize_to_scratchpad, 0, NULL),
+	B("scratchpad_restore_to_origin", NULL, settings.scratchpad_restore_to_origin, 0, NULL),
+	D("split_ratio", NULL, settings.split_ratio, 0, 1, "%f\n", CFG_COMMIT | CFG_EXCLUSIVE, NULL),
+	E("focus_on_activate", NULL, settings.focus_on_activate, focus_on_activate_values, CFG_COMMIT,
+		NULL),
+	E("decoration_mode", NULL, settings.decoration_mode, decoration_mode_values, CFG_COMMIT,
+		on_decoration_mode),
+	E("automatic_scheme", NULL, settings.automatic_scheme, automatic_scheme_values, CFG_COMMIT, NULL),
+	E("initial_polarity", NULL, settings.initial_polarity, initial_polarity_values, 0, NULL),
+	E("focus_follows_pointer", "focus_follows_mouse", settings.focus_follows_mouse,
+		focus_follows_pointer_values, CFG_COMMIT, NULL),
+	E("workspace_anim_direction", NULL, settings.workspace_anim_direction,
+		workspace_anim_direction_values, 0, NULL),
+	B("enable_animations", NULL, settings.enable_animations, 0, NULL),
+	B("workspace_anim_slide_up", NULL, settings.workspace_anim_slide_up, 0, NULL),
+	B("edge_scroller_pointer_focus", NULL, edge_scroller_pointer_focus, 0, NULL),
+	I("directional_focus_tightness", NULL, settings.directional_focus_tightness, 0, 100, "%d\n", 0,
+		NULL),
+	I("mapping_events_count", NULL, settings.mapping_events_count, 0, 1000000, "%d\n", 0, NULL),
+	I("ignore_ewmh_fullscreen", NULL, settings.ignore_ewmh_fullscreen, 0, 2, "%d\n", 0, NULL),
+
+	/* padding */
+	I("top_padding", NULL, settings.padding.top, INT_MIN, INT_MAX, "%d\n", CFG_COMMIT | CFG_CLAMP,
+		NULL),
+	I("right_padding", NULL, settings.padding.right, INT_MIN, INT_MAX, "%d\n", CFG_COMMIT | CFG_CLAMP,
+		NULL),
+	I("bottom_padding", NULL, settings.padding.bottom, INT_MIN, INT_MAX, "%d\n", CFG_COMMIT | CFG_CLAMP,
+		NULL),
+	I("left_padding", NULL, settings.padding.left, INT_MIN, INT_MAX, "%d\n", CFG_COMMIT | CFG_CLAMP,
+		NULL),
+
+	/* borders */
+	S("normal_border_color", NULL, settings.normal_border_color, sizeof(settings.normal_border_color),
+		CFG_COMMIT, on_border_color),
+	S("active_border_color", NULL, settings.active_border_color, sizeof(settings.active_border_color),
+		CFG_COMMIT, on_border_color),
+	S("focused_border_color", NULL, settings.focused_border_color,
+		sizeof(settings.focused_border_color), CFG_COMMIT, on_border_color),
+	S("presel_feedback_color", NULL, settings.presel_feedback_color,
+		sizeof(settings.presel_feedback_color), CFG_COMMIT, on_border_color),
+	S("tiling_drag_indicator_color", NULL, settings.tiling_drag_indicator_color,
+		sizeof(settings.tiling_drag_indicator_color), 0, NULL),
+
+	/* text */
+	S("text_font", NULL, text_font, sizeof(text_font), 0, on_text),
+	I("text_height", NULL, text_height, 0, 0, "%d\n", CFG_POSITIVE, on_text),
+
+	/* scroller */
+	F("scroller_default_proportion", NULL, scroller_default_proportion, 0.1, 1.0, "%.2f\n", CFG_CLAMP,
+		NULL),
+	F("scroller_default_proportion_single", NULL, scroller_default_proportion_single, 0.1, 1.0,
+		"%.2f\n", CFG_CLAMP, NULL),
+	B("scroller_focus_center", NULL, scroller_focus_center, 0, NULL),
+	B("scroller_prefer_center", NULL, scroller_prefer_center, 0, NULL),
+	B("scroller_prefer_overspread", NULL, scroller_prefer_overspread, 0, NULL),
+	B("scroller_ignore_proportion_single", NULL, scroller_ignore_proportion_single, 0, NULL),
+	I("scroller_structs", NULL, scroller_structs, 0, 1000000, "%d\n", CFG_CLAMP, NULL),
+
+	/* blur */
+	B("blur_enabled", NULL, blur_enabled, 0, NULL),
+	F("blur_radius", NULL, blur_radius, 0, 0, "%.2f\n", CFG_POSITIVE, NULL),
+	B("blur_full_res", NULL, blur_full_res, 0, NULL),
+	I("blur_passes", NULL, blur_passes, 1, 10, "%d\n", 0, NULL),
+	I("blur_downsample", NULL, blur_downsample, 1, 8, "%d\n", 0, on_blur_downsample),
+	F("blur_offset", NULL, blur_offset, 0.0, 8.0, "%.3f\n", 0, NULL),
+	F("blur_saturation", NULL, blur_saturation, 0.0, 3.0, "%.3f\n", 0, NULL),
+	F("blur_vibrancy", NULL, blur_vibrancy, 0.0, 1.0, "%.3f\n", 0, NULL),
+	F("blur_vibrancy_darkness", NULL, blur_vibrancy_darkness, 0.0, 1.0, "%.3f\n", 0, NULL),
+	F("blur_noise_strength", NULL, blur_noise_strength, 0.0, 1.0, "%.3f\n", 0, NULL),
+	F("blur_brightness", NULL, blur_brightness, 0.5, 2.0, "%.3f\n", 0, NULL),
+	F("blur_contrast", NULL, blur_contrast, 0.5, 2.0, "%.3f\n", 0, NULL),
+
+	/* refraction */
+	F("refraction_strength", NULL, refraction_strength, 0.0, 30.0, "%.3f\n", 0, NULL),
+	F("refraction_edge_size_px", NULL, refraction_edge_size_px, 0.0, 400.0, "%.3f\n", 0, NULL),
+	F("refraction_corner_radius_px", NULL, refraction_corner_radius_px, 0.0, 400.0, "%.3f\n", 0, NULL),
+	F("refraction_normal_pow", NULL, refraction_normal_pow, 0.0, 8.0, "%.3f\n", 0, NULL),
+	F("refraction_rgb_fringing", NULL, refraction_rgb_fringing, 0.0, 1.0, "%.6f\n", 0, NULL),
+	F("refraction_offset", NULL, refraction_offset, 0.0, 8.0, "%.3f\n", 0, NULL),
+	I("refraction_texture_repeat_mode", NULL, refraction_texture_repeat_mode, 0, 1, "%d\n", 0, NULL),
+
+	/* mica and acrylic */
+	B("mica_enabled", NULL, mica_enabled, 0, on_mica),
+	F("mica_tint_strength", NULL, mica_tint_strength, 0.0, 1.0, "%.3f\n", 0, on_mica),
+	C("mica_tint", NULL, mica_tint, 0, on_mica),
+	C("acrylic_tint", NULL, acrylic_tint, 0, NULL),
+	F("acrylic_tint_strength", NULL, acrylic_tint_strength, 0.0, 1.0, "%.3f\n", 0, NULL),
+	F("acrylic_noise_strength", NULL, acrylic_noise_strength, 0.0, 1.0, "%.3f\n", 0, NULL),
+	I("acrylic_blur_passes", NULL, acrylic_blur_passes, 0, 10, "%d\n", 0, NULL),
+
+	/* shadow */
+	F("shadow_size", NULL, settings.shadow_size, 0.0, 100.0, "%.1f\n", 0, NULL),
+	F("shadow_offset_x", NULL, settings.shadow_offset_x, -100.0, 100.0, "%.1f\n", 0, NULL),
+	F("shadow_offset_y", NULL, settings.shadow_offset_y, -100.0, 100.0, "%.1f\n", 0, NULL),
+	C("shadow_color", NULL, settings.shadow_color, 0, NULL),
+
+	/* screen shader */
+	B("screen_shader_enabled", NULL, screen_shader_enabled, 0, on_screen_shader_enabled),
+
+	/* idle power management */
+	I("idle_timeout", NULL, settings.idle_timeout, 0, 86400, "%d\n", 0, on_idle),
+	B("idle_dpms", NULL, settings.idle_dpms, 0, on_idle),
+	B("realtime_scheduling", NULL, settings.realtime_scheduling, 0, on_realtime_scheduling),
+};
+
+
+#undef B
+#undef I
+#undef F
+#undef D
+#undef E
+#undef S
+#undef C
+
+static const cfg_setting_t *find_setting(const char *name) {
+	for (size_t i = 0; i < IPC_ARRAY_LEN(settings_table); i++) {
+		if (streq(name, settings_table[i].name))
+			return &settings_table[i];
+
+		if (settings_table[i].alias && streq(name, settings_table[i].alias))
+			return &settings_table[i];
+	}
+	return NULL;
+}
+
+static bool cfg_set_bool(ipc_args_t *a, const cfg_setting_t *s) {
+	bool *var = s->ptr;
+	const char *arg;
+
+	if (!ipc_need(a, "value", &arg))
+		return false;
+
+	if (!streq(arg, "true") && !streq(arg, "on") && !streq(arg, "1") && !streq(arg, "yes")) {
+		if (!streq(arg, "false") && !streq(arg, "off") && !streq(arg, "0") && !streq(arg, "no")) {
+			ipc_fail(a, "Expected true or false\n");
+			return false;
+		}
+		*var = false;
+	} else {
+		*var = true;
+	}
+	return true;
+}
+
+static void cfg_store_enum(const cfg_setting_t *s, long value) {
+	assert(sizeof(int) == 4);
+	int v = (int)value;
+	memcpy(s->ptr, &v, sizeof(v));
+}
+
+static bool cfg_set_enum(ipc_args_t *a, const cfg_setting_t *s) {
+	long value;
+	if (!ipc_enum(a, "value", s->values, &value))
+		return false;
+
+	cfg_store_enum(s, value);
+	return true;
+}
+
+static bool cfg_range(ipc_args_t *a, const cfg_setting_t *s, double val, double step, double *out) {
+	if (!isfinite(val)) {
+		ipc_fail(a, "%s: value must be a finite number\n", s->name);
+		return false;
+	}
+
+	bool positive = (s->flags & CFG_POSITIVE) != 0;
+	bool lo_excl = (s->flags & (CFG_POSITIVE | CFG_EXCLUSIVE)) != 0;
+	bool hi_excl = (s->flags & CFG_EXCLUSIVE) != 0;
+
+	bool below = lo_excl ? val <= s->min : val < s->min;
+	bool above = !positive && (hi_excl ? val >= s->max : val > s->max);
+
+	if (!below && !above) {
+		*out = val;
+		return true;
+	}
+
+	if (!(s->flags & CFG_CLAMP)) {
+		if (below)
+			ipc_fail(a, "%s: value must be greater than %g\n", s->name, s->min);
+		else
+			ipc_fail(a, "%s: value must be less than %g\n", s->name, s->max);
+		return false;
+	}
+
+	// an exclusive bound clamps to the nearest value inside the range
+	*out = below ? (lo_excl ? s->min + step : s->min) : (hi_excl ? s->max - step : s->max);
+	return true;
+}
+
+static bool cfg_set_int(ipc_args_t *a, const cfg_setting_t *s) {
+	const char *arg;
+	if (!ipc_need(a, "value", &arg))
+		return false;
+
+	char *end;
+	errno = 0;
+	long val = strtol(arg, &end, 10);
+	if (end == arg || *end != '\0' || errno == ERANGE) {
+		ipc_fail(a, "%s: invalid value \"%s\"\n", s->name, arg);
+		return false;
+	}
+
+	double out;
+	if (!cfg_range(a, s, (double)val, 1.0, &out))
+		return false;
+
+	*((int *)s->ptr) = (int)out;
+	return true;
+}
+
+static bool cfg_set_float(ipc_args_t *a, const cfg_setting_t *s) {
+	const char *arg;
+	if (!ipc_need(a, "value", &arg))
+		return false;
+
+	char *end;
+	double val = strtod(arg, &end);
+	if (end == arg || *end != '\0') {
+		ipc_fail(a, "%s: invalid value \"%s\"\n", s->name, arg);
+		return false;
+	}
+
+	double out;
+	if (!cfg_range(a, s, val, 0.0, &out))
+		return false;
+
+	*((float *)s->ptr) = (float)out;
+	return true;
+}
+
+static bool cfg_set_double(ipc_args_t *a, const cfg_setting_t *s) {
+	const char *arg;
+	if (!ipc_need(a, "value", &arg))
+		return false;
+
+	char *end;
+	double val = strtod(arg, &end);
+	if (end == arg || *end != '\0') {
+		ipc_fail(a, "%s: invalid value \"%s\"\n", s->name, arg);
+		return false;
+	}
+
+	double out;
+	if (!cfg_range(a, s, val, 0.0, &out))
+		return false;
+
+	*((double *)s->ptr) = out;
+	return true;
+}
+
+static bool cfg_set_str(ipc_args_t *a, const cfg_setting_t *s) {
+	return ipc_str(a, "value", s->ptr, s->size);
+}
+
+static bool cfg_set_rgba(ipc_args_t *a, const cfg_setting_t *s) {
+	const char *arg;
+	if (!ipc_need(a, "value", &arg))
+		return false;
+
+	float *rgba = s->ptr;
+	float parsed[4];
+	if (!ipc_parse_color_float(arg, parsed)) {
+		ipc_fail(a, "Expected \"R G B [A]\"\n");
+		return false;
+	}
+
+	memcpy(rgba, parsed, sizeof(parsed));
+	return true;
+}
+
+static void cfg_get(ipc_args_t *a, const cfg_setting_t *s) {
+	char buf[512];
+
+	switch (s->type) {
+	case CFG_BOOL:
+		snprintf(buf, sizeof(buf), "%s\n", *(bool *)s->ptr ? "true" : "false");
+		break;
+	case CFG_INT:
+		snprintf(buf, sizeof(buf), s->fmt, *(int *)s->ptr);
+		break;
+	case CFG_FLOAT:
+		snprintf(buf, sizeof(buf), s->fmt, *(float *)s->ptr);
+		break;
+	case CFG_DOUBLE:
+		snprintf(buf, sizeof(buf), s->fmt, *(double *)s->ptr);
+		break;
+	case CFG_ENUM: {
+		int v;
+		memcpy(&v, s->ptr, sizeof(v));
+		const char *value = ipc_enum_name(s->values, v);
+		snprintf(buf, sizeof(buf), "%s\n", value ? value : "?");
+		break;
+	}
+	case CFG_STR:
+		snprintf(buf, sizeof(buf), "%s\n", (char *)s->ptr);
+		break;
+	case CFG_RGBA:
+		ipc_format_color_float(buf, sizeof(buf), s->ptr);
+		break;
+	}
+
+	ipc_ok(a, buf);
+}
+
+static bool cfg_set(ipc_args_t *a, const cfg_setting_t *s) {
+	bool ok = true;
+
+	switch (s->type) {
+	case CFG_BOOL:
+		ok = cfg_set_bool(a, s);
+		break;
+	case CFG_INT:
+		ok = cfg_set_int(a, s);
+		break;
+	case CFG_FLOAT:
+		ok = cfg_set_float(a, s);
+		break;
+	case CFG_DOUBLE:
+		ok = cfg_set_double(a, s);
+		break;
+	case CFG_ENUM:
+		ok = cfg_set_enum(a, s);
+		break;
+	case CFG_STR:
+		ok = cfg_set_str(a, s);
+		break;
+	case CFG_RGBA:
+		ok = cfg_set_rgba(a, s);
+		break;
+	}
+
+	if (!ok)
+		return false;
+
+	if (s->on_set)
+		s->on_set();
+	if (s->flags & CFG_COMMIT)
+		transaction_commit_dirty();
+
+	ipc_okf(a, "%s set\n", s->name);
+	return true;
+}
+
+static void cfg_tab_color(ipc_args_t *a, const char *suffix) {
+	static const struct {
+		const char *name;
+		float *color;
+	} colors[] = {
+		{"bar_bg", color_bar_bg},
+		{"bg", color_tab_bg},
+		{"bg_active", color_tab_bg_active},
+		{"text", color_tab_text},
+		{"text_active", color_tab_text_active},
+		{"sep", color_tab_sep},
+	};
+
+	for (size_t i = 0; i < IPC_ARRAY_LEN(colors); i++) {
+		if (!streq(suffix, colors[i].name))
+			continue;
+
+		if (!ipc_peek(a)) {
+			char buf[128];
+			ipc_format_color_float(buf, sizeof(buf), colors[i].color);
+			ipc_ok(a, buf);
+			return;
+		}
+
+		cfg_setting_t tmp = {
+			.name = "tab_color",
+			.type = CFG_RGBA,
+			.ptr = colors[i].color
+		};
+		if (!cfg_set_rgba(a, &tmp))
+			return;
+
+		tabs_rebuild_all();
+		ipc_okf(a, "tab_color_%s set\n", colors[i].name);
 		return;
 	}
 
-	if (streq("border_width", *args)) {
-		if (num >= 2) {
-			int val = atoi(args[1]);
-			settings.border_width = val;
-			transaction_commit_dirty();
-			send_success(client_fd, "border_width set\n");
-		} else {
-			char buf[64];
-			snprintf(buf, sizeof(buf), "%d\n", settings.border_width);
-			send_success(client_fd, buf);
-		}
-	} else if (streq("window_gap", *args)) {
-		if (num >= 2) {
-			int val = atoi(args[1]);
-			settings.window_gap = val;
-			output_t *m;
-			wl_list_for_each(m, &mon_list, link) {
-				desktop_t *d;
-				wl_list_for_each(d, &m->desk_list, link) {
-					d->window_gap = settings.window_gap;
-				}
-			}
-			transaction_commit_dirty();
-			send_success(client_fd, "window_gap set\n");
-		} else {
-			char buf[64];
-			snprintf(buf, sizeof(buf), "%d\n", settings.window_gap);
-			send_success(client_fd, buf);
-		}
-	} else if (streq("borderless_monocle", *args)) {
-		ipc_handle_bool(args, num, client_fd, &settings.borderless_monocle, IPC_FLAG_COMMIT);
-	} else if (streq("borderless_singleton", *args)) {
-		ipc_handle_bool(args, num, client_fd, &settings.borderless_singleton, IPC_FLAG_COMMIT);
-	} else if (streq("smart_gaps", *args)) {
-		ipc_handle_bool(args, num, client_fd, &settings.smart_gaps, IPC_FLAG_COMMIT);
-	} else if (streq("smart_borders", *args)) {
-		ipc_handle_bool(args, num, client_fd, &settings.smart_borders, IPC_FLAG_COMMIT);
-	} else if (streq("respect_tiled_min_size", *args)) {
-		ipc_handle_bool(args, num, client_fd, &settings.respect_tiled_min_size, IPC_FLAG_COMMIT);
-	} else if (streq("focus_wrapping", *args)) {
-		ipc_handle_bool(args, num, client_fd, &settings.focus_wrapping, IPC_FLAG_COMMIT);
-	} else if (streq("focus_on_activate", *args)) {
-		if (ipc_handle_enum(args, num, client_fd, &settings.focus_on_activate,
-			sizeof(settings.focus_on_activate), focus_on_activate_values,
-			sizeof(focus_on_activate_values) / sizeof(focus_on_activate_values[0]),
-			"config focus_on_activate: expected \"focus\", \"none\", \"smart\", or \"urgent\"\n"))
-			transaction_commit_dirty();
-	} else if (streq("hide_lone_tab", *args)) {
-		ipc_handle_bool(args, num, client_fd, &settings.hide_lone_tab, IPC_FLAG_COMMIT);
-	} else if (streq("gapless_monocle", *args)) {
-		ipc_handle_bool(args, num, client_fd, &settings.gapless_monocle, IPC_FLAG_COMMIT);
-	} else if (streq("decoration_mode", *args)) {
-		if (ipc_handle_enum(args, num, client_fd, &settings.decoration_mode,
-				sizeof(settings.decoration_mode), decoration_mode_values,
-				sizeof(decoration_mode_values) / sizeof(decoration_mode_values[0]),
-				"config decoration_mode: expected \"none\", \"tabs\", \"always\", or \"csd\"\n")) {
-			tabs_rebuild_all();
+	ipc_fail(a, "Unknown tab color \"%s\"\n", suffix);
+}
 
-			// refresh decor
-			view_t *tl;
-			wl_list_for_each(tl, &server.views, link)
-				tl->impl->set_decorations(tl);
-
-			transaction_commit_dirty();
+static void cfg_scroller_presets(ipc_args_t *a) {
+	if (!ipc_peek(a)) {
+		char buf[512];
+		ipc_buf_t b;
+		ipc_buf_init(&b, buf, sizeof(buf));
+		for (int i = 0; i < scroller_proportion_preset_count; i++) {
+			ipc_buff(&b, "%.2f%s", scroller_proportion_preset[i],
+				i < scroller_proportion_preset_count - 1 ? "," : "\n");
 		}
-	} else if (streq("enable_animations", *args)) {
-		ipc_handle_bool(args, num, client_fd, &settings.enable_animations, IPC_FLAG_NONE);
-	} else if (streq("workspace_anim_direction", *args)) {
-		if (num >= 2) {
-			if (streq(args[1], "vertical")) {
-				settings.workspace_anim_direction = WORKSPACE_ANIM_VERTICAL;
-				send_success(client_fd, "workspace_anim_direction set to vertical\n");
-			} else if (streq(args[1], "horizontal")) {
-				settings.workspace_anim_direction = WORKSPACE_ANIM_HORIZONTAL;
-				send_success(client_fd, "workspace_anim_direction set to horizontal\n");
-			} else {
-				send_failure(client_fd, "workspace_anim_direction: must be 'vertical' or 'horizontal'\n");
-			}
-		} else {
-			send_success(client_fd,
-				settings.workspace_anim_direction == WORKSPACE_ANIM_VERTICAL ? "vertical\n" : "horizontal\n");
-		}
-	} else if (streq("workspace_anim_slide_up", *args)) {
-		ipc_handle_bool(args, num, client_fd, &settings.workspace_anim_slide_up, IPC_FLAG_NONE);
-	} else if (streq("edge_scroller_pointer_focus", *args)) {
-		ipc_handle_bool(args, num, client_fd, &edge_scroller_pointer_focus, IPC_FLAG_NONE);
-	} else if (args[0][0] == 't' && strncmp(*args, "tab_color_", 10) == 0) {
-		typedef struct {
-			const char *name;
-			float *color;
-		} tab_cfg_t;
-		static const tab_cfg_t tab_colors[] = {
-			{"bar_bg", color_bar_bg},
-			{"bg", color_tab_bg},
-			{"bg_active", color_tab_bg_active},
-			{"text", color_tab_text},
-			{"text_active", color_tab_text_active},
-			{"sep", color_tab_sep},
-		};
-		const char *suffix = *args + 10;
-		for (size_t i = 0; i < sizeof(tab_colors) / sizeof(tab_colors[0]); i++) {
-			if (streq(suffix, tab_colors[i].name)) {
-				if (num >= 2) {
-					float rgba[4];
-					if (ipc_parse_color_float(args[1], rgba)) {
-						memcpy(tab_colors[i].color, rgba, sizeof(rgba));
-						tabs_rebuild_all();
-						char msg[128];
-						snprintf(msg, sizeof(msg), "%s set\n", *args);
-						send_success(client_fd, msg);
-					} else {
-						char msg[128];
-						snprintf(msg, sizeof(msg), "config %s: expected \"R G B [A]\"\n", *args);
-						send_failure(client_fd, msg);
-					}
-				} else {
-					char buf[128];
-					ipc_format_color_float(buf, sizeof(buf), tab_colors[i].color);
-					send_success(client_fd, buf);
-				}
-				return;
-			}
-		}
-		send_failure(client_fd, "config: unknown tab_color setting\n");
-	} else if (streq("text_font", *args)) {
-		if (num >= 2) {
-			snprintf(text_font, sizeof(text_font), "%s", args[1]);
-			tabs_rebuild_all();
-			send_success(client_fd, "text_font set\n");
-		} else {
-			char buf[256];
-			snprintf(buf, sizeof(buf), "%s\n", text_font);
-			send_success(client_fd, buf);
-		}
-	} else if (streq("text_height", *args)) {
-		if (num >= 2) {
-			int val = atoi(args[1]);
-			if (val > 0) {
-				text_height = val;
-				tabs_rebuild_all();
-				send_success(client_fd, "text_height set\n");
-			} else {
-				send_failure(client_fd, "config text_height: value must be > 0\n");
-			}
-		} else {
-			char buf[64];
-			snprintf(buf, sizeof(buf), "%d\n", text_height);
-			send_success(client_fd, buf);
-		}
-	} else if (streq("scroller_default_proportion", *args)) {
-		ipc_handle_float(args, num, client_fd, &scroller_default_proportion, IPC_FLAG_NONE, 0.1f, 1.0f,
-			"%.2f\n", NULL);
-	} else if (streq("scroller_proportion_preset", *args)) {
-		if (num >= 2) {
-			char *value = args[1];
-			int count = 1;
-			for (char *p = value; *p; p++)
-				if (*p == ',')
-					count++;
-
-			if (scroller_proportion_preset)
-				free(scroller_proportion_preset);
-
-			scroller_proportion_preset = malloc(count * sizeof(float));
-			if (!scroller_proportion_preset) {
-				send_failure(client_fd, "memory allocation failed\n");
-				return;
-			}
-
-			char *token = strtok(value, ",");
-			int i = 0;
-			while (token && i < count) {
-				float val = atof(token);
-				if (val < 0.1f)
-					val = 0.1f;
-				if (val > 1.0f)
-					val = 1.0f;
-				scroller_proportion_preset[i++] = val;
-				token = strtok(NULL, ",");
-			}
-			scroller_proportion_preset_count = i;
-
-			send_success(client_fd, "scroller_proportion_preset set\n");
-		} else {
-			char buf[512];
-			int offset = 0;
-			for (int i = 0; i < scroller_proportion_preset_count && offset < 500; i++) {
-				offset += snprintf(buf + offset, sizeof(buf) - offset, "%.2f%s", scroller_proportion_preset[i],
-					i < scroller_proportion_preset_count - 1 ? "," : "\n");
-			}
-			send_success(client_fd, buf);
-		}
-	} else if (streq("scroller_default_proportion_single", *args)) {
-		ipc_handle_float(args, num, client_fd, &scroller_default_proportion_single, IPC_FLAG_NONE, 0.1f,
-			1.0f, "%.2f\n", NULL);
-	} else if (streq("scroller_focus_center", *args)) {
-		ipc_handle_bool(args, num, client_fd, &scroller_focus_center, IPC_FLAG_NONE);
-	} else if (streq("scroller_prefer_center", *args)) {
-		ipc_handle_bool(args, num, client_fd, &scroller_prefer_center, IPC_FLAG_NONE);
-	} else if (streq("scroller_prefer_overspread", *args)) {
-		ipc_handle_bool(args, num, client_fd, &scroller_prefer_overspread, IPC_FLAG_NONE);
-	} else if (streq("scroller_ignore_proportion_single", *args)) {
-		ipc_handle_bool(args, num, client_fd, &scroller_ignore_proportion_single, IPC_FLAG_NONE);
-	} else if (streq("scroller_structs", *args)) {
-		ipc_handle_int(args, num, client_fd, &scroller_structs, IPC_FLAG_NONE, 0, 1000000, NULL);
-	} else if (streq("focus_follows_pointer", *args) || streq("focus_follows_mouse", *args)) {
-		if (ipc_handle_enum(args, num, client_fd, &settings.focus_follows_mouse,
-			sizeof(settings.focus_follows_mouse), focus_follows_pointer_values,
-			sizeof(focus_follows_pointer_values) / sizeof(focus_follows_pointer_values[0]),
-			"config focus_follows_pointer: expected \"no\", \"yes\", or \"always\"\n"))
-			transaction_commit_dirty();
-	} else if (streq("pointer_follows_focus", *args)) {
-		ipc_handle_bool(args, num, client_fd, &settings.pointer_follows_focus, IPC_FLAG_COMMIT);
-	} else if (streq("split_ratio", *args)) {
-		if (num >= 2) {
-			double val = atof(args[1]);
-			if (val > 0 && val < 1) {
-				settings.split_ratio = val;
-				transaction_commit_dirty();
-				send_success(client_fd, "split_ratio set\n");
-			} else {
-				send_failure(client_fd, "config split_ratio: invalid value\n");
-			}
-		} else {
-			char buf[64];
-			snprintf(buf, sizeof(buf), "%f\n", settings.split_ratio);
-			send_success(client_fd, buf);
-		}
-	} else if (streq("top_padding", *args)) {
-		ipc_handle_int(args, num, client_fd, &settings.padding.top, IPC_FLAG_COMMIT, INT_MIN, INT_MAX,
-			NULL);
-	} else if (streq("right_padding", *args)) {
-		ipc_handle_int(args, num, client_fd, &settings.padding.right, IPC_FLAG_COMMIT, INT_MIN, INT_MAX,
-			NULL);
-	} else if (streq("bottom_padding", *args)) {
-		ipc_handle_int(args, num, client_fd, &settings.padding.bottom, IPC_FLAG_COMMIT, INT_MIN, INT_MAX,
-			NULL);
-	} else if (streq("left_padding", *args)) {
-		ipc_handle_int(args, num, client_fd, &settings.padding.left, IPC_FLAG_COMMIT, INT_MIN, INT_MAX,
-			NULL);
-	} else if (streq("normal_border_color", *args)) {
-		ipc_handle_border_color(args, num, client_fd, settings.normal_border_color,
-			sizeof(settings.normal_border_color), "normal_border_color", true, true);
-	} else if (streq("active_border_color", *args)) {
-		ipc_handle_border_color(args, num, client_fd, settings.active_border_color,
-			sizeof(settings.active_border_color), "active_border_color", true, true);
-	} else if (streq("focused_border_color", *args)) {
-		ipc_handle_border_color(args, num, client_fd, settings.focused_border_color,
-			sizeof(settings.focused_border_color), "focused_border_color", true, true);
-	} else if (streq("presel_feedback_color", *args)) {
-		ipc_handle_border_color(args, num, client_fd, settings.presel_feedback_color,
-			sizeof(settings.presel_feedback_color), "presel_feedback_color", false, true);
-	} else if (streq("tiling_drag_indicator_color", *args)) {
-		ipc_handle_border_color(args, num, client_fd, settings.tiling_drag_indicator_color,
-			sizeof(settings.tiling_drag_indicator_color), "tiling_drag_indicator_color", false, false);
-	} else if (streq("normal_border_gradient", *args) || streq("active_border_gradient",
-			*args) || streq("focused_border_gradient", *args) || streq("normal_border_gradient2",
-			*args) || streq("active_border_gradient2", *args) || streq("focused_border_gradient2",
-			*args) || streq("normal_border_gradient_lerp", *args) || streq("active_border_gradient_lerp",
-			*args) || streq("focused_border_gradient_lerp", *args)) {
-		border_theme_t *bt;
-		if (args[0][0] == 'n')
-			bt = &settings.normal_border_theme;
-		else if (args[0][0] == 'a')
-			bt = &settings.active_border_theme;
-		else
-			bt = &settings.focused_border_theme;
-
-		bool is_gradient2 = (strstr(*args, "gradient2") != NULL);
-		bool is_lerp = (strstr(*args, "lerp") != NULL);
-
-		if (is_lerp) {
-			if (num >= 2) {
-				bt->gradient_lerp = (float)atof(args[1]);
-				if (bt->gradient_lerp < 0.0f)
-					bt->gradient_lerp = 0.0f;
-				if (bt->gradient_lerp > 1.0f)
-					bt->gradient_lerp = 1.0f;
-				refresh_border_colors();
-				transaction_commit_dirty();
-				send_success(client_fd, "border gradient lerp set\n");
-			} else {
-				char buf[32];
-				snprintf(buf, sizeof(buf), "%f\n", bt->gradient_lerp);
-				send_success(client_fd, buf);
-			}
-		} else {
-			float *grad = is_gradient2 ? bt->gradient2 : bt->gradient;
-			int *gcount = is_gradient2 ? &bt->gradient2_count : &bt->gradient_count;
-			float *gangle = is_gradient2 ? &bt->gradient2_angle : &bt->gradient_angle;
-
-			if (num >= 2) {
-				char joined[512] = "";
-				for (int i = 1; i < num; i++) {
-					if (i > 1)
-						strncat(joined, " ", sizeof(joined) - strlen(joined) - 1);
-					strncat(joined, args[i], sizeof(joined) - strlen(joined) - 1);
-				}
-
-				if (streq(joined, "clear")) {
-					*gcount = 0;
-					*gangle = 0.0f;
-				} else {
-					ipc_parse_gradient(joined, grad, gcount, gangle);
-				}
-
-				refresh_border_colors();
-				transaction_commit_dirty();
-				send_success(client_fd, is_gradient2 ? "border gradient2 set\n" : "border gradient set\n");
-			} else {
-				char buf[512];
-				ipc_format_gradient(buf, sizeof(buf), grad, *gcount, *gangle);
-				send_success(client_fd, buf);
-				send_success(client_fd, "\n");
-			}
-		}
-	} else if (streq("automatic_scheme", *args)) {
-		if (num >= 2) {
-			if (streq("longest_side", args[1]) || streq("longest-side", args[1])) {
-				settings.automatic_scheme = SCHEME_LONGEST_SIDE;
-			} else if (streq("alternate", args[1])) {
-				settings.automatic_scheme = SCHEME_ALTERNATE;
-			} else if (streq("spiral", args[1])) {
-				settings.automatic_scheme = SCHEME_SPIRAL;
-			} else {
-				send_failure(client_fd, "config automatic_scheme: invalid value\n");
-				return;
-			}
-			transaction_commit_dirty();
-			send_success(client_fd, "automatic_scheme set\n");
-		} else {
-			char scheme_buf[64];
-			const char *scheme_str = "spiral";
-			if (settings.automatic_scheme == SCHEME_LONGEST_SIDE)
-				scheme_str = "longest_side";
-			else if (settings.automatic_scheme == SCHEME_ALTERNATE)
-				scheme_str = "alternate";
-			snprintf(scheme_buf, sizeof(scheme_buf), "%s\n", scheme_str);
-			send_success(client_fd, scheme_buf);
-		}
-	} else if (streq("initial_polarity", *args)) {
-		if (num >= 2) {
-			if (streq("first_child", args[1]) || streq("first-child", args[1])) {
-				settings.initial_polarity = FIRST_CHILD;
-			} else if (streq("second_child", args[1]) || streq("second-child", args[1])) {
-				settings.initial_polarity = SECOND_CHILD;
-			} else {
-				send_failure(client_fd, "config initial_polarity: invalid value\n");
-				return;
-			}
-			send_success(client_fd, "initial_polarity set\n");
-		} else {
-			send_success(client_fd,
-				settings.initial_polarity == FIRST_CHILD ? "first_child\n" : "second_child\n");
-		}
-	} else if (streq("directional_focus_tightness", *args)) {
-		ipc_handle_int(args, num, client_fd, &settings.directional_focus_tightness, IPC_FLAG_NONE, 0, 100,
-			"invalid value");
-	} else if (streq("mapping_events_count", *args)) {
-		ipc_handle_int(args, num, client_fd, &settings.mapping_events_count, IPC_FLAG_NONE, 0, 1000000,
-			"invalid value");
-	} else if (streq("minimize_to_scratchpad", *args)) {
-		ipc_handle_bool(args, num, client_fd, &settings.minimize_to_scratchpad, IPC_FLAG_NONE);
-	} else if (streq("scratchpad_restore_to_origin", *args)) {
-		ipc_handle_bool(args, num, client_fd, &settings.scratchpad_restore_to_origin, IPC_FLAG_NONE);
-	} else if (streq("ignore_ewmh_fullscreen", *args)) {
-		ipc_handle_int(args, num, client_fd, &settings.ignore_ewmh_fullscreen, IPC_FLAG_NONE, 0, 2,
-			"invalid value (0-2)");
-	} else if (streq("click_to_focus", *args)) {
-		ipc_handle_bool(args, num, client_fd, &settings.click_to_focus, IPC_FLAG_NONE);
-	} else if (streq("record_history", *args)) {
-		ipc_handle_bool(args, num, client_fd, &settings.record_history, IPC_FLAG_NONE);
-	} else if (streq("allow_tearing", *args)) {
-		ipc_handle_bool(args, num, client_fd, &settings.allow_tearing, IPC_FLAG_COMMIT);
-	} else if (streq("auto_float_dialogs", *args)) {
-		ipc_handle_bool(args, num, client_fd, &settings.auto_float_dialogs, IPC_FLAG_NONE);
-	} else if (streq("blur_enabled", *args)) {
-		ipc_handle_bool(args, num, client_fd, &blur_enabled, IPC_FLAG_NONE);
-	} else if (streq("blur_algorithm", *args)) {
-		if (num >= 2) {
-			enum blur_algorithm algo = blur_algorithm_from_str(args[1]);
-			if (algo == BLUR_ALGORITHM_NONE && strcmp(args[1], "none") != 0) {
-				send_failure(client_fd, "config blur_algorithm: unknown algorithm\n");
-			} else {
-				blur_algorithm = algo;
-				send_success(client_fd, "blur_algorithm set\n");
-			}
-		} else {
-			char buf[64];
-			snprintf(buf, sizeof(buf), "%s\n", effects_algorithm_to_str(blur_algorithm));
-			send_success(client_fd, buf);
-		}
-	} else if (streq("blur_passes", *args)) {
-		ipc_handle_int(args, num, client_fd, &blur_passes, IPC_FLAG_NONE, 1, 10, "value must be 1-10");
-	} else if (streq("blur_radius", *args)) {
-		if (num >= 2) {
-			float val = atof(args[1]);
-			if (val > 0.0f) {
-				blur_radius = val;
-				send_success(client_fd, "blur_radius set\n");
-			} else {
-				send_failure(client_fd, "config blur_radius: value must be > 0\n");
-			}
-		} else {
-			char buf[64];
-			snprintf(buf, sizeof(buf), "%.2f\n", blur_radius);
-			send_success(client_fd, buf);
-		}
-	} else if (streq("blur_full_res", *args)) {
-		ipc_handle_bool(args, num, client_fd, &blur_full_res, IPC_FLAG_NONE);
-	} else if (streq("blur_offset", *args)) {
-		ipc_handle_float(args, num, client_fd, &blur_offset, IPC_FLAG_NONE, 0.0f, 8.0f, "%.3f\n",
-			"value must be 0.0-8.0");
-	} else if (streq("blur_saturation", *args)) {
-		ipc_handle_float(args, num, client_fd, &blur_saturation, IPC_FLAG_NONE, 0.0f, 3.0f, "%.3f\n",
-			"value must be 0.0-3.0");
-	} else if (streq("refraction_strength", *args)) {
-		ipc_handle_float(args, num, client_fd, &refraction_strength, IPC_FLAG_NONE, 0.0f, 30.0f, "%.3f\n",
-			"value must be 0.0-30.0");
-	} else if (streq("refraction_edge_size_px", *args)) {
-		ipc_handle_float(args, num, client_fd, &refraction_edge_size_px, IPC_FLAG_NONE, 0.0f, 400.0f,
-			"%.3f\n", "value must be 0.0-400.0");
-	} else if (streq("refraction_corner_radius_px", *args)) {
-		ipc_handle_float(args, num, client_fd, &refraction_corner_radius_px, IPC_FLAG_NONE, 0.0f, 400.0f,
-			"%.3f\n", "value must be 0.0-400.0");
-	} else if (streq("refraction_normal_pow", *args)) {
-		ipc_handle_float(args, num, client_fd, &refraction_normal_pow, IPC_FLAG_NONE, 0.0f, 8.0f, "%.3f\n",
-			"value must be 0.0-8.0");
-	} else if (streq("refraction_rgb_fringing", *args)) {
-		ipc_handle_float(args, num, client_fd, &refraction_rgb_fringing, IPC_FLAG_NONE, 0.0f, 1.0f,
-			"%.6f\n", "value must be 0.0-1.0");
-	} else if (streq("refraction_texture_repeat_mode", *args)) {
-		if (num >= 2) {
-			int val = atoi(args[1]);
-			if (val == 0 || val == 1) {
-				refraction_texture_repeat_mode = val;
-				send_success(client_fd, "refraction_texture_repeat_mode set\n");
-			} else {
-				send_failure(client_fd,
-					"config refraction_texture_repeat_mode: value must be 0 (clamp) or 1 (mirror)\n");
-			}
-		} else {
-			char buf[32];
-			snprintf(buf, sizeof(buf), "%d\n", refraction_texture_repeat_mode);
-			send_success(client_fd, buf);
-		}
-	} else if (streq("refraction_offset", *args)) {
-		ipc_handle_float(args, num, client_fd, &refraction_offset, IPC_FLAG_NONE, 0.0f, 8.0f, "%.3f\n",
-			"value must be 0.0-8.0");
-	} else if (streq("blur_downsample", *args)) {
-		if (num >= 2) {
-			int val = atoi(args[1]);
-			if (val >= 1 && val <= 8) {
-				blur_downsample = val;
-				output_t *m;
-				wl_list_for_each(m, &mon_list, link) {
-					if (m && m->effects)
-						effects_output_resize(m->effects, m->width, m->height, m);
-				}
-				send_success(client_fd, "blur_downsample set\n");
-			} else {
-				send_failure(client_fd, "config blur_downsample: value must be 1-8\n");
-			}
-		} else {
-			char buf[64];
-			snprintf(buf, sizeof(buf), "%d\n", blur_downsample);
-			send_success(client_fd, buf);
-		}
-	} else if (streq("blur_vibrancy", *args)) {
-		ipc_handle_float(args, num, client_fd, &blur_vibrancy, IPC_FLAG_NONE, 0.0f, 1.0f, "%.3f\n",
-			"value must be 0.0-1.0");
-	} else if (streq("blur_vibrancy_darkness", *args)) {
-		ipc_handle_float(args, num, client_fd, &blur_vibrancy_darkness, IPC_FLAG_NONE, 0.0f, 1.0f,
-			"%.3f\n", "value must be 0.0-1.0");
-	} else if (streq("blur_noise_strength", *args)) {
-		ipc_handle_float(args, num, client_fd, &blur_noise_strength, IPC_FLAG_NONE, 0.0f, 1.0f, "%.3f\n",
-			"value must be 0.0-1.0");
-	} else if (streq("blur_brightness", *args)) {
-		ipc_handle_float(args, num, client_fd, &blur_brightness, IPC_FLAG_NONE, 0.5f, 2.0f, "%.3f\n",
-			"value must be 0.5-2.0");
-	} else if (streq("blur_contrast", *args)) {
-		ipc_handle_float(args, num, client_fd, &blur_contrast, IPC_FLAG_NONE, 0.5f, 2.0f, "%.3f\n",
-			"value must be 0.5-2.0");
-	} else if (streq("mica_enabled", *args)) {
-		if (ipc_handle_bool(args, num, client_fd, &mica_enabled, IPC_FLAG_NONE)) {
-			output_t *m;
-			wl_list_for_each(m, &mon_list, link)
-				effects_invalidate_mica(m->effects);
-		}
-	} else if (streq("mica_tint_strength", *args)) {
-		if (num >= 2) {
-			float val = (float)atof(args[1]);
-			if (val >= 0.0f && val <= 1.0f) {
-				mica_tint_strength = val;
-				output_t *m;
-				wl_list_for_each(m, &mon_list, link)
-					effects_invalidate_mica(m->effects);
-				send_success(client_fd, "mica_tint_strength set\n");
-			} else {
-				send_failure(client_fd, "config mica_tint_strength: value must be 0.0-1.0\n");
-			}
-		} else {
-			char buf[64];
-			snprintf(buf, sizeof(buf), "%.3f\n", mica_tint_strength);
-			send_success(client_fd, buf);
-		}
-	} else if (streq("mica_tint", *args)) {
-		if (ipc_handle_rgba(args, num, client_fd, mica_tint,
-				"config mica_tint: expected \"R G B [A]\"\n")) {
-			output_t *m;
-			wl_list_for_each(m, &mon_list, link)
-				effects_invalidate_mica(m->effects);
-		}
-	} else if (streq("acrylic_tint", *args)) {
-		ipc_handle_rgba(args, num, client_fd, acrylic_tint,
-			"config acrylic_tint: expected \"R G B [A]\"\n");
-	} else if (streq("acrylic_tint_strength", *args)) {
-		ipc_handle_float(args, num, client_fd, &acrylic_tint_strength, IPC_FLAG_NONE, 0.0f, 1.0f, "%.3f\n",
-			"value must be 0.0-1.0");
-	} else if (streq("acrylic_noise_strength", *args)) {
-		ipc_handle_float(args, num, client_fd, &acrylic_noise_strength, IPC_FLAG_NONE, 0.0f, 1.0f,
-			"%.3f\n", "value must be 0.0-1.0");
-	} else if (streq("acrylic_light_anchor", *args)) {
-		if (num >= 2) {
-			float a, b;
-			int n = sscanf(args[1], "%f %f", &a, &b);
-			if (n == 2 && a >= -1.0f && a <= 1.0f && b >= -1.0f && b <= 1.0f) {
-				acrylic_light_anchor[0] = a;
-				acrylic_light_anchor[1] = b;
-				send_success(client_fd, "acrylic_light_anchor set\n");
-			} else {
-				send_failure(client_fd, "config acrylic_light_anchor: values must be -1.0 to 1.0\n");
-			}
-		} else {
-			char buf[64];
-			snprintf(buf, sizeof(buf), "%.3f\n", acrylic_light_anchor[0]);
-			send_success(client_fd, buf);
-		}
-	} else if (streq("acrylic_blur_passes", *args)) {
-		ipc_handle_int(args, num, client_fd, &acrylic_blur_passes, IPC_FLAG_NONE, 0, 10,
-			"value must be 0-10");
-	} else if (streq("screen_shader", *args)) {
-		if (num >= 2) {
-			if (!screen_shader_set(args[1])) {
-				send_failure(client_fd,
-					"config screen_shader: unknown shader (builtin: none grayscale invert sepia nightlight)\n");
-			} else {
-				send_success(client_fd, "screen_shader set\n");
-			}
-		} else {
-			char buf[256];
-			snprintf(buf, sizeof(buf), "%s\n", screen_shader_get_name());
-			send_success(client_fd, buf);
-		}
-	} else if (streq("screen_shader_file", *args)) {
-		if (num >= 2) {
-			if (!screen_shader_load_file(args[1])) {
-				send_failure(client_fd, "config screen_shader_file: failed to load shader\n");
-			} else {
-				send_success(client_fd, "screen_shader_file loaded\n");
-			}
-		} else {
-			send_failure(client_fd, "config screen_shader_file: missing path argument\n");
-		}
-	} else if (streq("screen_shader_enabled", *args)) {
-		bool set = ipc_handle_bool(args, num, client_fd, &screen_shader_enabled, IPC_FLAG_NONE);
-		if (set && !screen_shader_enabled)
-			screen_shader_hide_nodes();
-	} else if (streq("animation_bezier", *args)) {
-		if (num >= 2) {
-			if (bezier_exists(args[1])) {
-				animation_set_bezier(args[1]);
-				send_success(client_fd, "animation_bezier set\n");
-			} else {
-				send_failure(client_fd, "config animation_bezier: no such bezier curve\n");
-			}
-		} else {
-			char buf[96];
-			snprintf(buf, sizeof(buf), "%s\n", animation_get_bezier());
-			send_success(client_fd, buf);
-		}
-	} else if (streq("animation_duration", *args)) {
-		if (num >= 2) {
-			int val = atoi(args[1]);
-			if (val > 0) {
-				animation_set_duration((uint32_t)val);
-				send_success(client_fd, "animation_duration set\n");
-			} else {
-				send_failure(client_fd, "config animation_duration: must be > 0\n");
-			}
-		} else {
-			char buf[64];
-			snprintf(buf, sizeof(buf), "%u\n", animation_get_duration());
-			send_success(client_fd, buf);
-		}
-	} else if (streq("animation", *args)) {
-		if (num < 2) {
-			send_failure(client_fd,
-				"config animation: expected <type> [bezier|duration|spring|enabled] [value]\n");
-		} else if (num >= 3 && streq("spring", args[2])) {
-			const char *sname = num >= 4 ? args[3] : "";
-			if (sname[0] != '\0' && !spring_exists(sname)) {
-				send_failure(client_fd, "config animation: no such spring curve\n");
-			} else if (animation_set_type_spring(args[1], sname)) {
-				send_success(client_fd, "animation type spring set\n");
-			} else {
-				send_failure(client_fd, "config animation: unknown type\n");
-			}
-		} else if (num >= 3 && streq("bezier", args[2])) {
-			const char *bname = num >= 4 ? args[3] : "";
-			if (bname[0] != '\0' && !bezier_exists(bname)) {
-				send_failure(client_fd, "config animation: no such bezier curve\n");
-			} else if (animation_set_type_config(args[1], bname, 0)) {
-				send_success(client_fd, "animation type bezier set\n");
-			} else {
-				send_failure(client_fd, "config animation: unknown type\n");
-			}
-		} else if (num >= 3 && streq("duration", args[2])) {
-			if (num < 4) {
-				send_failure(client_fd, "config animation <type> duration: expected value\n");
-			} else {
-				int val = atoi(args[3]);
-				if (val <= 0) {
-					send_failure(client_fd, "config animation <type> duration: must be > 0\n");
-				} else if (animation_set_type_config(args[1], NULL, (uint32_t)val)) {
-					send_success(client_fd, "animation type duration set\n");
-				} else {
-					send_failure(client_fd, "config animation: unknown type\n");
-				}
-			}
-		} else if (num >= 3 && streq("enabled", args[2])) {
-			if (num < 4) {
-				bool enabled = animation_type_get_enabled(args[1]);
-				send_success(client_fd, enabled ? "enabled\n" : "disabled\n");
-			} else {
-				bool val = streq(args[3], "true") || streq(args[3], "1");
-				if (animation_type_set_enabled(args[1], val))
-					send_success(client_fd, val ? "enabled\n" : "disabled\n");
-				else
-					send_failure(client_fd, "config animation: unknown type\n");
-			}
-		} else {
-			int idx = animation_type_from_name(args[1]);
-			if (idx < 0) {
-				send_failure(client_fd, "config animation: unknown type\n");
-			} else {
-				const char *bname = animation_type_get_bezier(args[1]);
-				uint32_t dur = animation_type_get_duration(args[1]);
-				const char *sname = animation_type_get_spring(args[1]);
-				bool enabled = animation_type_get_enabled(args[1]);
-				char buf[256];
-				int off = 0;
-				if (sname) {
-					off = snprintf(buf, sizeof(buf), "spring: %s\n", sname);
-				} else {
-					off = snprintf(buf, sizeof(buf), "bezier: %s\n", bname ? bname : "(global default)");
-				}
-				off += snprintf(buf + off, sizeof(buf) - off, "duration: %u\n",
-					dur > 0 ? dur : animation_get_duration());
-				snprintf(buf + off, sizeof(buf) - off, "enabled: %s\n", enabled ? "true" : "false");
-				send_success(client_fd, buf);
-			}
-		}
-	} else if (streq("shadow_size", *args)) {
-		ipc_handle_float(args, num, client_fd, &settings.shadow_size, IPC_FLAG_NONE, 0.0f, 100.0f,
-			"%.1f\n", "value must be 0-100");
-	} else if (streq("shadow_offset_x", *args)) {
-		ipc_handle_float(args, num, client_fd, &settings.shadow_offset_x, IPC_FLAG_NONE, -100.0f, 100.0f,
-			"%.1f\n", "value must be -100-100");
-	} else if (streq("shadow_offset_y", *args)) {
-		ipc_handle_float(args, num, client_fd, &settings.shadow_offset_y, IPC_FLAG_NONE, -100.0f, 100.0f,
-			"%.1f\n", "value must be -100-100");
-	} else if (streq("shadow_color", *args)) {
-		ipc_handle_rgba(args, num, client_fd, settings.shadow_color,
-			"config shadow_color: expected \"R G B [A]\"\n");
-	} else if (streq("idle_timeout", *args)) {
-		if (ipc_handle_int(args, num, client_fd, &settings.idle_timeout, IPC_FLAG_NONE, 0, 86400,
-			"value must be 0-86400"))
-			idle_power_reset_timer();
-	} else if (streq("idle_dpms", *args)) {
-		if (ipc_handle_bool(args, num, client_fd, &settings.idle_dpms, IPC_FLAG_NONE))
-			idle_power_reset_timer();
-	} else if (streq("realtime_scheduling", *args)) {
-		if (ipc_handle_bool(args, num, client_fd, &settings.realtime_scheduling,
-			IPC_FLAG_NONE) && settings.realtime_scheduling)
-			set_rr_scheduling();
-	} else {
-		send_failure(client_fd, "config: unknown setting\n");
+		ipc_buf_send(a, &b);
+		return;
 	}
+
+	const char *value;
+	if (!ipc_need(a, "comma separated values", &value))
+		return;
+
+	int count = 1;
+	for (const char *p = value; *p; p++) {
+		if (*p == ',')
+			count++;
+	}
+
+	float *presets = malloc(count * sizeof(float));
+	if (!presets) {
+		ipc_fail(a, "Memory allocation failed\n");
+		return;
+	}
+
+	char *copy = strdup(value);
+	if (!copy) {
+		free(presets);
+		ipc_fail(a, "Memory allocation failed\n");
+		return;
+	}
+
+	int i = 0;
+	for (char *tok = strtok(copy, ","); tok && i < count; tok = strtok(NULL, ",")) {
+		float val = atof(tok);
+		if (val < 0.1f)
+			val = 0.1f;
+		if (val > 1.0f)
+			val = 1.0f;
+		presets[i++] = val;
+	}
+	free(copy);
+
+	free(scroller_proportion_preset);
+	scroller_proportion_preset = presets;
+	scroller_proportion_preset_count = i;
+
+	ipc_ok(a, "scroller_proportion_preset set\n");
+}
+
+// <normal|active|focused>_border_gradient[2|_lerp]
+typedef enum {
+	GRAD_NORMAL,
+	GRAD_ACTIVE,
+	GRAD_FOCUSED,
+} grad_theme_t;
+
+typedef struct {
+	const char *name;
+	grad_theme_t theme;
+	bool second; // gradient2 rather than gradient
+	bool lerp; // lerp factor rather than colour stops
+} cfg_gradient_t;
+
+static const cfg_gradient_t gradients[] = {
+	{"normal_border_gradient", GRAD_NORMAL, false, false},
+	{"active_border_gradient", GRAD_ACTIVE, false, false},
+	{"focused_border_gradient", GRAD_FOCUSED, false, false},
+	{"normal_border_gradient2", GRAD_NORMAL, true, false},
+	{"active_border_gradient2", GRAD_ACTIVE, true, false},
+	{"focused_border_gradient2", GRAD_FOCUSED, true, false},
+	{"normal_border_gradient_lerp", GRAD_NORMAL, false, true},
+	{"active_border_gradient_lerp", GRAD_ACTIVE, false, true},
+	{"focused_border_gradient_lerp", GRAD_FOCUSED, false, true},
+};
+
+static const cfg_gradient_t *find_gradient(const char *name) {
+	for (size_t i = 0; i < IPC_ARRAY_LEN(gradients); i++) {
+		if (streq(gradients[i].name, name))
+			return &gradients[i];
+	}
+	return NULL;
+}
+
+static void cfg_border_gradient(ipc_args_t *a, const cfg_gradient_t *g) {
+	static border_theme_t *const themes[] = {
+		[GRAD_NORMAL] = &settings.normal_border_theme,
+		[GRAD_ACTIVE] = &settings.active_border_theme,
+		[GRAD_FOCUSED] = &settings.focused_border_theme,
+	};
+	border_theme_t *bt = themes[g->theme];
+
+	if (g->lerp) {
+		if (!ipc_peek(a)) {
+			ipc_okf(a, "%f\n", bt->gradient_lerp);
+			return;
+		}
+
+		float v;
+		if (!ipc_float(a, "value", 0.0f, 1.0f, &v))
+			return;
+
+		bt->gradient_lerp = v;
+		refresh_border_colors();
+		transaction_commit_dirty();
+		ipc_okf(a, "%s set\n", g->name);
+		return;
+	}
+
+	float *grad = g->second ? bt->gradient2 : bt->gradient;
+	int *gcount = g->second ? &bt->gradient2_count : &bt->gradient_count;
+	float *gangle = g->second ? &bt->gradient2_angle : &bt->gradient_angle;
+
+	if (!ipc_peek(a)) {
+		// leave room for the trailing newline and its terminator
+		char buf[512];
+		ipc_format_gradient(buf, sizeof(buf) - 2, grad, *gcount, *gangle);
+		size_t len = strlen(buf);
+		buf[len] = '\n';
+		buf[len + 1] = '\0';
+		ipc_ok(a, buf);
+		return;
+	}
+
+	char joined[512] = {0};
+	ipc_buf_t b;
+	ipc_buf_init(&b, joined, sizeof(joined));
+	ipc_foreach(a, stop)
+		ipc_buff(&b, "%s%s", b.len > 0 ? " " : "", stop);
+
+	if (streq(joined, "clear")) {
+		*gcount = 0;
+		*gangle = 0.0f;
+	} else if (!ipc_parse_gradient(joined, grad, gcount, gangle)) {
+		ipc_fail(a, "Expected one or more #RRGGBB stops and an optional angle\n");
+		return;
+	}
+
+	refresh_border_colors();
+	transaction_commit_dirty();
+	ipc_okf(a, "%s set\n", g->name);
+}
+
+static void cfg_acrylic_light_anchor(ipc_args_t *a) {
+	if (!ipc_peek(a)) {
+		char buf[128];
+		snprintf(buf, sizeof(buf), "%.3f %.3f\n", acrylic_light_anchor[0], acrylic_light_anchor[1]);
+		ipc_ok(a, buf);
+		return;
+	}
+
+	float x, y;
+	if (!ipc_float(a, "x", -1.0f, 1.0f, &x) || !ipc_float(a, "y", -1.0f, 1.0f, &y))
+		return;
+
+	acrylic_light_anchor[0] = x;
+	acrylic_light_anchor[1] = y;
+	ipc_ok(a, "acrylic_light_anchor set\n");
+}
+
+static void cfg_blur_algorithm(ipc_args_t *a) {
+	if (!ipc_peek(a)) {
+		ipc_okf(a, "%s\n", effects_algorithm_to_str(blur_algorithm));
+		return;
+	}
+
+	const char *name;
+	if (!ipc_need(a, "algorithm", &name))
+		return;
+
+	enum blur_algorithm algo = blur_algorithm_from_str(name);
+	if (algo == BLUR_ALGORITHM_NONE && !streq(name, "none")) {
+		ipc_fail(a, "Unknown algorithm\n");
+		return;
+	}
+
+	blur_algorithm = algo;
+	ipc_ok(a, "blur_algorithm set\n");
+}
+
+static void cfg_screen_shader(ipc_args_t *a) {
+	if (!ipc_peek(a)) {
+		ipc_okf(a, "%s\n", screen_shader_get_name());
+		return;
+	}
+
+	const char *name;
+	if (!ipc_need(a, "shader", &name))
+		return;
+
+	if (!screen_shader_set(name)) {
+		ipc_fail(a, "Unknown shader (builtin: none grayscale invert sepia nightlight)\n");
+		return;
+	}
+
+	ipc_ok(a, "screen_shader set\n");
+}
+
+static void cfg_screen_shader_file(ipc_args_t *a) {
+	const char *path;
+	if (!ipc_need(a, "path", &path))
+		return;
+
+	if (!screen_shader_load_file(path)) {
+		ipc_fail(a, "Failed to load shader\n");
+		return;
+	}
+
+	ipc_ok(a, "screen_shader_file loaded\n");
+}
+
+static void cfg_animation_bezier(ipc_args_t *a) {
+	if (!ipc_peek(a)) {
+		ipc_okf(a, "%s\n", animation_get_bezier());
+		return;
+	}
+
+	const char *name;
+	if (!ipc_need(a, "curve", &name))
+		return;
+
+	if (!bezier_exists(name)) {
+		ipc_fail(a, "No such bezier curve\n");
+		return;
+	}
+
+	animation_set_bezier(name);
+	ipc_ok(a, "animation_bezier set\n");
+}
+
+static void cfg_animation_duration(ipc_args_t *a) {
+	if (!ipc_peek(a)) {
+		ipc_okf(a, "%u\n", animation_get_duration());
+		return;
+	}
+
+	const char *arg;
+	if (!ipc_need(a, "duration", &arg))
+		return;
+
+	int ms;
+	if (!ipc_int_str(a, arg, "duration", 1, INT_MAX, &ms) || !ipc_end(a))
+		return;
+
+	animation_set_duration((uint32_t)ms);
+	ipc_ok(a, "animation_duration set\n");
+}
+
+// config animation <type> [spring|bezier|duration|enabled] [value]
+static void cfg_animation(ipc_args_t *a) {
+	if (!ipc_peek(a)) {
+		ipc_fail(a, "expected a type\n");
+		return;
+	}
+
+	const char *type;
+	if (!ipc_need(a, "type", &type))
+		return;
+
+	if (!ipc_peek(a)) {
+		int idx = animation_type_from_name(type);
+		if (idx < 0) {
+			ipc_fail(a, "Unknown type \"%s\"\n", type);
+			return;
+		}
+
+		const char *spring = animation_type_get_spring(type);
+		const char *bezier = animation_type_get_bezier(type);
+		uint32_t dur = animation_type_get_duration(type);
+		bool enabled = animation_type_get_enabled(type);
+
+		char buf[256];
+		ipc_buf_t b;
+		ipc_buf_init(&b, buf, sizeof(buf));
+		if (spring)
+			ipc_buff(&b, "spring: %s\n", spring);
+		else
+			ipc_buff(&b, "bezier: %s\n", bezier ? bezier : "(global default)");
+		ipc_buff(&b, "duration: %u\n", dur > 0 ? dur : animation_get_duration());
+		ipc_buff(&b, "enabled: %s\n", enabled ? "true" : "false");
+		ipc_ok(a, buf);
+		return;
+	}
+
+	const char *what = ipc_take(a);
+
+	if (streq(what, "spring") || streq(what, "bezier")) {
+		// an explicit empty name means "fall back to the default curve"
+		const char *curve = "";
+		if (ipc_peek(a)) {
+			curve = ipc_take(a);
+			if (curve[0] != '\0') {
+				bool exists = streq(what, "spring") ? spring_exists(curve) : bezier_exists(curve);
+				if (!exists) {
+					ipc_fail(a, "No such %s curve \"%s\"\n", what, curve);
+					return;
+				}
+			}
+		}
+
+		bool ok = streq(what, "spring") ? animation_set_type_spring(type,
+			curve) : animation_set_type_config(type, curve, 0);
+		if (!ok) {
+			ipc_fail(a, "Unknown type \"%s\"\n", type);
+			return;
+		}
+
+		ipc_okf(a, "Animation type %s set\n", what);
+		return;
+	}
+
+	if (streq(what, "duration")) {
+		int ms;
+		if (!ipc_int(a, "value", 1, INT_MAX, &ms))
+			return;
+
+		if (!animation_set_type_config(type, NULL, (uint32_t)ms)) {
+			ipc_fail(a, "Unknown type \"%s\"\n", type);
+			return;
+		}
+
+		ipc_ok(a, "Animation type duration set\n");
+		return;
+	}
+
+	if (streq(what, "enabled")) {
+		if (!ipc_peek(a)) {
+			ipc_okf(a, "%s\n", animation_type_get_enabled(type) ? "enabled" : "disabled");
+			return;
+		}
+
+		bool on = animation_type_get_enabled(type);
+		if (!ipc_toggle(a, &on))
+			return;
+
+		if (!animation_type_set_enabled(type, on)) {
+			ipc_fail(a, "Unknown type \"%s\"\n", type);
+			return;
+		}
+
+		ipc_okf(a, "%s\n", on ? "enabled" : "disabled");
+		return;
+	}
+
+	ipc_fail(a, "Expected one of: spring, bezier, duration, enabled\n");
+}
+
+void ipc_cmd_config(ipc_args_t *a) {
+	const char *name = ipc_peek(a);
+	if (!name) {
+		ipc_fail(a, "missing setting name\n");
+		return;
+	}
+
+	ipc_take(a);
+
+	if (strncmp(name, "tab_color_", 10) == 0) {
+		cfg_tab_color(a, name + 10);
+		return;
+	}
+
+	const cfg_gradient_t *grad = find_gradient(name);
+	if (grad) {
+		cfg_border_gradient(a, grad);
+		return;
+	}
+
+	if (streq(name, "scroller_proportion_preset")) {
+		cfg_scroller_presets(a);
+		return;
+	}
+
+	if (streq(name, "acrylic_light_anchor")) {
+		cfg_acrylic_light_anchor(a);
+		return;
+	}
+
+	if (streq(name, "blur_algorithm")) {
+		cfg_blur_algorithm(a);
+		return;
+	}
+
+	if (streq(name, "screen_shader")) {
+		cfg_screen_shader(a);
+		return;
+	}
+
+	if (streq(name, "screen_shader_file")) {
+		cfg_screen_shader_file(a);
+		return;
+	}
+
+	if (streq(name, "animation_bezier")) {
+		cfg_animation_bezier(a);
+		return;
+	}
+
+	if (streq(name, "animation_duration")) {
+		cfg_animation_duration(a);
+		return;
+	}
+
+	if (streq(name, "animation")) {
+		cfg_animation(a);
+		return;
+	}
+
+	const cfg_setting_t *s = find_setting(name);
+	if (!s) {
+		ipc_fail(a, "unknown setting \"%s\"\n", name);
+		return;
+	}
+
+	if (ipc_peek(a))
+		cfg_set(a, s);
+	else
+		cfg_get(a, s);
 }

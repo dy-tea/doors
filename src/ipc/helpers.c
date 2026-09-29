@@ -1,15 +1,10 @@
 #include "ipc/helpers.h"
 #include "server.h"
-#include "transaction.h"
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-// from ipc.c
-void send_success(int client_fd, const char *msg);
-void send_failure(int client_fd, const char *msg);
 
 bool streq(const char *a, const char *b) {
 	return strcmp(a, b) == 0;
@@ -90,172 +85,47 @@ bool ipc_parse_gradient(const char *str, float out[BORDER_GRADIENT_MAX_STOPS * 4
 
 // serialise a gradient back to a string for IPC get queries.
 void ipc_format_gradient(char *buf, size_t bufsz, const float *colors, int count, float angle) {
-	buf[0] = '\0';
+	ipc_buf_t b;
+	ipc_buf_init(&b, buf, bufsz);
 	for (int i = 0; i < count; i++) {
-		char tmp[20];
 		unsigned r = (unsigned)(colors[i * 4 + 0] * 255.0f + 0.5f);
 		unsigned g = (unsigned)(colors[i * 4 + 1] * 255.0f + 0.5f);
-		unsigned b = (unsigned)(colors[i * 4 + 2] * 255.0f + 0.5f);
+		unsigned bl = (unsigned)(colors[i * 4 + 2] * 255.0f + 0.5f);
 		unsigned a = (unsigned)(colors[i * 4 + 3] * 255.0f + 0.5f);
-		snprintf(tmp, sizeof(tmp), "%02x%02x%02x%02x ", r, g, b, a);
-		strncat(buf, tmp, bufsz - strlen(buf) - 1);
+		ipc_buff(&b, "%02x%02x%02x%02x ", r, g, bl, a);
 	}
-	char tmp[20];
-	snprintf(tmp, sizeof(tmp), "%ddeg", (int)(angle * 180.0f / 3.14159265f));
-	strncat(buf, tmp, bufsz - strlen(buf) - 1);
+	ipc_buff(&b, "%ddeg", (int)(angle * 180.0f / 3.14159265f));
 }
 
-bool ipc_handle_bool(char **args, int num, int client_fd, bool *var, int flags) {
-	if (num >= 2) {
-		*var = streq(args[1], "true") || streq(args[1], "on") || streq(args[1], "1");
-		if (flags & IPC_FLAG_COMMIT)
-			transaction_commit_dirty();
-		char msg[128];
-		snprintf(msg, sizeof(msg), "%s set\n", args[0]);
-		send_success(client_fd, msg);
-		return true;
-	}
-	send_success(client_fd, *var ? "true\n" : "false\n");
-	return false;
-}
-
-bool ipc_handle_int(char **args, int num, int client_fd, int *var, int flags, int min, int max,
-		const char *errmsg) {
-	if (num >= 2) {
-		int val = atoi(args[1]);
-		if (val < min || val > max) {
-			if (errmsg) {
-				char buf[128];
-				snprintf(buf, sizeof(buf), "config %s: %s\n", args[0], errmsg);
-				send_failure(client_fd, buf);
-				return false;
-			}
-			if (val < min)
-				val = min;
-			if (val > max)
-				val = max;
-		}
-		*var = val;
-		if (flags & IPC_FLAG_COMMIT)
-			transaction_commit_dirty();
-		char msg[128];
-		snprintf(msg, sizeof(msg), "%s set\n", args[0]);
-		send_success(client_fd, msg);
-		return true;
-	}
-	char buf[64];
-	snprintf(buf, sizeof(buf), "%d\n", *var);
-	send_success(client_fd, buf);
-	return false;
-}
-
-bool ipc_handle_float(char **args, int num, int client_fd, float *var, int flags, float min,
-		float max, const char *fmt, const char *errmsg) {
-	if (num >= 2) {
-		float val = (float)atof(args[1]);
-		if (val < min || val > max) {
-			if (errmsg) {
-				char buf[128];
-				snprintf(buf, sizeof(buf), "config %s: %s\n", args[0], errmsg);
-				send_failure(client_fd, buf);
-				return false;
-			}
-			if (val < min)
-				val = min;
-			if (val > max)
-				val = max;
-		}
-		*var = val;
-		if (flags & IPC_FLAG_COMMIT)
-			transaction_commit_dirty();
-		char msg[128];
-		snprintf(msg, sizeof(msg), "%s set\n", args[0]);
-		send_success(client_fd, msg);
-		return true;
-	}
-	char buf[64];
-	snprintf(buf, sizeof(buf), fmt, *var);
-	send_success(client_fd, buf);
-	return false;
-}
-
-node_t *ipc_focused_node(int client_fd, const char *ctx, output_t **mon, desktop_t **desk) {
+node_t *ipc_focused(ipc_args_t *a, output_t **out) {
 	output_t *m = server.focused_output;
 	desktop_t *d = m ? m->desk : NULL;
 	node_t *n = d ? d->focus : NULL;
-	if (mon)
-		*mon = m;
-	if (desk)
-		*desk = d;
 
-	char msg[128];
+	if (out)
+		*out = m;
+
 	if (!d) {
-		snprintf(msg, sizeof(msg), "%s: no focused desktop\n", ctx);
-		send_failure(client_fd, msg);
+		ipc_fail(a, "No focused desktop\n");
 		return NULL;
 	}
 	if (!n) {
-		snprintf(msg, sizeof(msg), "%s: no focused node\n", ctx);
-		send_failure(client_fd, msg);
+		ipc_fail(a, "No focused node\n");
 		return NULL;
 	}
 	return n;
 }
 
-bool ipc_handle_enum(char **args, int num, int client_fd, void *var, size_t varsize,
-		const cfg_enum_value_t *values, size_t nvalues, const char *errmsg) {
-	assert(varsize == sizeof(int));
-	int cur;
-	memcpy(&cur, var, sizeof(cur));
+desktop_t *ipc_focused_desk(ipc_args_t *a, output_t **out) {
+	output_t *m = server.focused_output;
+	desktop_t *d = m ? m->desk : NULL;
 
-	char buf[128];
-	if (num < 2) {
-		const char *name = NULL;
-		for (size_t i = 0; i < nvalues; i++) {
-			if (values[i].value == cur) {
-				name = values[i].name;
-				break;
-			}
-		}
-		// fall back to the raw value if it is outside the table
-		if (name != NULL)
-			snprintf(buf, sizeof(buf), "%s\n", name);
-		else
-			snprintf(buf, sizeof(buf), "%d\n", cur);
-		send_success(client_fd, buf);
-		return false;
+	if (out)
+		*out = m;
+
+	if (!d) {
+		ipc_fail(a, "No focused desktop\n");
+		return NULL;
 	}
-
-	for (size_t i = 0; i < nvalues; i++) {
-		if (streq(values[i].name, args[1])) {
-			int next = (int)values[i].value;
-			memcpy(var, &next, sizeof(next));
-			snprintf(buf, sizeof(buf), "%s set\n", args[0]);
-			send_success(client_fd, buf);
-			return true;
-		}
-	}
-
-	send_failure(client_fd, errmsg);
-	return false;
-}
-
-bool ipc_handle_rgba(char **args, int num, int client_fd, float rgba[4], const char *errmsg) {
-	if (num < 2) {
-		char buf[128];
-		ipc_format_color_float(buf, sizeof(buf), rgba);
-		send_success(client_fd, buf);
-		return false;
-	}
-
-	float parsed[4];
-	if (!ipc_parse_color_float(args[1], parsed)) {
-		send_failure(client_fd, errmsg);
-		return false;
-	}
-	memcpy(rgba, parsed, sizeof(parsed));
-	char msg[128];
-	snprintf(msg, sizeof(msg), "%s set\n", args[0]);
-	send_success(client_fd, msg);
-	return true;
+	return d;
 }

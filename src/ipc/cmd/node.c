@@ -1,36 +1,23 @@
 #include "animation.h"
 #include "effects/effects.h"
 #include "input/keyboard.h"
-#include "ipc/cmd.h"
+#include "ipc/args.h"
 #include "ipc/helpers.h"
-#include "ipc/ipc.h"
 #include "layout/floating.h"
 #include "layout/layout.h"
 #include "output/output.h"
 #include "protocol/workspace.h"
-#include "protocol/xwayland.h"
 #include "scratchpad.h"
 #include "server.h"
+#include "surface.h"
 #include "tabs.h"
 #include "transaction.h"
 #include "tree.h"
-#include <fcntl.h>
 #include <limits.h>
-#include <stdarg.h>
-#include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <wayland-server-core.h>
-#include <wlr/backend/headless.h>
-#include <wlr/backend/multi.h>
-#include <wlr/backend/wayland.h>
-#include <wlr/backend/x11.h>
-#include <wlr/types/wlr_xdg_shell.h>
-#include <wlr/util/box.h>
-#include <wlr/util/log.h>
-#include <wlr/xwayland.h>
 
 static void hide_node_client(node_t *n) {
 	n->client->flags.shown = false;
@@ -90,911 +77,877 @@ static void unlink_and_refocus(node_t *n, desktop_t *src, output_t *mon) {
 	n->ntxnrefs = 0;
 }
 
+static node_t *focused_client(ipc_args_t *a, output_t **mon) {
+	node_t *n = ipc_focused(a, mon);
+	if (!n)
+		return NULL;
+	if (!n->client) {
+		ipc_fail(a, "Focused node has no client\n");
+		return NULL;
+	}
+	return n;
+}
+
+static const cfg_enum_value_t direction_values[] = {
+	{"north", DIR_NORTH},
+	{"n", DIR_NORTH},
+	{"south", DIR_SOUTH},
+	{"s", DIR_SOUTH},
+	{"east", DIR_EAST},
+	{"e", DIR_EAST},
+	{"west", DIR_WEST},
+	{"w", DIR_WEST},
+	IPC_ENUM_END,
+};
+
+static const cfg_enum_value_t layer_values[] = {
+	{"below", LAYER_BELOW},
+	{"normal", LAYER_NORMAL},
+	{"above", LAYER_ABOVE},
+	IPC_ENUM_END,
+};
+
+static const cfg_enum_value_t circulate_values[] = {
+	{"forward", 1},
+	{"f", 1},
+	{"backward", -1},
+	{"back", -1},
+	{"b", -1},
+	IPC_ENUM_END,
+};
+
+// look up a node on the focused desktop by its reported id
+static node_t *find_node_by_id(ipc_args_t *a, desktop_t *desk, const char *what) {
+	const char *arg;
+	if (!ipc_need(a, what, &arg))
+		return NULL;
+
+	int id = atoi(arg);
+	if (id <= 0) {
+		ipc_fail(a, "invalid %s \"%s\"\n", what, arg);
+		return NULL;
+	}
+
+	for (node_t *n = first_extrema(desk->root); n != NULL; n = next_leaf(n, desk->root)) {
+		if (n->id == (uint32_t)id)
+			return n;
+	}
+
+	ipc_fail(a, "%s %d not found\n", what, id);
+	return NULL;
+}
+
+static void node_focus(ipc_args_t *a) {
+	output_t *m = server.focused_output;
+	if (m && m->desk && m->desk->focus && m->desk->focus->client) {
+		focus_node(m, m->desk, m->desk->focus);
+		ipc_ok(a, "Focused\n");
+	} else {
+		ipc_fail(a, "No focused node\n");
+	}
+}
+
+static void node_close(ipc_args_t *a) {
+	output_t *m = server.focused_output;
+	if (m && m->desk && m->desk->focus && m->desk->focus->client) {
+		kill_node(m->desk, m->desk->focus);
+		ipc_ok(a, "Closed\n");
+	} else {
+		ipc_fail(a, "No focused node to close\n");
+	}
+}
+
+static void node_state(ipc_args_t *a) {
+	static const struct {
+		const char *name;
+		void (*apply)(void);
+	} states[] = {
+		{"tiled", tile_focused},
+		{"floating", toggle_floating},
+		{"fullscreen", toggle_fullscreen},
+		{"maximized", toggle_maximize},
+		{"minimized", toggle_minimize},
+	};
+
+	const char *name;
+	if (!ipc_need(a, "state", &name))
+		return;
+
+	for (size_t i = 0; i < IPC_ARRAY_LEN(states); i++) {
+		if (!streq(name, states[i].name))
+			continue;
+
+		states[i].apply();
+
+		output_t *m = server.focused_output;
+		if (m && m->desk && m->desk->focus && m->desk->focus->client)
+			ipc_ok(a, "State changed\n");
+		else
+			ipc_fail(a, "No focused node\n");
+		return;
+	}
+
+	ipc_buf_t b;
+	char list[128];
+	ipc_buf_init(&b, list, sizeof(list));
+	for (size_t i = 0; i < IPC_ARRAY_LEN(states); i++)
+		ipc_buff(&b, "%s\"%s\"", i > 0 ? ", " : "", states[i].name);
+	ipc_fail(a, "Unknown state, expected one of: %s\n", list);
+}
+
+static void node_to_desktop(ipc_args_t *a) {
+	const char *name;
+	if (!ipc_need(a, "desktop", &name))
+		return;
+
+	desktop_t *target = find_desktop_by_name(name);
+	if (!target) {
+		ipc_fail(a, "Desktop \"%s\" not found\n", name);
+		return;
+	}
+
+	output_t *m = server.focused_output;
+	if (!m || !m->desk || !m->desk->focus) {
+		ipc_fail(a, "No focused node\n");
+		return;
+	}
+	if (m->desk == target) {
+		ipc_fail(a, "Already on target desktop\n");
+		return;
+	}
+
+	node_t *n = m->desk->focus;
+	if (!n->client) {
+		ipc_fail(a, "Focused node has no client\n");
+		return;
+	}
+
+	desktop_t *src = m->desk;
+	unlink_and_refocus(n, src, m);
+	insert_node(target, n, find_public(target));
+	target->focus = n;
+
+	hide_leaves(target);
+	arrange(m, target, false);
+
+	for (node_t *it = first_extrema(src->root); it != NULL; it = next_leaf(it, src->root)) {
+		if (!it->client)
+			continue;
+		if (node_is_minimized(it))
+			continue;
+
+		it->client->flags.shown = true;
+		bool configured = true;
+		if (it->client->view)
+			configured = it->client->view->configured;
+		if (!configured)
+			continue;
+
+		struct wlr_scene_tree *st = client_get_scene_tree(it->client);
+		if (st)
+			wlr_scene_node_set_enabled(&st->node, true);
+	}
+	arrange(m, src, true);
+
+	ipc_ok(a, "node sent to desktop\n");
+}
+
 static bool *node_flag_field(node_t *n, const char *key) {
-	if (strcmp(key, "sticky") == 0)
+	if (streq(key, "sticky"))
 		return &n->sticky;
-	if (strcmp(key, "private") == 0)
+	if (streq(key, "private"))
 		return &n->private_node;
-	if (strcmp(key, "locked") == 0)
+	if (streq(key, "locked"))
 		return &n->locked;
-	if (strcmp(key, "marked") == 0)
+	if (streq(key, "marked"))
 		return &n->marked;
 	return NULL;
 }
 
-void ipc_cmd_node(char **args, int num, int client_fd) {
-	if (num < 1) {
-		send_failure(client_fd, "node: Missing arguments\n");
+static bool node_flag_key_matches(const char *arg, const ipc_sub_t *sub) {
+	(void)sub;
+	return arg[0] != '-';
+}
+
+static void node_flag(ipc_args_t *a) {
+	output_t *m;
+	node_t *n = ipc_focused(a, &m);
+	if (!n)
+		return;
+
+	const char *arg;
+	if (!ipc_need(a, "flag", &arg))
+		return;
+
+	const char *eq = strchr(arg, '=');
+	char key[MAXLEN];
+	const char *val = NULL;
+	if (eq) {
+		size_t klen = (size_t)(eq - arg);
+		if (klen >= sizeof(key)) {
+			ipc_fail(a, "Flag name too long\n");
+			return;
+		}
+		memcpy(key, arg, klen);
+		key[klen] = '\0';
+		val = eq + 1;
+	} else {
+		snprintf(key, sizeof(key), "%s", arg);
+	}
+
+	// opacity and border_radius take a number, every other flag takes a bool
+	bool numeric = streq(key, "opacity") || streq(key, "border_radius");
+
+	bool want = false;
+	if (val && !numeric) {
+		if (streq(val, "true") || streq(val, "on") || streq(val, "1"))
+			want = true;
+		else if (!streq(val, "false") && !streq(val, "off") && !streq(val, "0")) {
+			ipc_fail(a, "Expected true or false for \"%s\", got \"%s\"\n", key, val);
+			return;
+		}
+	}
+
+	bool *field = node_flag_field(n, key);
+	if (streq(key, "hidden")) {
+		node_set_hidden(n, val ? want : !n->hidden);
+		transaction_commit_dirty();
+		ipc_ok(a, "Flag changed\n");
+	} else if (field != NULL) {
+		*field = val ? want : !*field;
+		transaction_commit_dirty();
+		ipc_ok(a, "Flag changed\n");
+	} else if (streq(key, "blur")) {
+		if (!n->client) {
+			ipc_fail(a, "Focused node has no client\n");
+			return;
+		}
+		n->client->flags.blur = val ? want : !n->client->flags.blur;
+		n->client->flags.blur_from_rule = true;
+		surface_client_set_effect(n->client, EFFECT_BLUR, n->client->flags.blur);
+		ipc_ok(a, "Flag changed\n");
+	} else if (streq(key, "mica") || streq(key, "acrylic")) {
+		if (!n->client) {
+			ipc_fail(a, "Focused node has no client\n");
+			return;
+		}
+
+		bool mica = streq(key, "mica");
+		surface_effect_t effect = mica ? EFFECT_MICA : EFFECT_ACRYLIC;
+		bool cur = mica ? n->client->flags.mica : n->client->flags.acrylic;
+		bool on = val ? want : !cur;
+
+		if (mica)
+			n->client->flags.mica = on;
+		else
+			n->client->flags.acrylic = on;
+
+		surface_client_set_effect(n->client, effect, on);
+		ipc_ok(a, "flag changed\n");
+	} else if (streq(key, "shadow")) {
+		if (!n->client) {
+			ipc_fail(a, "Focused node has no client\n");
+			return;
+		}
+		bool on = val ? want : !n->client->flags.shadow;
+		n->client->flags.shadow = on;
+		n->client->shadow_size = settings.shadow_size;
+		n->client->shadow_offset_x = settings.shadow_offset_x;
+		n->client->shadow_offset_y = settings.shadow_offset_y;
+		memcpy(n->client->shadow_color, settings.shadow_color, sizeof(settings.shadow_color));
+		surface_client_set_shadow(n->client, on);
+		ipc_ok(a, "flag changed\n");
+	} else if (numeric) {
+		if (!val) {
+			ipc_fail(a, "Flag \"%s\" requires a value\n", key);
+			return;
+		}
+		if (!n->client) {
+			ipc_fail(a, "Focused node has no client\n");
+			return;
+		}
+
+		if (streq(key, "opacity")) {
+			double o;
+			if (!ipc_double_str(a, val, key, 0, 1, &o))
+				return;
+
+			n->client->opacity = (float)o;
+
+			struct wlr_scene_node *node = n->client->view ? &n->client->view->scene_tree->node : NULL;
+			if (!node) {
+				ipc_fail(a, "No toplevel or xwayland view\n");
+				return;
+			}
+			surface_set_opacity(node, (float)o);
+			ipc_okf(a, "%s set\n", key);
+		} else {
+			double r;
+			if (!ipc_double_str(a, val, key, 0, INFINITY, &r))
+				return;
+
+			surface_client_set_border_radius(n->client, (float)r);
+			ipc_okf(a, "%s set\n", key);
+		}
+	} else {
+		ipc_fail(a, "Unknown flag \"%s\"\n", key);
+	}
+}
+
+static void node_scratchpad(ipc_args_t *a) {
+	output_t *m;
+	if (!focused_client(a, &m))
+		return;
+
+	scratchpad_add(m->desk->focus);
+	ipc_ok(a, "Sent to scratchpad\n");
+}
+
+static void node_move(ipc_args_t *a) {
+	int dx, dy;
+	if (!ipc_int(a, "dx", INT_MIN, INT_MAX, &dx) || !ipc_int(a, "dy", INT_MIN, INT_MAX, &dy))
+		return;
+
+	output_t *m;
+	node_t *n = focused_client(a, &m);
+	if (!n)
+		return;
+
+	if (IS_FLOATING(n->client)) {
+		struct wlr_box moved = n->client->floating_rectangle;
+		moved.x += dx;
+		moved.y += dy;
+		float_node_set_rect(n, moved);
+	} else {
+		float_node(m, m->desk, n, NULL);
+	}
+
+	ipc_ok(a, "moved\n");
+}
+
+typedef struct {
+	const char *name;
+	int8_t mx, my, mw, mh;
+} resize_handle_t;
+
+static const resize_handle_t resize_handles[] = {
+	{"northwest", 1, 1, -1, -1},
+	{"nw", 1, 1, -1, -1},
+	{"left", 1, 1, -1, -1},
+	{"north", 0, 1, 0, -1},
+	{"n", 0, 1, 0, -1},
+	{"northeast", 0, 1, 1, -1},
+	{"ne", 0, 1, 1, -1},
+	{"east", 0, 0, 1, 0},
+	{"e", 0, 0, 1, 0},
+	{"right", 0, 0, 1, 0},
+	{"southeast", 0, 0, 1, 1},
+	{"se", 0, 0, 1, 1},
+	{"south", 0, 0, 0, 1},
+	{"s", 0, 0, 0, 1},
+	{"southwest", 1, 0, -1, 1},
+	{"sw", 1, 0, -1, 1},
+	{"west", 1, 0, -1, 0},
+	{"w", 1, 0, -1, 0},
+	{"center", 1, 1, 1, 1},
+	{"c", 1, 1, 1, 1},
+};
+
+static void node_resize(ipc_args_t *a) {
+	const char *handle;
+	int dx, dy;
+	if (!ipc_need(a, "handle", &handle) || !ipc_int(a, "dx", INT_MIN, INT_MAX, &dx) || !ipc_int(a, "dy",
+		INT_MIN, INT_MAX, &dy))
+		return;
+
+	const resize_handle_t *h = NULL;
+	for (size_t i = 0; i < IPC_ARRAY_LEN(resize_handles); i++) {
+		if (streq(handle, resize_handles[i].name)) {
+			h = &resize_handles[i];
+			break;
+		}
+	}
+	if (!h) {
+		ipc_fail(a, "Unknown handle \"%s\", expected a compass direction or \"center\"\n", handle);
 		return;
 	}
 
-	if (streq("-f", *args) || streq("--focus", *args)) {
-		output_t *m = server.focused_output;
-		if (m && m->desk && m->desk->focus && m->desk->focus->client) {
-			focus_node(m, m->desk, m->desk->focus);
-			send_success(client_fd, "focused\n");
-		} else {
-			send_failure(client_fd, "no focused node\n");
-		}
-	} else if (streq("-c", *args) || streq("--close", *args)) {
-		output_t *m = server.focused_output;
-		if (m && m->desk && m->desk->focus && m->desk->focus->client) {
-			kill_node(m->desk, m->desk->focus);
-			send_success(client_fd, "closed\n");
-		} else {
-			send_failure(client_fd, "no focused node to close\n");
-		}
-	} else if (streq("-t", *args) || streq("--state", *args)) {
-		if (num < 2) {
-			send_failure(client_fd, "node -t: missing state argument\n");
+	output_t *m;
+	node_t *n = focused_client(a, &m);
+	if (!n)
+		return;
+
+	bool was_floating = IS_FLOATING(n->client);
+	struct wlr_box resized = node_current_rect(n);
+	resized.x += h->mx * dx;
+	resized.y += h->my * dy;
+	resized.width += h->mw * dx;
+	resized.height += h->mh * dy;
+
+	if (resized.width < 50)
+		resized.width = 50;
+	if (resized.height < 50)
+		resized.height = 50;
+
+	// transaction sends configure and brings border along
+	if (was_floating)
+		float_node_set_rect(n, resized);
+	else
+		float_node(m, m->desk, n, &resized);
+
+	ipc_ok(a, "Resized\n");
+}
+
+static void node_activate(ipc_args_t *a) {
+	output_t *m;
+	node_t *n = ipc_focused(a, &m);
+	if (!n)
+		return;
+
+	activate_node(m, m->desk, n);
+	ipc_ok(a, "Activated\n");
+}
+
+static void node_kill(ipc_args_t *a) {
+	output_t *m;
+	node_t *n = ipc_focused(a, &m);
+	if (!n)
+		return;
+
+	kill_node(m->desk, n);
+	transaction_commit_dirty();
+	ipc_ok(a, "killed\n");
+}
+
+static void node_to_monitor(ipc_args_t *a) {
+	bool follow = false;
+	const char *name = NULL;
+	const char *arg;
+	while ((arg = ipc_peek(a)) != NULL) {
+		ipc_take(a);
+		if (streq(arg, "--follow"))
+			follow = true;
+		else if (!name)
+			name = arg;
+		else {
+			ipc_fail(a, "Unexpected argument \"%s\"\n", arg);
 			return;
 		}
-		args++;
-		num--;
-		if (streq("tiled", *args)) {
-			tile_focused();
-		} else if (streq("floating", *args)) {
-			toggle_floating();
-		} else if (streq("fullscreen", *args)) {
-			toggle_fullscreen();
-		} else if (streq("maximized", *args)) {
-			toggle_maximize();
-		} else if (streq("minimized", *args)) {
-			toggle_minimize();
-		} else {
-			send_failure(client_fd, "node -t: unknown state\n");
-			return;
-		}
+	}
 
-		output_t *m = server.focused_output;
-		if (m && m->desk && m->desk->focus && m->desk->focus->client) {
-			send_success(client_fd, "state changed\n");
-		} else {
-			send_failure(client_fd, "no focused node\n");
-		}
-	} else if (streq("-d", *args) || streq("--to-desktop", *args)) {
-		if (num < 2) {
-			send_failure(client_fd, "node -d: missing desktop name\n");
-			return;
-		}
-		args++;
-		num--;
-		char *desk_name = *args;
-		desktop_t *target = find_desktop_by_name(desk_name);
-		if (!target) {
-			send_failure(client_fd, "node -d: desktop not found\n");
-			return;
-		}
+	if (!name) {
+		ipc_fail(a, "Missing monitor\n");
+		return;
+	}
 
-		output_t *m = server.focused_output;
-		if (!m || !m->desk || !m->desk->focus) {
-			send_failure(client_fd, "node -d: no focused node\n");
-			return;
-		}
+	output_t *target = find_output_by_name(name);
+	if (!target) {
+		ipc_fail(a, "Monitor \"%s\" not found\n", name);
+		return;
+	}
 
-		if (m->desk == target) {
-			send_failure(client_fd, "node -d: already on target desktop\n");
-			return;
-		}
+	output_t *m = server.focused_output;
+	if (!m || !m->desk) {
+		ipc_fail(a, "No focused desktop\n");
+		return;
+	}
+	if (m == target) {
+		ipc_fail(a, "Already on target monitor\n");
+		return;
+	}
 
-		node_t *n = m->desk->focus;
-		if (n == NULL || n->client == NULL) {
-			send_failure(client_fd, "node -d: no client\n");
-			return;
-		}
+	node_t *n = m->desk->focus;
+	if (!n || !n->client) {
+		ipc_fail(a, "Focused node has no client\n");
+		return;
+	}
 
-		desktop_t *src_desk = m->desk;
+	desktop_t *target_desk = target->desk;
+	if (!target_desk && !wl_list_empty(&target->desk_list))
+		target_desk = wl_container_of(target->desk_list.next, target_desk, link);
+	if (!target_desk) {
+		ipc_fail(a, "Target monitor has no desktops\n");
+		return;
+	}
 
-		unlink_and_refocus(n, src_desk, m);
+	desktop_t *src_desk = m->desk;
+	unlink_and_refocus(n, src_desk, m);
+	insert_node(target_desk, n, find_public(target_desk));
+	target_desk->focus = n;
+	unhide_leaves(target_desk);
 
-		insert_node(target, n, find_public(target));
+	arrange(target, target_desk, true);
+	arrange(m, src_desk, src_desk->root != NULL);
+	if (follow)
+		focus_node(target, target_desk, n);
 
-		target->focus = n;
-		if (target == m->desk)
-			focus_node(m, target, n);
+	ipc_ok(a, "Node sent to monitor\n");
+}
 
-		if (target == m->desk) {
-			unhide_leaves(target);
-			arrange(m, target, true);
-		} else {
-			hide_leaves(target);
-			arrange(m, target, false);
-		}
+static void node_to_node(ipc_args_t *a) {
+	output_t *m;
+	node_t *n1 = ipc_focused(a, &m);
+	if (!n1)
+		return;
+	if (!n1->client) {
+		ipc_fail(a, "Focused node has no client\n");
+		return;
+	}
 
-		if (src_desk == m->desk) {
-			for (node_t *n_iter = first_extrema(src_desk->root); n_iter != NULL; n_iter = next_leaf(n_iter,
-					src_desk->root)) {
-				if (n_iter->client) {
-					if (node_is_minimized(n_iter))
-						continue;
-					n_iter->client->flags.shown = true;
-					bool already_configured = true;
-					if (n_iter->client->view)
-						already_configured = n_iter->client->view->configured;
-					if (already_configured) {
-						struct wlr_scene_tree *scene_tree = client_get_scene_tree(n_iter->client);
-						if (scene_tree)
-							wlr_scene_node_set_enabled(&scene_tree->node, true);
-					}
-				}
-			}
-			arrange(m, src_desk, true);
-		} else if (src_desk->root) {
-			for (node_t *n_iter = first_extrema(src_desk->root); n_iter != NULL; n_iter = next_leaf(n_iter,
-					src_desk->root)) {
-				if (n_iter->client) {
-					n_iter->client->flags.shown = false;
-					struct wlr_scene_tree *scene_tree = client_get_scene_tree(n_iter->client);
-					if (scene_tree)
-						wlr_scene_node_set_enabled(&scene_tree->node, false);
-				}
-			}
-		}
+	node_t *n2 = find_node_by_id(a, m->desk, "target node");
+	if (!n2)
+		return;
 
-		send_success(client_fd, "node sent to desktop\n");
-	} else if (streq("-g", *args) || streq("--flag", *args)) {
-		if (num < 2) {
-			send_failure(client_fd, "node -g: missing flag argument\n");
-			return;
-		}
-		args++;
-		num--;
+	if (n1 == n2) {
+		ipc_fail(a, "Cannot transfer to self\n");
+		return;
+	}
 
-		output_t *m;
-		node_t *n = ipc_focused_node(client_fd, "node -g", &m, NULL);
-		if (!n)
-			return;
+	desktop_t *src_desk = m->desk;
+	desktop_t *target_desk = src_desk;
+	unlink_and_refocus(n1, src_desk, m);
 
-		char *key = strtok(*args, "=");
-		char *val = strtok(NULL, "=");
+	if (n2->first_child) {
+		n1->parent = n2;
+		n2->second_child = n1;
+	} else {
+		n1->parent = n2;
+		n2->first_child = n1;
+	}
 
-		bool set_value = false;
-		bool has_value = false;
+	target_desk->focus = n1;
+	if (target_desk == m->desk)
+		focus_node(m, target_desk, n1);
 
-		if (val == NULL) {
-			has_value = false;
-		} else {
-			has_value = true;
-			if (strcmp(val, "true") == 0 || strcmp(val, "on") == 0 || strcmp(val, "1") == 0) {
-				set_value = true;
-			} else if (strcmp(val, "false") == 0 || strcmp(val, "off") == 0 || strcmp(val, "0") == 0) {
-				set_value = false;
-			}
-		}
-
-		bool *node_flag = node_flag_field(n, key);
-		if (strcmp(key, "hidden") == 0) {
-			node_set_hidden(n, has_value ? set_value : !n->hidden);
-			transaction_commit_dirty();
-			send_success(client_fd, "flag changed\n");
-		} else if (node_flag != NULL) {
-			*node_flag = has_value ? set_value : !*node_flag;
-			transaction_commit_dirty();
-			send_success(client_fd, "flag changed\n");
-		} else if (strcmp(key, "blur") == 0) {
-			if (!n->client) {
-				send_failure(client_fd, "node -g: no client\n");
-				return;
-			}
-			bool new_blur = has_value ? set_value : !n->client->flags.blur;
-			n->client->flags.blur = new_blur;
-			n->client->flags.blur_from_rule = true;
-			surface_client_set_effect(n->client, EFFECT_BLUR, new_blur);
-			send_success(client_fd, "flag changed\n");
-		} else if (strcmp(key, "mica") == 0) {
-			if (!n->client) {
-				send_failure(client_fd, "node -g: no client\n");
-				return;
-			}
-			bool new_val = has_value ? set_value : !n->client->flags.mica;
-			n->client->flags.mica = new_val;
-			surface_client_set_effect(n->client, EFFECT_MICA, new_val);
-			send_success(client_fd, "flag changed\n");
-		} else if (strcmp(key, "acrylic") == 0) {
-			if (!n->client) {
-				send_failure(client_fd, "node -g: no client\n");
-				return;
-			}
-			bool new_val = has_value ? set_value : !n->client->flags.acrylic;
-			n->client->flags.acrylic = new_val;
-			surface_client_set_effect(n->client, EFFECT_ACRYLIC, new_val);
-			send_success(client_fd, "flag changed\n");
-		} else if (strcmp(key, "shadow") == 0) {
-			if (!n->client) {
-				send_failure(client_fd, "node -g: no client\n");
-				return;
-			}
-			bool new_val = has_value ? set_value : !n->client->flags.shadow;
-			n->client->flags.shadow = new_val;
-			n->client->shadow_size = settings.shadow_size;
-			n->client->shadow_offset_x = settings.shadow_offset_x;
-			n->client->shadow_offset_y = settings.shadow_offset_y;
-			memcpy(n->client->shadow_color, settings.shadow_color, sizeof(settings.shadow_color));
-			surface_client_set_shadow(n->client, new_val);
-			send_success(client_fd, "flag changed\n");
-		} else if (strncmp(key, "border_radius", 13) == 0) {
-			if (!n->client) {
-				send_failure(client_fd, "node -g: no client\n");
-				return;
-			}
-			float r = atof(key + 14);
-			surface_client_set_border_radius(n->client, r);
-			send_success(client_fd, "border_radius set\n");
-		} else if (strncmp(key, "opacity", 7) == 0) {
-			if (!n->client) {
-				send_failure(client_fd, "node -g: no client\n");
-				return;
-			}
-			float o = atof(key + 8);
-
-			if (o < 0 || o > 1.0) {
-				send_failure(client_fd, "node -g: opacity out of range 0.0-1.0\n");
-				return;
-			}
-
-			n->client->opacity = o;
-
-			struct wlr_scene_node *node = NULL;
-			if (n->client->view)
-				node = &n->client->view->scene_tree->node;
-
-			if (node) {
-				surface_set_opacity(node, o);
-				send_success(client_fd, "opacity set\n");
-			} else {
-				send_failure(client_fd, "node -g: no toplevel or xwayland view\n");
-			}
-		} else {
-			send_failure(client_fd, "node -g: unknown flag\n");
-			return;
-		}
-	} else if (streq("-S", *args) || streq("--scratchpad", *args)) {
-		output_t *m;
-		node_t *n = ipc_focused_node(client_fd, "node -S", &m, NULL);
-		if (!n)
-			return;
-		if (!n->client) {
-			send_failure(client_fd, "node -S: no focused client\n");
-			return;
-		}
-		scratchpad_add(n);
-		send_success(client_fd, "sent to scratchpad\n");
-	} else if (streq("-v", *args) || streq("--move", *args)) {
-		if (num < 3) {
-			send_failure(client_fd, "node -v: missing delta arguments\n");
-			return;
-		}
-		args++;
-		num--;
-
-		output_t *m;
-		node_t *n = ipc_focused_node(client_fd, "node -v", &m, NULL);
-		if (!n)
-			return;
-		if (!n->client) {
-			send_failure(client_fd, "node -v: no focused client\n");
-			return;
-		}
-
-		int dx = 0, dy = 0;
-		if (sscanf(*args, "%d", &dx) != 1) {
-			send_failure(client_fd, "node -v: invalid dx\n");
-			return;
-		}
-		args++;
-		num--;
-
-		if (sscanf(*args, "%d", &dy) != 1) {
-			send_failure(client_fd, "node -v: invalid dy\n");
-			return;
-		}
-
-		if (IS_FLOATING(n->client)) {
-			struct wlr_box moved = n->client->floating_rectangle;
-			moved.x += dx;
-			moved.y += dy;
-			float_node_set_rect(n, moved);
-		} else
-			float_node(m, m->desk, n, NULL);
-
-		send_success(client_fd, "moved\n");
-	} else if (streq("-z", *args) || streq("--resize", *args)) {
-		if (num < 4) {
-			send_failure(client_fd, "node -z: missing arguments\n");
-			return;
-		}
-		args++;
-		num--;
-
-		output_t *m;
-		node_t *n = ipc_focused_node(client_fd, "node -z", &m, NULL);
-		if (!n)
-			return;
-		if (!n->client) {
-			send_failure(client_fd, "node -z: no focused client\n");
-			return;
-		}
-
-		char *handle = *args;
-		int dx = 0, dy = 0;
-
-		args++;
-		num--;
-
-		if (sscanf(*args, "%d", &dx) != 1) {
-			send_failure(client_fd, "node -z: invalid dx\n");
-			return;
-		}
-		args++;
-		num--;
-		if (sscanf(*args, "%d", &dy) != 1) {
-			send_failure(client_fd, "node -z: invalid dy\n");
-			return;
-		}
-
-		bool was_floating = IS_FLOATING(n->client);
-		struct wlr_box resized = node_current_rect(n);
-
-		if (strcmp(handle, "northwest") == 0 || strcmp(handle, "nw") == 0 || strcmp(handle,
-				"left") == 0) {
-			resized.x += dx;
-			resized.y += dy;
-			resized.width -= dx;
-			resized.height -= dy;
-		} else if (strcmp(handle, "north") == 0 || strcmp(handle, "n") == 0) {
-			resized.y += dy;
-			resized.height -= dy;
-		} else if (strcmp(handle, "northeast") == 0 || strcmp(handle, "ne") == 0) {
-			resized.y += dy;
-			resized.width += dx;
-			resized.height -= dy;
-		} else if (strcmp(handle, "east") == 0 || strcmp(handle, "e") == 0 || strcmp(handle,
-				"right") == 0) {
-			resized.width += dx;
-		} else if (strcmp(handle, "southeast") == 0 || strcmp(handle, "se") == 0) {
-			resized.width += dx;
-			resized.height += dy;
-		} else if (strcmp(handle, "south") == 0 || strcmp(handle, "s") == 0) {
-			resized.height += dy;
-		} else if (strcmp(handle, "southwest") == 0 || strcmp(handle, "sw") == 0) {
-			resized.x += dx;
-			resized.width -= dx;
-			resized.height += dy;
-		} else if (strcmp(handle, "west") == 0 || strcmp(handle, "w") == 0) {
-			resized.x += dx;
-			resized.width -= dx;
-		} else if (strcmp(handle, "center") == 0 || strcmp(handle, "c") == 0) {
-			resized.x += dx;
-			resized.y += dy;
-			resized.width += dx;
-			resized.height += dy;
-		} else {
-			send_failure(client_fd, "node -z: invalid resize handle\n");
-			return;
-		}
-
-		if (resized.width < 50)
-			resized.width = 50;
-		if (resized.height < 50)
-			resized.height = 50;
-
-		// the transaction sends the configure and brings the border along
-		if (was_floating)
-			float_node_set_rect(n, resized);
-		else
-			float_node(m, m->desk, n, &resized);
-
-		send_success(client_fd, "resized\n");
-	} else if (streq("-a", *args) || streq("--activate", *args)) {
-		output_t *m;
-		node_t *n = ipc_focused_node(client_fd, "node -a", &m, NULL);
-		if (!n)
-			return;
-		activate_node(m, m->desk, n);
-		send_success(client_fd, "activated\n");
-	} else if (streq("-k", *args) || streq("--kill", *args)) {
-		output_t *m;
-		node_t *n = ipc_focused_node(client_fd, "node -k", &m, NULL);
-		if (!n)
-			return;
-		kill_node(m->desk, n);
-		transaction_commit_dirty();
-		send_success(client_fd, "killed\n");
-	} else if (streq("-m", *args) || streq("--to-monitor", *args)) {
-		if (num < 2) {
-			send_failure(client_fd, "node -m: missing monitor name\n");
-			return;
-		}
-		args++;
-		num--;
-
-		bool set_focus = false;
-		char *target_name = NULL;
-		while (num > 0) {
-			if (streq("--follow", *args)) {
-				set_focus = true;
-			} else if (target_name == NULL) {
-				target_name = *args;
-			} else {
-				send_failure(client_fd, "node -m: unexpected argument\n");
-				return;
-			}
-			args++;
-			num--;
-		}
-
-		if (target_name == NULL) {
-			send_failure(client_fd, "node -m: missing monitor name\n");
-			return;
-		}
-
-		output_t *target = find_output_by_name(target_name);
-		if (!target) {
-			send_failure(client_fd, "node -m: monitor not found\n");
-			return;
-		}
-
-		output_t *m = server.focused_output;
-		if (!m || !m->desk) {
-			send_failure(client_fd, "node -m: no focused desktop\n");
-			return;
-		}
-
-		if (m == target) {
-			send_failure(client_fd, "node -m: already on target monitor\n");
-			return;
-		}
-
-		node_t *n = m->desk->focus;
-		if (!n || !n->client) {
-			send_failure(client_fd, "node -m: no client\n");
-			return;
-		}
-
-		desktop_t *src_desk = m->desk;
-		desktop_t *target_desk = target->desk ? target->desk : (wl_list_empty(&target->desk_list) ? NULL :
-			wl_container_of(target->desk_list.next, target_desk, link));
-
-		if (!target_desk) {
-			send_failure(client_fd, "node -m: target monitor has no desktops");
-			return;
-		}
-
-		unlink_and_refocus(n, src_desk, m);
-
-		insert_node(target_desk, n, find_public(target_desk));
-		target_desk->focus = n;
-
-		unhide_leaves(target_desk);
-
-		arrange(target, target_desk, true);
+	unhide_leaves(target_desk);
+	arrange(m, target_desk, true);
+	if (src_desk != target_desk)
 		arrange(m, src_desk, src_desk->root != NULL);
-		if (set_focus)
-			focus_node(target, target_desk, n);
 
-		send_success(client_fd, "node sent to monitor\n");
-	} else if (streq("-n", *args) || streq("--to-node", *args)) {
-		if (num < 2) {
-			send_failure(client_fd, "node -n: missing target node\n");
-			return;
+	ipc_ok(a, "Node sent to node\n");
+}
+
+static void node_layer(ipc_args_t *a) {
+	long value;
+	if (!ipc_enum(a, "layer", layer_values, &value))
+		return;
+
+	output_t *m;
+	node_t *n = focused_client(a, &m);
+	if (!n)
+		return;
+
+	n->client->layer = (stack_layer_t)value;
+	transaction_commit_dirty();
+	ipc_ok(a, "Layer changed\n");
+}
+
+static void node_type_split(ipc_args_t *a, output_t *m, node_t *target, long split_type) {
+	split_type_t prev_st = target->split_type;
+	node_set_split_type(target, (split_type_t)split_type);
+
+	if (prev_st == TYPE_TABBED && split_type != TYPE_TABBED) {
+		tabs_destroy(target);
+		for (node_t *leaf = first_extrema(target); leaf != NULL && leaf != target; leaf = next_leaf(leaf,
+				target)) {
+			if (leaf->client == NULL || leaf->client->state == STATE_FLOATING)
+				continue;
+			if (node_is_minimized(leaf))
+				continue;
+
+			leaf->client->flags.shown = true;
+			struct wlr_scene_tree *st = client_get_scene_tree(leaf->client);
+			if (st)
+				wlr_scene_node_set_enabled(&st->node, true);
 		}
-		args++;
-		num--;
+	}
 
-		output_t *m;
-		node_t *n1 = ipc_focused_node(client_fd, "node -n", &m, NULL);
-		if (!n1)
-			return;
-		if (!n1->client) {
-			send_failure(client_fd, "node -n: no focused client\n");
-			return;
-		}
+	arrange(m, m->desk, true);
 
-		node_t *n2 = NULL;
-		int target_id = atoi(*args);
-		if (target_id > 0) {
-			for (node_t *n = first_extrema(m->desk->root); n != NULL; n = next_leaf(n, m->desk->root)) {
-				if (n->id == (uint32_t)target_id) {
-					n2 = n;
-					break;
-				}
-			}
-		}
+	// reapply decoration mode for all leaves
+	for (node_t *leaf = first_extrema(target); leaf != NULL && leaf != target; leaf = next_leaf(leaf,
+			target)) {
+		view_t *view = leaf->client ? leaf->client->view : NULL;
+		if (view)
+			view->impl->set_decorations(view);
+	}
 
-		if (!n2) {
-			send_failure(client_fd, "node -n: target node not found\n");
-			return;
-		}
+	if (m->desk->focus != NULL)
+		focus_node(m, m->desk, m->desk->focus);
+	ipc_ok(a, "type changed\n");
+}
 
-		if (n1 == n2) {
-			send_failure(client_fd, "node -n: cannot transfer to self\n");
-			return;
-		}
+static void node_type_tab(ipc_args_t *a, output_t *m, node_t *n, int forward) {
+	node_t *t = tabbed_ancestor(n);
+	if (!t) {
+		ipc_fail(a, "Focused node not in tab group\n");
+		return;
+	}
 
-		desktop_t *src_desk = m->desk;
-		desktop_t *target_desk = src_desk;
+	node_t *next = forward ? tab_next_leaf(t, n) : tab_prev_leaf(t, n);
+	if (next) {
+		focus_node(m, m->desk, next);
+		arrange(m, m->desk, true);
+	}
+	ipc_okf(a, "%s tab\n", forward ? "Next" : "Prev");
+}
 
-		unlink_and_refocus(n1, src_desk, m);
+static void node_type(ipc_args_t *a) {
+	output_t *m;
+	node_t *n = ipc_focused(a, &m);
+	if (!n)
+		return;
 
-		if (n2->first_child) {
-			n1->parent = n2;
-			n2->second_child = n1;
-		} else {
-			n1->parent = n2;
-			n2->first_child = n1;
-		}
+	static const cfg_enum_value_t split_types[] = {
+		{"tabbed", TYPE_TABBED},
+		{"horizontal", TYPE_HORIZONTAL},
+		{"vertical", TYPE_VERTICAL},
+	};
 
-		target_desk->focus = n1;
-		if (target_desk == m->desk)
-			focus_node(m, target_desk, n1);
-
-		unhide_leaves(target_desk);
-
-		arrange(m, target_desk, true);
-		if (src_desk != target_desk)
-			arrange(m, src_desk, src_desk->root != NULL);
-
-		send_success(client_fd, "node sent to node\n");
-	} else if (streq("-l", *args) || streq("--layer", *args)) {
-		if (num < 2) {
-			send_failure(client_fd, "node -l: missing layer argument\n");
-			return;
-		}
-		args++;
-		num--;
-
-		output_t *m;
-		node_t *n = ipc_focused_node(client_fd, "node -l", &m, NULL);
-		if (!n)
-			return;
-		if (!n->client) {
-			send_failure(client_fd, "node -l: no client\n");
-			return;
-		}
-
-		stack_layer_t layer;
-		if (streq("below", *args)) {
-			layer = LAYER_BELOW;
-		} else if (streq("normal", *args)) {
-			layer = LAYER_NORMAL;
-		} else if (streq("above", *args)) {
-			layer = LAYER_ABOVE;
-		} else {
-			send_failure(client_fd, "node -l: unknown layer (use below, normal, or above)\n");
-			return;
-		}
-
-		n->client->layer = layer;
-		transaction_commit_dirty();
-		send_success(client_fd, "layer changed\n");
-	} else if (streq("-y", *args) || streq("--type", *args)) {
-		if (num < 2) {
-			send_failure(client_fd, "node -y: missing type argument\n");
-			return;
-		}
-		args++;
-		num--;
-
-		output_t *m;
-		node_t *n = ipc_focused_node(client_fd, "node -y", &m, NULL);
-		if (!n)
-			return;
-
-		if (streq("next_tab", *args) || streq("next.tab", *args)) {
-			node_t *t = tabbed_ancestor(n);
-			if (t == NULL) {
-				send_failure(client_fd, "node -y: focused node not in tab group\n");
-				return;
-			}
-			node_t *next = tab_next_leaf(t, n);
-			if (next != NULL) {
-				focus_node(m, m->desk, next);
-				arrange(m, m->desk, true);
-			}
-			send_success(client_fd, "next tab\n");
-			return;
-		}
-		if (streq("prev_tab", *args) || streq("prev.tab", *args)) {
-			node_t *t = tabbed_ancestor(n);
-			if (t == NULL) {
-				send_failure(client_fd, "node -y: focused node not in tab group\n");
-				return;
-			}
-			node_t *prev = tab_prev_leaf(t, n);
-			if (prev != NULL) {
-				focus_node(m, m->desk, prev);
-				arrange(m, m->desk, true);
-			}
-			send_success(client_fd, "prev tab\n");
-			return;
-		}
-		if (streq("tabbed", *args) || streq("horizontal", *args) || streq("vertical", *args)) {
-			node_t *target = n->parent;
-			if (target == NULL) {
-				send_failure(client_fd, "node -y: focused node has no parent\n");
-				return;
-			}
-			split_type_t prev_st = target->split_type;
-			split_type_t st = TYPE_HORIZONTAL;
-			if (streq("tabbed", *args))
-				st = TYPE_TABBED;
-			else if (streq("vertical", *args))
-				st = TYPE_VERTICAL;
-			node_set_split_type(target, st);
-
-			if (prev_st == TYPE_TABBED && st != TYPE_TABBED) {
-				tabs_destroy(target);
-				for (node_t *leaf = first_extrema(target); leaf != NULL && leaf != target; leaf = next_leaf(leaf,
-						target)) {
-					if (leaf->client == NULL)
-						continue;
-					if (leaf->client->state == STATE_FLOATING)
-						continue;
-					if (node_is_minimized(leaf))
-						continue;
-					leaf->client->flags.shown = true;
-					struct wlr_scene_tree *stree = client_get_scene_tree(leaf->client);
-					if (stree)
-						wlr_scene_node_set_enabled(&stree->node, true);
-				}
-			}
-
-			arrange(m, m->desk, true);
-
-			// reapply decoration mode for all leaves
-			for (node_t *leaf = first_extrema(target); leaf != NULL && leaf != target; leaf = next_leaf(leaf,
-					target)) {
-				view_t *view = leaf->client ? leaf->client->view : NULL;
-				if (view)
-					view->impl->set_decorations(view);
-			}
-
-			if (m->desk->focus != NULL)
-				focus_node(m, m->desk, m->desk->focus);
-			send_success(client_fd, "type changed\n");
-			return;
-		}
+	const char *name = ipc_peek(a);
+	if (!name) {
+		// no argument cycles between the two plain split directions
 		node_set_split_type(n, (split_type_t)((n->split_type + 1) % 2));
-
 		transaction_commit_dirty();
-		send_success(client_fd, "type changed\n");
-	} else if (streq("-r", *args) || streq("--ratio", *args)) {
-		if (num < 2) {
-			send_failure(client_fd, "node -r: missing ratio argument\n");
-			return;
-		}
-		args++;
-		num--;
+		ipc_ok(a, "Type changed\n");
+		return;
+	}
 
-		output_t *m;
-		node_t *n = ipc_focused_node(client_fd, "node -r", &m, NULL);
-		if (!n)
+	if (streq(name, "next_tab") || streq(name, "next.tab")) {
+		ipc_take(a);
+		node_type_tab(a, m, n, 1);
+		return;
+	}
+	if (streq(name, "prev_tab") || streq(name, "prev.tab")) {
+		ipc_take(a);
+		node_type_tab(a, m, n, 0);
+		return;
+	}
+
+	long value;
+	if (!ipc_enum_opt(a, "type", split_types, &value))
+		return;
+
+	node_t *target = n->parent;
+	if (!target) {
+		ipc_fail(a, "Focused node has no parent\n");
+		return;
+	}
+	node_type_split(a, m, target, value);
+}
+
+static void node_ratio(ipc_args_t *a) {
+	output_t *m;
+	node_t *n = ipc_focused(a, &m);
+	if (!n)
+		return;
+
+	const char *arg;
+	if (!ipc_need(a, "ratio", &arg))
+		return;
+
+	double rat;
+	if (arg[0] == '+' || arg[0] == '-') {
+		double delta;
+		if (!ipc_delta_str(a, "ratio", arg, &delta))
 			return;
 
-		double rat;
-		if ((*args)[0] == '+' || (*args)[0] == '-') {
-			float delta;
-			if (sscanf(*args, "%f", &delta) == 1) {
-				if (delta > -1 && delta < 1) {
-					rat = n->split_ratio + delta;
-				} else {
-					int max = (n->split_type == TYPE_HORIZONTAL) ? n->rectangle.height : n->rectangle.width;
-					rat = ((max * n->split_ratio) + delta) / max;
-				}
-			} else {
-				send_failure(client_fd, "node -r: invalid argument\n");
-				return;
-			}
+		if (delta > -1 && delta < 1) {
+			rat = n->split_ratio + delta;
 		} else {
-			if (sscanf(*args, "%lf", &rat) != 1) {
-				send_failure(client_fd, "node -r: invalid argument\n");
-				return;
-			}
+			int max = (n->split_type == TYPE_HORIZONTAL) ? n->rectangle.height : n->rectangle.width;
+			rat = ((max * n->split_ratio) + delta) / max;
 		}
+	} else if (!ipc_double_str(a, arg, "ratio", 0, 1, &rat)) {
+		return;
+	}
 
-		if (rat > 0 && rat < 1) {
-			node_set_split_ratio(n, rat);
-			transaction_commit_dirty();
-			send_success(client_fd, "ratio changed\n");
+	if (rat <= 0 || rat >= 1) {
+		ipc_fail(a, "Ratio must be between 0 and 1\n");
+		return;
+	}
+
+	node_set_split_ratio(n, rat);
+	transaction_commit_dirty();
+	ipc_ok(a, "Ratio changed\n");
+}
+
+static void node_circulate(ipc_args_t *a) {
+	long value;
+	if (!ipc_enum(a, "direction", circulate_values, &value))
+		return;
+
+	output_t *m;
+	node_t *n = ipc_focused(a, &m);
+	if (!n)
+		return;
+
+	node_t *next = value > 0 ? next_leaf(n, m->desk->root) : prev_leaf(n, m->desk->root);
+	if (next) {
+		m->desk->focus = next;
+		focus_node(m, m->desk, next);
+	}
+
+	ipc_ok(a, "Circulated\n");
+}
+
+static void node_insert_receptacle(ipc_args_t *a) {
+	output_t *m = server.focused_output;
+	if (!m || !m->desk) {
+		ipc_fail(a, "No focused desktop\n");
+		return;
+	}
+
+	node_t *n = m->desk->focus;
+	node_t *receptacle = make_node(0);
+	receptacle->vacant = true;
+	receptacle->split_type = TYPE_VERTICAL;
+	receptacle->split_ratio = 0.5;
+
+	if (n && !is_leaf(n)) {
+		if (n->first_child) {
+			receptacle->parent = n;
+			n->second_child->parent = receptacle;
+			receptacle->first_child = n->second_child;
+			n->second_child = receptacle;
 		} else {
-			send_failure(client_fd, "node -r: ratio out of range\n");
-			return;
+			n->first_child = receptacle;
+			receptacle->parent = n;
 		}
-	} else if (streq("-C", *args) || streq("--circulate", *args)) {
-		if (num < 2) {
-			send_failure(client_fd, "node -C: missing direction\n");
-			return;
-		}
-		args++;
-		num--;
+	} else if (n) {
+		node_t *parent = n->parent;
+		if (parent) {
+			if (parent->first_child == n)
+				parent->first_child = receptacle;
+			else
+				parent->second_child = receptacle;
+			receptacle->parent = parent;
 
-		output_t *m;
-		node_t *n = ipc_focused_node(client_fd, "node -C", &m, NULL);
-		if (!n)
-			return;
-
-		if (streq("forward", *args) || streq("f", *args)) {
-			node_t *next = next_leaf(n, m->desk->root);
-			if (next) {
-				m->desk->focus = next;
-				focus_node(m, m->desk, next);
-			}
-		} else if (streq("backward", *args) || streq("b", *args)) {
-			node_t *prev = prev_leaf(n, m->desk->root);
-			if (prev) {
-				m->desk->focus = prev;
-				focus_node(m, m->desk, prev);
-			}
-		} else {
-			send_failure(client_fd, "node -C: unknown direction\n");
-			return;
-		}
-
-		send_success(client_fd, "circulated\n");
-	} else if (streq("-i", *args) || streq("--insert-receptacle", *args)) {
-		output_t *m = server.focused_output;
-		if (!m || !m->desk) {
-			send_failure(client_fd, "node -i: no focused desktop\n");
-			return;
-		}
-		node_t *n = m->desk->focus;
-
-		node_t *receptacle = make_node(0);
-		receptacle->vacant = true;
-		receptacle->split_type = TYPE_VERTICAL;
-		receptacle->split_ratio = 0.5;
-
-		if (n && !is_leaf(n)) {
-			if (n->first_child) {
-				receptacle->parent = n;
-				n->second_child->parent = receptacle;
-				receptacle->first_child = n->second_child;
-				n->second_child = receptacle;
-			} else {
-				n->first_child = receptacle;
-				receptacle->parent = n;
-			}
-		} else if (n) {
-			node_t *parent = n->parent;
-			if (parent) {
-				if (parent->first_child == n) {
-					parent->first_child = receptacle;
-				} else {
-					parent->second_child = receptacle;
-				}
-				receptacle->parent = parent;
-
-				if (n->split_type == TYPE_VERTICAL) {
-					receptacle->first_child = n;
-					n->parent = receptacle;
-				} else {
-					receptacle->second_child = n;
-					n->parent = receptacle;
-				}
-			} else {
-				m->desk->root = receptacle;
+			if (n->split_type == TYPE_VERTICAL) {
 				receptacle->first_child = n;
 				n->parent = receptacle;
+			} else {
+				receptacle->second_child = n;
+				n->parent = receptacle;
 			}
-			receptacle->split_type = TYPE_VERTICAL;
 		} else {
 			m->desk->root = receptacle;
+			receptacle->first_child = n;
+			n->parent = receptacle;
 		}
-
-		transaction_commit_dirty();
-		send_success(client_fd, "receptacle inserted\n");
-	} else if (streq("-p", *args) || streq("--presel-dir", *args)) {
-		if (num < 2) {
-			send_failure(client_fd, "node -p: missing direction\n");
-			return;
-		}
-		args++;
-		num--;
-
-		output_t *m;
-		node_t *n = ipc_focused_node(client_fd, "node -p", &m, NULL);
-		if (!n)
-			return;
-		if (n->vacant) {
-			send_failure(client_fd, "node -p: no valid node\n");
-			return;
-		}
-
-		if (streq("cancel", *args)) {
-			if (n->presel) {
-				free(n->presel);
-				n->presel = NULL;
-			}
-			send_success(client_fd, "presel cancelled\n");
-			return;
-		}
-
-		direction_t dir;
-		if (streq("west", *args) || streq("w", *args)) {
-			dir = DIR_WEST;
-		} else if (streq("east", *args) || streq("e", *args)) {
-			dir = DIR_EAST;
-		} else if (streq("north", *args) || streq("n", *args)) {
-			dir = DIR_NORTH;
-		} else if (streq("south", *args) || streq("s", *args)) {
-			dir = DIR_SOUTH;
-		} else {
-			send_failure(client_fd, "node -p: unknown direction\n");
-			return;
-		}
-
-		presel_dir(n, dir);
-		transaction_commit_dirty();
-		send_success(client_fd, "presel set\n");
-	} else if (streq("-o", *args) || streq("--presel-ratio", *args)) {
-		if (num < 2) {
-			send_failure(client_fd, "node -o: missing ratio\n");
-			return;
-		}
-		args++;
-		num--;
-
-		output_t *m;
-		node_t *n = ipc_focused_node(client_fd, "node -o", &m, NULL);
-		if (!n)
-			return;
-		if (n->vacant) {
-			send_failure(client_fd, "node -o: no valid node\n");
-			return;
-		}
-
-		double rat;
-		if (sscanf(*args, "%lf", &rat) != 1 || rat <= 0 || rat >= 1) {
-			send_failure(client_fd, "node -o: invalid ratio\n");
-			return;
-		}
-
-		if (!n->presel) {
-			n->presel = make_presel();
-		}
-		n->presel->split_ratio = rat;
-
-		transaction_commit_dirty();
-		send_success(client_fd, "presel ratio set\n");
-	} else if (streq("-s", *args) || streq("--swap", *args)) {
-		if (num < 2) {
-			send_failure(client_fd, "node -s: missing target node\n");
-			return;
-		}
-		args++;
-		num--;
-
-		output_t *m;
-		node_t *n1 = ipc_focused_node(client_fd, "node -s", &m, NULL);
-		if (!n1)
-			return;
-
-		node_t *n2 = NULL;
-		int target_id = atoi(*args);
-		if (target_id > 0) {
-			for (node_t *n = first_extrema(m->desk->root); n != NULL; n = next_leaf(n, m->desk->root)) {
-				if (n->id == (uint32_t)target_id) {
-					n2 = n;
-					break;
-				}
-			}
-		}
-
-		if (!n2) {
-			send_failure(client_fd, "node -s: target node not found\n");
-			return;
-		}
-
-		if (n1 == n2) {
-			send_failure(client_fd, "node -s: cannot swap with self\n");
-			return;
-		}
-
-		swap_nodes(m, m->desk, n1, m, m->desk, n2);
-		m->desk->focus = n2;
-		transaction_commit_dirty();
-		send_success(client_fd, "swapped\n");
+		receptacle->split_type = TYPE_VERTICAL;
 	} else {
-		send_failure(client_fd, "node: unknown command\n");
+		m->desk->root = receptacle;
 	}
+
+	transaction_commit_dirty();
+	ipc_ok(a, "Receptacle inserted\n");
+}
+
+static void node_presel_dir(ipc_args_t *a) {
+	const char *arg;
+	if (!ipc_need(a, "direction", &arg))
+		return;
+
+	output_t *m;
+	node_t *n = ipc_focused(a, &m);
+	if (!n)
+		return;
+	if (n->vacant) {
+		ipc_fail(a, "Focused node is a receptacle\n");
+		return;
+	}
+
+	if (streq(arg, "cancel")) {
+		free(n->presel);
+		n->presel = NULL;
+		ipc_ok(a, "Presel cancelled\n");
+		return;
+	}
+
+	long dir;
+	if (!ipc_enum_names(a, "direction", arg, direction_values, &dir))
+		return;
+
+	presel_dir(n, (direction_t)dir);
+	transaction_commit_dirty();
+	ipc_ok(a, "Presel set\n");
+}
+
+static void node_presel_ratio(ipc_args_t *a) {
+	double rat;
+	if (!ipc_double(a, "ratio", 0, 1, &rat))
+		return;
+	if (rat <= 0 || rat >= 1) {
+		ipc_fail(a, "Ratio must be between 0 and 1\n");
+		return;
+	}
+
+	output_t *m;
+	node_t *n = ipc_focused(a, &m);
+	if (!n)
+		return;
+	if (n->vacant) {
+		ipc_fail(a, "Focused node is a receptacle\n");
+		return;
+	}
+
+	if (!n->presel)
+		n->presel = make_presel();
+	n->presel->split_ratio = rat;
+
+	transaction_commit_dirty();
+	ipc_ok(a, "Presel ratio set\n");
+}
+
+static void node_swap(ipc_args_t *a) {
+	output_t *m;
+	node_t *n1 = ipc_focused(a, &m);
+	if (!n1)
+		return;
+
+	node_t *n2 = find_node_by_id(a, m->desk, "target node");
+	if (!n2)
+		return;
+
+	if (n1 == n2) {
+		ipc_fail(a, "Cannot swap with self\n");
+		return;
+	}
+
+	swap_nodes(m, m->desk, n1, m, m->desk, n2);
+	m->desk->focus = n2;
+	transaction_commit_dirty();
+	ipc_ok(a, "Swapped\n");
+}
+
+const ipc_sub_t node_subs[] = {
+	IPC_SUB("-f", "--focus", "node -f | --focus", node_focus),
+	IPC_SUB("-c", "--close", "node -c | --close", node_close),
+	IPC_SUB("-t", "--state", "node -t | --state <tiled|floating|fullscreen|maximized|minimized>",
+		node_state),
+	IPC_SUB("-d", "--to-desktop", "node -d | --to-desktop <desktop>", node_to_desktop),
+	{"-g", "--flag", NULL, "node -g | --flag <key>[=true|false]", node_flag, node_flag_key_matches},
+	IPC_SUB("-S", "--scratchpad", "node -S | --scratchpad", node_scratchpad),
+	IPC_SUB("-v", "--move", "node -v | --move <dx> <dy>", node_move),
+	IPC_SUB("-z", "--resize", "node -z | --resize <handle> <dx> <dy>", node_resize),
+	IPC_SUB("-a", "--activate", "node -a | --activate", node_activate),
+	IPC_SUB("-k", "--kill", "node -k | --kill", node_kill),
+	IPC_SUB("-m", "--to-monitor", "node -m | --to-monitor <monitor> [--follow]", node_to_monitor),
+	IPC_SUB("-n", "--to-node", "node -n | --to-node <id>", node_to_node),
+	IPC_SUB("-l", "--layer", "node -l | --layer <below|normal|above>", node_layer),
+	IPC_SUB("-y", "--type", "node -y | --type [tabbed|horizontal|vertical|next_tab|prev_tab]",
+		node_type),
+	IPC_SUB("-r", "--ratio", "node -r | --ratio [+|-]<ratio|px>", node_ratio),
+	IPC_SUB("-C", "--circulate", "node -C | --circulate <forward|backward>", node_circulate),
+	IPC_SUB("-i", "--insert-receptacle", "node -i | --insert-receptacle", node_insert_receptacle),
+	IPC_SUB("-p", "--presel-dir", "node -p | --presel-dir <direction|cancel>", node_presel_dir),
+	IPC_SUB("-o", "--presel-ratio", "node -o | --presel-ratio <ratio>", node_presel_ratio),
+	IPC_SUB("-s", "--swap", "node -s | --swap <id>", node_swap),
+	IPC_SUB_END,
+};
+
+void ipc_cmd_node(ipc_args_t *a) {
+	if (!ipc_sub_dispatch(a, node_subs))
+		ipc_fail_unknown(a, node_subs);
 }
