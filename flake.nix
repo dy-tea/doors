@@ -74,7 +74,6 @@
               homepage = "https://github.com/dy-tea/doors";
               license = pkgs.lib.licenses.gpl3Only;
               maintainers = [
-                "anispwyn"
                 "foxtrottt"
               ];
             };
