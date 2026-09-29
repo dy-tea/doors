@@ -9,11 +9,11 @@
 #include "protocol/idle.h"
 #include "protocol/layer.h"
 #include "protocol/lock.h"
+#include "protocol/workspace.h"
 #include "protocol/xwayland.h"
 #include "server.h"
 #include "tree.h"
 #include "types.h"
-#include "workspace.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>

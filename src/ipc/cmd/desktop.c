@@ -4,10 +4,10 @@
 #include "ipc/ipc.h"
 #include "layout/layout.h"
 #include "output/output.h"
+#include "protocol/workspace.h"
 #include "server.h"
 #include "transaction.h"
 #include "tree.h"
-#include "workspace.h"
 #include <stdlib.h>
 #include <string.h>
 

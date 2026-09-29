@@ -2,9 +2,9 @@
 #include "ipc/helpers.h"
 #include "ipc/ipc.h"
 #include "output/output.h"
+#include "protocol/workspace.h"
 #include "server.h"
 #include "tree.h"
-#include "workspace.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

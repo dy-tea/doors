@@ -5,10 +5,10 @@
 #include "layout/master_stack.h"
 #include "once.h"
 #include "output/output.h"
+#include "protocol/workspace.h"
 #include "server.h"
 #include "tree.h"
 #include "types.h"
-#include "workspace.h"
 #include <stdint.h>
 #include <string.h>
 #include <wlr/types/wlr_scene.h>

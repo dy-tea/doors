@@ -31,6 +31,7 @@
 #include "protocol/toplevel_tag.h"
 #include "protocol/virtual_keyboard.h"
 #include "protocol/virtual_pointer.h"
+#include "protocol/workspace.h"
 #include "protocol/xdg_decoration.h"
 #include "protocol/xdg_shell.h"
 #include "protocol/xwayland.h"
@@ -41,7 +42,6 @@
 #include "settings.h"
 #include "spring.h"
 #include "transaction.h"
-#include "workspace.h"
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdlib.h>

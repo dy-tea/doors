@@ -6,8 +6,8 @@
 #include "layout/layout.h"
 #include "once.h"
 #include "output/output.h"
-#include "popup.h"
 #include "protocol/layer.h"
+#include "protocol/popup.h"
 #include "server.h"
 #include "tree.h"
 #include <stdlib.h>

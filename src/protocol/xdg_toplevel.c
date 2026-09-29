@@ -7,7 +7,8 @@
 #include "layout/layout.h"
 #include "layout/scroller.h"
 #include "output/output.h"
-#include "popup.h"
+#include "protocol/popup.h"
+#include "protocol/workspace.h"
 #include "protocol/xdg_toplevel.h"
 #include "protocol/xwayland.h"
 #include "render_unfocused.h"
@@ -19,7 +20,6 @@
 #include "transaction.h"
 #include "tree.h"
 #include "types.h"
-#include "workspace.h"
 #include <math.h>
 #include <pixman.h>
 #include <stdlib.h>

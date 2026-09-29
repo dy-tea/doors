@@ -12,6 +12,7 @@
 #include "output/output.h"
 #include "protocol/global_shortcuts.h"
 #include "protocol/idle_power.h"
+#include "protocol/workspace.h"
 #include "protocol/xdg_toplevel.h"
 #include "protocol/xwayland.h"
 #include "server.h"
@@ -19,7 +20,6 @@
 #include "transaction.h"
 #include "tree.h"
 #include "types.h"
-#include "workspace.h"
 #include <stdlib.h>
 #include <unistd.h>
 #include <wayland-server-core.h>

@@ -8,6 +8,7 @@
 #include "layout/layout.h"
 #include "once.h"
 #include "output/output.h"
+#include "protocol/workspace.h"
 #include "protocol/xwayland.h"
 #include "render_unfocused.h"
 #include "rule.h"
@@ -16,7 +17,6 @@
 #include "surface.h"
 #include "tree.h"
 #include "types.h"
-#include "workspace.h"
 #include <pixman.h>
 #include <stdlib.h>
 #include <string.h>

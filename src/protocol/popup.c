@@ -1,6 +1,6 @@
 #include "output/output.h"
-#include "popup.h"
 #include "protocol/layer.h"
+#include "protocol/popup.h"
 #include "protocol/xdg_toplevel.h"
 #include "server.h"
 #include <stdlib.h>

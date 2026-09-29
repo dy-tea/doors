@@ -9,6 +9,7 @@
 #include "layout/tree.h"
 #include "output/output.h"
 #include "protocol/copy_capture.h"
+#include "protocol/workspace.h"
 #include "protocol/xdg_toplevel.h"
 #include "protocol/xwayland.h"
 #include "server.h"
@@ -16,7 +17,6 @@
 #include "tabs.h"
 #include "tree.h"
 #include "view.h"
-#include "workspace.h"
 #include <pixman.h>
 #include <stdlib.h>
 #include <time.h>

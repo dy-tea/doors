@@ -5,11 +5,11 @@
 #include "ipc/ipc.h"
 #include "output/config.h"
 #include "output/output.h"
+#include "protocol/workspace.h"
 #include "server.h"
 #include "tabs.h"
 #include "transaction.h"
 #include "tree.h"
-#include "workspace.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>

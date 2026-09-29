@@ -7,13 +7,13 @@
 #include "layout/floating.h"
 #include "layout/layout.h"
 #include "output/output.h"
+#include "protocol/workspace.h"
 #include "protocol/xwayland.h"
 #include "scratchpad.h"
 #include "server.h"
 #include "tabs.h"
 #include "transaction.h"
 #include "tree.h"
-#include "workspace.h"
 #include <fcntl.h>
 #include <limits.h>
 #include <stdarg.h>
