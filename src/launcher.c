@@ -181,9 +181,11 @@ static void handle_xdg_activation_request_activate(struct wl_listener *listener,
 		return;
 	}
 
-	view_t *view = xdg_surface->data;
-	if (view == NULL)
+	view_t *view = view_from_wlr_surface(event->surface);
+	if (view == NULL || view->scene_tree == NULL) {
+		wlr_log(WLR_DEBUG, "Surface has no view to activate");
 		return;
+	}
 
 	wlr_log(WLR_DEBUG, "Activating toplevel %p", (void *)view);
 

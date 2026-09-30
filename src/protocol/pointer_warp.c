@@ -14,7 +14,7 @@ static void handle_pointer_warp(struct wl_listener *listener, void *data) {
 	if (focused_surface != NULL)
 		focused_client = wl_resource_get_client(focused_surface->resource);
 
-	if (focused_surface != NULL || event->seat_client->client != focused_client) {
+	if (focused_surface == NULL || event->seat_client->client != focused_client) {
 		wlr_log(WLR_DEBUG, "Denying request to warp cursor from unfocused client");
 		return;
 	}
@@ -29,12 +29,15 @@ static void handle_pointer_warp(struct wl_listener *listener, void *data) {
 		return;
 	}
 
-	view_t *view = event->surface->data;
-	if (view == NULL)
+	view_t *view = view_from_wlr_surface(event->surface);
+	if (view == NULL || view->node == NULL) {
+		wlr_log(WLR_DEBUG, "Denying request to warp cursor for surface without a view");
 		return;
+	}
 
-	double lx = event->x + view->node->pending.rectangle.x - view->node->rectangle.x;
-	double ly = event->y + view->node->pending.rectangle.y - view->node->rectangle.y;
+	node_t *n = view->node;
+	double lx = event->x + n->pending.rectangle.x - n->rectangle.x;
+	double ly = event->y + n->pending.rectangle.y - n->rectangle.y;
 	wlr_cursor_warp(server.cursor, NULL, lx, ly);
 	wlr_seat_pointer_warp(event->seat_client->seat, event->x, event->y);
 	cursor_rebase();
