@@ -35,6 +35,8 @@ typedef struct xwayland_toplevel_t {
 
 	struct wlr_xwayland_surface *xwayland_surface;
 
+	bool fullscreen_at_map;
+
 	struct wl_listener map;
 	struct wl_listener unmap;
 	struct wl_listener destroy;

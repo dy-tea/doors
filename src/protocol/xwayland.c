@@ -456,6 +456,7 @@ static void handle_map(struct wl_listener *listener, void *data) {
 
 	xwayland_toplevel->view.mapped = true;
 	xwayland_toplevel->view.configured = false;
+	xwayland_toplevel->fullscreen_at_map = false;
 
 	if (!xsurface->surface) {
 		wlr_log(WLR_ERROR, "XWayland surface %u has no wlr_surface at map time", xsurface->window_id);
@@ -632,6 +633,7 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	} else if (xsurface->fullscreen && settings.ignore_ewmh_fullscreen != 1) {
 		target_desktop->fullscreen_recreate_pending_window_id = 0;
 		client_set_fullscreen(target_monitor, target_desktop, node, true);
+		xwayland_toplevel->fullscreen_at_map = true;
 	} else if (xsurface->maximized_vert || xsurface->maximized_horz) {
 		client_set_maximized(target_monitor, target_desktop, node, true);
 		wlr_xwayland_surface_set_maximized(xsurface, true, true);
@@ -830,6 +832,12 @@ static void handle_request_minimize(struct wl_listener *listener, void *data) {
 	if (view_is_ready(&xwayland_toplevel->view) && xwayland_toplevel->view.node) {
 		output_t *m = xwayland_toplevel->view.node->output;
 		desktop_t *d = m != NULL ? m->desk : NULL;
+
+		if (ev->minimize && xwayland_toplevel->fullscreen_at_map && xsurface->fullscreen) {
+			wlr_xwayland_surface_set_minimized(xsurface, false);
+			return;
+		}
+
 		client_set_minimized(m, d, xwayland_toplevel->view.node, ev->minimize);
 	}
 
