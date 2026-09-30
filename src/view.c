@@ -510,11 +510,11 @@ void view_center_and_clip_surface(view_t *view) {
 		if (bw > 0) {
 			update_borders(view->border_tree, view->border_rects, border_size, (unsigned int)bw, x, y);
 			update_border_colors(c);
-			if (view->rounded && view->rounded->border_shader_node && (c->border_radius > 0.0f ||
+			if (view->rounded && (view->rounded->border_shader_node || c->border_radius > 0.0f ||
 					view->rounded->gradient_count >= 2)) {
 				rounded_mark_border_size(view->rounded, border_size.width, border_size.height, bw,
 					view->node && view->node->output ? view->node->output->wlr_output->scale : 1.0f);
-				if (border_size.width + 2 * bw > 0)
+				if (view->rounded->border_shader_node && border_size.width + 2 * bw > 0)
 					wlr_scene_buffer_set_dest_size(view->rounded->border_shader_node, border_size.width + 2 * bw,
 						border_size.height + 2 * bw);
 			}

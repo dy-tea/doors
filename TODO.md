@@ -19,7 +19,6 @@
 # Misc
 - Rework the docs to be easier to use
 - Improve the README (include video, images, better info)
-- Looks like there is a 1px gap between toplevels and borders under certain conditions, likely a rounding error somewhere (observed on zed editor and ghostty on a two column layout with their toplevel on the right)
 - Multimon is barely tested and there are quite a few bugs there
 
 # Potential

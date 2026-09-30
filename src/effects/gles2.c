@@ -101,7 +101,7 @@ struct gles2_data {
 		GLint tex;
 	} u_ext_blit;
 	struct {
-		GLint resolution, border_radius, border_width_px, border_color, scale;
+		GLint resolution, border_radius, inner_rect, inner_size, inner_radius, border_color, scale;
 		GLint gradient_colors, gradient_count, gradient_angle;
 		GLint gradient2_colors, gradient2_count, gradient2_angle;
 		GLint gradient_lerp;
@@ -550,7 +550,9 @@ static bool gles2_init(struct wlr_renderer *r, struct wlr_allocator *a) {
 	if (g->prog_border) {
 		g->u_border.resolution = glGetUniformLocation(g->prog_border, "resolution");
 		g->u_border.border_radius = glGetUniformLocation(g->prog_border, "border_radius");
-		g->u_border.border_width_px = glGetUniformLocation(g->prog_border, "border_width_px");
+		g->u_border.inner_rect = glGetUniformLocation(g->prog_border, "inner_rect");
+		g->u_border.inner_size = glGetUniformLocation(g->prog_border, "inner_size");
+		g->u_border.inner_radius = glGetUniformLocation(g->prog_border, "inner_radius");
 		g->u_border.border_color = glGetUniformLocation(g->prog_border, "border_color");
 		g->u_border.scale = glGetUniformLocation(g->prog_border, "scale");
 		g->u_border.gradient_colors = glGetUniformLocation(g->prog_border, "gradient_colors");
@@ -1054,7 +1056,9 @@ static bool gles2_render_border(struct be_border_params *p, be_effect_resource_t
 
 	glUniform2f(g->u_border.resolution, p->res_w, p->res_h);
 	glUniform1f(g->u_border.border_radius, p->border_radius);
-	glUniform1f(g->u_border.border_width_px, p->border_width_px);
+	glUniform2f(g->u_border.inner_rect, p->inner_x, p->inner_y);
+	glUniform2f(g->u_border.inner_size, p->inner_w, p->inner_h);
+	glUniform1f(g->u_border.inner_radius, p->inner_radius);
 	glUniform1f(g->u_border.scale, p->scale);
 	glUniform4fv(g->u_border.border_color, 1, p->border_color);
 

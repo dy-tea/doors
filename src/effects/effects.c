@@ -1708,10 +1708,16 @@ static bool blur_render_shadow(view_t *tl) {
 	return true;
 }
 
-static bool blur_render_border(view_t *tl, int content_w, int content_h) {
+static int round_px(double v) {
+	return (int)(v >= 0.0 ? v + 0.5 : v - 0.5);
+}
+
+static bool blur_render_border(view_t *tl, struct wlr_box content) {
 	if (!tl->border_tree)
 		return false;
 	if (!tl->rounded)
+		return false;
+	if (content.width <= 0 || content.height <= 0)
 		return false;
 
 	float scale = tl->node->output ? tl->node->output->wlr_output->scale : 1.0f;
@@ -1723,15 +1729,41 @@ static bool blur_render_border(view_t *tl, int content_w, int content_h) {
 		return false;
 	}
 
-	double log_fw = (double)content_w + 2 * bw_i;
-	double log_fh = (double)content_h + 2 * bw_i;
-	if (log_fw <= 0 || log_fh <= 0)
+	int ring_w = content.width + 2 * bw_i;
+	int ring_h = content.height + 2 * bw_i;
+	if (ring_w <= 0 || ring_h <= 0)
 		return false;
 
-	int phys_w = (int)(log_fw * scale + 0.5);
-	int phys_h = (int)(log_fh * scale + 0.5);
+	// the scene draws the ring at this rect, scaled to the output
+	double ring_x = (double)content.x - bw_i;
+	double ring_y = (double)content.y - bw_i;
+	double dst_w = (double)ring_w * scale;
+	double dst_h = (double)ring_h * scale;
+
+	int phys_w = round_px(dst_w);
+	int phys_h = round_px(dst_h);
 	if (phys_w <= 0 || phys_h <= 0)
 		return false;
+
+	int px0 = (int)floor((double)content.x * scale - 0.5) + 1;
+	int px1 = (int)ceil(((double)content.x + content.width) * scale - 0.5) - 1;
+	int py0 = (int)floor((double)content.y * scale - 0.5) + 1;
+	int py1 = (int)ceil(((double)content.y + content.height) * scale - 0.5) - 1;
+
+	double texel_w = (double)phys_w / dst_w;
+	double texel_h = (double)phys_h / dst_h;
+	int origin_x = round_px(ring_x * scale);
+	int origin_y = round_px(ring_y * scale);
+	tl->rounded->border_shader_origin_x = origin_x;
+	tl->rounded->border_shader_origin_y = origin_y;
+	int ix0 = px0 - origin_x;
+	int ix1 = px1 + 1 - origin_x;
+	int iy0 = py0 - origin_y;
+	int iy1 = py1 + 1 - origin_y;
+	ix0 = ix0 < 0 ? 0 : (ix0 > phys_w ? phys_w : ix0);
+	iy0 = iy0 < 0 ? 0 : (iy0 > phys_h ? phys_h : iy0);
+	ix1 = ix1 < ix0 ? ix0 : (ix1 > phys_w ? phys_w : ix1);
+	iy1 = iy1 < iy0 ? iy0 : (iy1 > phys_h ? phys_h : iy1);
 
 	if (!tl->rounded->border_shader_node) {
 		tl->rounded->border_shader_node = wlr_scene_buffer_create(tl->border_tree, NULL);
@@ -1745,17 +1777,30 @@ static bool blur_render_border(view_t *tl, int content_w, int content_h) {
 		&tl->rounded->border_shader_buf_w, &tl->rounded->border_shader_buf_h, phys_w, phys_h))
 		return false;
 
-	float render_scale_x = (float)phys_w / (float)log_fw;
-	float render_scale_y = (float)phys_h / (float)log_fh;
-	float render_scale = (render_scale_x + render_scale_y) * 0.5f;
+	// one texel is one output pixel, therefore antialiasing is a single texel wide
+	float texel = (float)((texel_w + texel_h) * 0.5);
+	float outer_r = (float)((double)c->border_radius * scale * texel);
+
+	// the hole's corner radius must not exceed the ring width on any side, or
+	// the arc would spill past the hole and cut the ring at the corners
+	int inset_x = ix0 < phys_w - ix1 ? ix0 : phys_w - ix1;
+	int inset_y = iy0 < phys_h - iy1 ? iy0 : phys_h - iy1;
+	int corner = inset_x < inset_y ? inset_x : inset_y;
+	float inner_r = outer_r - (float)corner;
+	if (inner_r < 0.0f)
+		inner_r = 0.0f;
 
 	struct be_border_params bp;
 	memset(&bp, 0, sizeof(bp));
-	bp.res_w = (float)log_fw;
-	bp.res_h = (float)log_fh;
-	bp.border_radius = (float)c->border_radius;
-	bp.border_width_px = (float)bw_i;
-	bp.scale = render_scale;
+	bp.res_w = (float)phys_w;
+	bp.res_h = (float)phys_h;
+	bp.border_radius = outer_r;
+	bp.inner_x = (float)ix0;
+	bp.inner_y = (float)iy0;
+	bp.inner_w = (float)(ix1 - ix0);
+	bp.inner_h = (float)(iy1 - iy0);
+	bp.inner_radius = inner_r;
+	bp.scale = 1.0f;
 	memcpy(bp.border_color, tl->rounded->border_color, sizeof(bp.border_color));
 	memcpy(bp.gradient_colors, tl->rounded->gradient_colors, sizeof(bp.gradient_colors));
 	bp.gradient_count = tl->rounded->gradient_count;
@@ -1792,7 +1837,7 @@ static bool blur_render_border(view_t *tl, int content_w, int content_h) {
 		(float)phys_h
 	};
 	wlr_scene_buffer_set_source_box(tl->rounded->border_shader_node, &src_box);
-	wlr_scene_buffer_set_dest_size(tl->rounded->border_shader_node, (int)log_fw, (int)log_fh);
+	wlr_scene_buffer_set_dest_size(tl->rounded->border_shader_node, ring_w, ring_h);
 	wlr_scene_node_set_enabled(&tl->rounded->border_shader_node->node, true);
 
 	static const float transparent[4] = {
@@ -2613,7 +2658,7 @@ after_capture:
 	{
 		view_t *tl;
 		wl_list_for_each(tl, &server.views, link) {
-			if (!tl->rounded || !tl->rounded->border_dirty)
+			if (!tl->rounded)
 				continue;
 			if (!tl->node || !tl->node->client || !tl->node->client->flags.shown)
 				continue;
@@ -2629,17 +2674,31 @@ after_capture:
 				continue;
 			}
 
-			struct wlr_box content_r = get_client_rect(tl);
+			struct wlr_box container = get_animated_client_rect(tl);
+			struct wlr_box content_offset = {0};
+			struct wlr_box border_size = {0};
+			view_resolve_content_layout(tl, container, &content_offset, &border_size);
 
-			if ((c->state == STATE_TILED || c->state == STATE_PSEUDO_TILED) && tl->geometry.width > 0 &&
-					tl->geometry.height > 0) {
-				if ((int)tl->geometry.width < content_r.width)
-					content_r.width = tl->geometry.width;
-				if ((int)tl->geometry.height < content_r.height)
-					content_r.height = tl->geometry.height;
-			}
+			struct wlr_box content = {
+				.x = container.x + content_offset.x,
+				.y = container.y + content_offset.y,
+				.width = border_size.width,
+				.height = border_size.height,
+			};
 
-			blur_render_border(tl, content_r.width, content_r.height);
+			if (tl->geometry.width <= 0 || tl->geometry.height <= 0)
+				continue;
+
+			float scale = tl->node->output->wlr_output->scale;
+			int bw = effective_border_width(tl->node->desktop);
+			if (tl->rounded->border_shader_origin_x != round_px(((double)content.x - bw) * scale) ||
+				tl->rounded->border_shader_origin_y != round_px(((double)content.y - bw) * scale))
+				tl->rounded->border_dirty = true;
+
+			if (!tl->rounded->border_dirty)
+				continue;
+
+			blur_render_border(tl, content);
 			tl->rounded->border_dirty = false;
 			tl->rounded->corner_mask_dirty = false;
 		}

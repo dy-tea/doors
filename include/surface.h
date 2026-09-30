@@ -78,6 +78,8 @@ typedef struct surface_rounded_t {
 	uint64_t border_shader_native[2];
 	int border_shader_buf_w;
 	int border_shader_buf_h;
+	int border_shader_origin_x;
+	int border_shader_origin_y;
 	bool border_dirty;
 	bool corner_mask_dirty;
 	float border_color[4];

@@ -1,7 +1,9 @@
 precision highp float;
 uniform vec2 resolution;
 uniform float border_radius;
-uniform float border_width_px;
+uniform vec2 inner_rect;
+uniform vec2 inner_size;
+uniform float inner_radius;
 uniform float scale;
 
 uniform vec4 gradient_colors[10];
@@ -75,11 +77,7 @@ void main() {
   vec2 px = v_uv * resolution;
 
   float a_outer = rounding_alpha(px, resolution, border_radius);
-
-  float inner_r = max(border_radius - border_width_px, 0.0);
-  vec2 inner_offset = vec2(border_width_px);
-  vec2 inner_size = resolution - inner_offset * 2.0;
-  float a_inner = rounding_alpha(px - inner_offset, inner_size, inner_r);
+  float a_inner = rounding_alpha(px - inner_rect, inner_size, inner_radius);
 
   vec4 col;
   if (gradient_count >= 2) {

@@ -2522,16 +2522,23 @@ static bool vk_render_border(struct be_border_params *p, be_effect_resource_t ds
 	struct {
 		float res[2];
 		float br;
-		float bw;
+		float _pad0;
+		float inner_rect[2];
+		float inner_size[2];
+		float inner_r;
 		float scale;
-		float _pad[3];
+		float _pad1[2];
 		float color[4];
 	} pc;
 	memset(&pc, 0, sizeof(pc));
 	pc.res[0] = p->res_w;
 	pc.res[1] = p->res_h;
 	pc.br = p->border_radius;
-	pc.bw = p->border_width_px;
+	pc.inner_rect[0] = p->inner_x;
+	pc.inner_rect[1] = p->inner_y;
+	pc.inner_size[0] = p->inner_w;
+	pc.inner_size[1] = p->inner_h;
+	pc.inner_r = p->inner_radius;
 	pc.scale = p->scale;
 	memcpy(pc.color, p->border_color, 16);
 

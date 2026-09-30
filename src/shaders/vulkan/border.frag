@@ -12,7 +12,9 @@ layout(binding = 1) uniform GradientData {
 layout(push_constant) uniform PC {
   vec2 resolution;
   float border_radius;
-  float border_width_px;
+  vec2 inner_rect;
+  vec2 inner_size;
+  float inner_radius;
   float scale;
   vec4 border_color;
 } pc;
@@ -66,10 +68,7 @@ vec4 sampleGradient(vec2 uv, vec4 colors[10], int count, float angle) {
 void main() {
   vec2 px = v_uv * pc.resolution;
   float a_outer = rounding_alpha(px, pc.resolution, pc.border_radius);
-  float inner_r = max(pc.border_radius - pc.border_width_px, 0.0);
-  vec2 inner_offset = vec2(pc.border_width_px);
-  vec2 inner_size = pc.resolution - inner_offset * 2.0;
-  float a_inner = rounding_alpha(px - inner_offset, inner_size, inner_r);
+  float a_inner = rounding_alpha(px - pc.inner_rect, pc.inner_size, pc.inner_radius);
   vec4 col;
   if (gd.gradient_count >= 2) {
     vec4 g1 = sampleGradient(v_uv, gd.gradient_colors, gd.gradient_count, gd.gradient_angle);

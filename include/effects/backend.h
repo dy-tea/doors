@@ -88,7 +88,9 @@ struct be_shadow_params {
 struct be_border_params {
 	float res_w, res_h;
 	float border_radius;
-	float border_width_px;
+	float inner_x, inner_y;
+	float inner_w, inner_h;
+	float inner_radius;
 	float border_color[4];
 	float scale;
 	float gradient_colors[40];
