@@ -128,10 +128,12 @@ void destroy_borders(struct wlr_scene_tree **border_tree, struct wlr_scene_rect 
 }
 
 void update_borders(struct wlr_scene_tree *border_tree, struct wlr_scene_rect *rects[4],
-		struct wlr_box geo, unsigned int bw) {
-	if (!border_tree || bw == 0 || geo.width < 1 || geo.height < 1) {
-		if (border_tree)
-			wlr_scene_node_set_enabled(&border_tree->node, false);
+		struct wlr_box geo, unsigned int bw, int off_x, int off_y) {
+	if (!border_tree)
+		return;
+
+	if (bw == 0 || geo.width < 1 || geo.height < 1) {
+		wlr_scene_node_set_enabled(&border_tree->node, false);
 		return;
 	}
 
@@ -141,7 +143,7 @@ void update_borders(struct wlr_scene_tree *border_tree, struct wlr_scene_rect *r
 	int h = geo.height;
 	int bwi = (int)bw;
 
-	wlr_scene_node_set_position(&border_tree->node, -bwi, -bwi);
+	wlr_scene_node_set_position(&border_tree->node, off_x - bwi, off_y - bwi);
 
 	// top
 	if (rects[0]) {

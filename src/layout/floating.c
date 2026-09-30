@@ -124,7 +124,7 @@ static struct wlr_box client_requested_size(client_t *c, struct wlr_box area) {
 	else if (c->view != NULL)
 		size = c->view->geometry;
 
-	if (size.width > MIN_WIDTH && size.height > MIN_HEIGHT)
+	if (size.width > MIN_RENDER_WIDTH && size.height > MIN_RENDER_HEIGHT)
 		return size;
 
 	// the client has nothing usable to offer, take a bit more than half of the desktop
@@ -133,18 +133,18 @@ static struct wlr_box client_requested_size(client_t *c, struct wlr_box area) {
 		.height = area.height * FLOATING_DEFAULT_HEIGHT / 100,
 	};
 
-	if (fallback.width < MIN_WIDTH)
-		fallback.width = MIN_WIDTH;
-	if (fallback.height < MIN_HEIGHT)
-		fallback.height = MIN_HEIGHT;
+	if (fallback.width < MIN_RENDER_WIDTH)
+		fallback.width = MIN_RENDER_WIDTH;
+	if (fallback.height < MIN_RENDER_HEIGHT)
+		fallback.height = MIN_RENDER_HEIGHT;
 	if (fallback.width > area.width)
 		fallback.width = area.width;
 	if (fallback.height > area.height)
 		fallback.height = area.height;
 
-	if (size.width <= MIN_WIDTH)
+	if (size.width <= MIN_RENDER_WIDTH)
 		size.width = fallback.width;
-	if (size.height <= MIN_HEIGHT)
+	if (size.height <= MIN_RENDER_HEIGHT)
 		size.height = fallback.height;
 
 	return size;
@@ -155,10 +155,10 @@ static struct wlr_box cascade_rect(struct wlr_box area, struct wlr_box size, int
 		size.width = area.width;
 	if (size.height > area.height)
 		size.height = area.height;
-	if (size.width < MIN_WIDTH)
-		size.width = MIN_WIDTH;
-	if (size.height < MIN_HEIGHT)
-		size.height = MIN_HEIGHT;
+	if (size.width < MIN_RENDER_WIDTH)
+		size.width = MIN_RENDER_WIDTH;
+	if (size.height < MIN_RENDER_HEIGHT)
+		size.height = MIN_RENDER_HEIGHT;
 	if (index < 0)
 		index = 0;
 
@@ -496,7 +496,7 @@ void floating_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 
 		struct wlr_box r = c->floating_rectangle;
 
-		if (r.width < MIN_WIDTH || r.height < MIN_HEIGHT) {
+		if (r.width < MIN_RENDER_WIDTH || r.height < MIN_RENDER_HEIGHT) {
 			apply_float_rect(n, cascade_rect(available, client_requested_size(c, available), index));
 		} else if (!rect_on_any_output(r)) {
 			struct wlr_box size = {0};

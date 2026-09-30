@@ -46,8 +46,8 @@ node_t *make_node(uint32_t id) {
 	n->second_child = NULL;
 	n->parent = NULL;
 	n->client = NULL;
-	n->constraints.min_width = MIN_WIDTH;
-	n->constraints.min_height = MIN_HEIGHT;
+	n->constraints.min_width = 0;
+	n->constraints.min_height = 0;
 	wl_list_init(&n->minimize_link);
 
 	// init transaction

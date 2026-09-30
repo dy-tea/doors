@@ -75,22 +75,21 @@ void render_leaf(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect, stru
 
 	// clamp up to constraints and center within the tile slot
 	if (settings.respect_tiled_min_size && use_centering) {
-		if ((int)n->constraints.min_width > MIN_WIDTH && r.width < (int)n->constraints.min_width &&
-				slot.width > 0) {
+		if (n->constraints.min_width > 0 && r.width < (int)n->constraints.min_width && slot.width > 0) {
 			r.x = slot.x + (slot.width - (int)n->constraints.min_width) / 2;
 			r.width = n->constraints.min_width;
 		}
-		if ((int)n->constraints.min_height > MIN_HEIGHT && r.height < (int)n->constraints.min_height &&
+		if (n->constraints.min_height > 0 && r.height < (int)n->constraints.min_height &&
 				slot.height > 0) {
 			r.y = slot.y + (slot.height - (int)n->constraints.min_height) / 2;
 			r.height = n->constraints.min_height;
 		}
 	}
 
-	if (r.width < MIN_WIDTH)
-		r.width = MIN_WIDTH;
-	if (r.height < MIN_HEIGHT)
-		r.height = MIN_HEIGHT;
+	if (r.width < MIN_RENDER_WIDTH)
+		r.width = MIN_RENDER_WIDTH;
+	if (r.height < MIN_RENDER_HEIGHT)
+		r.height = MIN_RENDER_HEIGHT;
 
 	n->client->arranged_rectangle = r;
 }

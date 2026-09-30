@@ -119,10 +119,10 @@ static void set_node_geom(node_t *n, struct wlr_box geom, output_t *m, desktop_t
 	r.width = (r.width > (int)(2 * bw)) ? r.width - 2 * bw : 0;
 	r.height = (r.height > (int)(2 * bw)) ? r.height - 2 * bw : 0;
 
-	if (r.width < MIN_WIDTH)
-		r.width = MIN_WIDTH;
-	if (r.height < MIN_HEIGHT)
-		r.height = MIN_HEIGHT;
+	if (r.width < MIN_RENDER_WIDTH)
+		r.width = MIN_RENDER_WIDTH;
+	if (r.height < MIN_RENDER_HEIGHT)
+		r.height = MIN_RENDER_HEIGHT;
 
 	if (n->client->state == STATE_PSEUDO_TILED) {
 		if (r.width > n->client->floating_rectangle.width)
@@ -130,19 +130,18 @@ static void set_node_geom(node_t *n, struct wlr_box geom, output_t *m, desktop_t
 		if (r.height > n->client->floating_rectangle.height)
 			r.height = n->client->floating_rectangle.height;
 
-		if (r.width < MIN_WIDTH)
-			r.width = MIN_WIDTH;
-		if (r.height < MIN_HEIGHT)
-			r.height = MIN_HEIGHT;
+		if (r.width < MIN_RENDER_WIDTH)
+			r.width = MIN_RENDER_WIDTH;
+		if (r.height < MIN_RENDER_HEIGHT)
+			r.height = MIN_RENDER_HEIGHT;
 	}
 
 	if (settings.respect_tiled_min_size) {
-		if ((int)n->constraints.min_width > MIN_WIDTH && r.width < (int)n->constraints.min_width &&
-				geom.width > 0) {
+		if (n->constraints.min_width > 0 && r.width < (int)n->constraints.min_width && geom.width > 0) {
 			r.x = geom.x + (geom.width - (int)n->constraints.min_width) / 2;
 			r.width = n->constraints.min_width;
 		}
-		if ((int)n->constraints.min_height > MIN_HEIGHT && r.height < (int)n->constraints.min_height &&
+		if (n->constraints.min_height > 0 && r.height < (int)n->constraints.min_height &&
 				geom.height > 0) {
 			r.y = geom.y + (geom.height - (int)n->constraints.min_height) / 2;
 			r.height = n->constraints.min_height;

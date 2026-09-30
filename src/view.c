@@ -430,6 +430,43 @@ void view_handle_outputs_update(struct wl_listener *listener, void *data) {
 	}
 }
 
+void view_resolve_content_layout(view_t *view, struct wlr_box container,
+		struct wlr_box *content_offset, struct wlr_box *border_size) {
+	int container_w = container.width > 0 ? container.width : 0;
+	int container_h = container.height > 0 ? container.height : 0;
+	int off_x = 0, off_y = 0;
+	int border_w = container_w, border_h = container_h;
+
+	if (view && view->geometry.width > 0 && view->geometry.height > 0) {
+		int geo_w = (int)view->geometry.width;
+		int geo_h = (int)view->geometry.height;
+
+		if (geo_w < container_w) {
+			off_x = (container_w - geo_w) / 2;
+			border_w = geo_w;
+		}
+		if (geo_h < container_h) {
+			off_y = (container_h - geo_h) / 2;
+			border_h = geo_h;
+		}
+	}
+
+	if (content_offset)
+		*content_offset = (struct wlr_box){
+			.x = off_x,
+			.y = off_y,
+			.width = 0,
+			.height = 0
+		};
+	if (border_size)
+		*border_size = (struct wlr_box){
+			.x = 0,
+			.y = 0,
+			.width = border_w,
+			.height = border_h
+		};
+}
+
 void view_center_and_clip_surface(view_t *view) {
 	if (!view || !view->content_tree || !view->client)
 		return;
@@ -438,83 +475,48 @@ void view_center_and_clip_surface(view_t *view) {
 	bool floating = (c->state == STATE_FLOATING);
 	bool fullscreen = (c->state == STATE_FULLSCREEN);
 	bool tiled = IS_TILED(c);
-	int x = 0, y = 0;
 	struct wlr_box *container_rect = NULL;
 	bool clip_to_geometry = true;
 
-	// center floating, fullscreen, and undersized tiled surfaces
-	if (floating || fullscreen || tiled) {
-		if (floating) {
-			container_rect = &c->floating_rectangle;
-		} else if (fullscreen) {
-			output_t *m = view->node->output;
-			container_rect = m ? &m->rectangle : &c->tiled_rectangle;
-		} else {
-			container_rect = &c->tiled_rectangle;
-		}
+	if (floating)
+		container_rect = &c->floating_rectangle;
+	else if (fullscreen) {
+		output_t *m = view->node->output;
+		container_rect = m ? &m->rectangle : &c->tiled_rectangle;
+	} else if (tiled)
+		container_rect = &c->tiled_rectangle;
 
-		if (container_rect && view->geometry.width > 0 && view->geometry.height > 0) {
-			int center_x = (container_rect->width - view->geometry.width) / 2;
-			int center_y = (container_rect->height - view->geometry.height) / 2;
+	int bw = effective_border_width(view->node->desktop);
+	struct wlr_box content_offset = {0};
+	struct wlr_box border_size = {0};
+	if (container_rect)
+		view_resolve_content_layout(view, *container_rect, &content_offset, &border_size);
 
-			x = center_x > 0 ? center_x : 0;
-			y = center_y > 0 ? center_y : 0;
+	int x = content_offset.x;
+	int y = content_offset.y;
 
-			if ((floating || fullscreen) && (x != 0 || y != 0)) {
-				wlr_log(WLR_DEBUG, "Centering surface: %dx%d at offset (%d,%d) in container %dx%d",
-					view->geometry.width, view->geometry.height, x, y, container_rect->width,
-					container_rect->height);
-				clip_to_geometry = false;
-			}
-		}
+	if (container_rect && (floating || fullscreen) && (x != 0 || y != 0)) {
+		wlr_log(WLR_DEBUG, "Centering surface: %dx%d at offset (%d,%d) in container %dx%d",
+			view->geometry.width, view->geometry.height, x, y, container_rect->width,
+			container_rect->height);
+		clip_to_geometry = false;
 	}
 
 	wlr_scene_node_set_position(&view->content_tree->node, x, y);
 
-	// when tiled or floating surface is smaller than its container, update borders
-	// to wrap the actual surface instead of the full allocated space
+	// when a tiled or floating surface is smaller than its container, the
+	// border wraps the actual surface instead of the full allocated space
 	if ((tiled || floating) && view->border_tree) {
-		unsigned int bw = effective_border_width(view->node->desktop);
 		if (bw > 0) {
-			if ((tiled || floating) && (x > 0 || y > 0)) {
-				int border_w = (int)view->geometry.width < container_rect->width ? (int)view->geometry.width :
-					container_rect->width;
-				int border_h = (int)view->geometry.height < container_rect->height ? (int)view->geometry.height
-					: container_rect->height;
-				struct wlr_box content_geo = {
-					0,
-					0,
-					border_w,
-					border_h
-				};
-				update_borders(view->border_tree, view->border_rects, content_geo, bw);
-				wlr_scene_node_set_position(&view->border_tree->node, (int)x - (int)bw, (int)y - (int)bw);
-				update_border_colors(c);
-				if (view->rounded && view->rounded->border_shader_node && (c->border_radius > 0.0f ||
-						view->rounded->gradient_count >= 2)) {
-					rounded_mark_border_size(view->rounded, border_w, border_h, (int)bw,
-						view->node && view->node->output ? view->node->output->wlr_output->scale : 1.0f);
-					if (border_w + 2 * (int)bw > 0)
-						wlr_scene_buffer_set_dest_size(view->rounded->border_shader_node, border_w + 2 * (int)bw,
-							border_h + 2 * (int)bw);
-				}
-			} else if (container_rect) {
-				struct wlr_box full_geo = {
-					0,
-					0,
-					container_rect->width,
-					container_rect->height
-				};
-				update_borders(view->border_tree, view->border_rects, full_geo, bw);
-				update_border_colors(c);
-				if (view->rounded && view->rounded->border_shader_node && (c->border_radius > 0.0f ||
-						view->rounded->gradient_count >= 2)) {
-					rounded_mark_border_size(view->rounded, container_rect->width, container_rect->height, (int)bw,
-						view->node && view->node->output ? view->node->output->wlr_output->scale : 1.0f);
-					if (container_rect->width + 2 * (int)bw > 0)
-						wlr_scene_buffer_set_dest_size(view->rounded->border_shader_node,
-							container_rect->width + 2 * (int)bw, container_rect->height + 2 * (int)bw);
-				}
+			update_borders(view->border_tree, view->border_rects, border_size, (unsigned int)bw, x, y);
+			update_border_colors(c);
+			if (view->rounded && view->rounded->border_shader_node && (c->border_radius > 0.0f ||
+					view->rounded->gradient_count >= 2)) {
+				rounded_mark_border_size(view->rounded, border_size.width, border_size.height, bw,
+					view->node && view->node->output ? view->node->output->wlr_output->scale : 1.0f);
+				if (border_size.width + 2 * bw > 0)
+					wlr_scene_buffer_set_dest_size(view->rounded->border_shader_node, border_size.width + 2 * bw,
+						border_size.height + 2 * bw);
 			}
 		} else if (view->border_tree->node.enabled) {
 			wlr_scene_node_set_enabled(&view->border_tree->node, false);

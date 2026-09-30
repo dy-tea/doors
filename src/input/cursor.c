@@ -182,7 +182,7 @@ static void apply_leaf_positions(desktop_t *d) {
 				r.width,
 				r.height
 			};
-			update_borders(client_border_tree(n->client), client_border_rects(n->client), geo, bw);
+			update_borders(client_border_tree(n->client), client_border_rects(n->client), geo, bw, 0, 0);
 			update_border_colors(n->client);
 			if (n->client->border_radius > 0.0f) {
 				surface_rounded_t *rounded = client_get_rounded(n->client);
@@ -379,10 +379,10 @@ static void process_cursor_resize(void) {
 	int new_width = new_right - new_left;
 	int new_height = new_bottom - new_top;
 
-	if (new_width < MIN_WIDTH)
-		new_width = MIN_WIDTH;
-	if (new_height < MIN_HEIGHT)
-		new_height = MIN_HEIGHT;
+	if (new_width < MIN_RENDER_WIDTH)
+		new_width = MIN_RENDER_WIDTH;
+	if (new_height < MIN_RENDER_HEIGHT)
+		new_height = MIN_RENDER_HEIGHT;
 
 	if (!view || !view->node || !view->node->client)
 		return;
@@ -418,7 +418,7 @@ static void process_cursor_resize(void) {
 			new_width,
 			new_height
 		};
-		update_borders(view->border_tree, view->border_rects, geo, bw);
+		update_borders(view->border_tree, view->border_rects, geo, bw, 0, 0);
 		update_border_colors(c);
 		if (c->border_radius > 0.0f && view->rounded) {
 			rounded_mark_border_size(view->rounded, new_width, new_height, (int)bw,

@@ -507,14 +507,17 @@ void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 		if (toplevel->view.node) {
 			struct wlr_xdg_toplevel_state *state = &toplevel->xdg_toplevel->current;
 			bool constraints_changed = false;
-			if (state->min_width > 0 &&
-					(uint16_t)state->min_width != toplevel->view.node->constraints.min_width) {
-				toplevel->view.node->constraints.min_width = state->min_width;
+			uint16_t min_w = state->min_width > 0 &&
+				state->min_width <= UINT16_MAX ? (uint16_t)state->min_width : 0;
+			uint16_t min_h = state->min_height > 0 &&
+				state->min_height <= UINT16_MAX ? (uint16_t)state->min_height : 0;
+
+			if (min_w != toplevel->view.node->constraints.min_width) {
+				toplevel->view.node->constraints.min_width = min_w;
 				constraints_changed = true;
 			}
-			if (state->min_height > 0 &&
-					(uint16_t)state->min_height != toplevel->view.node->constraints.min_height) {
-				toplevel->view.node->constraints.min_height = state->min_height;
+			if (min_h != toplevel->view.node->constraints.min_height) {
+				toplevel->view.node->constraints.min_height = min_h;
 				constraints_changed = true;
 			}
 			if (constraints_changed && toplevel->view.node->output && toplevel->view.node->desktop) {

@@ -14,7 +14,6 @@
 # Layout
 - Better tab grouping (see sway or Hyprland for reference)
 - Better scrolling layout handling (see niri for reference)
-- Undersized surfaces jump to the right when adding toplevels in a tiled layout
 - Tiled layout with many toplevels is buggy (adding or removing toplevels causes borders to not be the correct size temporarily, toplevels get clipped to a very small size temporarily)
 
 # Misc

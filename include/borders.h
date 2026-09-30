@@ -23,7 +23,7 @@ void create_borders(struct wlr_scene_tree *parent, struct wlr_scene_tree **borde
 	struct wlr_scene_rect *rects[4]);
 void destroy_borders(struct wlr_scene_tree **border_tree, struct wlr_scene_rect *rects[4]);
 void update_borders(struct wlr_scene_tree *border_tree, struct wlr_scene_rect *rects[4],
-	struct wlr_box geo, unsigned int bw);
+	struct wlr_box geo, unsigned int bw, int off_x, int off_y);
 void update_border_colors(client_t *client);
 
 // reparse the configured colours and repaint every border on every desktop

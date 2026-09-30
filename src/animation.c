@@ -565,6 +565,40 @@ bool animation_start_workspace_slide(output_t *output, node_t *node,
 
 static void update_resize_entry(animation_entry_t *entry);
 
+static bool anim_entry_box(const animation_entry_t *entry, struct wlr_box *out) {
+	if (!entry)
+		return false;
+
+	double e = entry->eased;
+	struct wlr_box r = {
+		.x = (int)(entry->from.x + (entry->to.x - entry->from.x) * e),
+		.y = (int)(entry->from.y + (entry->to.y - entry->from.y) * e),
+		.width = (int)(entry->from.width + (entry->to.width - entry->from.width) * e),
+		.height = (int)(entry->from.height + (entry->to.height - entry->from.height) * e),
+	};
+	if (r.width < 1)
+		r.width = 1;
+	if (r.height < 1)
+		r.height = 1;
+
+	int from_right = entry->from.x + entry->from.width;
+	int to_right = entry->to.x + entry->to.width;
+	if (entry->from.x == entry->to.x)
+		r.x = entry->from.x;
+	else if (from_right == to_right)
+		r.x = from_right - r.width;
+
+	int from_bottom = entry->from.y + entry->from.height;
+	int to_bottom = entry->to.y + entry->to.height;
+	if (entry->from.y == entry->to.y)
+		r.y = entry->from.y;
+	else if (from_bottom == to_bottom)
+		r.y = from_bottom - r.height;
+
+	*out = r;
+	return true;
+}
+
 bool animation_start_resize(view_t *view, struct wlr_box from, struct wlr_box to) {
 	if (!view || !view->scene_tree || !view->content_tree || !view->node ||
 		!settings.enable_animations)
@@ -592,16 +626,7 @@ bool animation_start_resize(view_t *view, struct wlr_box from, struct wlr_box to
 
 	animation_entry_t *entry = find_animation(view->node);
 	if (entry) {
-		// compute current interpolated state from the ongoing animation
-		double e = entry->eased;
-		from.x = (int)(entry->from.x + (entry->to.x - entry->from.x) * e);
-		from.y = (int)(entry->from.y + (entry->to.y - entry->from.y) * e);
-		from.width = (int)(entry->from.width + (entry->to.width - entry->from.width) * e);
-		from.height = (int)(entry->from.height + (entry->to.height - entry->from.height) * e);
-		if (from.width < 1)
-			from.width = 1;
-		if (from.height < 1)
-			from.height = 1;
+		anim_entry_box(entry, &from);
 	} else {
 		entry = create_animation_entry();
 		if (!entry)
@@ -640,32 +665,17 @@ static void update_resize_entry(animation_entry_t *entry) {
 	if (!entry->view || !entry->view->content_tree)
 		return;
 
-	double eased = entry->eased;
-	int x = (int)(entry->from.x + (entry->to.x - entry->from.x) * eased);
-	int y = (int)(entry->from.y + (entry->to.y - entry->from.y) * eased);
-	int width = (int)(entry->from.width + (entry->to.width - entry->from.width) * eased);
-	int height = (int)(entry->from.height + (entry->to.height - entry->from.height) * eased);
-
 	if (entry->from.width <= 0 || entry->from.height <= 0)
 		return;
-	if (width < 1)
-		width = 1;
-	if (height < 1)
-		height = 1;
 
-	int from_right = entry->from.x + entry->from.width;
-	int to_right = entry->to.x + entry->to.width;
-	if (entry->from.x == entry->to.x)
-		x = entry->from.x;
-	else if (from_right == to_right)
-		x = from_right - width;
+	struct wlr_box box;
+	if (!anim_entry_box(entry, &box))
+		return;
 
-	int from_bottom = entry->from.y + entry->from.height;
-	int to_bottom = entry->to.y + entry->to.height;
-	if (entry->from.y == entry->to.y)
-		y = entry->from.y;
-	else if (from_bottom == to_bottom)
-		y = from_bottom - height;
+	int x = box.x;
+	int y = box.y;
+	int width = box.width;
+	int height = box.height;
 
 	// update scene tree position
 	wlr_scene_node_set_position(&entry->view->scene_tree->node, x, y);
@@ -679,36 +689,21 @@ static void update_resize_entry(animation_entry_t *entry) {
 	};
 	wlr_scene_subsurface_tree_set_clip(&entry->view->content_tree->node, &clip);
 
-	// update content centering for undersized surfaces
+	struct wlr_box container = {
+		.x = entry->view->geometry.x,
+		.y = entry->view->geometry.y,
+		.width = width,
+		.height = height,
+	};
+	struct wlr_box content_offset = {0};
+	struct wlr_box border_size = {0};
+	view_resolve_content_layout(entry->view, container, &content_offset, &border_size);
+
 	if (entry->node && entry->node->client) {
 		client_t *c = entry->node->client;
-		if (IS_TILED(c) || c->state == STATE_FLOATING || c->state == STATE_FULLSCREEN) {
-			int geo_w = (int)entry->view->geometry.width;
-			int geo_h = (int)entry->view->geometry.height;
-
-			// anchor content to whichever edge is fixed; center when both move
-			int cx, cy;
-			if (entry->from.x == entry->to.x && from_right != to_right)
-				cx = 0;
-			else if (from_right == to_right && entry->from.x != entry->to.x)
-				cx = width - geo_w;
-			else
-				cx = (width - geo_w) / 2;
-
-			if (entry->from.y == entry->to.y && from_bottom != to_bottom)
-				cy = 0;
-			else if (from_bottom == to_bottom && entry->from.y != entry->to.y)
-				cy = height - geo_h;
-			else
-				cy = (height - geo_h) / 2;
-
-			if (cx < 0)
-				cx = 0;
-			if (cy < 0)
-				cy = 0;
-
-			wlr_scene_node_set_position(&entry->view->content_tree->node, cx, cy);
-		}
+		if (IS_TILED(c) || c->state == STATE_FLOATING || c->state == STATE_FULLSCREEN)
+			wlr_scene_node_set_position(&entry->view->content_tree->node, content_offset.x,
+				content_offset.y);
 	}
 
 	// update borders to follow the animated size
@@ -717,37 +712,15 @@ static void update_resize_entry(animation_entry_t *entry) {
 		if (entry->node && entry->node->client)
 			bw = effective_border_width(entry->node->desktop);
 
-		// constrain to the actual surface geometry when content is smaller than container
-		int bwidth = width;
-		int bheight = height;
-		if ((int)entry->view->geometry.width > 0 && (int)entry->view->geometry.width < width)
-			bwidth = (int)entry->view->geometry.width;
-		if ((int)entry->view->geometry.height > 0 && (int)entry->view->geometry.height < height)
-			bheight = (int)entry->view->geometry.height;
-
-		struct wlr_box geo = {
-			0,
-			0,
-			bwidth,
-			bheight
-		};
-		update_borders(entry->view->border_tree, entry->view->border_rects, geo, bw);
-
-		// center border tree if content is offset (undersized surface)
-		int cx = entry->view->content_tree->node.x;
-		int cy = entry->view->content_tree->node.y;
-		if (cx > 0 || cy > 0)
-			wlr_scene_node_set_position(&entry->view->border_tree->node, cx - (int)bw, cy - (int)bw);
-		else
-			wlr_scene_node_set_position(&entry->view->border_tree->node, -(int)bw, -(int)bw);
-
+		update_borders(entry->view->border_tree, entry->view->border_rects, border_size, bw,
+			content_offset.x, content_offset.y);
 		update_border_colors(entry->node->client);
 
 		// update rounded corner shader buffer to match animated size
 		if (entry->view->rounded) {
 			if (entry->view->rounded->border_shader_node && bw > 0) {
-				int new_fw = bwidth + 2 * (int)bw;
-				int new_fh = bheight + 2 * (int)bw;
+				int new_fw = border_size.width + 2 * (int)bw;
+				int new_fh = border_size.height + 2 * (int)bw;
 				if (new_fw > 0 && new_fh > 0)
 					wlr_scene_buffer_set_dest_size(entry->view->rounded->border_shader_node, new_fw, new_fh);
 			}
@@ -793,31 +766,8 @@ bool animation_get_geometry_progress(view_t *view, struct wlr_box *out) {
 
 	if (entry->kind == ANIM_KIND_RESIZE || entry->kind == ANIM_KIND_GEOMETRY ||
 			entry->kind == ANIM_KIND_WORKSPACE_SLIDE) {
-		if (out) {
-			double e = entry->eased;
-			out->x = (int)(entry->from.x + (entry->to.x - entry->from.x) * e);
-			out->y = (int)(entry->from.y + (entry->to.y - entry->from.y) * e);
-			out->width = (int)(entry->from.width + (entry->to.width - entry->from.width) * e);
-			out->height = (int)(entry->from.height + (entry->to.height - entry->from.height) * e);
-			if (out->width < 1)
-				out->width = 1;
-			if (out->height < 1)
-				out->height = 1;
-
-			int from_right = entry->from.x + entry->from.width;
-			int to_right = entry->to.x + entry->to.width;
-			if (entry->from.x == entry->to.x)
-				out->x = entry->from.x;
-			else if (from_right == to_right)
-				out->x = from_right - out->width;
-
-			int from_bottom = entry->from.y + entry->from.height;
-			int to_bottom = entry->to.y + entry->to.height;
-			if (entry->from.y == entry->to.y)
-				out->y = entry->from.y;
-			else if (from_bottom == to_bottom)
-				out->y = from_bottom - out->height;
-		}
+		if (out)
+			anim_entry_box(entry, out);
 		return true;
 	}
 

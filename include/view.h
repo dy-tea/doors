@@ -67,6 +67,9 @@ bool view_is_ready(view_t *view);
 
 view_t *view_from_wlr_surface(struct wlr_surface *surface);
 
+void view_resolve_content_layout(view_t *view, struct wlr_box container,
+	struct wlr_box *content_offset, struct wlr_box *border_size);
+
 void view_center_and_clip_surface(view_t *view);
 bool view_get_surface_offset(view_t *view, int *ox, int *oy);
 

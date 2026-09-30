@@ -202,9 +202,15 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 	if (rect->width < 1 || rect->height < 1) {
 		wlr_log(WLR_DEBUG, "Node %u content area too small (%dx%d), hiding", node->id, rect->width,
 			rect->height);
+
+		animation_cancel_node(node);
+
 		if (node->client->view) {
 			if (node->client->view->saved_surface_tree)
 				view_remove_saved_buffer(node->client->view);
+			struct wlr_scene_tree *bt = node->client->view->border_tree;
+			if (bt && bt->node.enabled)
+				wlr_scene_node_set_enabled(&bt->node, false);
 		}
 		struct wlr_scene_tree *st = client_get_scene_tree(node->client);
 		if (st)
@@ -274,43 +280,24 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 
 			if (node->client->view) {
 				view_t *tl = node->client->view;
-				bool undersized = instruction->state != STATE_FLOATING &&
-					instruction->state != STATE_FULLSCREEN && tl->geometry.width > 0 && tl->geometry.height > 0 &&
-					((int)tl->geometry.width < rect->width || (int)tl->geometry.height < rect->height ||
-					(int)tl->geometry.width > rect->width || (int)tl->geometry.height > rect->height);
-				struct wlr_box geo;
-				int border_x, border_y;
-				if (undersized) {
-					int center_x = (rect->width - (int)tl->geometry.width) / 2;
-					int center_y = (rect->height - (int)tl->geometry.height) / 2;
-					int cx = center_x > 0 ? center_x : 0;
-					int cy = center_y > 0 ? center_y : 0;
-					geo = (struct wlr_box){
-						0,
-						0,
-						(int)tl->geometry.width < rect->width ? (int)tl->geometry.width : rect->width,
-						(int)tl->geometry.height < rect->height ? (int)tl->geometry.height : rect->height
-					};
-					border_x = cx - (int)bw;
-					border_y = cy - (int)bw;
-				} else {
-					geo = (struct wlr_box){
-						0,
-						0,
-						rect->width,
-						rect->height
-					};
-					border_x = -(int)bw;
-					border_y = -(int)bw;
-				}
-				update_borders(border_tree, border_rects, geo, bw);
-				wlr_scene_node_set_position(&border_tree->node, border_x, border_y);
+				int bwi = (int)bw;
+				struct wlr_box container = {
+					0,
+					0,
+					rect->width,
+					rect->height
+				};
+				struct wlr_box content_offset = {0};
+				struct wlr_box border_size = {0};
+				view_resolve_content_layout(tl, container, &content_offset, &border_size);
+
+				update_borders(border_tree, border_rects, border_size, bw, content_offset.x, content_offset.y);
 				update_border_colors(node->client);
 				surface_rounded_t *rounded = client_get_rounded(node->client);
 				if (rounded && (node->client->border_radius > 0.0f || rounded->gradient_count >= 2)) {
 					if (rounded->border_shader_node) {
-						int new_fw = geo.width + 2 * (int)bw;
-						int new_fh = geo.height + 2 * (int)bw;
+						int new_fw = border_size.width + 2 * bwi;
+						int new_fh = border_size.height + 2 * bwi;
 						if (new_fw > 0 && new_fh > 0) {
 							float scale = node->client->view && node->client->view->node &&
 								node->client->view->node->output ? node->client->view->node->output->wlr_output->scale :
@@ -325,15 +312,6 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 						}
 					}
 				}
-			} else if (border_tree) {
-				const struct wlr_box geo = {
-					0,
-					0,
-					rect->width,
-					rect->height
-				};
-				update_borders(border_tree, border_rects, geo, bw);
-				update_border_colors(node->client);
 			}
 		} else if (border_tree && border_tree->node.enabled) {
 			wlr_scene_node_set_enabled(&border_tree->node, false);

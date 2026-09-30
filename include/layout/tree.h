@@ -9,8 +9,8 @@ typedef struct output_t output_t;
 typedef struct desktop_t desktop_t;
 typedef struct node_t node_t;
 
-#define MIN_WIDTH 1
-#define MIN_HEIGHT 1
+#define MIN_RENDER_WIDTH 1
+#define MIN_RENDER_HEIGHT 1
 
 // the area of a desktop that tiles may occupy, after output and desktop padding
 struct wlr_box desktop_usable_area(output_t *m, desktop_t *d);
