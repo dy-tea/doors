@@ -238,6 +238,23 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 		return;
 	}
 
+	// don't wait for rountrip with xwayland toplevels
+	if (view_to_xwayland(view)) {
+		wlr_log(WLR_INFO, "Transaction xwayland node %u: target=(%d,%d %dx%d) current=(%dx%d) state=%d",
+			node->id, rect->x, rect->y, rect->width, rect->height, view->geometry.width,
+			view->geometry.height, instruction->state);
+		if ((int)rect->width != (int)view->geometry.width ||
+				(int)rect->height != (int)view->geometry.height) {
+			view_configure(view, *rect);
+			view->geometry.width = rect->width;
+			view->geometry.height = rect->height;
+			wlr_log(WLR_INFO, "Transaction configured Xwayland: (%d,%d %dx%d)", rect->x, rect->y, rect->width,
+				rect->height);
+		} else {
+			wlr_log(WLR_INFO, "Transaction skipped Xwayland configure (size unchanged)");
+		}
+	}
+
 	if (node->output && scene_tree && (scene_tree->node.x != rect->x || scene_tree->node.y != rect->y ||
 		(instruction->previous_tiled_rectangle.width > 0 &&
 		(instruction->previous_tiled_rectangle.width != rect->width ||
@@ -320,24 +337,6 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 
 	if (!snapshot_resize && node->client->view)
 		view_center_and_clip_surface(node->client->view);
-
-	// xwayland has no configure serial, so a transaction is only matched by
-	// pushing the size and letting the client redraw
-	if (view_to_xwayland(view)) {
-		wlr_log(WLR_INFO, "Transaction xwayland node %u: target=(%d,%d %dx%d) current=(%dx%d) state=%d",
-			node->id, rect->x, rect->y, rect->width, rect->height, view->geometry.width,
-			view->geometry.height, instruction->state);
-		if ((int)rect->width != (int)view->geometry.width ||
-				(int)rect->height != (int)view->geometry.height) {
-			view_configure(view, *rect);
-			view->geometry.width = rect->width;
-			view->geometry.height = rect->height;
-			wlr_log(WLR_INFO, "Transaction configured Xwayland: (%d,%d %dx%d)", rect->x, rect->y, rect->width,
-				rect->height);
-		} else {
-			wlr_log(WLR_INFO, "Transaction skipped Xwayland configure (size unchanged)");
-		}
-	}
 
 	if (node->client->flags.shown && !node->client->flags.minimized) {
 		wlr_scene_node_set_enabled(&scene_tree->node, true);

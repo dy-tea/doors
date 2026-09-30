@@ -438,6 +438,9 @@ static void handle_commit(struct wl_listener *listener, void *data) {
 			xwayland_toplevel->view.client->floating_rectangle.width = new_geo.width;
 			xwayland_toplevel->view.client->floating_rectangle.height = new_geo.height;
 		}
+
+		if (xwayland_toplevel->view.node && !animation_is_resizing(xwayland_toplevel->view.node))
+			view_center_and_clip_surface(&xwayland_toplevel->view);
 	}
 
 	// update opacity
@@ -564,7 +567,6 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	view_create_foreign_toplevels(&xwayland_toplevel->view, app_id, title);
 
 	bool rule_forces_float = rule && rule->has & RULE_TYPE_STATE && rule->state == STATE_FLOATING;
-	bool layout_floated = false;
 	if (wants_float || rule_forces_float) {
 		wlr_scene_node_reparent(&xwayland_toplevel->view.scene_tree->node, server.float_tree);
 		client->floating_rectangle.x = xsurface->x;
@@ -585,8 +587,6 @@ static void handle_map(struct wl_listener *listener, void *data) {
 		}
 	} else if (!(rule && rule->has & RULE_TYPE_STATE) && layout_init_client(target_monitor,
 			target_desktop, client)) {
-		layout_floated = true;
-
 		// tell the client about the size and position the layout picked
 		struct wlr_box *rect = &client->floating_rectangle;
 		xwayland_toplevel_configure(xwayland_toplevel, rect->x, rect->y, rect->width, rect->height);
@@ -654,14 +654,6 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	ipc_put_status(SUB_MASK_NODE_ADD, "node_add[%s,%s,%u]\n",
 		client && client->app_id[0] ? client->app_id : "?",
 		client && client->title[0] ? client->title : "?", node->id);
-
-	if (!wants_float && !layout_floated && xwayland_toplevel->view.client) {
-		struct wlr_box *rect = &client->tiled_rectangle;
-		view_configure(&xwayland_toplevel->view, *rect);
-		xwayland_toplevel->view.geometry.width = rect->width;
-		xwayland_toplevel->view.geometry.height = rect->height;
-		wlr_scene_node_set_position(&xwayland_toplevel->view.scene_tree->node, rect->x, rect->y);
-	}
 
 	view_set_activated(&xwayland_toplevel->view, true);
 	server.last_focused_xwayland_view = &xwayland_toplevel->view;
