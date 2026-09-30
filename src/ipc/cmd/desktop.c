@@ -154,7 +154,7 @@ static void desk_swap(ipc_args_t *a) {
 
 	desktop_t *target = find_desktop_by_name_in_monitor(mon, name);
 	if (!target) {
-		ipc_fail(a, "Target desktop \"%s\" not found\n", name);
+		ipc_fail(a, "Desktop \"%s\" not found on monitor \"%s\"\n", name, mon->name);
 		return;
 	}
 	if (target == desk) {
@@ -245,11 +245,9 @@ static void desk_to_monitor(ipc_args_t *a) {
 	if (!ipc_need(a, "monitor", &name))
 		return;
 
-	output_t *target = find_output_by_name(name);
-	if (!target) {
-		ipc_fail(a, "Monitor \"%s\" not found\n", name);
+	output_t *target = ipc_output_by_name(a, name);
+	if (!target)
 		return;
-	}
 	if (desk->output == target) {
 		ipc_fail(a, "Already on target monitor\n");
 		return;
@@ -276,8 +274,12 @@ static void desk_to_monitor(ipc_args_t *a) {
 }
 
 static void desk_focus_sub(ipc_args_t *a) {
-	desk_focus_relative(a, ipc_peek(a));
-	ipc_end(a);
+	const char *rel = ipc_take(a);
+
+	if (rel && !ipc_end(a))
+		return;
+
+	desk_focus_relative(a, rel);
 }
 
 const ipc_sub_t desktop_subs[] = {

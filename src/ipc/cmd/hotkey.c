@@ -9,9 +9,7 @@
 #include <xkbcommon/xkbcommon.h>
 
 static void hotkey_list(ipc_args_t *a) {
-	char buf[DOORS_BUFSIZ];
-	ipc_buf_t b;
-	ipc_buf_init(&b, buf, sizeof(buf));
+	IPC_REPLY(b);
 	for (size_t i = 0; i < num_keybinds; i++) {
 		keybind_t *kb = &keybinds[i];
 

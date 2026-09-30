@@ -85,8 +85,7 @@ static void act_toggle(ipc_args_t *a) {
 	ipc_buf_t b;
 	char list[256];
 	ipc_buf_init(&b, list, sizeof(list));
-	for (size_t i = 0; i < IPC_ARRAY_LEN(props); i++)
-		ipc_buff(&b, "%s\"%s\"", i > 0 ? ", " : "", props[i].name);
+	IPC_FORMAT_NAMES(&b, props, IPC_ARRAY_LEN(props));
 	ipc_fail(a, "Unknown property \"%s\", expected one of: %s\n", name, list);
 }
 

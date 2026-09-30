@@ -327,22 +327,7 @@ static const cfg_setting_t *find_setting(const char *name) {
 }
 
 static bool cfg_set_bool(ipc_args_t *a, const cfg_setting_t *s) {
-	bool *var = s->ptr;
-	const char *arg;
-
-	if (!ipc_need(a, "value", &arg))
-		return false;
-
-	if (!streq(arg, "true") && !streq(arg, "on") && !streq(arg, "1") && !streq(arg, "yes")) {
-		if (!streq(arg, "false") && !streq(arg, "off") && !streq(arg, "0") && !streq(arg, "no")) {
-			ipc_fail(a, "Expected true or false\n");
-			return false;
-		}
-		*var = false;
-	} else {
-		*var = true;
-	}
-	return true;
+	return ipc_bool(a, "value", (bool *)s->ptr);
 }
 
 static void cfg_store_enum(const cfg_setting_t *s, long value) {
@@ -840,7 +825,7 @@ static void cfg_animation_duration(ipc_args_t *a) {
 // config animation <type> [spring|bezier|duration|enabled] [value]
 static void cfg_animation(ipc_args_t *a) {
 	if (!ipc_peek(a)) {
-		ipc_fail(a, "expected a type\n");
+		ipc_fail(a, "Expected a type\n");
 		return;
 	}
 
@@ -936,10 +921,27 @@ static void cfg_animation(ipc_args_t *a) {
 	ipc_fail(a, "Expected one of: spring, bezier, duration, enabled\n");
 }
 
+typedef struct {
+	const char *name;
+	void (*fn)(ipc_args_t *a);
+} cfg_named_handler_t;
+
+static const cfg_named_handler_t special_settings[] = {
+	{"scroller_proportion_preset", cfg_scroller_presets},
+	{"acrylic_light_anchor", cfg_acrylic_light_anchor},
+	{"blur_algorithm", cfg_blur_algorithm},
+	{"screen_shader", cfg_screen_shader},
+	{"screen_shader_file", cfg_screen_shader_file},
+	{"animation_bezier", cfg_animation_bezier},
+	{"animation_duration", cfg_animation_duration},
+	{"animation", cfg_animation},
+	{NULL, NULL},
+};
+
 void ipc_cmd_config(ipc_args_t *a) {
 	const char *name = ipc_peek(a);
 	if (!name) {
-		ipc_fail(a, "missing setting name\n");
+		ipc_fail(a, "Missing setting name\n");
 		return;
 	}
 
@@ -956,49 +958,17 @@ void ipc_cmd_config(ipc_args_t *a) {
 		return;
 	}
 
-	if (streq(name, "scroller_proportion_preset")) {
-		cfg_scroller_presets(a);
-		return;
-	}
+	for (const cfg_named_handler_t *sp = special_settings; sp->name; sp++) {
+		if (!streq(name, sp->name))
+			continue;
 
-	if (streq(name, "acrylic_light_anchor")) {
-		cfg_acrylic_light_anchor(a);
-		return;
-	}
-
-	if (streq(name, "blur_algorithm")) {
-		cfg_blur_algorithm(a);
-		return;
-	}
-
-	if (streq(name, "screen_shader")) {
-		cfg_screen_shader(a);
-		return;
-	}
-
-	if (streq(name, "screen_shader_file")) {
-		cfg_screen_shader_file(a);
-		return;
-	}
-
-	if (streq(name, "animation_bezier")) {
-		cfg_animation_bezier(a);
-		return;
-	}
-
-	if (streq(name, "animation_duration")) {
-		cfg_animation_duration(a);
-		return;
-	}
-
-	if (streq(name, "animation")) {
-		cfg_animation(a);
+		sp->fn(a);
 		return;
 	}
 
 	const cfg_setting_t *s = find_setting(name);
 	if (!s) {
-		ipc_fail(a, "unknown setting \"%s\"\n", name);
+		ipc_fail(a, "Unknown setting \"%s\"\n", name);
 		return;
 	}
 

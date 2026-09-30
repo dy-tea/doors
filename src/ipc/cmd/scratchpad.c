@@ -1,5 +1,4 @@
 #include "ipc/args.h"
-#include "ipc/ipc.h"
 #include "ipc/registry.h"
 #include "scratchpad.h"
 #include "transaction.h"
@@ -52,9 +51,7 @@ static void sp_hide(ipc_args_t *a) {
 }
 
 static void sp_list(ipc_args_t *a) {
-	char buf[DOORS_BUFSIZ];
-	ipc_buf_t b;
-	ipc_buf_init(&b, buf, sizeof(buf));
+	IPC_REPLY(b);
 
 	int count = scratchpad_count();
 	ipc_buff(&b, "%d\n", count);

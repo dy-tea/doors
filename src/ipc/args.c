@@ -218,6 +218,22 @@ bool ipc_str(ipc_args_t *a, const char *what, char *dst, size_t dstsz) {
 	return true;
 }
 
+bool ipc_bool(ipc_args_t *a, const char *what, bool *out) {
+	const char *arg;
+	if (!ipc_need(a, what, &arg))
+		return false;
+
+	return ipc_bool_str(a, arg, what, out);
+}
+
+bool ipc_bool_str(ipc_args_t *a, const char *arg, const char *what, bool *out) {
+	if (!parse_bool(arg, out)) {
+		ipc_fail(a, "Expected true or false for %s, got \"%s\"\n", what, arg);
+		return false;
+	}
+	return true;
+}
+
 bool ipc_delta(ipc_args_t *a, const char *what, double *out) {
 	const char *arg;
 	if (!ipc_need(a, what, &arg))

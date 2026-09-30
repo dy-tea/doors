@@ -139,14 +139,14 @@ static bool rule_apply_key(ipc_args_t *a, rule_t *r, const char *arg) {
 		return true;
 	}
 
-	ipc_fail(a, "unknown rule option \"%s\"\n", arg);
+	ipc_fail(a, "Unknown rule option \"%s\"\n", arg);
 	return false;
 }
 
 static void rule_add(ipc_args_t *a) {
 	rule_t *r = make_rule();
 	if (!r) {
-		ipc_fail(a, "failed to create rule\n");
+		ipc_fail(a, "Failed to create rule\n");
 		return;
 	}
 
@@ -190,7 +190,7 @@ static void rule_add(ipc_args_t *a) {
 
 	if (!have_app_id && r->match.title[0] == '\0' && r->match.tag[0] == '\0') {
 		free(r);
-		ipc_fail(a, "must specify an app_id, title= or tag=\n");
+		ipc_fail(a, "Must specify an app_id, title= or tag=\n");
 		return;
 	}
 
@@ -206,7 +206,7 @@ static void rule_remove(ipc_args_t *a) {
 	if (remove_rule_by_index(idx))
 		ipc_ok(a, "rule removed\n");
 	else
-		ipc_fail(a, "invalid index %d\n", idx);
+		ipc_fail(a, "Invalid index %d\n", idx);
 }
 
 static void rule_show_list(ipc_args_t *a) {

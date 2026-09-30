@@ -45,23 +45,22 @@ static bool query_parse_selectors(ipc_args_t *a, query_filter_t *f) {
 			continue;
 		}
 
+		const bool want_monitor = streq(opt, "-m") || streq(opt, "--monitor");
+		const bool want_desktop = streq(opt, "-d") || streq(opt, "--desktop");
+
+		const char *what = want_monitor ? "monitor" : want_desktop ? "desktop" : "node";
 		const char *value;
-		if (!ipc_need(a, streq(opt, "-m") || streq(opt, "--monitor") ? "monitor" : streq(opt,
-			"-d") || streq(opt, "--desktop") ? "desktop" : "node", &value))
+		if (!ipc_need(a, what, &value))
 			return false;
 
-		if (streq(opt, "-m") || streq(opt, "--monitor")) {
-			f->mon = find_output_by_name(value);
-			if (!f->mon) {
-				ipc_fail(a, "Monitor \"%s\" not found\n", value);
+		if (want_monitor) {
+			f->mon = ipc_output_by_name(a, value);
+			if (!f->mon)
 				return false;
-			}
-		} else if (streq(opt, "-d") || streq(opt, "--desktop")) {
-			f->desk = find_desktop_by_name(value);
-			if (!f->desk) {
-				ipc_fail(a, "Desktop \"%s\" not found\n", value);
+		} else if (want_desktop) {
+			f->desk = ipc_desktop_by_name(a, value);
+			if (!f->desk)
 				return false;
-			}
 		} else {
 			int id = atoi(value);
 			if (id <= 0) {
@@ -99,9 +98,7 @@ static bool view_selected(const view_t *view, const query_filter_t *f) {
 static void q_tree(ipc_args_t *a) {
 	const query_filter_t *f = a->ctx;
 
-	char buf[DOORS_BUFSIZ];
-	ipc_buf_t b;
-	ipc_buf_init(&b, buf, sizeof(buf));
+	IPC_REPLY(b);
 
 	ipc_buff(&b, "{\n");
 
@@ -145,9 +142,7 @@ static void q_tree(ipc_args_t *a) {
 static void q_monitors(ipc_args_t *a) {
 	const query_filter_t *f = a->ctx;
 
-	char buf[DOORS_BUFSIZ];
-	ipc_buf_t b;
-	ipc_buf_init(&b, buf, sizeof(buf));
+	IPC_REPLY(b);
 
 	output_t *m;
 	wl_list_for_each(m, &mon_list, link) {
@@ -166,9 +161,7 @@ static void q_monitors(ipc_args_t *a) {
 static void q_desktops(ipc_args_t *a) {
 	const query_filter_t *f = a->ctx;
 
-	char buf[DOORS_BUFSIZ];
-	ipc_buf_t b;
-	ipc_buf_init(&b, buf, sizeof(buf));
+	IPC_REPLY(b);
 
 	output_t *m;
 	wl_list_for_each(m, &mon_list, link) {
@@ -193,9 +186,7 @@ static void q_desktops(ipc_args_t *a) {
 static void q_nodes(ipc_args_t *a) {
 	const query_filter_t *f = a->ctx;
 
-	char buf[DOORS_BUFSIZ];
-	ipc_buf_t b;
-	ipc_buf_init(&b, buf, sizeof(buf));
+	IPC_REPLY(b);
 
 	view_t *view;
 	wl_list_for_each(view, &server.views, link) {
@@ -243,9 +234,7 @@ static void q_focused(ipc_args_t *a) {
 		break;
 	}
 
-	char buf[DOORS_BUFSIZ];
-	ipc_buf_t b;
-	ipc_buf_init(&b, buf, sizeof(buf));
+	IPC_REPLY(b);
 
 	const char *title = n->client ? n->client->title : "";
 	const char *label = "?";

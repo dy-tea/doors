@@ -23,9 +23,7 @@ static void wm_dump_state(ipc_args_t *a) {
 		IPC_ENUM_END,
 	};
 
-	char buf[DOORS_BUFSIZ];
-	ipc_buf_t b;
-	ipc_buf_init(&b, buf, sizeof(buf));
+	IPC_REPLY(b);
 
 	ipc_buff(&b, "{\n  \"monitors\": [\n");
 
@@ -78,13 +76,13 @@ static void wm_add_monitor(ipc_args_t *a) {
 		return;
 
 	if (find_output_by_name(name)) {
-		ipc_fail(a, "monitor \"%s\" already exists\n", name);
+		ipc_fail(a, "Monitor \"%s\" already exists\n", name);
 		return;
 	}
 
 	struct output_config *oc = output_config_create(name);
 	if (!oc) {
-		ipc_fail(a, "failed to add monitor\n");
+		ipc_fail(a, "Failed to add monitor\n");
 		return;
 	}
 
@@ -115,9 +113,7 @@ static void wm_adopt_orphans(ipc_args_t *a) {
 }
 
 static void wm_get_status(ipc_args_t *a) {
-	char buf[DOORS_BUFSIZ];
-	ipc_buf_t b;
-	ipc_buf_init(&b, buf, sizeof(buf));
+	IPC_REPLY(b);
 
 	int output_count = 0;
 	output_t *m;

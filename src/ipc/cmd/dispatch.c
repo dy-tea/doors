@@ -43,9 +43,7 @@ static const ipc_cmd_t commands[] = {
 };
 
 static void ipc_cmd_commands(ipc_args_t *a) {
-	char buf[DOORS_BUFSIZ];
-	ipc_buf_t b;
-	ipc_buf_init(&b, buf, sizeof(buf));
+	IPC_REPLY(b);
 
 	for (size_t i = 0; i < IPC_ARRAY_LEN(commands); i++) {
 		const ipc_cmd_t *c = &commands[i];

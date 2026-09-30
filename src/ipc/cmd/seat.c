@@ -2,14 +2,11 @@
 #include "input/keyboard.h"
 #include "input/seat.h"
 #include "ipc/args.h"
-#include "ipc/ipc.h"
 #include "ipc/registry.h"
 #include "server.h"
 
 static void seat_list(ipc_args_t *a) {
-	char buf[DOORS_BUFSIZ];
-	ipc_buf_t b;
-	ipc_buf_init(&b, buf, sizeof(buf));
+	IPC_REPLY(b);
 
 	seat_t *s;
 	wl_list_for_each(s, &server.seats, link) {

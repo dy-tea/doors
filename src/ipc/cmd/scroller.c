@@ -12,7 +12,7 @@
 // find column and tile index for a focused client in the scroller state
 static bool find_focused_tile(ipc_args_t *a, desktop_t *desk, int *out_col) {
 	if (!desk->focus || !desk->focus->client || !desk->scroller_state) {
-		ipc_fail(a, "no focused tiled window\n");
+		ipc_fail(a, "No focused tiled window\n");
 		return false;
 	}
 
@@ -263,7 +263,7 @@ static void ms_promote(ipc_args_t *a) {
 		return;
 
 	if (!master_stack_promote(desk)) {
-		ipc_fail(a, "focus a secondary tiled window\n");
+		ipc_fail(a, "Focus a secondary tiled window\n");
 		return;
 	}
 
@@ -278,7 +278,7 @@ static void ms_demote(ipc_args_t *a) {
 		return;
 
 	if (!master_stack_demote(desk)) {
-		ipc_fail(a, "focus a master tiled window\n");
+		ipc_fail(a, "Focus a master tiled window\n");
 		return;
 	}
 

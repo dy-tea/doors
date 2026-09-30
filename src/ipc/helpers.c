@@ -1,4 +1,5 @@
 #include "ipc/helpers.h"
+#include "protocol/workspace.h"
 #include "server.h"
 #include <assert.h>
 #include <stdbool.h>
@@ -127,5 +128,19 @@ desktop_t *ipc_focused_desk(ipc_args_t *a, output_t **out) {
 		ipc_fail(a, "No focused desktop\n");
 		return NULL;
 	}
+	return d;
+}
+
+output_t *ipc_output_by_name(ipc_args_t *a, const char *name) {
+	output_t *m = find_output_by_name(name);
+	if (!m)
+		ipc_fail(a, "Monitor \"%s\" not found\n", name);
+	return m;
+}
+
+desktop_t *ipc_desktop_by_name(ipc_args_t *a, const char *name) {
+	desktop_t *d = find_desktop_by_name(name);
+	if (!d)
+		ipc_fail(a, "Desktop \"%s\" not found\n", name);
 	return d;
 }

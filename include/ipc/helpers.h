@@ -22,3 +22,5 @@ void ipc_format_gradient(char *buf, size_t bufsz, const float *colors, int count
  */
 node_t *ipc_focused(ipc_args_t *a, output_t **out);
 desktop_t *ipc_focused_desk(ipc_args_t *a, output_t **out);
+output_t *ipc_output_by_name(ipc_args_t *a, const char *name);
+desktop_t *ipc_desktop_by_name(ipc_args_t *a, const char *name);

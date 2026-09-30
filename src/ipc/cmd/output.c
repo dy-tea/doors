@@ -40,7 +40,7 @@ static bool need_output(ipc_args_t *a) {
 	if (c->mon)
 		return true;
 
-	ipc_fail(a, "No such output \"%s\"\n", c->name);
+	ipc_fail(a, "Monitor \"%s\" not found\n", c->name);
 	return false;
 }
 
@@ -81,9 +81,7 @@ static const cfg_enum_value_t bit_depth_values[] = {
 };
 
 static void out_list(ipc_args_t *a) {
-	char buf[DOORS_BUFSIZ];
-	ipc_buf_t b;
-	ipc_buf_init(&b, buf, sizeof(buf));
+	IPC_REPLY(b);
 
 	ipc_buff(&b, "[");
 	output_t *o;
@@ -321,6 +319,7 @@ static void out_color_profile(ipc_args_t *a) {
 		{"gamma22", 0},
 		{"srgb", 1},
 		{"icc", 2},
+		IPC_ENUM_END,
 	};
 
 	long kind;
@@ -378,9 +377,7 @@ static void out_modes(ipc_args_t *a) {
 	if (!need_output(a))
 		return;
 
-	char buf[DOORS_BUFSIZ];
-	ipc_buf_t b;
-	ipc_buf_init(&b, buf, sizeof(buf));
+	IPC_REPLY(b);
 
 	ipc_buff(&b, "[");
 	struct wlr_output *wo = ctx_of(a)->mon->wlr_output;
@@ -448,9 +445,7 @@ static void out_desktops(ipc_args_t *a) {
 
 	output_t *mon = ctx_of(a)->mon;
 	if (!ipc_peek(a)) {
-		char buf[DOORS_BUFSIZ];
-		ipc_buf_t b;
-		ipc_buf_init(&b, buf, sizeof(buf));
+		IPC_REPLY(b);
 
 		desktop_t *d;
 		wl_list_for_each(d, &mon->desk_list, link)
@@ -537,11 +532,9 @@ static void out_swap_desktops(ipc_args_t *a) {
 		return;
 
 	output_t *mon = ctx_of(a)->mon;
-	output_t *target = find_output_by_name(name);
-	if (!target) {
-		ipc_fail(a, "Target output \"%s\" not found\n", name);
+	output_t *target = ipc_output_by_name(a, name);
+	if (!target)
 		return;
-	}
 	if (target == mon) {
 		ipc_fail(a, "Cannot swap with self\n");
 		return;

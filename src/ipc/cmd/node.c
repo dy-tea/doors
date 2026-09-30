@@ -124,7 +124,7 @@ static node_t *find_node_by_id(ipc_args_t *a, desktop_t *desk, const char *what)
 
 	int id = atoi(arg);
 	if (id <= 0) {
-		ipc_fail(a, "invalid %s \"%s\"\n", what, arg);
+		ipc_fail(a, "Invalid %s \"%s\"\n", what, arg);
 		return NULL;
 	}
 
@@ -190,8 +190,7 @@ static void node_state(ipc_args_t *a) {
 	ipc_buf_t b;
 	char list[128];
 	ipc_buf_init(&b, list, sizeof(list));
-	for (size_t i = 0; i < IPC_ARRAY_LEN(states); i++)
-		ipc_buff(&b, "%s\"%s\"", i > 0 ? ", " : "", states[i].name);
+	IPC_FORMAT_NAMES(&b, states, IPC_ARRAY_LEN(states));
 	ipc_fail(a, "Unknown state, expected one of: %s\n", list);
 }
 
@@ -200,11 +199,9 @@ static void node_to_desktop(ipc_args_t *a) {
 	if (!ipc_need(a, "desktop", &name))
 		return;
 
-	desktop_t *target = find_desktop_by_name(name);
-	if (!target) {
-		ipc_fail(a, "Desktop \"%s\" not found\n", name);
+	desktop_t *target = ipc_desktop_by_name(a, name);
+	if (!target)
 		return;
-	}
 
 	output_t *m = server.focused_output;
 	if (!m || !m->desk || !m->desk->focus) {
@@ -299,14 +296,8 @@ static void node_flag(ipc_args_t *a) {
 	bool numeric = streq(key, "opacity") || streq(key, "border_radius");
 
 	bool want = false;
-	if (val && !numeric) {
-		if (streq(val, "true") || streq(val, "on") || streq(val, "1"))
-			want = true;
-		else if (!streq(val, "false") && !streq(val, "off") && !streq(val, "0")) {
-			ipc_fail(a, "Expected true or false for \"%s\", got \"%s\"\n", key, val);
-			return;
-		}
-	}
+	if (val && !numeric && !ipc_bool_str(a, val, key, &want))
+		return;
 
 	bool *field = node_flag_field(n, key);
 	if (streq(key, "hidden")) {
@@ -540,11 +531,9 @@ static void node_to_monitor(ipc_args_t *a) {
 		return;
 	}
 
-	output_t *target = find_output_by_name(name);
-	if (!target) {
-		ipc_fail(a, "Monitor \"%s\" not found\n", name);
+	output_t *target = ipc_output_by_name(a, name);
+	if (!target)
 		return;
-	}
 
 	output_t *m = server.focused_output;
 	if (!m || !m->desk) {
@@ -702,6 +691,7 @@ static void node_type(ipc_args_t *a) {
 		{"tabbed", TYPE_TABBED},
 		{"horizontal", TYPE_HORIZONTAL},
 		{"vertical", TYPE_VERTICAL},
+		IPC_ENUM_END,
 	};
 
 	const char *name = ipc_peek(a);
@@ -927,7 +917,7 @@ const ipc_sub_t node_subs[] = {
 	IPC_SUB("-t", "--state", "node -t | --state <tiled|floating|fullscreen|maximized|minimized>",
 		node_state),
 	IPC_SUB("-d", "--to-desktop", "node -d | --to-desktop <desktop>", node_to_desktop),
-	{"-g", "--flag", NULL, "node -g | --flag <key>[=true|false]", node_flag, node_flag_key_matches},
+	IPC_SUBM("-g", "--flag", "node -g | --flag <key>[=true|false]", node_flag, node_flag_key_matches),
 	IPC_SUB("-S", "--scratchpad", "node -S | --scratchpad", node_scratchpad),
 	IPC_SUB("-v", "--move", "node -v | --move <dx> <dy>", node_move),
 	IPC_SUB("-z", "--resize", "node -z | --resize <handle> <dx> <dy>", node_resize),

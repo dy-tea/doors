@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ipc/ipc.h"
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -33,6 +34,7 @@ bool ipc_end(ipc_args_t *a);
 bool ipc_int(ipc_args_t *a, const char *what, long min, long max, int *out);
 bool ipc_double(ipc_args_t *a, const char *what, double min, double max, double *out);
 bool ipc_float(ipc_args_t *a, const char *what, float min, float max, float *out);
+bool ipc_bool(ipc_args_t *a, const char *what, bool *out);
 bool ipc_str(ipc_args_t *a, const char *what, char *dst, size_t dstsz);
 
 bool ipc_delta(ipc_args_t *a, const char *what, double *out);
@@ -53,6 +55,7 @@ const char *ipc_enum_name(const cfg_enum_value_t *tbl, long value);
 bool ipc_enum_names(ipc_args_t *a, const char *what, const char *arg, const cfg_enum_value_t *tbl,
 	long *out);
 bool ipc_int_str(ipc_args_t *a, const char *arg, const char *what, long min, long max, int *out);
+bool ipc_bool_str(ipc_args_t *a, const char *arg, const char *what, bool *out);
 bool ipc_float_str(ipc_args_t *a, const char *arg, const char *what, float min, float max,
 	float *out);
 bool ipc_double_str(ipc_args_t *a, const char *arg, const char *what, double min, double max,
@@ -68,6 +71,16 @@ typedef struct {
 void ipc_buf_init(ipc_buf_t *b, char *buf, size_t cap);
 void ipc_buff(ipc_buf_t * b, const char *fmt, ...);
 void ipc_buf_send(ipc_args_t *a, const ipc_buf_t *b);
+
+// declares a reply buffer and its writer, ready to be sent with ipc_buf_send
+#define IPC_REPLY(name) \
+	char name##_storage[DOORS_BUFSIZ] = {0}; \
+	ipc_buf_t name = {.buf = name##_storage, .cap = sizeof(name##_storage)}
+
+// appends `"a", "b", "c"` for a fixed-length array whose first member is `name`
+#define IPC_FORMAT_NAMES(b, arr, n) \
+	for (size_t _i = 0; _i < (size_t)(n); _i++) \
+		ipc_buff((b), "%s\"%s\"", _i > 0 ? ", " : "", (arr)[_i].name)
 
 typedef struct ipc_sub_t ipc_sub_t;
 
@@ -91,6 +104,7 @@ struct ipc_sub_t {
 
 #define IPC_SUB(flag, lname, usage, fn) {flag, lname, NULL, usage, fn, NULL}
 #define IPC_SUBA(flag, lname, aliases, usage, fn) {flag, lname, aliases "\0", usage, fn, NULL}
+#define IPC_SUBM(flag, lname, usage, fn, match) {flag, lname, NULL, usage, fn, match}
 
 bool ipc_sub_dispatch(ipc_args_t *a, const ipc_sub_t *subs);
 void ipc_fail_unknown(ipc_args_t *a, const ipc_sub_t *subs);
