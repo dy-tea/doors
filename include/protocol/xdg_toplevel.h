@@ -34,5 +34,8 @@ typedef struct xdg_toplevel_t {
 // helper functions
 void xdg_toplevel_apply_decoration_mode(xdg_toplevel_t *tl);
 
+// re-send the wm capabilities to every mapped xdg toplevel
+void xdg_toplevel_refresh_capabilities(void);
+
 xdg_toplevel_t *xdg_toplevel_create(struct wlr_xdg_toplevel *xdg_toplevel);
 void xdg_toplevel_adopt(xdg_toplevel_t *toplevel);

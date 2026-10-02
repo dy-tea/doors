@@ -291,6 +291,9 @@ typedef struct {
 	// Real-time scheduling
 	bool realtime_scheduling;
 
+	// when false, disables minimizing completely, still allows you to unminimize
+	bool enable_minimize;
+
 	// Scratchpad behavior
 	bool minimize_to_scratchpad;
 

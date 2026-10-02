@@ -265,6 +265,12 @@ doorsctl config auto_float_dialogs true|false
 When true, windows that advertise themselves as dialogs via the `xdg-dialog-v1` protocol are automatically floated when they open. This applies to both modal and non-modal dialogs. Window rules with an explicit `state` still take priority. Default: false.
 
 ```
+doorsctl config enable_minimize true|false
+```
+
+When false, minimizing is disabled entirely. Windows minimized while the option was enabled (or by a `minimized=on` window rule) can still be brought back with `doorsctl toggle restore_minimized`. Default: true.
+
+```
 doorsctl config minimize_to_scratchpad true|false
 ```
 
@@ -608,6 +614,8 @@ doorsctl toggle minimize          # Toggles minimize
 doorsctl toggle restore_minimized # Restore the most recently minimized window
 ```
 
+Minimize can be turned off entirely with `doorsctl config enable_minimize false`; restoring already minimized windows keeps working.
+
 #### Scratchpad Commands
 
 The scratchpad provides a way to temporarily hide windows and bring them back when needed.
@@ -924,6 +932,7 @@ doorsctl config focus_wrapping [true|false]
 doorsctl config focus_on_activate focus|none|smart|urgent
 doorsctl config gapless_monocle [true|false]
 doorsctl config enable_animations [true|false]
+doorsctl config enable_minimize [true|false]
 doorsctl config edge_scroller_pointer_focus [true|false]
 doorsctl config scroller_default_proportion [<value>]
 doorsctl config scroller_proportion_preset [<values>]

@@ -944,6 +944,10 @@ bool client_set_minimized(output_t *m, desktop_t *d, node_t *n, bool value) {
 	if (c->flags.minimized == value)
 		return false;
 
+	// when minimize is disabled, restoring still works but nothing may be minimized
+	if (value && !settings.enable_minimize)
+		return false;
+
 	if (value && c->state == STATE_FULLSCREEN)
 		client_set_fullscreen(m, d, n, false);
 

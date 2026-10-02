@@ -830,6 +830,10 @@ static void handle_request_minimize(struct wl_listener *listener, void *data) {
 			return;
 		}
 
+		// when minimize is disabled, don't report the window as hidden either
+		if (ev->minimize && !settings.enable_minimize)
+			return;
+
 		client_set_minimized(m, d, xwayland_toplevel->view.node, ev->minimize);
 	}
 

@@ -205,6 +205,9 @@ let
       ++ optionals (oc.auto-float-dialogs != null) [
         "doorsctl config auto_float_dialogs ${boolString oc.auto-float-dialogs}"
       ]
+      ++ optionals (oc.enable-minimize != null) [
+        "doorsctl config enable_minimize ${boolString oc.enable-minimize}"
+      ]
       ++ optionals (oc.minimize-to-scratchpad != null) [
         "doorsctl config minimize_to_scratchpad ${boolString oc.minimize-to-scratchpad}"
       ]
@@ -1044,6 +1047,12 @@ in
                             type = types.bool;
                             default = false;
                             description = "When true, windows that advertise themselves as dialogs via the `xdg-dialog-v1` procotol are automatically floated when they open. This applies to both modal and non-modal dialogs. Window rules with an explicit `state` still take priority.";
+                          };
+
+                          enable-minimize = mkOption {
+                            type = types.bool;
+                            default = true;
+                            description = "When false, minimizing is disabled entirely: the minimize capability is no longer advertised to clients, minimize requests from clients are ignored, and the minimize commands do nothing. Restoring already minimized windows keeps working.";
                           };
 
                           minimize-to-scratchpad = mkOption {

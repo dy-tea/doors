@@ -51,6 +51,27 @@ static const view_impl_t xdg_view_impl = {
 	.configure = xdg_view_impl_configure,
 };
 
+static uint32_t xdg_toplevel_wm_capabilities(void) {
+	uint32_t caps = WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN |
+		WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE;
+
+	if (settings.enable_minimize)
+		caps |= WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE;
+
+	return caps;
+}
+
+void xdg_toplevel_refresh_capabilities(void) {
+	view_t *view;
+	wl_list_for_each(view, &server.views, link) {
+		xdg_toplevel_t *tl = view_to_xdg(view);
+		if (tl == NULL || !view_is_ready(view))
+			continue;
+
+		wlr_xdg_toplevel_set_wm_capabilities(tl->xdg_toplevel, xdg_toplevel_wm_capabilities());
+	}
+}
+
 static bool xdg_toplevel_should_use_server_decorations(xdg_toplevel_t *tl) {
 	if (!tl || !tl->view.node)
 		return false;
@@ -496,9 +517,7 @@ void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 		if (xdg_surface->initialized)
 			wlr_xdg_surface_schedule_configure(xdg_surface);
 
-		wlr_xdg_toplevel_set_wm_capabilities(toplevel->xdg_toplevel,
-			WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN | WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE |
-			WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE);
+		wlr_xdg_toplevel_set_wm_capabilities(toplevel->xdg_toplevel, xdg_toplevel_wm_capabilities());
 		return;
 	}
 

@@ -7,6 +7,7 @@
 #include "layout/scroller.h"
 #include "output/output.h"
 #include "protocol/idle_power.h"
+#include "protocol/xdg_toplevel.h"
 #include "realtime.h"
 #include "server.h"
 #include "spring.h"
@@ -124,6 +125,10 @@ static void on_idle(void) {
 	idle_power_reset_timer();
 }
 
+static void on_enable_minimize(void) {
+	xdg_toplevel_refresh_capabilities();
+}
+
 static const cfg_enum_value_t focus_on_activate_values[] = {
 	{"focus", FOCUS_ON_ACTIVATE_FOCUS},
 	{"none", FOCUS_ON_ACTIVATE_NONE},
@@ -201,6 +206,7 @@ static const cfg_setting_t settings_table[] = {
 	B("record_history", NULL, settings.record_history, 0, NULL),
 	B("allow_tearing", NULL, settings.allow_tearing, CFG_COMMIT, NULL),
 	B("auto_float_dialogs", NULL, settings.auto_float_dialogs, 0, NULL),
+	B("enable_minimize", NULL, settings.enable_minimize, 0, on_enable_minimize),
 	B("minimize_to_scratchpad", NULL, settings.minimize_to_scratchpad, 0, NULL),
 	B("scratchpad_restore_to_origin", NULL, settings.scratchpad_restore_to_origin, 0, NULL),
 	D("split_ratio", NULL, settings.split_ratio, 0, 1, "%f\n", CFG_COMMIT | CFG_EXCLUSIVE, NULL),
