@@ -187,7 +187,3 @@ node_t *find_fence_from(node_t *n, direction_t dir) {
 
 	return NULL;
 }
-
-node_t *find_fence(node_t *n, direction_t dir) {
-	return find_fence_from(n, dir);
-}

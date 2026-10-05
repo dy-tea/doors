@@ -48,7 +48,7 @@ typedef struct scroller_state_t {
 	double view_offset;
 	struct wlr_box working_area;
 	bool activate_prev_column_on_removal;
-	float default_proportion, default_proportion_single;
+	float default_proportion;
 } scroller_state_t;
 
 scroller_state_t *scroller_create(void);
@@ -77,8 +77,6 @@ void scroller_apply_client_rules(client_t *c, float rule_proportion, float rule_
 
 bool scroller_resize_width(desktop_t *d, float delta);
 bool scroller_resize_stack(desktop_t *d, float delta);
-void scroller_set_proportion(client_t *client, float proportion);
-void scroller_cycle_proportion_preset(client_t *client);
 
 void scroller_apply_active_focus(desktop_t *d, struct output_t *m);
 
@@ -91,14 +89,3 @@ void scroller_view_offset_gesture_update(desktop_t *d, double delta_x);
 bool scroller_view_offset_gesture_end(desktop_t *d);
 
 int scroller_collect(desktop_t *d, node_t ***out_nodes);
-
-extern float scroller_default_proportion;
-extern float scroller_default_proportion_single;
-extern int scroller_structs;
-extern bool scroller_focus_center;
-extern bool scroller_prefer_center;
-extern bool scroller_prefer_overspread;
-extern bool scroller_ignore_proportion_single;
-extern bool edge_scroller_pointer_focus;
-extern float *scroller_proportion_preset;
-extern int scroller_proportion_preset_count;

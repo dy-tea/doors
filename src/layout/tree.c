@@ -11,14 +11,7 @@ struct wlr_box desktop_usable_area(output_t *m, desktop_t *d) {
 	if (m == NULL || d == NULL)
 		return (struct wlr_box){0};
 
-	struct wlr_box rect = m->usable_area;
-
-	rect.x += m->padding.left + d->padding.left;
-	rect.y += m->padding.top + d->padding.top;
-	rect.width -= m->padding.left + d->padding.left + d->padding.right + m->padding.right;
-	rect.height -= m->padding.top + d->padding.top + d->padding.bottom + m->padding.bottom;
-
-	return rect;
+	return m->usable_area;
 }
 
 void render_leaf(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect, struct wlr_box root_rect,

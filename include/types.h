@@ -62,12 +62,6 @@ typedef enum {
 } focus_follows_mouse_mode_t;
 
 typedef enum {
-	LAYER_BELOW,
-	LAYER_NORMAL,
-	LAYER_ABOVE
-} stack_layer_t;
-
-typedef enum {
 	LAYOUT_TILED,
 	LAYOUT_MONOCLE,
 	LAYOUT_SCROLLER,
@@ -135,8 +129,6 @@ typedef struct {
 	uint32_t maximized : 1;
 	uint32_t minimized : 1;
 	uint32_t master_stack_master : 1;
-	uint32_t cursor_in_left_half : 1;
-	uint32_t cursor_in_upper_half : 1;
 	uint32_t blur : 1;
 	uint32_t blur_from_rule : 1;
 	uint32_t mica : 1;
@@ -157,7 +149,6 @@ typedef struct client_t {
 	char app_id[MAXLEN];
 	char title[MAXLEN];
 	client_state_t state, last_state;
-	stack_layer_t layer, last_layer;
 	struct wlr_box floating_rectangle, tiled_rectangle, committed_tiled_rectangle, arranged_rectangle;
 	struct wlr_box pre_maximize_rectangle;
 	struct view_t *view;
@@ -222,7 +213,6 @@ typedef struct desktop_t {
 	node_t *root, *focus;
 	struct scroller_state_t *scroller_state;
 	struct wl_list link;
-	padding_t padding;
 	int window_gap;
 	struct output_t *output;
 	uint32_t fullscreen_recreate_pending_window_id;
@@ -236,12 +226,6 @@ typedef struct desktop_t {
 	// minimize history
 	struct wl_list minimized;
 } desktop_t;
-
-typedef struct {
-	struct output_t *output;
-	desktop_t *desktop;
-	node_t *node;
-} coordinates_t;
 
 // border gradient theme
 #define BORDER_GRADIENT_MAX_STOPS 10
@@ -266,7 +250,6 @@ typedef struct {
 	int focus_follows_mouse;
 	bool pointer_follows_focus;
 	bool record_history;
-	bool click_to_focus;
 	bool allow_tearing;
 	bool auto_float_dialogs;
 	decoration_mode_t decoration_mode;
@@ -274,14 +257,12 @@ typedef struct {
 	bool hide_lone_tab;
 	workspace_anim_direction_t workspace_anim_direction;
 	bool workspace_anim_slide_up;
-	int mapping_events_count;
 
 	// Transaction system settings
 	int txn_timeout_ms;
 	bool debug_txn_timings;
 	bool debug_noatomic;
 	bool debug_txn_wait;
-	int directional_focus_tightness;
 	int ignore_ewmh_fullscreen;
 
 	// Idle power management (DPMS timeout)
@@ -308,9 +289,12 @@ typedef struct {
 	float shadow_color[4];
 
 	padding_t monocle_padding;
-	padding_t padding;
 	int border_width;
 	int window_gap;
+
+	float scroller_default_proportion;
+	float *scroller_proportion_preset;
+	int scroller_proportion_preset_count;
 	bool smart_gaps;
 	bool smart_borders;
 	bool respect_tiled_min_size;

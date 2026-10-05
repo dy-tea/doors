@@ -37,7 +37,6 @@ bool ipc_float(ipc_args_t *a, const char *what, float min, float max, float *out
 bool ipc_bool(ipc_args_t *a, const char *what, bool *out);
 bool ipc_str(ipc_args_t *a, const char *what, char *dst, size_t dstsz);
 
-bool ipc_delta(ipc_args_t *a, const char *what, double *out);
 bool ipc_delta_str(ipc_args_t *a, const char *what, const char *arg, double *out);
 
 bool ipc_toggle(ipc_args_t *a, bool *cur);
@@ -60,6 +59,8 @@ bool ipc_float_str(ipc_args_t *a, const char *arg, const char *what, float min, 
 	float *out);
 bool ipc_double_str(ipc_args_t *a, const char *arg, const char *what, double min, double max,
 	double *out);
+
+bool ipc_parse_float(const char *s, float min, float max, float *out);
 
 typedef struct {
 	char *buf;

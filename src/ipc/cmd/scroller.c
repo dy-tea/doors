@@ -119,7 +119,7 @@ static void scr_unstack(ipc_args_t *a) {
 }
 
 static void scr_cycle_preset(ipc_args_t *a) {
-	if (!scroller_proportion_preset || scroller_proportion_preset_count == 0) {
+	if (!settings.scroller_proportion_preset || settings.scroller_proportion_preset_count == 0) {
 		ipc_fail(a, "No presets configured\n");
 		return;
 	}
@@ -136,17 +136,17 @@ static void scr_cycle_preset(ipc_args_t *a) {
 	scroller_state_t *s = desk->scroller_state;
 	double cur = s->columns[col].width.value;
 	int next = 0;
-	for (int i = 0; i < scroller_proportion_preset_count; i++) {
-		if (fabs(scroller_proportion_preset[i] - cur) < 0.01f) {
+	for (int i = 0; i < settings.scroller_proportion_preset_count; i++) {
+		if (fabs(settings.scroller_proportion_preset[i] - cur) < 0.01f) {
 			next = i + 1;
 			break;
 		}
 	}
-	if (next >= scroller_proportion_preset_count)
+	if (next >= settings.scroller_proportion_preset_count)
 		next = 0;
 
 	s->columns[col].width.type = SCROLLER_WIDTH_PROPORTION;
-	s->columns[col].width.value = scroller_proportion_preset[next];
+	s->columns[col].width.value = settings.scroller_proportion_preset[next];
 	arrange(mon, desk, true);
 	ipc_ok(a, "Cycled to next preset\n");
 }

@@ -12,9 +12,6 @@ typedef struct ime_relay_t {
 	struct wl_list text_inputs;
 	struct wlr_input_method_v2 *input_method;
 	struct wlr_surface *focused_surface;
-
-	struct wlr_keyboard_modifiers forwarded_modifiers;
-
 	struct ime_text_t *active_text_input;
 
 	struct wl_list popups;

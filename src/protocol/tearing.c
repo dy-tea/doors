@@ -9,7 +9,6 @@ typedef struct {
 	struct wlr_tearing_control_v1 *tearing_control;
 	struct wl_listener set_hint;
 	struct wl_listener destroy;
-	struct wl_list link;
 } tearing_controller_t;
 
 static void handle_tearing_controller_set_hint(struct wl_listener *listener, void *data) {
@@ -27,7 +26,6 @@ static void handle_tearing_controller_destroy(struct wl_listener *listener, void
 	tearing_controller_t *controller = wl_container_of(listener, controller, destroy);
 	wl_list_remove(&controller->set_hint.link);
 	wl_list_remove(&controller->destroy.link);
-	wl_list_remove(&controller->link);
 	free(controller);
 }
 
@@ -50,9 +48,6 @@ static void handle_new_tearing_hint(struct wl_listener *listener, void *data) {
 	wl_signal_add(&tearing_control->events.set_hint, &controller->set_hint);
 	controller->destroy.notify = handle_tearing_controller_destroy;
 	wl_signal_add(&tearing_control->events.destroy, &controller->destroy);
-	wl_list_init(&controller->link);
-
-	wl_list_insert(&server.tearing_controllers, &controller->link);
 }
 
 void tearing_init(void) {
@@ -63,7 +58,6 @@ void tearing_init(void) {
 		exit(EXIT_FAILURE);
 	}
 	server.tearing_control_new_object.notify = handle_new_tearing_hint;
-	wl_list_init(&server.tearing_controllers);
 	wl_signal_add(&server.tearing_control_v1->events.new_object, &server.tearing_control_new_object);
 }
 

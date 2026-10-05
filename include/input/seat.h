@@ -25,6 +25,4 @@ typedef struct seat_t {
 
 seat_t *seat_create(const char *name);
 void seat_destroy(seat_t *seat);
-seat_t *seat_find_by_name(const char *name);
-seat_t *seat_find_by_wlr_seat(struct wlr_seat *wlr_seat);
 seat_t *seat_default(void);

@@ -67,7 +67,7 @@ static void wm_dump_state(ipc_args_t *a) {
 }
 
 static void wm_load_state(ipc_args_t *a) {
-	ipc_ok(a, "Not implemented\n");
+	ipc_fail(a, "load-state is not implemented\n");
 }
 
 static void wm_add_monitor(ipc_args_t *a) {
@@ -91,11 +91,7 @@ static void wm_add_monitor(ipc_args_t *a) {
 }
 
 static void wm_reorder_monitors(ipc_args_t *a) {
-	const char *name;
-	if (!ipc_need(a, "monitor name", &name))
-		return;
-
-	ipc_ok(a, "Unimplemented\n");
+	ipc_fail(a, "reorder-monitors is not implemented\n");
 }
 
 static void wm_adopt_orphans(ipc_args_t *a) {

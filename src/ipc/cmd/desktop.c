@@ -305,6 +305,12 @@ void ipc_cmd_desktop(ipc_args_t *a) {
 		return;
 	}
 
+	// a bare desktop name is only meaningful relative to an output
+	if (arg && arg[0] != '-' && server.focused_output == NULL) {
+		ipc_fail(a, "No focused monitor\n");
+		return;
+	}
+
 	output_t *mon = server.focused_output;
 	if (arg && arg[0] != '-') {
 		desktop_t *desk = find_desktop_by_name_in_monitor(mon, arg);

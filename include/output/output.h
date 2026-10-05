@@ -47,7 +47,6 @@ typedef struct output_t {
 	int max_render_time;
 
 	enum scale_filter_mode scale_filter_mode, applied_scale_filter;
-	enum wl_output_subpixel detected_subpixel;
 
 	struct wlr_color_transform *color_transform;
 	bool hdr;
@@ -55,9 +54,6 @@ typedef struct output_t {
 
 	char name[64]; // SMALEN
 	uint32_t id;
-	bool wired;
-	padding_t padding;
-	unsigned int sticky_count;
 
 	struct wlr_box rectangle;
 	desktop_t *desk, *last_desk;
@@ -68,16 +64,15 @@ typedef struct output_t {
 void output_create(struct wlr_output *wlr_output);
 void output_enable(output_t *output);
 void output_disable(output_t *output);
-void output_destroy(output_t *output);
+void output_teardown(output_t *output);
 output_t *output_from_wlr_output(struct wlr_output *wlr_output);
 output_t *output_get_in_direction(output_t *reference, uint32_t direction);
 void output_update_usable_area(output_t *output);
-void output_set_scale_filter(output_t *output, enum scale_filter_mode mode);
-void output_get_identifier(char *identifier, size_t len, output_t *output);
 void output_update_scale(output_t *output, float scale);
 output_t *output_get_valid(void);
 void output_schedule_frame(output_t *output);
 bool output_supports_hdr(output_t *output, const char **unsupported_reason_ptr);
 void output_set_focused(output_t *m);
+void set_orphan_active_desk(desktop_t *d);
 output_t *output_at(double x, double y);
 output_t *find_output_by_name(const char *name);

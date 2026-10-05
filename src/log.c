@@ -33,10 +33,31 @@ static const char *verbosity_headers[] = {
 	[WLR_DEBUG] = "[DEBUG]",
 };
 
+#define LOGS_TO_KEEP 25
+
+static int mkdir_p(const char *path) {
+	char tmp[sizeof(log_dir)];
+	snprintf(tmp, sizeof(tmp), "%s", path);
+
+	for (char *p = tmp + 1; *p; p++) {
+		if (*p != '/')
+			continue;
+		*p = '\0';
+		if (mkdir(tmp, 0700) != 0 && errno != EEXIST)
+			return -1;
+		*p = '/';
+	}
+
+	if (mkdir(tmp, 0700) != 0 && errno != EEXIST)
+		return -1;
+
+	return 0;
+}
+
 static int log_compare(const void *a, const void *b) {
-	const struct dirent *ea = *(const struct dirent **)a;
-	const struct dirent *eb = *(const struct dirent **)b;
-	return strcmp(eb->d_name, ea->d_name);
+	const char *const *ea = a;
+	const char *const *eb = b;
+	return strcmp(*eb, *ea);
 }
 
 static void cleanup_old_logs(void) {
@@ -44,7 +65,6 @@ static void cleanup_old_logs(void) {
 	if (!dir)
 		return;
 
-	struct dirent **namelist = NULL;
 	int count = 0;
 	struct dirent *entry;
 	while ((entry = readdir(dir)) != NULL) {
@@ -53,39 +73,39 @@ static void cleanup_old_logs(void) {
 	}
 	rewinddir(dir);
 
-	if (count <= 25) {
+	if (count <= LOGS_TO_KEEP) {
 		closedir(dir);
 		return;
 	}
 
-	namelist = malloc(count * sizeof(struct dirent *));
-	if (!namelist) {
+	char **names = malloc((size_t)count * sizeof(char *));
+	if (!names) {
 		closedir(dir);
 		return;
 	}
 
 	int i = 0;
-	while ((entry = readdir(dir)) != NULL) {
-		if (strstr(entry->d_name, ".log")) {
-			namelist[i] = malloc(sizeof(struct dirent));
-			memcpy(namelist[i], entry, sizeof(struct dirent));
-			i++;
-		}
+	while (i < count && (entry = readdir(dir)) != NULL) {
+		if (!strstr(entry->d_name, ".log"))
+			continue;
+		names[i] = strdup(entry->d_name);
+		if (!names[i])
+			break;
+		i++;
 	}
 	closedir(dir);
 
-	qsort(namelist, count, sizeof(struct dirent *), log_compare);
+	qsort(names, (size_t)i, sizeof(char *), log_compare);
 
-	for (int j = 25; j < count; j++) {
+	for (int j = LOGS_TO_KEEP; j < i; j++) {
 		char full_path[2048];
-		snprintf(full_path, sizeof(full_path), "%s/%s", log_dir, namelist[j]->d_name);
+		snprintf(full_path, sizeof(full_path), "%s/%s", log_dir, names[j]);
 		unlink(full_path);
-		free(namelist[j]);
 	}
 
-	for (int j = 0; j < 25; j++)
-		free(namelist[j]);
-	free(namelist);
+	for (int j = 0; j < i; j++)
+		free(names[j]);
+	free(names);
 }
 
 static void log_callback(enum wlr_log_importance importance, const char *fmt, va_list args) {
@@ -215,10 +235,7 @@ int log_init(const char *log_file_path) {
 		// try to create directories
 		struct stat st = {0};
 		if (stat(log_dir, &st) == -1) {
-			char mkdir_cmd[sizeof(log_dir) + 16];
-			snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p %s", log_dir);
-
-			if (system(mkdir_cmd) != 0) {
+			if (mkdir_p(log_dir) != 0) {
 				fprintf(stderr, "ERROR: Failed to create log directory: %s\n", log_dir);
 				return -1;
 			}

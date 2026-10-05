@@ -1,6 +1,7 @@
 #include "input/input.h"
 #include "input/keyboard.h"
 #include "input/pointer.h"
+#include "input/touch.h"
 #include "once.h"
 #include "server.h"
 #include <float.h>
@@ -579,6 +580,8 @@ void input_init(void) {
 
 void input_fini(void) {
 	ONCE();
+	touch_fini();
+
 	for (size_t i = 0; i < num_input_configs; i++) {
 		input_config_destroy(input_configs[i]);
 		input_configs[i] = NULL;

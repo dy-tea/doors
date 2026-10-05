@@ -9,18 +9,6 @@
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
 
-float scroller_default_proportion = 0.5f;
-float scroller_default_proportion_single = 1.0f;
-int scroller_structs = 0;
-bool scroller_focus_center = false;
-bool scroller_prefer_center = true;
-bool scroller_prefer_overspread = false;
-bool scroller_ignore_proportion_single = false;
-bool edge_scroller_pointer_focus = true;
-
-float *scroller_proportion_preset = NULL;
-int scroller_proportion_preset_count = 0;
-
 static int max_i(int a, int b) {
 	return a > b ? a : b;
 }
@@ -59,8 +47,7 @@ scroller_state_t *scroller_create(void) {
 		return NULL;
 	s->view_offset = 0.0;
 	s->activate_prev_column_on_removal = false;
-	s->default_proportion = scroller_default_proportion;
-	s->default_proportion_single = scroller_default_proportion_single;
+	s->default_proportion = settings.scroller_default_proportion;
 	return s;
 }
 
@@ -1019,19 +1006,6 @@ bool scroller_resize_stack(desktop_t *d, float delta) {
 		h = 1.0;
 	col->tiles[tile_idx].height.value = h;
 	return true;
-}
-
-void scroller_set_proportion(client_t *client, float proportion) {
-	if (!client)
-		return;
-	(void)proportion;
-	wlr_log(WLR_DEBUG, "Stub (client=%p prop=%.2f)", (void *)client, proportion);
-}
-
-void scroller_cycle_proportion_preset(client_t *client) {
-	if (!client || !scroller_proportion_preset || scroller_proportion_preset_count == 0)
-		return;
-	wlr_log(WLR_DEBUG, "Stub");
 }
 
 int scroller_collect(desktop_t *d, node_t ***out_nodes) {

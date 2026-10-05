@@ -403,6 +403,60 @@ void output_request_state(struct wl_listener *listener, void *data) {
 		output_update_scale(output, new_scale);
 }
 
+void output_teardown(output_t *output) {
+	if (output == NULL)
+		return;
+
+	output_t *next = output->link.next != &mon_list ? wl_container_of(output->link.next, next,
+		link) : NULL;
+	output_t *prev = output->link.prev != &mon_list ? wl_container_of(output->link.prev, prev,
+		link) : NULL;
+	wl_list_remove(&output->link);
+
+	if (server.focused_output == output)
+		output_set_focused(next ? next : prev);
+	if (mon == output)
+		mon = wl_list_empty(&mon_list) ? NULL : wl_container_of(mon_list.next, mon, link);
+
+	wlr_color_transform_unref(output->color_transform);
+	output->color_transform = NULL;
+	effects_output_fini(output->effects);
+	output->effects = NULL;
+
+	desktop_t *d, *dtmp;
+	wl_list_for_each_safe(d, dtmp, &output->desk_list, link) {
+		wl_list_remove(&d->link);
+		desktop_clear_output(d, NULL);
+
+		d->output = NULL;
+		wl_list_insert(orphan_desk_list.prev, &d->link);
+	}
+	wl_list_init(&output->desk_list);
+	output->desk = NULL;
+
+	if (output->layer_bg)
+		wlr_scene_node_destroy(&output->layer_bg->node);
+	if (output->layer_bottom)
+		wlr_scene_node_destroy(&output->layer_bottom->node);
+	if (output->layer_top)
+		wlr_scene_node_destroy(&output->layer_top->node);
+	if (output->layer_overlay)
+		wlr_scene_node_destroy(&output->layer_overlay->node);
+	output->layer_bg = NULL;
+	output->layer_bottom = NULL;
+	output->layer_top = NULL;
+	output->layer_overlay = NULL;
+
+	if (output->wlr_output)
+		output->wlr_output->data = NULL;
+
+	free(output);
+}
+
+void set_orphan_active_desk(desktop_t *d) {
+	orphan_active_desk = d;
+}
+
 static void handle_output_destroy(struct wl_listener *listener, void *data) {
 	(void)data;
 	output_t *output = wl_container_of(listener, output, destroy);
@@ -429,35 +483,12 @@ static void handle_output_destroy(struct wl_listener *listener, void *data) {
 		output->repaint_timer = NULL;
 	}
 
-	output_t *next = output->link.next != &mon_list ? wl_container_of(output->link.next, next,
-		link) : NULL;
-	output_t *prev = output->link.prev != &mon_list ? wl_container_of(output->link.prev, prev,
-		link) : NULL;
-	wl_list_remove(&output->link);
+	output_teardown(output);
 
-	if (server.focused_output == output)
-		server.focused_output = next ? next : prev;
-	if (mon == output)
-		mon = wl_list_empty(&mon_list) ? NULL : wl_container_of(mon_list.next, mon, link);
-
-	wlr_color_transform_unref(output->color_transform);
-	effects_output_fini(output->effects);
-
-	desktop_t *d, *dtmp;
-	wl_list_for_each_safe(d, dtmp, &output->desk_list, link) {
-		wl_list_remove(&d->link);
-		desktop_clear_output(d, NULL);
-
-		d->output = NULL;
-		wl_list_insert(orphan_desk_list.prev, &d->link);
-	}
-	wl_list_init(&output->desk_list);
-	output->desk = NULL;
 	if (active_desk)
 		orphan_active_desk = active_desk;
 
 	ipc_put_status(SUB_MASK_MONITOR_REMOVE, "monitor_remove[%s]\n", output->name);
-	free(output);
 }
 
 void output_create(struct wlr_output *wlr_output) {
@@ -480,8 +511,6 @@ void output_create(struct wlr_output *wlr_output) {
 		wlr_output_set_name(wlr_output, output->name);
 	}
 	output->id = next_monitor_id++;
-	output->wired = true;
-	output->padding = (padding_t){0};
 	output->rectangle = (struct wlr_box){
 		0,
 		0,
@@ -594,7 +623,6 @@ void output_enable(output_t *output) {
 	output->width = output->rectangle.width;
 	output->height = output->rectangle.height;
 
-	output->detected_subpixel = output->wlr_output->subpixel;
 	output->scale_filter_mode = SCALE_FILTER_NEAREST;
 
 	output_update_usable_area(output);
@@ -615,22 +643,6 @@ void output_disable(output_t *output) {
 		output->desk->output = NULL;
 		output->desk = NULL;
 	}
-}
-
-void output_destroy(output_t *output) {
-	if (!output)
-		return;
-
-	if (output->layer_bg)
-		wlr_scene_node_destroy(&output->layer_bg->node);
-	if (output->layer_bottom)
-		wlr_scene_node_destroy(&output->layer_bottom->node);
-	if (output->layer_top)
-		wlr_scene_node_destroy(&output->layer_top->node);
-	if (output->layer_overlay)
-		wlr_scene_node_destroy(&output->layer_overlay->node);
-
-	free(output);
 }
 
 output_t *output_from_wlr_output(struct wlr_output *wlr_output) {
@@ -667,21 +679,6 @@ void output_update_usable_area(output_t *output) {
 	output->usable_area.y = 0;
 	output->usable_area.width = output->width;
 	output->usable_area.height = output->height;
-}
-
-void output_set_scale_filter(output_t *output, enum scale_filter_mode mode) {
-	if (!output)
-		return;
-
-	output->scale_filter_mode = mode;
-	output_configure_scene(output);
-}
-
-void output_get_identifier(char *identifier, size_t len, output_t *output) {
-	struct wlr_output *wlr_output = output->wlr_output;
-	snprintf(identifier, len, "%s %s %s", wlr_output->make ? wlr_output->make : "Unknown",
-		wlr_output->model ? wlr_output->model : "Unknown",
-		wlr_output->serial ? wlr_output->serial : "Unknown");
 }
 
 void output_update_scale(output_t *output, float scale) {

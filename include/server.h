@@ -140,7 +140,6 @@ typedef struct server_t {
 
 	struct wlr_tearing_control_manager_v1 *tearing_control_v1;
 	struct wl_listener tearing_control_new_object;
-	struct wl_list tearing_controllers;
 
 	struct wlr_keyboard_shortcuts_inhibit_manager_v1 *keyboard_shortcuts_inhibit_manager;
 	struct wl_listener keyboard_shortcuts_inhibit_new_inhibitor;

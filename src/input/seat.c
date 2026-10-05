@@ -135,24 +135,6 @@ void seat_destroy(seat_t *seat) {
 	free(seat);
 }
 
-seat_t *seat_find_by_name(const char *name) {
-	seat_t *seat;
-	wl_list_for_each(seat, &server.seats, link)
-		if (strcmp(seat->name, name) == 0)
-			return seat;
-
-	return NULL;
-}
-
-seat_t *seat_find_by_wlr_seat(struct wlr_seat *wlr_seat) {
-	seat_t *seat;
-	wl_list_for_each(seat, &server.seats, link)
-		if (seat->wlr_seat == wlr_seat)
-			return seat;
-
-	return NULL;
-}
-
 seat_t *seat_default(void) {
 	if (wl_list_empty(&server.seats))
 		return NULL;

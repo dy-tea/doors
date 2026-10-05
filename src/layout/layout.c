@@ -407,19 +407,3 @@ void layout_toggle(desktop_t *d, layout_t target) {
 
 	layout_set(d, d->layout == target ? d->user_layout : target);
 }
-
-void layout_cycle(output_t *m, desktop_t *d, int direction) {
-	if (d == NULL)
-		return;
-
-	int num_layouts = sizeof(registry) / sizeof(registry[0]);
-	int current = (int)d->layout;
-	int next = (current + direction) % num_layouts;
-	if (next < 0)
-		next += num_layouts;
-
-	layout_set(d, (layout_t)next);
-	arrange(m, d, true);
-	if (d->focus)
-		focus_node(m, d, d->focus);
-}

@@ -601,20 +601,19 @@ static void out_remove(ipc_args_t *a) {
 		return;
 	}
 
-	output_t *next = mon->link.next != &mon_list ? wl_container_of(mon->link.next, mon, link) : NULL;
-	output_t *prev = mon->link.prev != &mon_list ? wl_container_of(mon->link.prev, mon, link) : NULL;
-	wl_list_remove(&mon->link);
+	char name[SMALEN];
+	snprintf(name, sizeof(name), "%s", mon->name);
+	desktop_t *last = mon->last_desk;
 
-	if (server.focused_output == mon) {
-		server.focused_output = next ? next : prev;
-		if (server.focused_output) {
-			focus_node(server.focused_output, server.focused_output->desk,
-				server.focused_output->desk ? server.focused_output->desk->focus : NULL);
-		}
-	}
+	output_teardown(mon);
 
-	ipc_put_status(SUB_MASK_MONITOR_REMOVE, "monitor_remove[%s]\n", mon->name);
-	free(mon);
+	set_orphan_active_desk(last);
+
+	output_t *focused = server.focused_output;
+	if (focused && focused->desk && focused->desk->focus)
+		focus_node(focused, focused->desk, focused->desk->focus);
+
+	ipc_put_status(SUB_MASK_MONITOR_REMOVE, "monitor_remove[%s]\n", name);
 	transaction_commit_dirty();
 	ipc_ok(a, "Removed\n");
 }
@@ -643,14 +642,12 @@ static void out_rectangle(ipc_args_t *a) {
 		}
 	}
 
-	mon->rectangle.x = x;
-	mon->rectangle.y = y;
-	mon->rectangle.width = width;
-	mon->rectangle.height = height;
-
-	ipc_put_status(SUB_MASK_MONITOR_CHANGE, "monitor_change[%s]\n", mon->name);
-	transaction_commit_dirty();
-	ipc_ok(a, "Rectangle set\n");
+	out_ctx_t *c = ctx_of(a);
+	c->oc->x = x;
+	c->oc->y = y;
+	c->oc->width = width;
+	c->oc->height = height;
+	apply_ok(a, "Output rectangle");
 }
 
 const ipc_sub_t output_subs[] = {

@@ -34,7 +34,7 @@ node_t *make_node(uint32_t id) {
 
 	n->id = id != 0 ? id : next_node_id++;
 	n->split_type = TYPE_VERTICAL;
-	n->split_ratio = 0.5;
+	n->split_ratio = settings.split_ratio;
 	n->vacant = false;
 	n->hidden = false;
 	n->sticky = false;
@@ -58,13 +58,13 @@ node_t *make_node(uint32_t id) {
 
 	// init current state
 	n->current.rectangle = (struct wlr_box){0};
-	n->current.split_ratio = 0.5;
+	n->current.split_ratio = settings.split_ratio;
 	n->current.split_type = TYPE_VERTICAL;
 	n->current.hidden = false;
 
 	// init pending state
 	n->pending.rectangle = (struct wlr_box){0};
-	n->pending.split_ratio = 0.5;
+	n->pending.split_ratio = settings.split_ratio;
 	n->pending.split_type = TYPE_VERTICAL;
 	n->pending.hidden = false;
 
@@ -78,8 +78,6 @@ client_t *make_client(void) {
 
 	c->state = STATE_TILED;
 	c->last_state = STATE_TILED;
-	c->layer = LAYER_NORMAL;
-	c->last_layer = LAYER_NORMAL;
 	c->flags.urgent = false;
 	c->flags.shown = false;
 	c->master_stack_order = next_master_stack_order++;
@@ -416,7 +414,7 @@ node_t *insert_node(desktop_t *d, node_t *n, node_t *f) {
 				c->split_type = TYPE_VERTICAL;
 			}
 
-			c->split_ratio = 0.5;
+			c->split_ratio = settings.split_ratio;
 
 			node_sync_split(c);
 		} else {
@@ -504,14 +502,15 @@ void remove_node(desktop_t *d, node_t *n) {
 		return;
 
 	// rebuild tab bar for each tabbed ancestor
-	node_t *tabbed_chain[64];
+	node_t *tabbed_chain[TREE_MAX_DEPTH];
 	int tabbed_chain_count = 0;
-	for (node_t *q = n->parent; q != NULL && tabbed_chain_count < 64; q = q->parent)
+	for (node_t *q = n->parent; q != NULL && tabbed_chain_count < TREE_MAX_DEPTH; q = q->parent)
 		if (q->split_type == TYPE_TABBED)
 			tabbed_chain[tabbed_chain_count++] = q;
 
 	node_t *p = n->parent;
 	bool n_is_first = is_first_child(n);
+	node_t *displaced_parent = NULL;
 
 	if (p == NULL) {
 		if (d->root != n) {
@@ -526,24 +525,9 @@ void remove_node(desktop_t *d, node_t *n) {
 			return;
 		}
 
-		// check if root has brother
-		node_t *b = brother_tree(n);
-		if (b != NULL) {
-			// promote brother to root
-			wlr_log(WLR_DEBUG, "Node %u is root with brother %u, promoting brother "
-				"to root", n->id, b->id);
-			d->root = b;
-			b->parent = NULL;
-			if (n->parent != NULL)
-				n->parent = NULL;
-			if (d->focus == n)
-				d->focus = b;
-		} else {
-			wlr_log(WLR_DEBUG, "Node %u has no parent or brother, clearing desktop "
-				"%s root", n->id, d->name);
-			d->root = NULL;
-			d->focus = NULL;
-		}
+		wlr_log(WLR_DEBUG, "Node %u is root, clearing desktop %s root", n->id, d->name);
+		d->root = NULL;
+		d->focus = NULL;
 	} else {
 		node_t *b = brother_tree(n);
 		node_t *g = p->parent;
@@ -557,15 +541,14 @@ void remove_node(desktop_t *d, node_t *n) {
 			return;
 		}
 
-		node_replace_child(d, p, b, g);
+		displaced_parent = p;
+		split_type_t old_split_type = p->split_type;
+		struct wlr_box old_rect = p->rectangle;
 
-		if (g != NULL) {
-			if (n_is_first)
-				p->first_child = NULL;
-			else
-				p->second_child = NULL;
-			p->parent = NULL;
-		}
+		node_replace_child(d, p, b, g);
+		p->first_child = NULL;
+		p->second_child = NULL;
+		p->parent = NULL;
 
 		// clear detached pointers
 		n->parent = NULL;
@@ -573,7 +556,7 @@ void remove_node(desktop_t *d, node_t *n) {
 		n->second_child = NULL;
 
 		// propagate TYPE_TABBED so remaining leaves stay tabbed
-		if (p->split_type == TYPE_TABBED && !is_leaf(b)) {
+		if (old_split_type == TYPE_TABBED && !is_leaf(b)) {
 			node_set_split_type(b, TYPE_TABBED);
 		}
 
@@ -585,8 +568,8 @@ void remove_node(desktop_t *d, node_t *n) {
 				else
 					rotate_tree(b, 90);
 			} else if (settings.automatic_scheme == SCHEME_LONGEST_SIDE || g == NULL) {
-				if (p != NULL && !is_leaf(b)) {
-					if (p->rectangle.width > p->rectangle.height) {
+				if (!is_leaf(b)) {
+					if (old_rect.width > old_rect.height) {
 						node_set_split_type(b, TYPE_VERTICAL);
 					} else {
 						node_set_split_type(b, TYPE_HORIZONTAL);
@@ -635,6 +618,13 @@ void remove_node(desktop_t *d, node_t *n) {
 			tabs_destroy(t);
 		else
 			tabs_rebuild(t);
+	}
+
+	if (displaced_parent != NULL) {
+		if (displaced_parent->dirty || displaced_parent->ntxnrefs > 0)
+			displaced_parent->destroying = true;
+		else
+			free_node(displaced_parent);
 	}
 }
 
@@ -994,7 +984,7 @@ presel_t *make_presel(void) {
 	if (p == NULL)
 		return NULL;
 
-	p->split_ratio = 0.5;
+	p->split_ratio = settings.split_ratio;
 	p->split_dir = DIR_EAST;
 
 	return p;
@@ -1147,7 +1137,7 @@ static bool validate_subtree(node_t *n, node_t *expected_parent, int depth) {
 	if (n == NULL)
 		return true;
 
-	if (depth > 64) {
+	if (depth > TREE_MAX_DEPTH) {
 		wlr_log(WLR_ERROR, "Depth limit reached at node %u, possible cycle", n->id);
 		return false;
 	}

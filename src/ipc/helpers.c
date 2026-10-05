@@ -1,7 +1,6 @@
 #include "ipc/helpers.h"
 #include "protocol/workspace.h"
 #include "server.h"
-#include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>

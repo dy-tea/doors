@@ -138,11 +138,6 @@ void idle_power_notify_activity(void) {
 	reset_idle_timer();
 }
 
-void idle_power_check_inhibitors(void) {
-	if (displays_off && is_inhibited())
-		turn_displays_on();
-}
-
 void idle_power_reset_timer(void) {
 	if (!idle_timer)
 		return;

@@ -737,25 +737,6 @@ bool animation_is_resizing(node_t *node) {
 	return entry && entry->kind == ANIM_KIND_RESIZE;
 }
 
-bool animation_get_toplevel_resize_progress(view_t *view, double *progress,
-		struct wlr_box *anim_from, struct wlr_box *anim_to) {
-	if (!view || !view->node)
-		return false;
-
-	animation_entry_t *entry = find_animation(view->node);
-	if (!entry || entry->kind != ANIM_KIND_RESIZE)
-		return false;
-
-	if (progress)
-		*progress = entry->eased;
-	if (anim_from)
-		*anim_from = entry->from;
-	if (anim_to)
-		*anim_to = entry->to;
-
-	return true;
-}
-
 bool animation_get_geometry_progress(view_t *view, struct wlr_box *out) {
 	if (!view || !view->node)
 		return false;

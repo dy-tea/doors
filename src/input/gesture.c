@@ -1,6 +1,5 @@
 #include "input/gesture.h"
 #include <math.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wlr/util/log.h>
@@ -142,58 +141,6 @@ char *gesture_parse(const char *input, gesture_t *output) {
 	return NULL;
 }
 
-char *gesture_to_string(const gesture_t *gesture) {
-	if (!gesture)
-		return strdup("");
-
-	char buf[256] = {0};
-	snprintf(buf, sizeof(buf), "%s", gesture_type_string(gesture->type));
-
-	if (gesture->fingers != GESTURE_FINGERS_ANY) {
-		char fingers[16];
-		snprintf(fingers, sizeof(fingers), ":%d", gesture->fingers);
-		strncat(buf, fingers, sizeof(buf) - strlen(buf) - 1);
-	}
-
-	if (gesture->directions != GESTURE_DIRECTION_NONE) {
-		strncat(buf, ":", sizeof(buf) - strlen(buf) - 1);
-
-		bool first = true;
-		if (gesture->directions & GESTURE_DIRECTION_UP) {
-			strncat(buf, first ? "up" : "+up", sizeof(buf) - strlen(buf) - 1);
-			first = false;
-		}
-		if (gesture->directions & GESTURE_DIRECTION_DOWN) {
-			strncat(buf, first ? "down" : "+down", sizeof(buf) - strlen(buf) - 1);
-			first = false;
-		}
-		if (gesture->directions & GESTURE_DIRECTION_LEFT) {
-			strncat(buf, first ? "left" : "+left", sizeof(buf) - strlen(buf) - 1);
-			first = false;
-		}
-		if (gesture->directions & GESTURE_DIRECTION_RIGHT) {
-			strncat(buf, first ? "right" : "+right", sizeof(buf) - strlen(buf) - 1);
-			first = false;
-		}
-		if (gesture->directions & GESTURE_DIRECTION_INWARD) {
-			strncat(buf, first ? "inward" : "+inward", sizeof(buf) - strlen(buf) - 1);
-			first = false;
-		}
-		if (gesture->directions & GESTURE_DIRECTION_OUTWARD) {
-			strncat(buf, first ? "outward" : "+outward", sizeof(buf) - strlen(buf) - 1);
-			first = false;
-		}
-		if (gesture->directions & GESTURE_DIRECTION_CLOCKWISE) {
-			strncat(buf, first ? "clockwise" : "+clockwise", sizeof(buf) - strlen(buf) - 1);
-			first = false;
-		}
-		if (gesture->directions & GESTURE_DIRECTION_COUNTERCLOCKWISE)
-			strncat(buf, first ? "counterclockwise" : "+counterclockwise", sizeof(buf) - strlen(buf) - 1);
-	}
-
-	return strdup(buf);
-}
-
 bool gesture_check(const gesture_t *target, enum gesture_type type, uint8_t fingers) {
 	if (!target || target->type != type)
 		return false;
@@ -201,27 +148,6 @@ bool gesture_check(const gesture_t *target, enum gesture_type type, uint8_t fing
 		return false;
 
 	return true;
-}
-
-bool gesture_match(const gesture_t *target, const gesture_t *to_match, bool exact) {
-	if (!target || !to_match)
-		return false;
-	if (target->type != to_match->type)
-		return false;
-	if (target->fingers != GESTURE_FINGERS_ANY && target->fingers != to_match->fingers)
-		return false;
-
-	if (exact)
-		return target->directions == to_match->directions;
-
-	return (target->directions & to_match->directions) != 0;
-}
-
-bool gesture_equal(const gesture_t *a, const gesture_t *b) {
-	if (!a || !b)
-		return false;
-
-	return a->type == b->type && a->fingers == b->fingers && a->directions == b->directions;
 }
 
 int8_t gesture_compare(const gesture_t *a, const gesture_t *b) {

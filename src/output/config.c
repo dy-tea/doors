@@ -74,6 +74,14 @@ void output_config_add(struct output_config *oc) {
 	wl_list_insert(&output_configs, &oc->link);
 }
 
+void output_config_remove(struct output_config *oc) {
+	if (!oc)
+		return;
+	if (!wl_list_empty(&oc->link))
+		wl_list_remove(&oc->link);
+	output_config_destroy(oc);
+}
+
 void output_set_power(struct wlr_output *wlr_output, uint32_t mode) {
 	if (!wlr_output)
 		return;
@@ -267,21 +275,6 @@ void output_config_apply(struct output_config *oc) {
 		output->name[SMALEN - 1] = '\0';
 		output_enable(output);
 		ipc_put_status(SUB_MASK_MONITOR_CHANGE, "monitor_change[%s]\n", output->name);
-	}
-}
-
-void output_apply_all_config(void) {
-	struct output_config *oc;
-	wl_list_for_each(oc, &output_configs, link)
-		output_config_apply(oc);
-}
-
-void output_config_update_from_wlr_output(output_t *output) {
-	struct output_config *oc = output_config_find(output->wlr_output->name);
-	if (!oc) {
-		oc = output_config_create(output->wlr_output->name);
-		if (oc)
-			output_config_add(oc);
 	}
 }
 

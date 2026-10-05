@@ -106,6 +106,17 @@ static bool parse_double(const char *s, double *out) {
 	return true;
 }
 
+bool ipc_parse_float(const char *s, float min, float max, float *out) {
+	double v;
+	if (!parse_double(s, &v))
+		return false;
+	if (v < min || v > max)
+		return false;
+
+	*out = (float)v;
+	return true;
+}
+
 static bool parse_bool(const char *s, bool *out) {
 	static const cfg_enum_value_t bools[] = {
 		{"true", 1},
@@ -232,14 +243,6 @@ bool ipc_bool_str(ipc_args_t *a, const char *arg, const char *what, bool *out) {
 		return false;
 	}
 	return true;
-}
-
-bool ipc_delta(ipc_args_t *a, const char *what, double *out) {
-	const char *arg;
-	if (!ipc_need(a, what, &arg))
-		return false;
-
-	return ipc_delta_str(a, what, arg, out);
 }
 
 bool ipc_delta_str(ipc_args_t *a, const char *what, const char *arg, double *out) {

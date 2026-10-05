@@ -1,6 +1,7 @@
 #include "settings.h"
 #include "tree.h"
 #include <stdint.h>
+#include <stdlib.h>
 
 // global settings
 doors_settings_t settings = {
@@ -13,7 +14,6 @@ doors_settings_t settings = {
 	.focus_follows_mouse = FOLLOWS_NO,
 	.pointer_follows_focus = false,
 	.record_history = true,
-	.click_to_focus = false,
 	.allow_tearing = false,
 	.auto_float_dialogs = false,
 	.decoration_mode = DECORATION_ALWAYS,
@@ -21,16 +21,16 @@ doors_settings_t settings = {
 	.hide_lone_tab = false,
 	.workspace_anim_direction = WORKSPACE_ANIM_VERTICAL,
 	.workspace_anim_slide_up = false,
-	.mapping_events_count = 0,
-	.directional_focus_tightness = 20,
 	.ignore_ewmh_fullscreen = 0,
 	.idle_timeout = 0,
 	.idle_dpms = true,
 	.realtime_scheduling = false,
 	.monocle_padding = {0},
-	.padding = {0},
 	.border_width = 2,
 	.window_gap = 10,
+	.scroller_default_proportion = 0.5f,
+	.scroller_proportion_preset = NULL,
+	.scroller_proportion_preset_count = 0,
 	.smart_gaps = false,
 	.smart_borders = false,
 	.respect_tiled_min_size = false,
@@ -94,6 +94,12 @@ void refresh_border_color_cache(void) {
 	parse_color(settings.focused_border_color, settings.focused_border_color_rgba);
 	parse_color(settings.presel_feedback_color, settings.presel_feedback_color_rgba);
 	parse_color(settings.tiling_drag_indicator_color, settings.tiling_drag_indicator_color_rgba);
+}
+
+void settings_fini(void) {
+	free(settings.scroller_proportion_preset);
+	settings.scroller_proportion_preset = NULL;
+	settings.scroller_proportion_preset_count = 0;
 }
 
 // global state

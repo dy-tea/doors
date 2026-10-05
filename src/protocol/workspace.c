@@ -180,7 +180,6 @@ void desktop_init(desktop_t *d, output_t *output, const char *name) {
 	d->master_stack.orientation = MASTER_LEFT;
 	d->master_stack.stack_layout = STACK_VERTICAL;
 	d->master_stack.count = 1;
-	d->padding = (padding_t){0};
 	d->output = output;
 	wl_list_init(&d->link);
 	wl_list_init(&d->minimized);

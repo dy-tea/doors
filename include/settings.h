@@ -5,6 +5,7 @@
 extern doors_settings_t settings;
 
 void refresh_border_color_cache(void);
+void settings_fini(void);
 
 extern struct output_t *mon;
 extern struct wl_list mon_list;

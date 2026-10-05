@@ -129,7 +129,6 @@ void server_init(void) {
 		wlr_drm_create(server.wl_display, server.renderer);
 		server.linux_dmabuf = wlr_linux_dmabuf_v1_create_with_renderer(server.wl_display, 4,
 			server.renderer);
-		server.export_dmabuf_manager = wlr_export_dmabuf_manager_v1_create(server.wl_display);
 	}
 
 	// drm syncobj
@@ -380,16 +379,11 @@ static int ipc_socket_handler(int fd, uint32_t mask, void *data) {
 
 int server_run(void) {
 	const char *socket = wl_display_add_socket_auto(server.wl_display);
-	if (!socket) {
-		wlr_backend_destroy(server.backend);
+	if (!socket)
 		return 1;
-	}
 
-	if (!wlr_backend_start(server.backend)) {
-		wlr_backend_destroy(server.backend);
-		wl_display_destroy(server.wl_display);
+	if (!wlr_backend_start(server.backend))
 		return 1;
-	}
 
 	setenv("WAYLAND_DISPLAY", socket, true);
 	setenv("XDG_CURRENT_DESKTOP", "doors", true);
@@ -413,10 +407,7 @@ int server_run(void) {
 	return 0;
 }
 
-// this will probably not work
 void server_restart(void) {
-	ipc_fini();
-
 	wl_display_terminate(server.wl_display);
 
 	if (fork() == 0)
@@ -432,15 +423,24 @@ void server_fini(void) {
 	animation_fini();
 	transaction_fini();
 	scratchpad_fini();
+	bezier_fini();
+	spring_fini();
 	workspace_fini();
 	ipc_fini();
 	rule_fini();
 	output_config_fini();
-	input_fini();
+	settings_fini();
 	global_shortcuts_fini();
+	security_ctx_fini();
 	config_fini();
 
 	wl_display_destroy_clients(server.wl_display);
+
+	seat_t *seat, *tmp_seat;
+	wl_list_for_each_safe(seat, tmp_seat, &server.seats, link)
+		seat_destroy(seat);
+
+	input_fini();
 	backend_fini();
 
 	xdg_shell_fini();
@@ -469,10 +469,6 @@ void server_fini(void) {
 	wlr_backend_destroy(server.backend);
 
 	wl_event_loop_dispatch_idle(wl_display_get_event_loop(server.wl_display));
-
-	seat_t *seat, *tmp_seat;
-	wl_list_for_each_safe(seat, tmp_seat, &server.seats, link)
-		seat_destroy(seat);
 
 	effects_fini();
 

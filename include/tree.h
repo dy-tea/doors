@@ -11,6 +11,8 @@
 typedef struct surface_rounded_t surface_rounded_t;
 typedef struct output_t output_t;
 
+#define TREE_MAX_DEPTH 64
+
 // node creation and destruction
 node_t *make_node(uint32_t id);
 client_t *make_client(void);

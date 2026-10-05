@@ -315,7 +315,9 @@ static void frame_destroy(copy_frame_t *frame) {
 static void frame_handle_resource_destroy(struct wl_resource *resource) {
 	copy_frame_t *frame = frame_from_resource(resource);
 	if (frame) {
-		frame->session->frame = NULL;
+		if (frame->session)
+			frame->session->frame = NULL;
+		frame->session = NULL;
 		frame_destroy(frame);
 	}
 }
@@ -772,6 +774,12 @@ static void frame_handle_capture(struct wl_client *wl_client, struct wl_resource
 	frame->capturing = true;
 
 	copy_session_t *session = frame->session;
+	if (!session) {
+		ext_image_copy_capture_frame_v1_send_failed(frame->resource,
+			EXT_IMAGE_COPY_CAPTURE_FRAME_V1_FAILURE_REASON_STOPPED);
+		frame_destroy(frame);
+		return;
+	}
 	struct wlr_ext_image_capture_source_v1 *source = session->source;
 
 	wlr_log(WLR_DEBUG, "Frame_handle_capture source=%p impl=%p", (void *)source,
@@ -856,6 +864,13 @@ static void session_destroy(copy_session_t *session) {
 	wl_list_remove(&session->source_destroy.link);
 	if (session->source)
 		session->source = NULL;
+
+	if (session->frame) {
+		copy_frame_t *frame = session->frame;
+		session->frame = NULL;
+		frame->session = NULL;
+		frame_destroy(frame);
+	}
 
 	wl_resource_set_user_data(session->resource, NULL);
 	free(session);

@@ -201,8 +201,14 @@ static const cfg_setting_t settings_table[] = {
 	B("focus_wrapping", NULL, settings.focus_wrapping, CFG_COMMIT, NULL),
 	B("hide_lone_tab", NULL, settings.hide_lone_tab, CFG_COMMIT, NULL),
 	B("gapless_monocle", NULL, settings.gapless_monocle, CFG_COMMIT, NULL),
+	I("monocle_top_padding", NULL, settings.monocle_padding.top, 0, INT_MAX, "%d\n", CFG_COMMIT, NULL),
+	I("monocle_right_padding", NULL, settings.monocle_padding.right, 0, INT_MAX, "%d\n", CFG_COMMIT,
+		NULL),
+	I("monocle_bottom_padding", NULL, settings.monocle_padding.bottom, 0, INT_MAX, "%d\n", CFG_COMMIT,
+		NULL),
+	I("monocle_left_padding", NULL, settings.monocle_padding.left, 0, INT_MAX, "%d\n", CFG_COMMIT,
+		NULL),
 	B("pointer_follows_focus", NULL, settings.pointer_follows_focus, CFG_COMMIT, NULL),
-	B("click_to_focus", NULL, settings.click_to_focus, 0, NULL),
 	B("record_history", NULL, settings.record_history, 0, NULL),
 	B("allow_tearing", NULL, settings.allow_tearing, CFG_COMMIT, NULL),
 	B("auto_float_dialogs", NULL, settings.auto_float_dialogs, 0, NULL),
@@ -222,21 +228,7 @@ static const cfg_setting_t settings_table[] = {
 		workspace_anim_direction_values, 0, NULL),
 	B("enable_animations", NULL, settings.enable_animations, 0, NULL),
 	B("workspace_anim_slide_up", NULL, settings.workspace_anim_slide_up, 0, NULL),
-	B("edge_scroller_pointer_focus", NULL, edge_scroller_pointer_focus, 0, NULL),
-	I("directional_focus_tightness", NULL, settings.directional_focus_tightness, 0, 100, "%d\n", 0,
-		NULL),
-	I("mapping_events_count", NULL, settings.mapping_events_count, 0, 1000000, "%d\n", 0, NULL),
 	I("ignore_ewmh_fullscreen", NULL, settings.ignore_ewmh_fullscreen, 0, 2, "%d\n", 0, NULL),
-
-	/* padding */
-	I("top_padding", NULL, settings.padding.top, INT_MIN, INT_MAX, "%d\n", CFG_COMMIT | CFG_CLAMP,
-		NULL),
-	I("right_padding", NULL, settings.padding.right, INT_MIN, INT_MAX, "%d\n", CFG_COMMIT | CFG_CLAMP,
-		NULL),
-	I("bottom_padding", NULL, settings.padding.bottom, INT_MIN, INT_MAX, "%d\n", CFG_COMMIT | CFG_CLAMP,
-		NULL),
-	I("left_padding", NULL, settings.padding.left, INT_MIN, INT_MAX, "%d\n", CFG_COMMIT | CFG_CLAMP,
-		NULL),
 
 	/* borders */
 	S("normal_border_color", NULL, settings.normal_border_color, sizeof(settings.normal_border_color),
@@ -255,15 +247,8 @@ static const cfg_setting_t settings_table[] = {
 	I("text_height", NULL, text_height, 0, 0, "%d\n", CFG_POSITIVE, on_text),
 
 	/* scroller */
-	F("scroller_default_proportion", NULL, scroller_default_proportion, 0.1, 1.0, "%.2f\n", CFG_CLAMP,
+	F("scroller_default_proportion", NULL, settings.scroller_default_proportion, 0.1, 1.0, "%.2f\n", CFG_CLAMP,
 		NULL),
-	F("scroller_default_proportion_single", NULL, scroller_default_proportion_single, 0.1, 1.0,
-		"%.2f\n", CFG_CLAMP, NULL),
-	B("scroller_focus_center", NULL, scroller_focus_center, 0, NULL),
-	B("scroller_prefer_center", NULL, scroller_prefer_center, 0, NULL),
-	B("scroller_prefer_overspread", NULL, scroller_prefer_overspread, 0, NULL),
-	B("scroller_ignore_proportion_single", NULL, scroller_ignore_proportion_single, 0, NULL),
-	I("scroller_structs", NULL, scroller_structs, 0, 1000000, "%d\n", CFG_CLAMP, NULL),
 
 	/* blur */
 	B("blur_enabled", NULL, blur_enabled, 0, NULL),
@@ -581,9 +566,9 @@ static void cfg_scroller_presets(ipc_args_t *a) {
 		char buf[512];
 		ipc_buf_t b;
 		ipc_buf_init(&b, buf, sizeof(buf));
-		for (int i = 0; i < scroller_proportion_preset_count; i++) {
-			ipc_buff(&b, "%.2f%s", scroller_proportion_preset[i],
-				i < scroller_proportion_preset_count - 1 ? "," : "\n");
+		for (int i = 0; i < settings.scroller_proportion_preset_count; i++) {
+			ipc_buff(&b, "%.2f%s", settings.scroller_proportion_preset[i],
+				i < settings.scroller_proportion_preset_count - 1 ? "," : "\n");
 		}
 		ipc_buf_send(a, &b);
 		return;
@@ -614,18 +599,19 @@ static void cfg_scroller_presets(ipc_args_t *a) {
 
 	int i = 0;
 	for (char *tok = strtok(copy, ","); tok && i < count; tok = strtok(NULL, ",")) {
-		float val = atof(tok);
-		if (val < 0.1f)
-			val = 0.1f;
-		if (val > 1.0f)
-			val = 1.0f;
-		presets[i++] = val;
+		if (!ipc_parse_float(tok, 0.1f, 1.0f, &presets[i])) {
+			free(copy);
+			free(presets);
+			ipc_fail(a, "Invalid value \"%s\" in proportion preset list\n", tok);
+			return;
+		}
+		i++;
 	}
 	free(copy);
 
-	free(scroller_proportion_preset);
-	scroller_proportion_preset = presets;
-	scroller_proportion_preset_count = i;
+	free(settings.scroller_proportion_preset);
+	settings.scroller_proportion_preset = presets;
+	settings.scroller_proportion_preset_count = i;
 
 	ipc_ok(a, "scroller_proportion_preset set\n");
 }

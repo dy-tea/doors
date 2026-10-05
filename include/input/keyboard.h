@@ -72,7 +72,6 @@ void send_to_desktop(int desktop_index);
 void send_to_desktop_by_name(const char *name);
 void send_to_next_desktop(void);
 void send_to_prev_desktop(void);
-void send_all_to_desktop(int desktop_index);
 void set_tiled_layout(void);
 void toggle_monocle(void);
 void monocle_toggle(struct output_t *m, desktop_t *d);

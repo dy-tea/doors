@@ -109,7 +109,7 @@ bool ipc_print_report(int fd) {
 	output_t *m;
 	wl_list_for_each(m, &mon_list, link) {
 		char mon_flag = (server.focused_output == m) ? 'M' : 'm';
-		offset += snprintf(buf + offset, sizeof(buf) - offset, "%c%s", mon_flag, m->name);
+		offset = ipc_buf_append(buf, sizeof(buf), offset, "%c%s", mon_flag, m->name);
 
 		desktop_t *d;
 		wl_list_for_each(d, &m->desk_list, link) {
@@ -119,18 +119,18 @@ bool ipc_print_report(int fd) {
 			else
 				desk_flag = d->focus ? 'o' : 'f';
 
-			offset += snprintf(buf + offset, sizeof(buf) - offset, ":%c%s", desk_flag, d->name);
+			offset = ipc_buf_append(buf, sizeof(buf), offset, ":%c%s", desk_flag, d->name);
 			if (desktop_has_urgent(d))
-				offset += snprintf(buf + offset, sizeof(buf) - offset, ":U%s", d->name);
+				offset = ipc_buf_append(buf, sizeof(buf), offset, ":U%s", d->name);
 		}
 
 		if (m->desk) {
-			offset += snprintf(buf + offset, sizeof(buf) - offset, ":L%c", layout_to_char(m->desk->layout));
+			offset = ipc_buf_append(buf, sizeof(buf), offset, ":L%c", layout_to_char(m->desk->layout));
 
 			if (m->desk->focus) {
 				char state_char = client_state_to_char(m->desk->focus->client);
 
-				offset += snprintf(buf + offset, sizeof(buf) - offset, ":T%c", state_char);
+				offset = ipc_buf_append(buf, sizeof(buf), offset, ":T%c", state_char);
 
 				int i = 0;
 				char flags[6] = {0};
@@ -145,15 +145,15 @@ bool ipc_print_report(int fd) {
 				if (m->desk->focus->hidden)
 					flags[i++] = 'H';
 				if (i > 0)
-					offset += snprintf(buf + offset, sizeof(buf) - offset, ":G%s", flags);
+					offset = ipc_buf_append(buf, sizeof(buf), offset, ":G%s", flags);
 			}
 		}
 
 		if (m->link.next != &mon_list)
-			offset += snprintf(buf + offset, sizeof(buf) - offset, "%s", ":");
+			offset = ipc_buf_append(buf, sizeof(buf), offset, "%s", ":");
 	}
 
-	offset += snprintf(buf + offset, sizeof(buf) - offset, "%s", "\n");
+	offset = ipc_buf_append(buf, sizeof(buf), offset, "%s", "\n");
 	return ipc_write_all(fd, buf, offset);
 }
 
@@ -165,10 +165,10 @@ void ipc_put_status(subscriber_mask_t mask, const char *fmt, ...) {
 	if (fmt) {
 		va_list args;
 		va_start(args, fmt);
-		len = vsnprintf(buf, sizeof(buf), fmt, args);
+		int n = vsnprintf(buf, sizeof(buf), fmt, args);
 		va_end(args);
-		if (len >= sizeof(buf))
-			len = sizeof(buf) - 1;
+		if (n > 0)
+			len = ((size_t)n < sizeof(buf)) ? (size_t)n : sizeof(buf) - 1;
 	}
 
 	wl_list_for_each_safe(sb, tmp, &subscriber_list, link) {

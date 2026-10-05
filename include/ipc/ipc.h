@@ -1,6 +1,9 @@
 #pragma once
 
+#include <stdarg.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdio.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <wayland-server-core.h>
@@ -9,7 +12,24 @@
 #define DOORS_SOCKET_PATH_TEMPLATE "/run/user/%d/doors-%d.sock"
 #define DOORS_BUFSIZ 4096
 
-#define DOORS_FIFO_TEMPLATE "doors_fifo.XXXXXX"
+static inline size_t ipc_buf_append(char *buf, size_t size, size_t offset, const char *fmt, ...) {
+	if (offset >= size)
+		return size - 1;
+
+	va_list ap;
+	va_start(ap, fmt);
+	int n = vsnprintf(buf + offset, size - offset, fmt, ap);
+	va_end(ap);
+
+	if (n < 0)
+		return offset;
+
+	size_t written = (size_t)n;
+	if (written >= size - offset)
+		return size - 1; // truncated
+
+	return offset + written;
+}
 
 typedef struct output_t output_t;
 

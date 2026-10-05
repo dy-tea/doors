@@ -46,7 +46,7 @@ static submap_t *current_parsing_submap = NULL;
 static keyboard_grouping_t keyboard_grouping = KEYBOARD_GROUP_DEFAULT;
 
 static int hotkey_watch_fd = -1;
-static char hotkey_config_path[PATH_MAX];
+static char hotkey_config_path[CONFIG_PATH_MAX];
 static struct wl_event_loop *hotkey_event_loop = NULL;
 static struct wl_event_source *hotkey_event_source = NULL;
 static void setup_inotify_watch(const char *config_path);
@@ -317,12 +317,20 @@ static void expand_braces_recursive(const char *input, char *prefix, size_t pref
 		if (result->count < MAX_EXPANSIONS) {
 			snprintf(result->strings[result->count], MAXLEN, "%s%s", prefix, input);
 			result->count++;
+		} else {
+			wlr_log(WLR_ERROR, "Brace expansion exceeds %d results, dropping: %s%s", MAX_EXPANSIONS, prefix,
+				input);
 		}
 		return;
 	}
 
 	// copy prefix
 	size_t pre_brace_len = brace_start - input;
+	if (prefix_len + pre_brace_len >= MAXLEN) {
+		wlr_log(WLR_ERROR, "Brace expansion prefix exceeds %d bytes, truncating: %s%s", MAXLEN, prefix,
+			input);
+		pre_brace_len = MAXLEN - prefix_len - 1;
+	}
 	char new_prefix[MAXLEN];
 	memcpy(new_prefix, prefix, prefix_len);
 	memcpy(new_prefix + prefix_len, input, pre_brace_len);
@@ -350,6 +358,10 @@ static void expand_braces_recursive(const char *input, char *prefix, size_t pref
 
 	// get content
 	size_t content_len = (brace_end - 1) - (brace_start + 1);
+	if (content_len >= MAXLEN) {
+		wlr_log(WLR_ERROR, "Brace expansion group exceeds %d bytes, truncating", MAXLEN);
+		content_len = MAXLEN - 1;
+	}
 	char content[MAXLEN];
 	memcpy(content, brace_start + 1, content_len);
 	content[content_len] = '\0';
@@ -933,10 +945,10 @@ static void setup_inotify_watch(const char *config_path) {
 		return;
 	}
 
-	strcpy(hotkey_config_path, config_path);
+	snprintf(hotkey_config_path, sizeof(hotkey_config_path), "%s", config_path);
 
-	char dir_path[PATH_MAX];
-	strcpy(dir_path, config_path);
+	char dir_path[CONFIG_PATH_MAX];
+	snprintf(dir_path, sizeof(dir_path), "%s", config_path);
 	char *last_slash = strrchr(dir_path, '/');
 	uint32_t mask = IN_MODIFY | IN_CLOSE_WRITE | IN_MOVED_TO | IN_CREATE;
 	if (last_slash) {
@@ -947,10 +959,6 @@ static void setup_inotify_watch(const char *config_path) {
 	}
 
 	add_hotkey_listener_to_event_loop();
-}
-
-void config_init(void) {
-	config_init_with_config_dir(NULL);
 }
 
 void config_init_with_config_dir(const char *config_dir) {

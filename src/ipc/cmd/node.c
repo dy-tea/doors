@@ -100,13 +100,6 @@ static const cfg_enum_value_t direction_values[] = {
 	IPC_ENUM_END,
 };
 
-static const cfg_enum_value_t layer_values[] = {
-	{"below", LAYER_BELOW},
-	{"normal", LAYER_NORMAL},
-	{"above", LAYER_ABOVE},
-	IPC_ENUM_END,
-};
-
 static const cfg_enum_value_t circulate_values[] = {
 	{"forward", 1},
 	{"f", 1},
@@ -617,18 +610,7 @@ static void node_to_node(ipc_args_t *a) {
 }
 
 static void node_layer(ipc_args_t *a) {
-	long value;
-	if (!ipc_enum(a, "layer", layer_values, &value))
-		return;
-
-	output_t *m;
-	node_t *n = focused_client(a, &m);
-	if (!n)
-		return;
-
-	n->client->layer = (stack_layer_t)value;
-	transaction_commit_dirty();
-	ipc_ok(a, "Layer changed\n");
+	ipc_fail(a, "node --layer is not implemented\n");
 }
 
 static void node_type_split(ipc_args_t *a, output_t *m, node_t *target, long split_type) {
@@ -792,7 +774,7 @@ static void node_insert_receptacle(ipc_args_t *a) {
 	node_t *receptacle = make_node(0);
 	receptacle->vacant = true;
 	receptacle->split_type = TYPE_VERTICAL;
-	receptacle->split_ratio = 0.5;
+	receptacle->split_ratio = settings.split_ratio;
 
 	if (n && !is_leaf(n)) {
 		if (n->first_child) {

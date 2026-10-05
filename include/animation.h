@@ -58,16 +58,5 @@ void animation_cancel_scene_tree(struct wlr_scene_tree *scene_tree);
 bool animation_update_output(output_t *output, struct timespec now);
 void animation_update_slide_blur(output_t *output);
 
-// Get the current animation progress for a toplevel resize (returns true if animating)
-// If progress is not NULL, it will be set to the eased progress value (0.0 to 1.0)
-// The anim_from and anim_to boxes will be set to the animation bounds if the toplevel is animating
-bool animation_get_toplevel_resize_progress(view_t *view, double *progress,
-	struct wlr_box *anim_from, struct wlr_box *anim_to);
-
-// Check if a node currently has an active resize animation
 bool animation_is_resizing(node_t *node);
-
-// Get the interpolated client rectangle for any geometry animation (resize or position).
-// Returns true if the toplevel has an active geometry animation, and fills *out with
-// the interpolated rectangle.
 bool animation_get_geometry_progress(view_t *view, struct wlr_box *out);
