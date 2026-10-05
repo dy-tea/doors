@@ -609,8 +609,40 @@ static void node_to_node(ipc_args_t *a) {
 	ipc_ok(a, "Node sent to node\n");
 }
 
+static const cfg_enum_value_t layer_values[] = {
+	{"below", CLIENT_LAYER_BELOW},
+	{"normal", CLIENT_LAYER_NORMAL},
+	{"above", CLIENT_LAYER_ABOVE},
+	IPC_ENUM_END,
+};
+
 static void node_layer(ipc_args_t *a) {
-	ipc_fail(a, "node --layer is not implemented\n");
+	long value;
+	if (!ipc_enum(a, "layer", layer_values, &value))
+		return;
+
+	output_t *m;
+	node_t *n = focused_client(a, &m);
+	if (!n)
+		return;
+
+	if (n->client->layer == (client_layer_t)value) {
+		ipc_okf(a, "Layer already %s\n", ipc_enum_name(layer_values, value));
+		return;
+	}
+
+	n->client->layer = (client_layer_t)value;
+
+	// a fullscreen toplevel always stays on top, its layer applies when it leaves
+	client_apply_layer(n->client);
+
+	transaction_commit_dirty();
+
+	const char *name = ipc_enum_name(layer_values, value);
+	if (value != CLIENT_LAYER_NORMAL && n->client->state == STATE_FULLSCREEN)
+		ipc_okf(a, "Layer set to %s, applies when leaving fullscreen\n", name);
+	else
+		ipc_okf(a, "Layer set to %s\n", name);
 }
 
 static void node_type_split(ipc_args_t *a, output_t *m, node_t *target, long split_type) {

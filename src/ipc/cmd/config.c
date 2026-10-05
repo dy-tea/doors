@@ -247,8 +247,8 @@ static const cfg_setting_t settings_table[] = {
 	I("text_height", NULL, text_height, 0, 0, "%d\n", CFG_POSITIVE, on_text),
 
 	/* scroller */
-	F("scroller_default_proportion", NULL, settings.scroller_default_proportion, 0.1, 1.0, "%.2f\n", CFG_CLAMP,
-		NULL),
+	F("scroller_default_proportion", NULL, settings.scroller_default_proportion, 0.1, 1.0, "%.2f\n",
+		CFG_CLAMP, NULL),
 
 	/* blur */
 	B("blur_enabled", NULL, blur_enabled, 0, NULL),
@@ -317,8 +317,25 @@ static const cfg_setting_t *find_setting(const char *name) {
 	return NULL;
 }
 
-static bool cfg_set_bool(ipc_args_t *a, const cfg_setting_t *s) {
-	return ipc_bool(a, "value", (bool *)s->ptr);
+static void cfg_errf(char *err, size_t errsz, const char *fmt, ...) {
+	if (err == NULL || errsz == 0)
+		return;
+
+	va_list ap;
+	va_start(ap, fmt);
+	vsnprintf(err, errsz, fmt, ap);
+	va_end(ap);
+}
+
+static bool cfg_set_bool(const cfg_setting_t *s, const char *arg, char *err, size_t errsz) {
+	bool v;
+	if (!ipc_parse_bool(arg, &v)) {
+		cfg_errf(err, errsz, "%s: expected true or false, got \"%s\"\n", s->name, arg);
+		return false;
+	}
+
+	*(bool *)s->ptr = v;
+	return true;
 }
 
 static void cfg_store_enum(const cfg_setting_t *s, long value) {
@@ -327,18 +344,28 @@ static void cfg_store_enum(const cfg_setting_t *s, long value) {
 	memcpy(s->ptr, &v, sizeof(v));
 }
 
-static bool cfg_set_enum(ipc_args_t *a, const cfg_setting_t *s) {
-	long value;
-	if (!ipc_enum(a, "value", s->values, &value))
-		return false;
+static bool cfg_set_enum(const cfg_setting_t *s, const char *arg, char *err, size_t errsz) {
+	for (const cfg_enum_value_t *e = s->values; e->name; e++) {
+		if (strcmp(arg, e->name) == 0) {
+			cfg_store_enum(s, e->value);
+			return true;
+		}
+	}
 
-	cfg_store_enum(s, value);
-	return true;
+	ipc_buf_t b;
+	char list[256];
+	ipc_buf_init(&b, list, sizeof(list));
+	for (const cfg_enum_value_t *e = s->values; e->name; e++)
+		ipc_buff(&b, "%s\"%s\"", b.len > 0 ? ", " : "", e->name);
+
+	cfg_errf(err, errsz, "%s: expected value to be one of: %s\n", s->name, list);
+	return false;
 }
 
-static bool cfg_range(ipc_args_t *a, const cfg_setting_t *s, double val, double step, double *out) {
+static bool cfg_range(const cfg_setting_t *s, double val, double step, char *err, size_t errsz,
+		double *out) {
 	if (!isfinite(val)) {
-		ipc_fail(a, "%s: value must be a finite number\n", s->name);
+		cfg_errf(err, errsz, "%s: value must be a finite number\n", s->name);
 		return false;
 	}
 
@@ -356,9 +383,9 @@ static bool cfg_range(ipc_args_t *a, const cfg_setting_t *s, double val, double 
 
 	if (!(s->flags & CFG_CLAMP)) {
 		if (below)
-			ipc_fail(a, "%s: value must be greater than %g\n", s->name, s->min);
+			cfg_errf(err, errsz, "%s: value must be greater than %g\n", s->name, s->min);
 		else
-			ipc_fail(a, "%s: value must be less than %g\n", s->name, s->max);
+			cfg_errf(err, errsz, "%s: value must be less than %g\n", s->name, s->max);
 		return false;
 	}
 
@@ -367,83 +394,73 @@ static bool cfg_range(ipc_args_t *a, const cfg_setting_t *s, double val, double 
 	return true;
 }
 
-static bool cfg_set_int(ipc_args_t *a, const cfg_setting_t *s) {
-	const char *arg;
-	if (!ipc_need(a, "value", &arg))
-		return false;
-
+static bool cfg_set_int(const cfg_setting_t *s, const char *arg, char *err, size_t errsz) {
 	char *end;
 	errno = 0;
 	long val = strtol(arg, &end, 10);
 	if (end == arg || *end != '\0' || errno == ERANGE) {
-		ipc_fail(a, "%s: invalid value \"%s\"\n", s->name, arg);
+		cfg_errf(err, errsz, "%s: invalid value \"%s\"\n", s->name, arg);
 		return false;
 	}
 
 	double out;
-	if (!cfg_range(a, s, (double)val, 1.0, &out))
+	if (!cfg_range(s, (double)val, 1.0, err, errsz, &out))
 		return false;
 
 	*((int *)s->ptr) = (int)out;
 	return true;
 }
 
-static bool cfg_set_float(ipc_args_t *a, const cfg_setting_t *s) {
-	const char *arg;
-	if (!ipc_need(a, "value", &arg))
-		return false;
-
+static bool cfg_set_float(const cfg_setting_t *s, const char *arg, char *err, size_t errsz) {
 	char *end;
 	double val = strtod(arg, &end);
 	if (end == arg || *end != '\0') {
-		ipc_fail(a, "%s: invalid value \"%s\"\n", s->name, arg);
+		cfg_errf(err, errsz, "%s: invalid value \"%s\"\n", s->name, arg);
 		return false;
 	}
 
 	double out;
-	if (!cfg_range(a, s, val, 0.0, &out))
+	if (!cfg_range(s, val, 0.0, err, errsz, &out))
 		return false;
 
 	*((float *)s->ptr) = (float)out;
 	return true;
 }
 
-static bool cfg_set_double(ipc_args_t *a, const cfg_setting_t *s) {
-	const char *arg;
-	if (!ipc_need(a, "value", &arg))
-		return false;
-
+static bool cfg_set_double(const cfg_setting_t *s, const char *arg, char *err, size_t errsz) {
 	char *end;
 	double val = strtod(arg, &end);
 	if (end == arg || *end != '\0') {
-		ipc_fail(a, "%s: invalid value \"%s\"\n", s->name, arg);
+		cfg_errf(err, errsz, "%s: invalid value \"%s\"\n", s->name, arg);
 		return false;
 	}
 
 	double out;
-	if (!cfg_range(a, s, val, 0.0, &out))
+	if (!cfg_range(s, val, 0.0, err, errsz, &out))
 		return false;
 
 	*((double *)s->ptr) = out;
 	return true;
 }
 
-static bool cfg_set_str(ipc_args_t *a, const cfg_setting_t *s) {
-	return ipc_str(a, "value", s->ptr, s->size);
-}
-
-static bool cfg_set_rgba(ipc_args_t *a, const cfg_setting_t *s) {
-	const char *arg;
-	if (!ipc_need(a, "value", &arg))
-		return false;
-
-	float *rgba = s->ptr;
-	float parsed[4];
-	if (!ipc_parse_color_float(arg, parsed)) {
-		ipc_fail(a, "Expected \"R G B [A]\"\n");
+static bool cfg_set_str(const cfg_setting_t *s, const char *arg, char *err, size_t errsz) {
+	if (strlen(arg) >= s->size) {
+		cfg_errf(err, errsz, "%s: value is too long\n", s->name);
 		return false;
 	}
 
+	snprintf(s->ptr, s->size, "%s", arg);
+	return true;
+}
+
+static bool cfg_set_rgba(const cfg_setting_t *s, const char *arg, char *err, size_t errsz) {
+	float parsed[4];
+	if (!ipc_parse_color_float(arg, parsed)) {
+		cfg_errf(err, errsz, "%s: expected \"R G B [A]\"\n", s->name);
+		return false;
+	}
+
+	float *rgba = s->ptr;
 	memcpy(rgba, parsed, sizeof(parsed));
 	return true;
 }
@@ -482,30 +499,31 @@ static void cfg_get(ipc_args_t *a, const cfg_setting_t *s) {
 	ipc_ok(a, buf);
 }
 
-static bool cfg_set(ipc_args_t *a, const cfg_setting_t *s) {
+// writes a setting, running its side effects and committing when it asks for it
+static bool cfg_apply(const cfg_setting_t *s, const char *arg, char *err, size_t errsz) {
 	bool ok = true;
 
 	switch (s->type) {
 	case CFG_BOOL:
-		ok = cfg_set_bool(a, s);
+		ok = cfg_set_bool(s, arg, err, errsz);
 		break;
 	case CFG_INT:
-		ok = cfg_set_int(a, s);
+		ok = cfg_set_int(s, arg, err, errsz);
 		break;
 	case CFG_FLOAT:
-		ok = cfg_set_float(a, s);
+		ok = cfg_set_float(s, arg, err, errsz);
 		break;
 	case CFG_DOUBLE:
-		ok = cfg_set_double(a, s);
+		ok = cfg_set_double(s, arg, err, errsz);
 		break;
 	case CFG_ENUM:
-		ok = cfg_set_enum(a, s);
+		ok = cfg_set_enum(s, arg, err, errsz);
 		break;
 	case CFG_STR:
-		ok = cfg_set_str(a, s);
+		ok = cfg_set_str(s, arg, err, errsz);
 		break;
 	case CFG_RGBA:
-		ok = cfg_set_rgba(a, s);
+		ok = cfg_set_rgba(s, arg, err, errsz);
 		break;
 	}
 
@@ -517,8 +535,17 @@ static bool cfg_set(ipc_args_t *a, const cfg_setting_t *s) {
 	if (s->flags & CFG_COMMIT)
 		transaction_commit_dirty();
 
-	ipc_okf(a, "%s set\n", s->name);
 	return true;
+}
+
+bool config_apply_value(const char *name, const char *value, char *err, size_t errsz) {
+	const cfg_setting_t *s = find_setting(name);
+	if (s == NULL) {
+		cfg_errf(err, errsz, "unknown setting \"%s\"\n", name);
+		return false;
+	}
+
+	return cfg_apply(s, value, err, errsz);
 }
 
 static void cfg_tab_color(ipc_args_t *a, const char *suffix) {
@@ -545,13 +572,21 @@ static void cfg_tab_color(ipc_args_t *a, const char *suffix) {
 			return;
 		}
 
+		const char *value;
+		if (!ipc_need(a, "value", &value))
+			return;
+
 		cfg_setting_t tmp = {
 			.name = "tab_color",
 			.type = CFG_RGBA,
 			.ptr = colors[i].color
 		};
-		if (!cfg_set_rgba(a, &tmp))
+
+		char err[128];
+		if (!cfg_set_rgba(&tmp, value, err, sizeof(err))) {
+			ipc_fail(a, "%s", err);
 			return;
+		}
 
 		tabs_rebuild_all();
 		ipc_okf(a, "tab_color_%s set\n", colors[i].name);
@@ -964,8 +999,18 @@ void ipc_cmd_config(ipc_args_t *a) {
 		return;
 	}
 
-	if (ipc_peek(a))
-		cfg_set(a, s);
-	else
+	if (!ipc_peek(a)) {
 		cfg_get(a, s);
+		return;
+	}
+
+	const char *arg = ipc_take(a);
+
+	char err[256];
+	if (!cfg_apply(s, arg, err, sizeof(err))) {
+		ipc_fail(a, "%s", err);
+		return;
+	}
+
+	ipc_okf(a, "%s set\n", s->name);
 }

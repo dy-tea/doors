@@ -60,6 +60,7 @@ bool ipc_float_str(ipc_args_t *a, const char *arg, const char *what, float min, 
 bool ipc_double_str(ipc_args_t *a, const char *arg, const char *what, double min, double max,
 	double *out);
 
+bool ipc_parse_bool(const char *s, bool *out);
 bool ipc_parse_float(const char *s, float min, float max, float *out);
 
 typedef struct {

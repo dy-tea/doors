@@ -33,6 +33,7 @@ static const char *verbosity_headers[] = {
 	[WLR_DEBUG] = "[DEBUG]",
 };
 
+
 #define LOGS_TO_KEEP 25
 
 static int mkdir_p(const char *path) {

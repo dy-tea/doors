@@ -91,6 +91,28 @@
 
 struct server_t server = {0};
 
+struct wlr_scene_tree *scene_stack_tree(scene_stack_t tree) {
+	switch (tree) {
+	case STACK_BG:
+		return server.bg_tree;
+	case STACK_BOTTOM:
+		return server.bot_tree;
+	case STACK_TILED:
+		return server.tile_tree;
+	case STACK_FLOATING:
+		return server.float_tree;
+	case STACK_TOP:
+		return server.top_tree;
+	case STACK_FULLSCREEN:
+		return server.full_tree;
+	case STACK_OVERLAY:
+		return server.over_tree;
+	case STACK_COUNT:
+		break;
+	}
+	return NULL;
+}
+
 void server_init(void) {
 	server = (struct server_t){0};
 

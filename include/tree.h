@@ -26,8 +26,8 @@ void kill_node(desktop_t *d, node_t *n);
 
 // node queries
 bool is_leaf(node_t *n);
-bool is_tiled(client_t *c);
-bool is_floating(client_t *c);
+bool is_tiled(const client_t *c);
+bool is_floating(const client_t *c);
 bool is_first_child(node_t *n);
 
 void node_replace_child(desktop_t *d, node_t *old, node_t *new, node_t *parent);

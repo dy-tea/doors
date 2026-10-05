@@ -528,6 +528,12 @@ doorsctl node interactive_resize       						# Interactive resize (for mouse but
 doorsctl node tiling_drag              						# Tiling drag (for mouse button binds on tiled windows)
 ```
 
+The layer of a window decides where it sits in the stacking order. `below` renders it under every other window, `above` over every other window but the fullscreen ones, and `normal` (the default) leaves it where its state (tiled/floating) puts it. A fullscreen window stays on top no matter its layer, the layer applies as soon as it leaves fullscreen.
+
+```
+doorsctl node --layer above|normal|below
+```
+
 #### Desktop Commands
 
 ```
@@ -1304,13 +1310,29 @@ Globally set if screen shaders should be enabled.
 ### WM Commands
 
 ```
-doorsctl wm --dump-state               # Dump current WM state as JSON
-doorsctl wm --load-state               # Load WM state (not implemented)
-doorsctl wm --add-monitor <name>       # Add a new monitor
-doorsctl wm -g --get-status            # Return compositor status (monitor/desktop/node counts)
-doorsctl wm -h [true|false]            # Get or set focus record history
-doorsctl wm -o --adopt-orphans         # Adopt orphaned toplevels into tree
-doorsctl wm -r --restart               # Restart the compositor
+doorsctl wm --dump-state                    # Dump current WM state as JSON
+doorsctl wm --load-state <file>             # Load WM state from a JSON file
+doorsctl wm --add-monitor <name>            # Add a new monitor
+doorsctl wm --reorder-monitors <names...>   # Reorder monitors
+doorsctl wm -g --get-status                 # Return compositor status (monitor/desktop/node counts)
+doorsctl wm -h [true|false]                 # Get or set focus record history
+doorsctl wm -o --adopt-orphans              # Adopt orphaned toplevels into tree
+doorsctl wm -r --restart                    # Restart the compositor
+```
+
+Dump the current state, edit it and load it back to restore a monitor arrangement
+together with the settings that go with it.
+
+```
+doorsctl wm --dump-state > ~/wm-state.json
+$EDITOR ~/wm-state.json
+doorsctl wm --load-state ~/wm-state.json
+```
+
+Reorder the monitors, ones left out keep their relative order behind them.
+
+```
+doorsctl wm --reorder-monitors DP-1 eDP-1 HDMI-A-1
 ```
 
 ### Subscribe Commands

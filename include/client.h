@@ -24,6 +24,15 @@ void client_set_visible(client_t *client, bool show);
 node_t *client_get_node(client_t *client);
 output_t *client_get_output(client_t *client);
 
+// scene tree a client's state puts it in, ignoring its layer
+struct wlr_scene_tree *client_state_tree(const client_t *client);
+
+// scene tree a client's state and layer put it in
+struct wlr_scene_tree *client_layer_tree(const client_t *client);
+
+// parents a client's scene tree into the tree its layer calls for
+void client_apply_layer(client_t *client);
+
 bool client_is_mapped(const client_t *client);
 struct wlr_surface *client_wlr_surface(client_t *client);
 struct wlr_ext_foreign_toplevel_handle_v1 *client_get_ext_foreign_toplevel(const client_t *client);

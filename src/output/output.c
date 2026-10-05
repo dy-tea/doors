@@ -681,6 +681,30 @@ void output_update_usable_area(output_t *output) {
 	output->usable_area.height = output->height;
 }
 
+void output_update_geometry(output_t *output) {
+	if (!output || !output->wlr_output)
+		return;
+
+	struct wlr_box layout_box;
+	wlr_output_layout_get_box(server.output_layout, output->wlr_output, &layout_box);
+
+	output->rectangle = layout_box;
+	output->usable_area = layout_box;
+	output->lx = layout_box.x;
+	output->ly = layout_box.y;
+	output->width = layout_box.width;
+	output->height = layout_box.height;
+
+	arrange_layers(output);
+
+	desktop_t *d;
+	wl_list_for_each(d, &output->desk_list, link)
+		arrange(output, d, true);
+
+	update_idle_inhibitors(NULL);
+	output_schedule_frame(output);
+}
+
 void output_update_scale(output_t *output, float scale) {
 	if (!output || !output->wlr_output)
 		return;
@@ -688,16 +712,6 @@ void output_update_scale(output_t *output, float scale) {
 	struct wlr_output *wlr_output = output->wlr_output;
 
 	wlr_log(WLR_INFO, "Updating output '%s' scale to %.2f", wlr_output->name, scale);
-
-	struct wlr_box layout_box;
-	wlr_output_layout_get_box(server.output_layout, wlr_output, &layout_box);
-	output->rectangle = layout_box;
-	output->usable_area = layout_box;
-	output->lx = layout_box.x;
-	output->ly = layout_box.y;
-	output->width = layout_box.width;
-	output->height = layout_box.height;
-	output->rectangle = layout_box;
 
 	view_t *view;
 	wl_list_for_each(view, &server.views, link) {
@@ -726,15 +740,8 @@ void output_update_scale(output_t *output, float scale) {
 	}
 
 	effects_invalidate_mica(output->effects);
-	arrange_layers(output);
 
-	// rearrange all desktop on this output
-	desktop_t *d;
-	wl_list_for_each(d, &output->desk_list, link)
-		arrange(output, d, true);
-
-	update_idle_inhibitors(NULL);
-	output_schedule_frame(output);
+	output_update_geometry(output);
 }
 
 output_t *output_get_valid(void) {

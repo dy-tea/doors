@@ -1,4 +1,6 @@
 #include "client.h"
+#include "server.h"
+#include "tree.h"
 #include "types.h"
 #include "view.h"
 #include <string.h>
@@ -90,4 +92,44 @@ void client_set_app_id(client_t *client, const char *app_id) {
 output_t *client_get_output(client_t *client) {
 	node_t *n = client_get_node(client);
 	return n ? n->output : NULL;
+}
+
+struct wlr_scene_tree *client_state_tree(const client_t *client) {
+	if (client == NULL)
+		return NULL;
+
+	if (client->state == STATE_FULLSCREEN)
+		return scene_stack_tree(STACK_FULLSCREEN);
+
+	// minimized and scratchpad toplevels are parked in the floating tree
+	return IS_FLOATING(client) ||
+		client->flags.minimized ? scene_stack_tree(STACK_FLOATING) : scene_stack_tree(STACK_TILED);
+}
+
+struct wlr_scene_tree *client_layer_tree(const client_t *client) {
+	struct wlr_scene_tree *tree = client_state_tree(client);
+	if (client == NULL || client->state == STATE_FULLSCREEN)
+		return tree;
+
+	switch (client->layer) {
+	case CLIENT_LAYER_BELOW:
+		return scene_stack_tree(STACK_BOTTOM);
+	case CLIENT_LAYER_ABOVE:
+		return scene_stack_tree(STACK_TOP);
+	case CLIENT_LAYER_NORMAL:
+		break;
+	}
+
+	return tree;
+}
+
+void client_apply_layer(client_t *client) {
+	struct wlr_scene_tree *scene_tree = client_get_scene_tree(client);
+	struct wlr_scene_tree *parent = client_layer_tree(client);
+	if (scene_tree == NULL || parent == NULL)
+		return;
+	if (scene_tree->node.parent == parent)
+		return;
+
+	wlr_scene_node_reparent(&scene_tree->node, parent);
 }

@@ -68,6 +68,7 @@ void output_teardown(output_t *output);
 output_t *output_from_wlr_output(struct wlr_output *wlr_output);
 output_t *output_get_in_direction(output_t *reference, uint32_t direction);
 void output_update_usable_area(output_t *output);
+void output_update_geometry(output_t *output);
 void output_update_scale(output_t *output, float scale);
 output_t *output_get_valid(void);
 void output_schedule_frame(output_t *output);

@@ -143,11 +143,11 @@ bool is_leaf(node_t *n) {
 	return (n != NULL && n->first_child == NULL && n->second_child == NULL);
 }
 
-bool is_tiled(client_t *c) {
+bool is_tiled(const client_t *c) {
 	return c != NULL && (c->state == STATE_TILED || c->state == STATE_PSEUDO_TILED);
 }
 
-bool is_floating(client_t *c) {
+bool is_floating(const client_t *c) {
 	return c != NULL && c->state == STATE_FLOATING;
 }
 
@@ -757,8 +757,7 @@ void client_set_fullscreen(output_t *m, desktop_t *d, node_t *n, bool value) {
 	if (n == NULL || n->client == NULL)
 		return;
 
-	struct wlr_scene_tree *scene_tree = client_get_scene_tree(n->client);
-	if (scene_tree == NULL) {
+	if (client_get_scene_tree(n->client) == NULL) {
 		wlr_log(WLR_ERROR, "Node %u has no scene tree", n->id);
 		return;
 	}
@@ -777,16 +776,9 @@ void client_set_fullscreen(output_t *m, desktop_t *d, node_t *n, bool value) {
 			restore = STATE_TILED;
 	}
 
-	if (value) {
-		wlr_scene_node_reparent(&scene_tree->node, server.full_tree);
-	} else if (restore == STATE_FLOATING) {
-		wlr_scene_node_reparent(&scene_tree->node, server.float_tree);
-	} else {
-		wlr_scene_node_reparent(&scene_tree->node, server.tile_tree);
-	}
-
 	tell_client_fullscreen(n, value);
 	set_state(m, d, n, value ? STATE_FULLSCREEN : restore);
+	client_apply_layer(n->client);
 
 	if (!value)
 		node_set_hidden(n, false);

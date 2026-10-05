@@ -34,21 +34,27 @@ node_t *desktop_fallback_focus(desktop_t *d, node_t *skip) {
 
 	// get topmost floating toplevel
 	node_t *best = NULL;
-	struct wl_list *link = server.float_tree->children.prev;
-	while (link != &server.float_tree->children && best == NULL) {
-		struct wlr_scene_node *sn = wl_container_of(link, sn, link);
+	for (int t = STACK_COUNT - 1; t >= 0 && best == NULL; t--) {
+		struct wlr_scene_tree *tree = scene_stack_tree((scene_stack_t)t);
+		if (tree == NULL)
+			continue;
 
-		for (int i = 0; i < count; i++) {
-			node_t *n = toplevels[i];
-			if (n == skip || !IS_FLOATING(n->client) || node_is_invisible(n) || !n->client->flags.shown)
-				continue;
+		struct wl_list *link = tree->children.prev;
+		while (link != &tree->children && best == NULL) {
+			struct wlr_scene_node *sn = wl_container_of(link, sn, link);
 
-			struct wlr_scene_tree *st = client_get_scene_tree(n->client);
-			if (st != NULL && &st->node == sn)
-				best = n;
+			for (int i = 0; i < count; i++) {
+				node_t *n = toplevels[i];
+				if (n == skip || !IS_FLOATING(n->client) || node_is_invisible(n) || !n->client->flags.shown)
+					continue;
+
+				struct wlr_scene_tree *st = client_get_scene_tree(n->client);
+				if (st != NULL && &st->node == sn)
+					best = n;
+			}
+
+			link = link->prev;
 		}
-
-		link = link->prev;
 	}
 
 	// no toplevel above tree, take the first one of it that the user can see

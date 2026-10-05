@@ -117,7 +117,7 @@ bool ipc_parse_float(const char *s, float min, float max, float *out) {
 	return true;
 }
 
-static bool parse_bool(const char *s, bool *out) {
+bool ipc_parse_bool(const char *s, bool *out) {
 	static const cfg_enum_value_t bools[] = {
 		{"true", 1},
 		{"on", 1},
@@ -129,6 +129,9 @@ static bool parse_bool(const char *s, bool *out) {
 		{"no", 0},
 		IPC_ENUM_END,
 	};
+
+	if (s == NULL)
+		return false;
 
 	for (const cfg_enum_value_t *e = bools; e->name; e++) {
 		if (strcmp(s, e->name) == 0) {
@@ -238,7 +241,7 @@ bool ipc_bool(ipc_args_t *a, const char *what, bool *out) {
 }
 
 bool ipc_bool_str(ipc_args_t *a, const char *arg, const char *what, bool *out) {
-	if (!parse_bool(arg, out)) {
+	if (!ipc_parse_bool(arg, out)) {
 		ipc_fail(a, "Expected true or false for %s, got \"%s\"\n", what, arg);
 		return false;
 	}
@@ -269,7 +272,7 @@ bool ipc_toggle(ipc_args_t *a, bool *cur) {
 	}
 
 	bool v;
-	if (!parse_bool(arg, &v)) {
+	if (!ipc_parse_bool(arg, &v)) {
 		ipc_fail(a, "Expected true or false, got \"%s\"\n", arg);
 		return false;
 	}

@@ -118,6 +118,7 @@ executable(
 		'src' / 'ipc' / 'args.c',
 		'src' / 'ipc' / 'helpers.c',
 		'src' / 'ipc' / 'ipc.c',
+		'src' / 'ipc' / 'json.c',
 		'src' / 'ipc' / 'subscribe.c',
 		'src' / 'ipc' / 'cmd' / 'actions.c',
 		'src' / 'ipc' / 'cmd' / 'config.c',

@@ -145,6 +145,12 @@ typedef enum {
 	VIEW_XWAYLAND,
 } view_type_t;
 
+typedef enum {
+	CLIENT_LAYER_NORMAL,
+	CLIENT_LAYER_BELOW,
+	CLIENT_LAYER_ABOVE,
+} client_layer_t;
+
 typedef struct client_t {
 	char app_id[MAXLEN];
 	char title[MAXLEN];
@@ -171,6 +177,7 @@ typedef struct client_t {
 	float shadow_color[4];
 
 	client_flags_t flags;
+	client_layer_t layer;
 } client_t;
 
 typedef struct node_t {

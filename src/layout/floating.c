@@ -295,7 +295,6 @@ static void float_node_impl(output_t *m, desktop_t *d, node_t *n, const struct w
 
 	node_set_hidden(n, false);
 
-	wlr_scene_node_reparent(&scene_tree->node, server.float_tree);
 	wlr_scene_node_set_position(&scene_tree->node, target.x, target.y);
 	apply_float_rect(n, target);
 
@@ -309,6 +308,8 @@ static void float_node_impl(output_t *m, desktop_t *d, node_t *n, const struct w
 		c->state = STATE_FLOATING;
 		node_set_dirty(n);
 	}
+
+	client_apply_layer(c);
 
 	if (c->view != NULL)
 		view_center_and_clip_surface(c->view);
@@ -338,10 +339,10 @@ void tile_node(output_t *m, desktop_t *d, node_t *n) {
 
 	if (c->state == STATE_FLOATING) {
 		node_set_hidden(n, false);
-		wlr_scene_node_reparent(&scene_tree->node, server.tile_tree);
 
 		c->last_state = c->state;
 		c->state = STATE_TILED;
+		client_apply_layer(c);
 
 		node_t *ref = d->focus != n ? d->focus : NULL;
 		insert_node(d, n, ref);
@@ -368,12 +369,12 @@ void tile_node(output_t *m, desktop_t *d, node_t *n) {
 		node_set_hidden(n, false);
 
 		wlr_scene_node_set_position(&scene_tree->node, c->floating_rectangle.x, c->floating_rectangle.y);
-		wlr_scene_node_reparent(&scene_tree->node, server.float_tree);
 
 		// restore focus
 		focus_node(m, d, n);
 
 		set_state(m, d, n, STATE_FLOATING);
+		client_apply_layer(c);
 
 		if (c->view != NULL)
 			view_center_and_clip_surface(c->view);

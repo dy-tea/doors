@@ -28,6 +28,17 @@ enum cursor_mode {
 	CURSOR_TILING_DRAG,
 };
 
+typedef enum {
+	STACK_BG,
+	STACK_BOTTOM,
+	STACK_TILED,
+	STACK_FLOATING,
+	STACK_TOP,
+	STACK_FULLSCREEN,
+	STACK_OVERLAY,
+	STACK_COUNT,
+} scene_stack_t;
+
 typedef struct output_t output_t;
 struct ime_relay_t;
 
@@ -235,6 +246,8 @@ typedef struct server_t {
 } server_t;
 
 extern struct server_t server;
+
+struct wlr_scene_tree *scene_stack_tree(scene_stack_t tree);
 
 void server_init(void);
 int server_run(void);

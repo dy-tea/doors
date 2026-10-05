@@ -50,6 +50,7 @@ static size_t collect_privileged_globals(struct wl_global **out, size_t max) {
 	return n;
 }
 
+
 #define PRIVILEGED_MAX 24
 
 static bool is_privileged(const struct wl_global *global) {

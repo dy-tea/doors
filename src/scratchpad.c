@@ -148,7 +148,7 @@ static void scratchpad_park(node_t *n, scratchpad_entry_t *entry) {
 
 	struct wlr_scene_tree *st = client_get_scene_tree(n->client);
 	if (st != NULL) {
-		wlr_scene_node_reparent(&st->node, server.float_tree);
+		client_apply_layer(n->client);
 		wlr_scene_node_set_position(&st->node, n->client->floating_rectangle.x,
 			n->client->floating_rectangle.y);
 		wlr_scene_node_set_enabled(&st->node, false);
@@ -241,7 +241,7 @@ void scratchpad_show(node_t *n) {
 		n->client->flags.maximized = false;
 
 		if (st) {
-			wlr_scene_node_reparent(&st->node, server.float_tree);
+			client_apply_layer(n->client);
 			wlr_scene_node_set_position(&st->node, n->client->floating_rectangle.x,
 				n->client->floating_rectangle.y);
 			wlr_scene_node_set_enabled(&st->node, true);
@@ -261,7 +261,7 @@ void scratchpad_show(node_t *n) {
 		n->client->flags.maximized = saved_maximized;
 
 		if (st != NULL) {
-			wlr_scene_node_reparent(&st->node, server.tile_tree);
+			client_apply_layer(n->client);
 			wlr_scene_node_set_enabled(&st->node, true);
 		}
 		n->client->flags.shown = true;
