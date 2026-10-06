@@ -1,4 +1,5 @@
 #include "log.h"
+#include "fs.h"
 #include "once.h"
 #include <dirent.h>
 #include <errno.h>
@@ -35,25 +36,6 @@ static const char *verbosity_headers[] = {
 
 
 #define LOGS_TO_KEEP 25
-
-static int mkdir_p(const char *path) {
-	char tmp[sizeof(log_dir)];
-	snprintf(tmp, sizeof(tmp), "%s", path);
-
-	for (char *p = tmp + 1; *p; p++) {
-		if (*p != '/')
-			continue;
-		*p = '\0';
-		if (mkdir(tmp, 0700) != 0 && errno != EEXIST)
-			return -1;
-		*p = '/';
-	}
-
-	if (mkdir(tmp, 0700) != 0 && errno != EEXIST)
-		return -1;
-
-	return 0;
-}
 
 static int log_compare(const void *a, const void *b) {
 	const char *const *ea = a;
@@ -236,7 +218,7 @@ int log_init(const char *log_file_path) {
 		// try to create directories
 		struct stat st = {0};
 		if (stat(log_dir, &st) == -1) {
-			if (mkdir_p(log_dir) != 0) {
+			if (!mkdir_p(log_dir, 0700)) {
 				fprintf(stderr, "ERROR: Failed to create log directory: %s\n", log_dir);
 				return -1;
 			}

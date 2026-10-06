@@ -26,6 +26,7 @@
 #include "protocol/pointer_warp.h"
 #include "protocol/screencopy.h"
 #include "protocol/security_ctx.h"
+#include "protocol/session_mgmt.h"
 #include "protocol/shortcuts_inhibit.h"
 #include "protocol/tearing.h"
 #include "protocol/toplevel_tag.h"
@@ -208,6 +209,7 @@ void server_init(void) {
 	xdg_decoration_init();
 	dialog_init();
 	toplevel_tag_init();
+	session_management_init();
 	launcher_init();
 	layer_init();
 	cursor_init();
@@ -440,6 +442,7 @@ void server_fini(void) {
 	xwayland_fini();
 	screencopy_fini();
 	image_copy_capture_fini();
+	session_management_fini();
 	render_unfocused_fini();
 	idle_power_fini();
 	animation_fini();

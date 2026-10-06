@@ -657,6 +657,37 @@ Prints out all currently registered binds registered through the global shortcut
 doorsctl globalshortcuts
 ```
 
+### Session Commands (xx-session-management-v1)
+
+Lists the application sessions that are currently in use, along with the window state the compositor has recorded for each of them.
+
+```
+doorsctl sessions
+```
+
+Example output:
+
+```
+sessions: /home/user/.local/state/doors/sessions
+  308a7ff3a06e055763cdb4385bd532e63738ff3af4c351182231e32ebf772f2c reason=3 toplevels=1
+    main [] 1252x692 at 14,14 on HEADLESS-1/default
+```
+
+The first line is the directory session state is kept in. It defaults to `$XDG_STATE_HOME/doors/sessions`, or `~/.local/state/doors/sessions` when `XDG_STATE_HOME` is unset or not absolute. It reads `(storage unavailable)` when there is no usable `HOME`, in which case sessions are neither persisted nor restored.
+
+Each session line shows the session id a client passes back to `xx_session_manager_v1.get_session`, the reason it was opened with (`1` launch, `2` recover, `3` session restore), and how many toplevels it is tracking right now.
+
+Each indented line below a session describes one remembered window:
+
+- The name the client gave it, followed by its state flags in brackets. Any of `floating`, `maximized`, `fullscreen` and `minimized` may appear; the bracket is empty for a tiled window.
+- Its geometry as `<width>x<height> at <x>,<y>`, and the `output/desktop` it lived on.
+- `(nothing recorded yet)` instead of a geometry, when the window has not been arranged yet and therefore has no size to restore.
+- `(inert)` when the client destroyed the toplevel session object, so the window is still tracked but the client can no longer update or remove it.
+- `(awaiting commit)` when the client asked to restore the window but has not committed its surface yet, so the remembered geometry has not been handed to it.
+- `(N remembered toplevel not open)` when a name is still on record but its window is closed. The state is kept so it can be restored the next time the app opens that window.
+
+A session only remembers a window once it has a size. A window that has only just mapped is recorded on the next arrange or when it unmaps, so `sessions` can briefly report `(nothing recorded yet)` for a window you can already see.
+
 #### Other Commands
 
 ```

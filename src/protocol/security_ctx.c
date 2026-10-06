@@ -1,6 +1,7 @@
 #include "once.h"
 #include "protocol/copy_capture.h"
 #include "protocol/screencopy.h"
+#include "protocol/session_mgmt.h"
 #include "server.h"
 #include <wlr/types/wlr_data_control_v1.h>
 #include <wlr/types/wlr_export_dmabuf_v1.h>
@@ -43,7 +44,8 @@ static size_t collect_privileged_globals(struct wl_global **out, size_t max) {
 	PRIV(server.workspace_manager->global);
 	PRIV(screencopy_get_global());
 	PRIV(image_capture_source_get_global());
-	PRIV(image_capture_source_get_global());
+	PRIV(image_copy_capture_get_global());
+	PRIV(session_mgr_get_global());
 
 #undef PRIV
 
@@ -51,7 +53,7 @@ static size_t collect_privileged_globals(struct wl_global **out, size_t max) {
 }
 
 
-#define PRIVILEGED_MAX 24
+#define PRIVILEGED_MAX 26
 
 static bool is_privileged(const struct wl_global *global) {
 	struct wl_global *priv[PRIVILEGED_MAX];

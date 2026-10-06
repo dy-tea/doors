@@ -8,6 +8,7 @@
 #include "layout/scroller.h"
 #include "output/output.h"
 #include "protocol/popup.h"
+#include "protocol/session_mgmt.h"
 #include "protocol/workspace.h"
 #include "protocol/xdg_toplevel.h"
 #include "protocol/xwayland.h"
@@ -249,6 +250,9 @@ void xdg_toplevel_adopt(xdg_toplevel_t *toplevel) {
 			should_focus = false;
 	}
 
+	session_placement_t placement;
+	session_mgmt_get_placement(toplevel->xdg_toplevel, &placement);
+
 	// find target monitor
 	output_t *target_output = m;
 	if (rule && rule->has & RULE_TYPE_MONITOR) {
@@ -259,6 +263,14 @@ void xdg_toplevel_adopt(xdg_toplevel_t *toplevel) {
 			wlr_log(WLR_DEBUG, "  Target desktop changed to: %s", target_output->name);
 		} else {
 			wlr_log(WLR_ERROR, "  Monitor %s not found", rule->monitor);
+		}
+	} else if (placement.output[0] != '\0') {
+		output_t *saved_output = find_output_by_name(placement.output);
+		if (saved_output) {
+			target_output = saved_output;
+			wlr_log(WLR_DEBUG, "  Session target output: %s", target_output->name);
+		} else {
+			wlr_log(WLR_INFO, "  Session output %s not found", placement.output);
 		}
 	}
 
@@ -290,6 +302,14 @@ void xdg_toplevel_adopt(xdg_toplevel_t *toplevel) {
 			wlr_log(WLR_DEBUG, "  Target desktop changed to: %s", target_desktop->name);
 		} else {
 			wlr_log(WLR_ERROR, "  Desktop %s not found", rule->desktop);
+		}
+	} else if (placement.desktop[0] != '\0') {
+		desktop_t *saved_desk = find_desktop_by_name_in_monitor(target_output, placement.desktop);
+		if (saved_desk) {
+			target_desktop = saved_desk;
+			wlr_log(WLR_DEBUG, "  Session target desktop: %s", target_desktop->name);
+		} else {
+			wlr_log(WLR_INFO, "  Session desktop %s not found", placement.desktop);
 		}
 	}
 
@@ -399,6 +419,8 @@ void xdg_toplevel_adopt(xdg_toplevel_t *toplevel) {
 
 	render_unfocused_client_update(n->client);
 
+	session_mgmt_handle_mapped(toplevel->xdg_toplevel);
+
 	wlr_log(WLR_INFO, "Window mapped and tiled: %s",
 		n->client->title[0] ? n->client->title : "untitled");
 }
@@ -413,6 +435,9 @@ void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 	toplevel->view.configured = false;
 
 	toplevel->view.image_capture_surface = NULL;
+
+	session_mgmt_handle_state_changed(toplevel->xdg_toplevel);
+
 	animation_cancel_view(&toplevel->view);
 
 	view_destroy_foreign_toplevels(&toplevel->view);
@@ -513,6 +538,8 @@ void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 	struct wlr_xdg_surface *xdg_surface = toplevel->xdg_toplevel->base;
 
 	if (xdg_surface->initial_commit) {
+		session_mgmt_handle_initial_commit(toplevel->xdg_toplevel);
+
 		// initial commit can happen before the xdg_surface is marked initialized
 		if (xdg_surface->initialized)
 			wlr_xdg_surface_schedule_configure(xdg_surface);
@@ -633,6 +660,8 @@ void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 
 	if (toplevel->view.node && toplevel->view.node->output)
 		output_schedule_frame(toplevel->view.node->output);
+
+	session_mgmt_handle_state_changed(toplevel->xdg_toplevel);
 }
 
 void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
@@ -640,6 +669,9 @@ void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 	xdg_toplevel_t *toplevel = wl_container_of(listener, toplevel, destroy);
 
 	wlr_log(WLR_INFO, "Toplevel destroyed");
+
+	// sessions no longer track this toplevel
+	session_mgmt_handle_destroy(toplevel->xdg_toplevel);
 
 	client_t *client = toplevel->view.client;
 

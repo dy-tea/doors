@@ -26,6 +26,7 @@ void ipc_cmd_rule(ipc_args_t *a);
 void ipc_cmd_scratchpad(ipc_args_t *a);
 void ipc_cmd_scroller(ipc_args_t *a);
 void ipc_cmd_seat(ipc_args_t *a);
+void ipc_cmd_sessions(ipc_args_t *a);
 bool ipc_cmd_subscribe(ipc_args_t *a); // true when the handler keeps the socket
 void ipc_cmd_wm(ipc_args_t *a);
 

@@ -64,6 +64,7 @@ protocols = [
 	'protocols' / 'ext-image-capture-source-v1.xml',
 	'protocols' / 'ext-image-copy-capture-v1.xml',
 	'protocols' / 'xx-hotkey-v1.xml',
+	'protocols' / 'xx-session-management-v1.xml',
 ]
 
 wl_protos_src = []
@@ -106,6 +107,7 @@ executable(
 		'src' / 'effects' / 'effects.c',
 		'src' / 'effects' / 'gles2.c',
 		'src' / 'effects' / 'vk.c',
+		'src' / 'fs.c',
 		'src' / 'input' / 'cursor.c',
 		'src' / 'input' / 'gesture.c',
 		'src' / 'input' / 'input.c',
@@ -136,6 +138,7 @@ executable(
 		'src' / 'ipc' / 'cmd' / 'scratchpad.c',
 		'src' / 'ipc' / 'cmd' / 'scroller.c',
 		'src' / 'ipc' / 'cmd' / 'seat.c',
+		'src' / 'ipc' / 'cmd' / 'sessions.c',
 		'src' / 'ipc' / 'cmd' / 'wm.c',
 		'src' / 'launcher.c',
 		'src' / 'layout' / 'floating.c',
@@ -164,6 +167,7 @@ executable(
 		'src' / 'protocol' / 'popup.c',
 		'src' / 'protocol' / 'screencopy.c',
 		'src' / 'protocol' / 'security_ctx.c',
+		'src' / 'protocol' / 'session_mgmt.c',
 		'src' / 'protocol' / 'shortcuts_inhibit.c',
 		'src' / 'protocol' / 'tearing.c',
 		'src' / 'protocol' / 'toplevel_tag.c',

@@ -36,6 +36,7 @@ static const ipc_cmd_t commands[] = {
 	{"scroller", "drive the scroller layout", ipc_cmd_scroller, scroller_subs},
 	{"seat", "list seats", ipc_cmd_seat, seat_subs},
 	CMD("send", "send the focused window to another desktop", ipc_cmd_actions),
+	CMD("sessions", "list application sessions and what they remember", ipc_cmd_sessions),
 	CMD("spring", "register a spring animation curve", ipc_cmd_actions),
 	CMD("swap", "swap with the neighbour in a direction", ipc_cmd_actions),
 	CMD("toggle", "toggle a window state", ipc_cmd_actions),
