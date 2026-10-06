@@ -1,7 +1,8 @@
 #include "fs.h"
 #include <errno.h>
-#include <linux/limits.h>
 #include <stdio.h>
+
+#define PATH_MAX 4096
 
 static bool ensure_dir(const char *path, mode_t mode) {
 	if (mkdir(path, mode) == 0 || errno == EEXIST)
