@@ -1,6 +1,9 @@
+#include "input/cursor.h"
 #include "input/input.h"
 #include "ipc/args.h"
 #include "ipc/registry.h"
+#include <errno.h>
+#include <stdlib.h>
 #include <string.h>
 
 static const cfg_enum_value_t input_type_values[] = {
@@ -41,6 +44,23 @@ void ipc_cmd_input(ipc_args_t *a) {
 		return;
 
 	const char *value = ipc_peek(a) ? ipc_peek(a) : "";
+
+	if (strcmp(property, "xcursor_size") == 0) {
+		char *end;
+		errno = 0;
+		long size = strtol(value, &end, 10);
+		if (errno || value[0] == '\0' || end[0] != '\0' || size < 1 || size > 512) {
+			ipc_fail(a, "input xcursor_size: expected 1-512\n");
+			return;
+		}
+		if (!cursor_set_size((uint32_t)size)) {
+			ipc_fail(a, "input xcursor_size: failed to load cursor theme\n");
+			return;
+		}
+		setenv("XCURSOR_SIZE", value, true);
+		ipc_ok(a, "ok\n");
+		return;
+	}
 
 	input_config_t *config = NULL;
 	for (size_t i = 0; i < num_input_configs; i++) {

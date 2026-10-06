@@ -1201,6 +1201,21 @@ static void handle_tablet_tool_button(struct wl_listener *listener, void *data) 
 		(enum zwp_tablet_pad_v2_button_state)event->state);
 }
 
+bool cursor_set_size(uint32_t size) {
+	struct wlr_xcursor_manager *mgr = wlr_xcursor_manager_create(getenv("XCURSOR_THEME"), size);
+	if (!mgr || !wlr_xcursor_manager_load(mgr, 1)) {
+		wlr_xcursor_manager_destroy(mgr);
+		return false;
+	}
+
+	struct wlr_xcursor_manager *old_mgr = server.cursor_mgr;
+	server.cursor_mgr = mgr;
+	server.xwayland.xcursor_manager = mgr;
+	wlr_cursor_set_xcursor(server.cursor, mgr, "default");
+	wlr_xcursor_manager_destroy(old_mgr);
+	return true;
+}
+
 void cursor_init(void) {
 	ONCE();
 	server.cursor = wlr_cursor_create();
@@ -1210,7 +1225,7 @@ void cursor_init(void) {
 	}
 	wlr_cursor_attach_output_layout(server.cursor, server.output_layout);
 
-	server.cursor_mgr = wlr_xcursor_manager_create(NULL, 24);
+	server.cursor_mgr = wlr_xcursor_manager_create(getenv("XCURSOR_THEME"), 24);
 	if (!server.cursor_mgr) {
 		wlr_log(WLR_ERROR, "Failed to create cursor manager");
 		exit(EXIT_FAILURE);
