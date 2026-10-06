@@ -222,15 +222,15 @@ void rule_apply_consequence(node_t *node, client_t *client, const rule_consequen
 		client->state = rule->state;
 
 	if (rule->has & RULE_TYPE_HIDDEN)
-		node_set_hidden(node, rule->flags & RULE_TYPE_HIDDEN);
+		node_set_hidden(node, rule_flag(rule, RULE_TYPE_HIDDEN));
 	if (rule->has & RULE_TYPE_MAXIMIZED)
-		client->flags.maximized = rule->flags & RULE_TYPE_MAXIMIZED;
+		client->flags.maximized = rule_flag(rule, RULE_TYPE_MAXIMIZED);
 	if (rule->has & RULE_TYPE_MINIMIZED)
-		client->flags.minimized = (rule->flags & RULE_TYPE_MINIMIZED) != 0;
+		client->flags.minimized = rule_flag(rule, RULE_TYPE_MINIMIZED);
 	if (rule->has & RULE_TYPE_STICKY)
-		node->sticky = rule->flags & RULE_TYPE_STICKY;
+		node->sticky = rule_flag(rule, RULE_TYPE_STICKY);
 	if (rule->has & RULE_TYPE_LOCKED)
-		node->locked = rule->flags & RULE_TYPE_LOCKED;
+		node->locked = rule_flag(rule, RULE_TYPE_LOCKED);
 
 	if (rule->has & RULE_TYPE_SCROLLER_PROPORTION || rule->has & RULE_TYPE_SCROLLER_PROPORTION_SINGLE)
 		scroller_apply_client_rules(client,
@@ -238,10 +238,10 @@ void rule_apply_consequence(node_t *node, client_t *client, const rule_consequen
 			rule->has & RULE_TYPE_SCROLLER_PROPORTION_SINGLE ? rule->scroller_proportion_single : 0.0f);
 
 	if (rule->has & RULE_TYPE_BLOCK_OUT_FROM_SCREENSHARE)
-		client->flags.block_out_from_screenshare = rule->flags & RULE_TYPE_BLOCK_OUT_FROM_SCREENSHARE;
+		client->flags.block_out_from_screenshare = rule_flag(rule, RULE_TYPE_BLOCK_OUT_FROM_SCREENSHARE);
 
 	if (rule->has & RULE_TYPE_ALLOW_TEARING) {
-		client->flags.allow_tearing = rule->flags & RULE_TYPE_ALLOW_TEARING;
+		client->flags.allow_tearing = rule_flag(rule, RULE_TYPE_ALLOW_TEARING);
 		client->flags.allow_tearing_from_rule = true;
 	}
 
@@ -249,15 +249,15 @@ void rule_apply_consequence(node_t *node, client_t *client, const rule_consequen
 		client->render_unfocused_fps = rule->render_unfocused_fps;
 
 	if (rule->has & RULE_TYPE_BLUR) {
-		client->flags.blur = rule->flags & RULE_TYPE_BLUR;
+		client->flags.blur = rule_flag(rule, RULE_TYPE_BLUR);
 		client->flags.blur_from_rule = true;
 	}
 
 	if (rule->has & RULE_TYPE_MICA)
-		client->flags.mica = rule->flags & RULE_TYPE_MICA;
+		client->flags.mica = rule_flag(rule, RULE_TYPE_MICA);
 
 	if (rule->has & RULE_TYPE_ACRYLIC)
-		client->flags.acrylic = rule->flags & RULE_TYPE_ACRYLIC;
+		client->flags.acrylic = rule_flag(rule, RULE_TYPE_ACRYLIC);
 
 	if (rule->has & RULE_TYPE_BORDER_RADIUS)
 		client->border_radius = rule->border_radius;
@@ -266,10 +266,10 @@ void rule_apply_consequence(node_t *node, client_t *client, const rule_consequen
 		client->opacity = rule->opacity;
 
 	if (rule->has & RULE_TYPE_ANIM_DISABLE)
-		client->flags.anim_disabled = rule->flags & RULE_TYPE_ANIM_DISABLE;
+		client->flags.anim_disabled = rule_flag(rule, RULE_TYPE_ANIM_DISABLE);
 
 	if (rule->has & RULE_TYPE_SHADOW) {
-		client->flags.shadow = rule->flags & RULE_TYPE_SHADOW;
+		client->flags.shadow = rule_flag(rule, RULE_TYPE_SHADOW);
 		client->shadow_size = settings.shadow_size;
 		client->shadow_offset_x = settings.shadow_offset_x;
 		client->shadow_offset_y = settings.shadow_offset_y;
@@ -284,15 +284,15 @@ void rule_apply_view_consequence(view_t *view, const rule_consequence_t *rule) {
 		return;
 
 	if (rule->has & RULE_TYPE_BLUR)
-		surface_client_set_effect(view->client, EFFECT_BLUR, rule->flags & RULE_TYPE_BLUR);
+		surface_client_set_effect(view->client, EFFECT_BLUR, rule_flag(rule, RULE_TYPE_BLUR));
 	if (rule->has & RULE_TYPE_MICA)
-		surface_client_set_effect(view->client, EFFECT_MICA, rule->flags & RULE_TYPE_MICA);
+		surface_client_set_effect(view->client, EFFECT_MICA, rule_flag(rule, RULE_TYPE_MICA));
 	if (rule->has & RULE_TYPE_ACRYLIC)
-		surface_client_set_effect(view->client, EFFECT_ACRYLIC, rule->flags & RULE_TYPE_ACRYLIC);
+		surface_client_set_effect(view->client, EFFECT_ACRYLIC, rule_flag(rule, RULE_TYPE_ACRYLIC));
 	if (rule->has & RULE_TYPE_BORDER_RADIUS)
 		surface_client_set_border_radius(view->client, rule->border_radius);
 	if (rule->has & RULE_TYPE_SHADOW)
-		surface_client_set_shadow(view->client, rule->flags & RULE_TYPE_SHADOW);
+		surface_client_set_shadow(view->client, rule_flag(rule, RULE_TYPE_SHADOW));
 	if (rule->has & RULE_TYPE_OPACITY)
 		surface_set_opacity(&view->scene_tree->node, rule->opacity);
 }

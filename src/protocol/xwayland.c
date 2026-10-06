@@ -662,6 +662,7 @@ static void handle_map(struct wl_listener *listener, void *data) {
 		xwayland_toplevel->view.image_capture_surface =
 			wlr_scene_surface_create(&xwayland_toplevel->view.image_capture->tree, xsurface->surface);
 	}
+	view_update_image_capture_block_out(&xwayland_toplevel->view);
 
 	client_update_foreign_toplevel_state(client);
 

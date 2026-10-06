@@ -34,7 +34,7 @@ void handle_keyboard_shortcuts_inhibit_new_inhibitor(struct wl_listener *listene
 	if (app_id || title || tag) {
 		rule_consequence_t *rule = find_matching_rule(app_id, title, tag);
 		if (rule && rule->has & RULE_TYPE_SHORTCUTS_INHIBITOR)
-			allow = rule->flags & RULE_TYPE_SHORTCUTS_INHIBITOR;
+			allow = rule_flag(rule, RULE_TYPE_SHORTCUTS_INHIBITOR);
 	}
 
 	if (allow)

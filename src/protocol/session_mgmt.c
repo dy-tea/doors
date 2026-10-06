@@ -1209,10 +1209,9 @@ size_t session_mgmt_write_list(char *buf, size_t buf_size) {
 
 			WRITE("    %s [%s%s%s%s] %dx%d at %d,%d on %s/%s%s%s\n", tl->name,
 				state->floating ? "floating " : "", state->maximized ? "maximized " : "",
-				state->fullscreen ? "fullscreen " : "", state->minimized ? "minimized " : "",
-				state->rect.width, state->rect.height, state->rect.x, state->rect.y, state->output,
-				state->desktop, tl->restore_pending ? " (awaiting commit)" : "",
-				tl->resource ? "" : " (inert)");
+				state->fullscreen ? "fullscreen " : "", state->minimized ? "minimized " : "", state->rect.width,
+				state->rect.height, state->rect.x, state->rect.y, state->output, state->desktop,
+				tl->restore_pending ? " (awaiting commit)" : "", tl->resource ? "" : " (inert)");
 		}
 
 		size_t known = 0;

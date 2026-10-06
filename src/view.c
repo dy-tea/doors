@@ -553,6 +553,43 @@ void view_center_and_clip_surface(view_t *view) {
 
 	if (view->shadow)
 		view->shadow->shadow_geometry_dirty = true;
+
+	view_update_image_capture_block_out(view);
+}
+
+void view_update_image_capture_block_out(view_t *view) {
+	if (!view || !view->image_capture || !view->client)
+		return;
+
+	bool blocked = view->client->flags.block_out_from_screenshare;
+	if (!blocked) {
+		if (view->image_capture_rect) {
+			wlr_scene_node_destroy(&view->image_capture_rect->node);
+			view->image_capture_rect = NULL;
+		}
+		return;
+	}
+
+	int width = (int)view->geometry.width;
+	int height = (int)view->geometry.height;
+	if (width < 1)
+		width = 1;
+	if (height < 1)
+		height = 1;
+
+	if (!view->image_capture_rect) {
+		static const float black[4] = {
+			0.0f,
+			0.0f,
+			0.0f,
+			1.0f
+		};
+		view->image_capture_rect = wlr_scene_rect_create(&view->image_capture->tree, width, height,
+			black);
+		return;
+	}
+
+	wlr_scene_rect_set_size(view->image_capture_rect, width, height);
 }
 
 bool view_get_surface_offset(view_t *view, int *ox, int *oy) {
@@ -806,14 +843,11 @@ void view_destroy(view_t *view) {
 
 	view_destroy_foreign_toplevels(view);
 
-	if (view->capture_renderer) {
-		capture_renderer_destroy(view->capture_renderer);
-		view->capture_renderer = NULL;
-	}
-
 	if (view->image_capture != NULL) {
 		wlr_scene_node_destroy(&view->image_capture->tree.node);
 		view->image_capture = NULL;
+		view->image_capture_surface = NULL;
+		view->image_capture_rect = NULL;
 		view->image_capture_source = NULL;
 	}
 

@@ -151,6 +151,7 @@ executable(
 		'src' / 'output' / 'config.c',
 		'src' / 'output' / 'output.c',
 		'src' / 'protocol' / 'bell.c',
+		'src' / 'protocol' / 'capture.c',
 		'src' / 'protocol' / 'copy_capture.c',
 		'src' / 'protocol' / 'cursor_shape.c',
 		'src' / 'protocol' / 'dialog.c',

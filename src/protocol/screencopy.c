@@ -1,10 +1,8 @@
 #include "once.h"
 #include "output/output.h"
+#include "protocol/capture.h"
 #include "protocol/screencopy.h"
-#include "protocol/xwayland.h"
 #include "server.h"
-#include "settings.h"
-#include "types.h"
 #include "wlr-screencopy-unstable-v1-protocol.h"
 #include <assert.h>
 #include <drm_fourcc.h>
@@ -188,96 +186,19 @@ static void client_unref(screencopy_client_t *client) {
 	free(client);
 }
 
-static void block_out_surface(node_t *node, struct wlr_scene_tree *scene_tree,
-		struct wlr_render_pass *pass, struct wlr_output *output, bool log_debug,
-		const char *transform_msg) {
-	if (!node || !node->client) {
-		if (log_debug)
-			wlr_log(WLR_DEBUG, "No node/client for toplevel %p", (void *)node);
-		return;
-	}
-
-	client_t *c = node->client;
-	if (!c->flags.block_out_from_screenshare) {
-		if (log_debug)
-			wlr_log(WLR_DEBUG, "%s not blocked", c->title);
-		return;
-	}
-	if (!c->flags.shown && c->state != STATE_FULLSCREEN) {
-		if (log_debug)
-			wlr_log(WLR_DEBUG, "%s not shown (state=%d)", c->title, c->state);
-		return;
-	}
-
-	output_t *o = output_from_wlr_output(output);
-	if (!o) {
-		if (log_debug)
-			wlr_log(WLR_DEBUG, "No output_t for wlr_output %p", (void *)output);
-		return;
-	}
-
-	struct wlr_box win_rect = {0};
-	switch (c->state) {
-	case STATE_TILED:
-	case STATE_PSEUDO_TILED:
-		win_rect = c->tiled_rectangle;
-		break;
-	case STATE_FLOATING:
-		win_rect = c->floating_rectangle;
-		break;
-	case STATE_FULLSCREEN:
-		win_rect = o->rectangle;
-		break;
-	}
-
-	if (win_rect.width == 0 || win_rect.height == 0)
+static void block_out_windows(struct wlr_render_pass *pass, struct wlr_output *output,
+		const struct wlr_box *box) {
+	struct wlr_box rects[CAPTURE_MAX_BLOCKED_RECTS];
+	size_t nrects = capture_block_out_rects(output, rects, CAPTURE_MAX_BLOCKED_RECTS);
+	if (nrects == 0)
 		return;
 
-	int abs_x, abs_y;
-	wlr_scene_node_coords(&scene_tree->node, &abs_x, &abs_y);
-
-	int bw = (int)settings.border_width;
-	float scale = o->wlr_output->scale;
-	int buf_x = (abs_x - o->rectangle.x - bw) * scale;
-	int buf_y = (abs_y - o->rectangle.y - bw) * scale;
-	int buf_w = (win_rect.width + 2 * bw) * scale;
-	int buf_h = (win_rect.height + 2 * bw) * scale;
-
-	if (log_debug)
-		wlr_log(WLR_DEBUG, "X=%d y=%d w=%d h=%d bw=%d scale=%f "
-			"buf_x=%d buf_y=%d buf_w=%d buf_h=%d", win_rect.x, win_rect.y, win_rect.width, win_rect.height,
-				bw, scale, buf_x, buf_y, buf_w, buf_h);
-
-	struct wlr_box block_box = {
-		.x = buf_x,
-		.y = buf_y,
-		.width = buf_w,
-		.height = buf_h,
-	};
-
-	enum wl_output_transform transform = wlr_output_transform_invert(output->transform);
-	if (transform != WL_OUTPUT_TRANSFORM_NORMAL) {
-		(void)transform;
-		wlr_log(WLR_DEBUG, "Screencopy block-out: skipped %s on transformed output", transform_msg);
-		return;
+	for (size_t i = 0; i < nrects; i++) {
+		rects[i].x -= box->x;
+		rects[i].y -= box->y;
 	}
 
-	wlr_render_pass_add_rect(pass, &(struct wlr_render_rect_options){
-		.box = block_box,
-		.color = {0, 0, 0, 1},
-		.blend_mode = WLR_RENDER_BLEND_MODE_NONE,
-	});
-}
-
-static void block_out_window(view_t *tl, struct wlr_render_pass *pass, struct wlr_output *output) {
-	block_out_surface(tl->node, tl->scene_tree, pass, output, true, "window");
-}
-
-static void block_out_windows(struct wlr_render_pass *pass, struct wlr_output *output) {
-	view_t *tl;
-	wl_list_for_each(tl, &server.views, link) {
-		block_out_window(tl, pass, output);
-	}
+	capture_block_out_render(pass, rects, nrects);
 }
 
 static void frame_handle_output_commit(struct wl_listener *listener, void *data) {
@@ -336,7 +257,7 @@ static void frame_handle_output_commit(struct wl_listener *listener, void *data)
 	});
 
 	wlr_log(WLR_DEBUG, "Calling block_out_windows before submit");
-	block_out_windows(pass, output);
+	block_out_windows(pass, output, &frame->box);
 
 	bool ok = wlr_render_pass_submit(pass);
 	wlr_texture_destroy(texture);

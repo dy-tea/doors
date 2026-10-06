@@ -323,11 +323,10 @@ void toggle_block_out_from_screenshare(void) {
 	n->client->flags.block_out_from_screenshare = !n->client->flags.block_out_from_screenshare;
 	wlr_log(WLR_DEBUG, "%s -> %d", n->client->app_id, n->client->flags.block_out_from_screenshare);
 
-	// toggle the image capture surface, which is what the compositor shows to
-	// screen recorders instead of the real surface
+	// toggle the scene that screen recorders see instead of the real surface
 	view_t *view = n->client->view;
 	struct wlr_surface *wlr_surface = view_wlr_surface(view);
-	if (view != NULL && wlr_surface != NULL) {
+	if (view != NULL && view->image_capture != NULL && wlr_surface != NULL) {
 		if (n->client->flags.block_out_from_screenshare && view->image_capture_surface) {
 			wlr_scene_node_destroy(&view->image_capture_surface->buffer->node);
 			view->image_capture_surface = NULL;
@@ -335,6 +334,8 @@ void toggle_block_out_from_screenshare(void) {
 			view->image_capture_surface = wlr_scene_surface_create(&view->image_capture->tree, wlr_surface);
 		}
 	}
+	if (view != NULL)
+		view_update_image_capture_block_out(view);
 
 	wlr_log(WLR_INFO, "Block out from screenshare: %s",
 		n->client->flags.block_out_from_screenshare ? "on" : "off");

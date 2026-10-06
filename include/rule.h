@@ -59,6 +59,10 @@ typedef struct {
 	int render_unfocused_fps;
 } rule_consequence_t;
 
+static inline bool rule_flag(const rule_consequence_t *rule, rule_type_t flag) {
+	return (rule->flags & flag) != 0;
+}
+
 typedef struct rule_t {
 	rule_match_t match;
 	rule_consequence_t consequence;

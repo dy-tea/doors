@@ -414,6 +414,7 @@ void xdg_toplevel_adopt(xdg_toplevel_t *toplevel) {
 			wlr_scene_surface_create(&toplevel->view.image_capture->tree,
 			toplevel->xdg_toplevel->base->surface);
 	}
+	view_update_image_capture_block_out(&toplevel->view);
 
 	client_update_foreign_toplevel_state(toplevel->view.client);
 

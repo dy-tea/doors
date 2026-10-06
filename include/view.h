@@ -33,7 +33,7 @@ struct view_t {
 	struct wlr_scene_surface *image_capture_surface;
 	struct wlr_scene *image_capture;
 	struct wlr_scene_tree *image_capture_tree;
-	void *capture_renderer;
+	struct wlr_scene_rect *image_capture_rect;
 
 	struct wlr_scene_tree *border_tree;
 	struct wlr_scene_rect *border_rects[4];
@@ -72,6 +72,8 @@ void view_resolve_content_layout(view_t *view, struct wlr_box container,
 
 void view_center_and_clip_surface(view_t *view);
 bool view_get_surface_offset(view_t *view, int *ox, int *oy);
+
+void view_update_image_capture_block_out(view_t *view);
 
 void view_set_activated(view_t *view, bool activated);
 void view_close(view_t *view);
