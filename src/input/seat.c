@@ -1,4 +1,5 @@
 #include "input/input_method.h"
+#include "input/keyboard.h"
 #include "input/seat.h"
 #include "input/tablet.h"
 #include "protocol/pointer_constraint.h"
@@ -109,14 +110,18 @@ void seat_destroy(seat_t *seat) {
 	if (!seat)
 		return;
 
+	keyboard_detach_seat(seat);
+
 	wl_list_remove(&seat->request_cursor.link);
 	wl_list_remove(&seat->pointer_focus_change.link);
 	wl_list_remove(&seat->request_set_selection.link);
 	wl_list_remove(&seat->request_start_drag.link);
 	wl_list_remove(&seat->start_drag.link);
 
-	if (seat->input_method_relay)
+	if (seat->input_method_relay) {
 		input_method_relay_finish(seat->input_method_relay);
+		seat->input_method_relay = NULL;
+	}
 
 	tablet_t *tablet, *tmp_tablet;
 	wl_list_for_each_safe(tablet, tmp_tablet, &seat->tablets, link)

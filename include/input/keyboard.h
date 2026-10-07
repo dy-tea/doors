@@ -40,6 +40,7 @@ keyboard_t *keyboard_create(struct wlr_input_device *device);
 void keyboard_modifiers(struct wl_listener *listener, void *data);
 void keyboard_key(struct wl_listener *listener, void *data);
 void keyboard_destroy(struct wl_listener *listener, void *data);
+void keyboard_detach_seat(struct seat_t *seat);
 
 // keyboard grouping
 void keyboard_reapply_grouping(void);

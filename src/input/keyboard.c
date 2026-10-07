@@ -206,6 +206,18 @@ void keyboard_destroy(struct wl_listener *listener, void *data) {
 	free(keyboard);
 }
 
+void keyboard_detach_seat(struct seat_t *seat) {
+	keyboard_t *keyboard, *tmp;
+
+	wl_list_for_each_safe(keyboard, tmp, &server.physical_keyboards, all_link)
+		if (keyboard->seat == seat)
+			keyboard->seat = NULL;
+
+	wl_list_for_each_safe(keyboard, tmp, &server.keyboards, active_link)
+		if (keyboard->seat == seat)
+			keyboard->seat = NULL;
+}
+
 // keybind handling using raw keycode (for number keys 1-0)
 keybind_t *handle_keybind_raw(uint32_t modifiers, uint32_t keycode, bool pressed) {
 	if (!pressed)
@@ -1049,7 +1061,9 @@ void keyboard_group_remove(keyboard_t *keyboard) {
 	if (wl_list_empty(&wlr_group->devices)) {
 		wlr_log(WLR_DEBUG, "Destroying empty keyboard group %p", (void *)wlr_group);
 
-		if (server.seat->keyboard_state.keyboard == group->representative->wlr_keyboard)
+		// the seat may already be gone, devices can outlive it during shutdown
+		if (!wl_list_empty(&server.seats) && group->representative &&
+			server.seat->keyboard_state.keyboard == group->representative->wlr_keyboard)
 			wlr_seat_set_keyboard(server.seat, NULL);
 
 		if (group->representative) {

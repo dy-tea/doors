@@ -3,7 +3,6 @@
 #include "protocol/capture.h"
 #include "protocol/copy_capture.h"
 #include "server.h"
-#include "types.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <wayland-server.h>
@@ -21,7 +20,6 @@
 #include <wlr/types/wlr_scene.h>
 #include <wlr/util/addon.h>
 #include <wlr/util/log.h>
-
 
 typedef struct output_capture_source_t {
 	struct wlr_ext_image_capture_source_v1 base;
