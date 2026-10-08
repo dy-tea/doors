@@ -30,6 +30,7 @@ Ensure you have the following dependencies installed:
 - pangocairo
 - shaderc
 - vulkan
+- libpcre2-8
 
 Build with meson:
 ```

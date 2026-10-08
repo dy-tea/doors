@@ -37,10 +37,25 @@ typedef enum {
 	RULE_TYPE_LAST = 1 << 24,
 } rule_type_t;
 
+typedef enum {
+	RULE_MATCH_EXACT,
+	RULE_MATCH_GLOB,
+	RULE_MATCH_REGEX,
+} rule_match_mode_t;
+
+#define RULE_RE_MAX 512 // PCRE2 pattern length limit
+
+typedef struct rule_pattern {
+	char pattern[RULE_RE_MAX]; // as written by the user
+	uint8_t mode; // rule_match_mode_t
+	bool caseless;
+	void *code; // compiled pcre2_code, NULL unless mode is GLOB or REGEX
+} rule_pattern_t;
+
 typedef struct {
-	char app_id[MAXLEN];
-	char title[MAXLEN];
-	char tag[MAXLEN];
+	rule_pattern_t app_id;
+	rule_pattern_t title;
+	rule_pattern_t tag;
 	bool one_shot;
 } rule_match_t;
 
@@ -63,6 +78,11 @@ static inline bool rule_flag(const rule_consequence_t *rule, rule_type_t flag) {
 	return (rule->flags & flag) != 0;
 }
 
+bool rule_pattern_set(rule_pattern_t *p, const char *spec, char *errbuf, size_t errsz);
+bool rule_pattern_match(const rule_pattern_t *p, const char *value);
+void rule_pattern_clear(rule_pattern_t *p);
+size_t rule_count(void);
+
 typedef struct rule_t {
 	rule_match_t match;
 	rule_consequence_t consequence;
@@ -76,6 +96,7 @@ void rule_fini(void);
 rule_t *make_rule(void);
 void add_rule(rule_t *r);
 void remove_rule(rule_t *r);
+void free_rule(rule_t *r);
 bool remove_rule_by_index(int idx);
 void list_rules(char *buf, size_t buf_size);
 rule_consequence_t *find_matching_rule(const char *app_id, const char *title, const char *tag);

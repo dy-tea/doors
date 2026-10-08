@@ -71,16 +71,27 @@ static bool rule_apply_flag(ipc_args_t *a, rule_t *r, const char *arg, bool *ok)
 }
 
 static bool rule_apply_key(ipc_args_t *a, rule_t *r, const char *arg) {
+	char errbuf[256] = {0};
+
 	if (key_prefix_len(arg, "title")) {
-		snprintf(r->match.title, MAXLEN, "%s", arg + 6);
+		if (!rule_pattern_set(&r->match.title, arg + 6, errbuf, sizeof(errbuf))) {
+			ipc_fail(a, "title: %s\n", errbuf);
+			return false;
+		}
 		return true;
 	}
 	if (key_prefix_len(arg, "tag")) {
-		snprintf(r->match.tag, MAXLEN, "%s", arg + 4);
+		if (!rule_pattern_set(&r->match.tag, arg + 4, errbuf, sizeof(errbuf))) {
+			ipc_fail(a, "tag: %s\n", errbuf);
+			return false;
+		}
 		return true;
 	}
 	if (key_prefix_len(arg, "app_id")) {
-		snprintf(r->match.app_id, MAXLEN, "%s", arg + 7);
+		if (!rule_pattern_set(&r->match.app_id, arg + 7, errbuf, sizeof(errbuf))) {
+			ipc_fail(a, "app_id: %s\n", errbuf);
+			return false;
+		}
 		return true;
 	}
 	if (key_prefix_len(arg, "desktop")) {
@@ -153,7 +164,14 @@ static void rule_add(ipc_args_t *a) {
 	r->consequence.has = RULE_TYPE_FOLLOW | RULE_TYPE_FOCUS | RULE_TYPE_MANAGE;
 	r->consequence.flags = RULE_TYPE_FOLLOW | RULE_TYPE_FOCUS | RULE_TYPE_MANAGE;
 
+	if (rule_count() >= MAX_RULES) {
+		free_rule(r);
+		ipc_fail(a, "Too many rules, the limit is %d\n", MAX_RULES);
+		return;
+	}
+
 	bool have_app_id = false;
+	char errbuf[256] = {0};
 
 	ipc_foreach(a, arg) {
 		if (streq(arg, "one_shot")) {
@@ -164,7 +182,11 @@ static void rule_add(ipc_args_t *a) {
 		// a bare word is the app_id shorthand, and only the first one wins
 		if (arg[0] != '-' && !strchr(arg, '=')) {
 			if (!have_app_id) {
-				snprintf(r->match.app_id, MAXLEN, "%s", arg);
+				if (!rule_pattern_set(&r->match.app_id, arg, errbuf, sizeof(errbuf))) {
+					free_rule(r);
+					ipc_fail(a, "app_id: %s\n", errbuf);
+					return;
+				}
 				have_app_id = true;
 			}
 			continue;
@@ -173,14 +195,14 @@ static void rule_add(ipc_args_t *a) {
 		bool applied;
 		if (rule_apply_flag(a, r, arg, &applied)) {
 			if (!applied) {
-				free(r);
+				free_rule(r);
 				return;
 			}
 			continue;
 		}
 
 		if (!rule_apply_key(a, r, arg)) {
-			free(r);
+			free_rule(r);
 			return;
 		}
 
@@ -188,8 +210,8 @@ static void rule_add(ipc_args_t *a) {
 			have_app_id = true;
 	}
 
-	if (!have_app_id && r->match.title[0] == '\0' && r->match.tag[0] == '\0') {
-		free(r);
+	if (!have_app_id && r->match.title.pattern[0] == '\0' && r->match.tag.pattern[0] == '\0') {
+		free_rule(r);
 		ipc_fail(a, "Must specify an app_id, title= or tag=\n");
 		return;
 	}
@@ -216,7 +238,8 @@ static void rule_show_list(ipc_args_t *a) {
 }
 
 const ipc_sub_t rule_subs[] = {
-	IPC_SUB("-a", "--add", "rule -a | --add <app_id> [one_shot] [key=value ...]", rule_add),
+	IPC_SUB("-a", "--add", "rule -a | --add <app_id> [one_shot] [key=value ...], "
+		"match fields take [exact:|glob:|regex:][i:]<pattern>", rule_add),
 	IPC_SUB("-r", "--remove", "rule -r | --remove <index>", rule_remove),
 	IPC_SUB("-l", "--list", "rule -l | --list", rule_show_list),
 	IPC_SUB_END,

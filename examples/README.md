@@ -699,6 +699,8 @@ doorsctl rule -r <index>                # Remove rule by index
 doorsctl rule -l                        # List all rules
 ```
 
+At most 128 rules can be defined at once.
+
 **Adding Rules (`-a` / `--add`):**
 Specify an app_id (or title) followed by consequence options:
 
@@ -740,6 +742,27 @@ doorsctl rule -a vesktop desktop=III
 doorsctl rule -a title="Exact Window Title" desktop=I
 doorsctl rule -a tag="browser" desktop=II
 ```
+
+| Mode | Meaning |
+|------|---------|
+| `exact` | Whole string, case sensitive. |
+| `glob` | Whole string with `*`, `?`, `[...]` (negate with `!`) and `{a,b}`. |
+| `regex` | PCRE2, matched anywhere in the value. |
+
+Add `i:` after the mode to ignore case.
+
+Examples:
+```
+doorsctl rule -a app_id=glob:org.mozilla.*  desktop=II
+doorsctl rule -a title="glob:*Picture-in-Picture*" state=tiled
+doorsctl rule -a title=regex:(?i)^picture   state=tiled
+doorsctl rule -a app_id=exact:i:firefox     desktop=II
+doorsctl rule -a tag=glob:{browser,mail}    state=floating
+```
+
+Note that `doorsrc` is run by the shell, so quote patterns that contain `*`, `[` or `{`.
+When several rules match a window, each consequence is taken from the last matching rule
+that sets it, so later `doorsctl rule -a` calls win over earlier ones.
 
 **Examples:**
 

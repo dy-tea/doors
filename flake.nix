@@ -43,6 +43,7 @@
             vulkan-loader
             shaderc.dev
             libdrm.dev
+            pcre2
           ];
 
           doors = pkgs.stdenv.mkDerivation {

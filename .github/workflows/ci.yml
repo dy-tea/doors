@@ -26,7 +26,7 @@ jobs:
             cairo libevdev libinput pixman libxcb libxkbcommon linux-api-headers \
             pango shaderc vulkan-headers xcb-util-wm xorg-xwayland libliftoff \
             lcms2 xcb-util-errors xcb-util-renderutil seatd vulkan-icd-loader \
-            libdisplay-info
+            libdisplay-info pcre2
 
       - name: Create build user
         run: |
@@ -89,7 +89,7 @@ jobs:
               pango shaderc vulkan-headers vulkan-loader xcb-util-wm xcb-util-errors hwdata \
               xcb-util-renderutil xcb-util-cursor xcb-util-image json-c lcms2 evdev-proto \
               freetype2 libepoll-shim libinotify mesa-libs egl-x11 egl-wayland libudev-devd \
-              gdk-pixbuf2 glslang xwayland libX11 libdisplay-info libliftoff bzip2
+              gdk-pixbuf2 glslang xwayland libX11 libdisplay-info libliftoff bzip2 pcre2
           run: |
             # Force-install libinotify: the VM image stripped the base .so,
             # but pkg skips it unless forced.

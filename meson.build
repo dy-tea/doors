@@ -34,6 +34,7 @@ libs = [
 	dependency('pangocairo'),
 	dependency('vulkan'),
 	dependency('shaderc'),
+	dependency('libpcre2-8'),
 	wayland_protos,
 ]
 
