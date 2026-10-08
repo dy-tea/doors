@@ -57,10 +57,12 @@ static const char *get_config_home(void) {
 	if (custom_config_dir)
 		return custom_config_dir;
 
-	const char *xdg = getenv("XDG_CONFIG_HOME");
-	if (xdg && xdg[0] != '\0')
-		return xdg;
 	static char buf[PATH_MAX];
+	const char *xdg = getenv("XDG_CONFIG_HOME");
+	if (xdg && xdg[0] != '\0') {
+		snprintf(buf, sizeof(buf), "%sdoors", xdg);
+		return buf;
+	}
 	snprintf(buf, sizeof(buf), "%s%s", getenv("HOME") ? getenv("HOME") : "/root", DOORS_CONFIG_DIR);
 	return buf;
 }
