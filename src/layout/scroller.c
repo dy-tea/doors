@@ -716,6 +716,7 @@ bool scroller_focus_next(desktop_t *d) {
 		return false;
 
 	int idx = s->active_column_idx;
+	bool found = false;
 	for (int step = 0; step < s->column_count; step++) {
 		idx = idx >= s->column_count - 1 ? 0 : idx + 1;
 		if (!scroller_column_focusable(&s->columns[idx]))
@@ -723,13 +724,14 @@ bool scroller_focus_next(desktop_t *d) {
 		if (idx == s->active_column_idx)
 			return false;
 
-		s->active_column_idx = idx;
+		found = true;
 		break;
 	}
 
-	if (idx == s->active_column_idx)
+	if (!found)
 		return false;
 
+	s->active_column_idx = idx;
 	s->view_offset = 0.0; // reset scroll for now
 	s->activate_prev_column_on_removal = false;
 	scroller_apply_active_focus(d, NULL);
@@ -742,6 +744,7 @@ bool scroller_focus_prev(desktop_t *d) {
 		return false;
 
 	int idx = s->active_column_idx;
+	bool found = false;
 	for (int step = 0; step < s->column_count; step++) {
 		idx = idx == 0 ? s->column_count - 1 : idx - 1;
 		if (!scroller_column_focusable(&s->columns[idx]))
@@ -749,13 +752,14 @@ bool scroller_focus_prev(desktop_t *d) {
 		if (idx == s->active_column_idx)
 			return false;
 
-		s->active_column_idx = idx;
+		found = true;
 		break;
 	}
 
-	if (idx == s->active_column_idx)
+	if (!found)
 		return false;
 
+	s->active_column_idx = idx;
 	s->view_offset = 0.0;
 	s->activate_prev_column_on_removal = false;
 	scroller_apply_active_focus(d, NULL);
