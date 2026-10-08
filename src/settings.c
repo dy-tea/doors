@@ -3,6 +3,41 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+static const scroller_size_t scroller_default_preset_widths[] = {
+	{SCROLLER_SIZE_PROPORTION, 1.0 / 3.0},
+	{SCROLLER_SIZE_PROPORTION, 0.5},
+	{SCROLLER_SIZE_PROPORTION, 2.0 / 3.0},
+};
+
+static const scroller_size_t scroller_default_preset_heights[] = {
+	{SCROLLER_SIZE_PROPORTION, 1.0 / 3.0},
+	{SCROLLER_SIZE_PROPORTION, 0.5},
+	{SCROLLER_SIZE_PROPORTION, 2.0 / 3.0},
+};
+
+static void scroller_preset_release(scroller_size_t **list, int *count) {
+	if (*list != NULL && *list != scroller_default_preset_widths &&
+		*list != scroller_default_preset_heights)
+		free(*list);
+
+	*list = NULL;
+	*count = 0;
+}
+
+void settings_set_scroller_preset_column_widths(scroller_size_t *list, int count) {
+	scroller_preset_release(&settings.scroller_preset_column_widths,
+		&settings.scroller_preset_column_widths_count);
+	settings.scroller_preset_column_widths = list;
+	settings.scroller_preset_column_widths_count = count;
+}
+
+void settings_set_scroller_preset_window_heights(scroller_size_t *list, int count) {
+	scroller_preset_release(&settings.scroller_preset_window_heights,
+		&settings.scroller_preset_window_heights_count);
+	settings.scroller_preset_window_heights = list;
+	settings.scroller_preset_window_heights_count = count;
+}
+
 // global settings
 doors_settings_t settings = {
 	.automatic_scheme = SCHEME_SPIRAL,
@@ -28,9 +63,16 @@ doors_settings_t settings = {
 	.monocle_padding = {0},
 	.border_width = 2,
 	.window_gap = 10,
-	.scroller_default_proportion = 0.5f,
-	.scroller_proportion_preset = NULL,
-	.scroller_proportion_preset_count = 0,
+	.scroller_default_column_width = {SCROLLER_SIZE_PROPORTION, 0.5},
+	.scroller_preset_column_widths = (scroller_size_t *)scroller_default_preset_widths,
+	.scroller_preset_column_widths_count = (int)(sizeof(scroller_default_preset_widths) /
+		sizeof(scroller_default_preset_widths[0])),
+	.scroller_preset_window_heights = (scroller_size_t *)scroller_default_preset_heights,
+	.scroller_preset_window_heights_count = (int)(sizeof(scroller_default_preset_heights) /
+		sizeof(scroller_default_preset_heights[0])),
+	.scroller_center_focused_column = SCROLLER_CENTER_NEVER,
+	.scroller_always_center_single_column = false,
+	.scroller_struts = {0},
 	.smart_gaps = false,
 	.smart_borders = false,
 	.respect_tiled_min_size = false,
@@ -97,9 +139,8 @@ void refresh_border_color_cache(void) {
 }
 
 void settings_fini(void) {
-	free(settings.scroller_proportion_preset);
-	settings.scroller_proportion_preset = NULL;
-	settings.scroller_proportion_preset_count = 0;
+	settings_set_scroller_preset_column_widths(NULL, 0);
+	settings_set_scroller_preset_window_heights(NULL, 0);
 }
 
 // global state

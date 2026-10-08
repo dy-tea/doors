@@ -4,8 +4,12 @@
 
 extern doors_settings_t settings;
 
+void settings_init(void);
 void refresh_border_color_cache(void);
 void settings_fini(void);
+
+void settings_set_scroller_preset_column_widths(scroller_size_t *list, int count);
+void settings_set_scroller_preset_window_heights(scroller_size_t *list, int count);
 
 bool config_apply_value(const char *name, const char *value, char *err, size_t errsz);
 

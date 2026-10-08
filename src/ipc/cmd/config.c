@@ -84,6 +84,16 @@ static void on_window_gap(void) {
 	}
 }
 
+static void on_scroller_default_column_width(void) {
+	output_t *m;
+	wl_list_for_each(m, &mon_list, link) {
+		desktop_t *d;
+		wl_list_for_each(d, &m->desk_list, link)
+			if (d->scroller_state)
+				d->scroller_state->default_column_width = settings.scroller_default_column_width;
+	}
+}
+
 static void on_decoration_mode(void) {
 	tabs_rebuild_all();
 
@@ -176,6 +186,14 @@ static const cfg_enum_value_t initial_polarity_values[] = {
 	IPC_ENUM_END,
 };
 
+static const cfg_enum_value_t scroller_center_mode_values[] = {
+	{"never", SCROLLER_CENTER_NEVER},
+	{"always", SCROLLER_CENTER_ALWAYS},
+	{"on-overflow", SCROLLER_CENTER_ON_OVERFLOW},
+	{"on_overflow", SCROLLER_CENTER_ON_OVERFLOW},
+	IPC_ENUM_END,
+};
+
 #define B(n, a, p, fl, on) {n, a, CFG_BOOL, &(p), 0, 0, 0, NULL, NULL, fl, on}
 #define I(n, a, p, lo, hi, f, fl, on) \
 	{n, a, CFG_INT, &(p), 0, lo, hi, f, NULL, fl, on}
@@ -247,8 +265,17 @@ static const cfg_setting_t settings_table[] = {
 	I("text_height", NULL, text_height, 0, 0, "%d\n", CFG_POSITIVE, on_text),
 
 	/* scroller */
-	F("scroller_default_proportion", NULL, settings.scroller_default_proportion, 0.1, 1.0, "%.2f\n",
-		CFG_CLAMP, NULL),
+	B("scroller_always_center_single_column", NULL, settings.scroller_always_center_single_column, 0,
+		NULL),
+	E("scroller_center_focused_column", NULL, settings.scroller_center_focused_column,
+		scroller_center_mode_values, 0, NULL),
+	I("scroller_left_strut", NULL, settings.scroller_struts.left, 0, INT_MAX, "%d\n", CFG_COMMIT,
+		NULL),
+	I("scroller_right_strut", NULL, settings.scroller_struts.right, 0, INT_MAX, "%d\n", CFG_COMMIT,
+		NULL),
+	I("scroller_top_strut", NULL, settings.scroller_struts.top, 0, INT_MAX, "%d\n", CFG_COMMIT, NULL),
+	I("scroller_bottom_strut", NULL, settings.scroller_struts.bottom, 0, INT_MAX, "%d\n", CFG_COMMIT,
+		NULL),
 
 	/* blur */
 	B("blur_enabled", NULL, blur_enabled, 0, NULL),
@@ -596,15 +623,45 @@ static void cfg_tab_color(ipc_args_t *a, const char *suffix) {
 	ipc_fail(a, "Unknown tab color \"%s\"\n", suffix);
 }
 
-static void cfg_scroller_presets(ipc_args_t *a) {
+static bool cfg_parse_scroller_size(const char *tok, scroller_size_t *out) {
+	size_t len = strlen(tok);
+
+	if (len > 2 && strcmp(tok + len - 2, "px") == 0) {
+		char *end;
+		double val = strtod(tok, &end);
+		if (end != tok + len - 2 || !isfinite(val) || val <= 0.0 || val > 65535.0)
+			return false;
+
+		out->type = SCROLLER_SIZE_FIXED;
+		out->value = val;
+		return true;
+	}
+
+	char *end;
+	double val = strtod(tok, &end);
+	if (end == tok || *end != '\0' || !isfinite(val) || val <= 0.0 || val > 1.0)
+		return false;
+
+	out->type = SCROLLER_SIZE_PROPORTION;
+	out->value = val;
+	return true;
+}
+
+static void cfg_format_scroller_size(scroller_size_t size, ipc_buf_t *b, bool last) {
+	if (size.type == SCROLLER_SIZE_FIXED)
+		ipc_buff(b, "%.0fpx%s", size.value, last ? "\n" : ",");
+	else
+		ipc_buff(b, "%.2f%s", size.value, last ? "\n" : ",");
+}
+
+static void cfg_scroller_preset_list(ipc_args_t *a, const char *name, const scroller_size_t *slot,
+		int count_slot, void (*store)(scroller_size_t * , int)) {
 	if (!ipc_peek(a)) {
 		char buf[512];
 		ipc_buf_t b;
 		ipc_buf_init(&b, buf, sizeof(buf));
-		for (int i = 0; i < settings.scroller_proportion_preset_count; i++) {
-			ipc_buff(&b, "%.2f%s", settings.scroller_proportion_preset[i],
-				i < settings.scroller_proportion_preset_count - 1 ? "," : "\n");
-		}
+		for (int i = 0; i < count_slot; i++)
+			cfg_format_scroller_size(slot[i], &b, i == count_slot - 1);
 		ipc_buf_send(a, &b);
 		return;
 	}
@@ -613,42 +670,84 @@ static void cfg_scroller_presets(ipc_args_t *a) {
 	if (!ipc_need(a, "comma separated values", &value))
 		return;
 
-	int count = 1;
-	for (const char *p = value; *p; p++) {
-		if (*p == ',')
-			count++;
-	}
-
-	float *presets = malloc(count * sizeof(float));
-	if (!presets) {
+	char *copy = strdup(value);
+	if (!copy) {
 		ipc_fail(a, "Memory allocation failed\n");
 		return;
 	}
 
-	char *copy = strdup(value);
-	if (!copy) {
-		free(presets);
+	size_t len = strlen(copy);
+	if (len >= 2 && copy[0] == '[' && copy[len - 1] == ']') {
+		memmove(copy, copy + 1, len - 2);
+		copy[len - 2] = '\0';
+	}
+
+	int count = 1;
+	for (char *p = copy; *p; p++) {
+		if (*p == ',')
+			count++;
+	}
+
+	scroller_size_t *presets = malloc((size_t)count * sizeof(*presets));
+	if (!presets) {
+		free(copy);
 		ipc_fail(a, "Memory allocation failed\n");
 		return;
 	}
 
 	int i = 0;
 	for (char *tok = strtok(copy, ","); tok && i < count; tok = strtok(NULL, ",")) {
-		if (!ipc_parse_float(tok, 0.1f, 1.0f, &presets[i])) {
-			free(copy);
+		if (!cfg_parse_scroller_size(tok, &presets[i])) {
+			ipc_fail(a, "%s: invalid value \"%s\", expected a proportion in (0, 1] or a size like "
+				"\"640px\"\n", name, tok);
 			free(presets);
-			ipc_fail(a, "Invalid value \"%s\" in proportion preset list\n", tok);
+			free(copy);
 			return;
 		}
 		i++;
 	}
 	free(copy);
 
-	free(settings.scroller_proportion_preset);
-	settings.scroller_proportion_preset = presets;
-	settings.scroller_proportion_preset_count = i;
+	store(presets, i);
+	ipc_okf(a, "%s set\n", name);
+}
 
-	ipc_ok(a, "scroller_proportion_preset set\n");
+static void cfg_scroller_preset_column_widths(ipc_args_t *a) {
+	cfg_scroller_preset_list(a, "scroller_preset_column_widths", settings.scroller_preset_column_widths,
+		settings.scroller_preset_column_widths_count, settings_set_scroller_preset_column_widths);
+}
+
+static void cfg_scroller_preset_window_heights(ipc_args_t *a) {
+	cfg_scroller_preset_list(a, "scroller_preset_window_heights",
+		settings.scroller_preset_window_heights, settings.scroller_preset_window_heights_count,
+		settings_set_scroller_preset_window_heights);
+}
+
+// scroller_default_column_width accepts either a proportion or a "Npx" fixed size.
+static void cfg_scroller_default_column_width(ipc_args_t *a) {
+	if (!ipc_peek(a)) {
+		char buf[64];
+		ipc_buf_t b;
+		ipc_buf_init(&b, buf, sizeof(buf));
+		cfg_format_scroller_size(settings.scroller_default_column_width, &b, true);
+		ipc_buf_send(a, &b);
+		return;
+	}
+
+	const char *value;
+	if (!ipc_need(a, "proportion or px size", &value))
+		return;
+
+	scroller_size_t size;
+	if (!cfg_parse_scroller_size(value, &size)) {
+		ipc_fail(a, "scroller_default_column_width: invalid value \"%s\", expected a proportion in "
+			"(0, 1] or a size like \"640px\"\n", value);
+		return;
+	}
+
+	settings.scroller_default_column_width = size;
+	on_scroller_default_column_width();
+	ipc_ok(a, "scroller_default_column_width set\n");
 }
 
 // <normal|active|focused>_border_gradient[2|_lerp]
@@ -954,7 +1053,11 @@ typedef struct {
 } cfg_named_handler_t;
 
 static const cfg_named_handler_t special_settings[] = {
-	{"scroller_proportion_preset", cfg_scroller_presets},
+	{"scroller_preset_column_widths", cfg_scroller_preset_column_widths},
+	{"scroller_proportion_preset", cfg_scroller_preset_column_widths},
+	{"scroller_preset_window_heights", cfg_scroller_preset_window_heights},
+	{"scroller_default_column_width", cfg_scroller_default_column_width},
+	{"scroller_default_proportion", cfg_scroller_default_column_width},
 	{"acrylic_light_anchor", cfg_acrylic_light_anchor},
 	{"blur_algorithm", cfg_blur_algorithm},
 	{"screen_shader", cfg_screen_shader},

@@ -3,6 +3,7 @@
 #include "launcher.h"
 #include "layout/layout.h"
 #include "layout/master_stack.h"
+#include "layout/scroller.h"
 #include "once.h"
 #include "output/output.h"
 #include "protocol/workspace.h"
@@ -1225,6 +1226,34 @@ void execute_bind(bind_t b) {
 				arrange(mon, mon->desk, true);
 		}
 		break;
+	case BIND_SCROLLER_CYCLE_PRESET:
+	case BIND_SCROLLER_CYCLE_PRESET_BACK:
+	case BIND_SCROLLER_CYCLE_HEIGHT:
+	case BIND_SCROLLER_CYCLE_HEIGHT_BACK:
+	case BIND_SCROLLER_TOGGLE_FULL_WIDTH:
+	case BIND_SCROLLER_EXPAND_COLUMN:
+	case BIND_SCROLLER_CENTER:
+	case BIND_SCROLLER_CENTER_VISIBLE:
+	case BIND_FOCUS_COLUMN_FIRST:
+	case BIND_FOCUS_COLUMN_LAST:
+	case BIND_FOCUS_DOWN_OR_LEFT:
+	case BIND_FOCUS_DOWN_OR_RIGHT:
+	case BIND_FOCUS_UP_OR_LEFT:
+	case BIND_FOCUS_UP_OR_RIGHT:
+	case BIND_MOVE_COLUMN_LEFT:
+	case BIND_MOVE_COLUMN_RIGHT:
+	case BIND_MOVE_COLUMN_UP:
+	case BIND_MOVE_COLUMN_DOWN:
+	case BIND_MOVE_COLUMN_FIRST:
+	case BIND_MOVE_COLUMN_LAST: {
+		if (mon == NULL || mon->desk == NULL || mon->desk->layout != LAYOUT_SCROLLER)
+			return;
+
+		bool changed = scroller_bind_action(mon->desk, b.action);
+		if (changed)
+			arrange(mon, mon->desk, true);
+		break;
+	}
 	case BIND_ROTATE_CW:
 		rotate_clockwise();
 		break;
@@ -1502,7 +1531,27 @@ const char *bind_action_name(bind_action_t action) {
 		"interactive_resize",
 		"tiling_drag",
 		"external",
-		"restore_minimized"
+		"restore_minimized",
+		"scroller_cycle_preset",
+		"scroller_cycle_preset_back",
+		"scroller_cycle_height",
+		"scroller_cycle_height_back",
+		"scroller_toggle_full_width",
+		"scroller_expand_column",
+		"scroller_center",
+		"scroller_center_visible",
+		"focus_column_first",
+		"focus_column_last",
+		"focus_down_or_left",
+		"focus_down_or_right",
+		"focus_up_or_left",
+		"focus_up_or_right",
+		"move_column_left",
+		"move_column_right",
+		"move_column_up",
+		"move_column_down",
+		"move_column_first",
+		"move_column_last",
 	};
 	_Static_assert(sizeof(names) / sizeof(names[0]) == BIND_ACTION_COUNT,
 		"bind_action_name() must have exactly one name per bind_action_t value");
@@ -1601,6 +1650,27 @@ bind_action_t bind_action_from_name(const char *name) {
 	ACTION_IF_MATCH("h", BIND_FLIP_HORIZONTAL);
 	ACTION_IF_MATCH("vertical", BIND_FLIP_VERTICAL);
 	ACTION_IF_MATCH("v", BIND_FLIP_VERTICAL);
+
+	ACTION_IF_MATCH("scroller_cycle_preset", BIND_SCROLLER_CYCLE_PRESET);
+	ACTION_IF_MATCH("scroller_cycle_preset_back", BIND_SCROLLER_CYCLE_PRESET_BACK);
+	ACTION_IF_MATCH("scroller_cycle_height", BIND_SCROLLER_CYCLE_HEIGHT);
+	ACTION_IF_MATCH("scroller_cycle_height_back", BIND_SCROLLER_CYCLE_HEIGHT_BACK);
+	ACTION_IF_MATCH("scroller_toggle_full_width", BIND_SCROLLER_TOGGLE_FULL_WIDTH);
+	ACTION_IF_MATCH("scroller_expand_column", BIND_SCROLLER_EXPAND_COLUMN);
+	ACTION_IF_MATCH("scroller_center", BIND_SCROLLER_CENTER);
+	ACTION_IF_MATCH("scroller_center_visible", BIND_SCROLLER_CENTER_VISIBLE);
+	ACTION_IF_MATCH("focus_column_first", BIND_FOCUS_COLUMN_FIRST);
+	ACTION_IF_MATCH("focus_column_last", BIND_FOCUS_COLUMN_LAST);
+	ACTION_IF_MATCH("focus_down_or_left", BIND_FOCUS_DOWN_OR_LEFT);
+	ACTION_IF_MATCH("focus_down_or_right", BIND_FOCUS_DOWN_OR_RIGHT);
+	ACTION_IF_MATCH("focus_up_or_left", BIND_FOCUS_UP_OR_LEFT);
+	ACTION_IF_MATCH("focus_up_or_right", BIND_FOCUS_UP_OR_RIGHT);
+	ACTION_IF_MATCH("move_column_left", BIND_MOVE_COLUMN_LEFT);
+	ACTION_IF_MATCH("move_column_right", BIND_MOVE_COLUMN_RIGHT);
+	ACTION_IF_MATCH("move_column_up", BIND_MOVE_COLUMN_UP);
+	ACTION_IF_MATCH("move_column_down", BIND_MOVE_COLUMN_DOWN);
+	ACTION_IF_MATCH("move_column_to_first", BIND_MOVE_COLUMN_FIRST);
+	ACTION_IF_MATCH("move_column_to_last", BIND_MOVE_COLUMN_LAST);
 
 #undef ACTION_IF_MATCH
 

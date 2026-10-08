@@ -243,7 +243,7 @@ static void process_cursor_tiled_resize(void) {
 				s->columns[col].width.value = 0.1;
 			if (s->columns[col].width.value > 1.0)
 				s->columns[col].width.value = 1.0;
-			s->columns[col].width.type = SCROLLER_WIDTH_PROPORTION;
+			s->columns[col].width.type = SCROLLER_SIZE_PROPORTION;
 		}
 
 		arrange(node->output, d, false);

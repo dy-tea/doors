@@ -124,58 +124,52 @@ doorsctl config hide_lone_tab true|false
 When true, the tab bar is hidden when a tabbed container has only one window.
 
 ```
-doorsctl config edge_scroller_pointer_focus true|false
+doorsctl config scroller_default_column_width [<0-1|Npx>]
 ```
 
-When true, pointer focus affects scroller behavior at edges.
+Sets the width new scroller columns get. A bare number is a proportion of the working area, a number with an `px` suffix is a fixed size. Defaults to `0.50`.
+`scroller_default_proportion` is accepted as an alias for the proportion form.
 
 ```
-doorsctl config scroller_default_proportion <value>
+doorsctl config scroller_preset_column_widths [<values>]
 ```
 
-Sets the default proportion for scroller layout (0.1-1.0).
+Sets the preset widths cycled by `scroller_cycle_width`, as a comma-separated list of
+proportions and/or fixed sizes, e.g. `[0.25,640px,1.0]`. Defaults to niri's
+`0.33,0.50,0.67`. `scroller_proportion_preset` is accepted as an alias.
 
 ```
-doorsctl config scroller_default_proportion_single <value>
+doorsctl config scroller_preset_window_heights [<values>]
 ```
 
-Sets the default proportion for a single window in scroller layout (0.1-1.0).
+Same syntax as above, for the preset heights cycled by `scroller cycle_height` within a column. Defaults to `0.33,0.50,0.67`.
 
 ```
-doorsctl config scroller_proportion_preset [<values>]
+doorsctl config scroller_center_focused_column never|always|on-overflow
 ```
 
-Sets preset proportions for scroller layout (comma-separated).
+Controls how the focused column is positioned in the viewport:
+
+- `never` — scroll only as much as needed, leaving the viewport alone when the focused
+  column is already fully visible (the default).
+- `always` — always keep the focused column centered.
+- `on-overflow` — scroll normally, but center the column when it does not fit on screen
+  together with the column you came from.
 
 ```
-doorsctl config scroller_focus_center true|false
+doorsctl config scroller_always_center_single_column true|false
 ```
 
-When true, the focused window is centered in the scroller viewport.
+When true, a desktop with a single column keeps that column centered. Defaults to false.
 
 ```
-doorsctl config scroller_prefer_center true|false
+doorsctl config scroller_left_strut <px>
+doorsctl config scroller_right_strut <px>
+doorsctl config scroller_top_strut <px>
+doorsctl config scroller_bottom_strut <px>
 ```
 
-When true, scroller layout prefers centering the focused window.
-
-```
-doorsctl config scroller_prefer_overspread true|false
-```
-
-When true, scroller layout prefers spreading windows to fill available space.
-
-```
-doorsctl config scroller_ignore_proportion_single true|false
-```
-
-When true, proportion settings are ignored for single-window scroller desktops.
-
-```
-doorsctl config scroller_structs <n>
-```
-
-Sets the number of visible scroller structs (non-negative integer).
+Reserves space at the screen edges so the scroller viewport never extends underneath a panel or dock.
 
 ```
 doorsctl config tab_color_bar_bg "R G B A"
@@ -970,9 +964,15 @@ doorsctl config focus_on_activate focus|none|smart|urgent
 doorsctl config gapless_monocle [true|false]
 doorsctl config enable_animations [true|false]
 doorsctl config enable_minimize [true|false]
-doorsctl config edge_scroller_pointer_focus [true|false]
-doorsctl config scroller_default_proportion [<value>]
-doorsctl config scroller_proportion_preset [<values>]
+doorsctl config scroller_default_column_width [<0-1|Npx>]
+doorsctl config scroller_preset_column_widths [<values>]
+doorsctl config scroller_preset_window_heights [<values>]
+doorsctl config scroller_center_focused_column [never|always|on-overflow]
+doorsctl config scroller_always_center_single_column [true|false]
+doorsctl config scroller_left_strut [<px>]
+doorsctl config scroller_right_strut [<px>]
+doorsctl config scroller_top_strut [<px>]
+doorsctl config scroller_bottom_strut [<px>]
 doorsctl config animation_bezier [<name>]
 doorsctl config animation_duration [<ms>]
 doorsctl config animation <type> [bezier|duration|spring|enabled] [<value>]
@@ -1408,13 +1408,42 @@ Set keyboard grouping mode.
 ### Scroller Commands
 
 ```
-doorsctl scroller proportion <value>          # Set proportion for focused scroller client
-doorsctl scroller stack                       # Stack focused client with previous
-doorsctl scroller unstack                     # Unstack focused client from its stack
-doorsctl scroller resize <delta>              # Resize focused scroller client width by delta
-doorsctl scroller set_proportion <value>      # Set scroller proportion (0.1-1.0)
-doorsctl scroller cycle_preset                # Cycle to next proportion preset
-doorsctl scroller center                      # Center focused scroller window in viewport
+doorsctl scroller proportion <0-1|Npx>        # Set focused column width (alias: set_width)
+doorsctl scroller resize <delta>              # Nudge focused column width proportionally
+doorsctl scroller set_height <0-1|Npx>        # Set focused window height within its column
+doorsctl scroller reset_height                # Return focused window to an automatic height
+doorsctl scroller cycle_width [fwd|back]      # Cycle preset column widths (alias: cycle_preset)
+doorsctl scroller cycle_height [fwd|back]     # Cycle preset window heights
+doorsctl scroller toggle_full_width           # Toggle focused column between full width and its previous width
+doorsctl scroller expand_column               # Grow focused column so everything on screen still fits
+doorsctl scroller stack                       # Stack focused client into the previous column
+doorsctl scroller unstack                     # Move focused client into its own column
+doorsctl scroller center                      # Center focused window in the viewport
+doorsctl scroller center_visible              # Center the columns currently on screen
+doorsctl scroller focus <action>              # Move focus, see actions below
+doorsctl scroller move <action>               # Move a column or window, see actions below
+doorsctl scroller swap <action>               # Swap focused window with its neighbour
+doorsctl scroller action <action>             # Any of the focus or move actions
+```
+
+The `focus`, `move` and `swap` subcommands take an action name. `swap` accepts the four
+cardinal directions only.
+
+```
+left / right / up / down                      # Same as focus_left / focus_right / ...
+west / east / north / south                    # Spelling of the same directions
+
+focus_left / focus_right / focus_up / focus_down
+focus_column_first / focus_column_last         # Jump to the first or last column
+focus_down_or_left / focus_down_or_right      # Move down within the column if possible,
+focus_up_or_left / focus_up_or_right          # otherwise to the neighbouring column
+
+move_column_left / move_column_right          # Move the focused column sideways
+move_column_up / move_column_down             # Move the focused window within its column
+move_column_to_first / move_column_to_last    # Move the focused column to either end
+
+consume_window_into_column                    # Same as scroller stack
+expel_window_from_column                      # Same as scroller unstack
 ```
 
 ### Master-Stack Commands

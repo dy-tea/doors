@@ -145,6 +145,7 @@ executable(
 		'src' / 'layout' / 'layout.c',
 		'src' / 'layout' / 'master_stack.c',
 		'src' / 'layout' / 'scroller.c',
+		'src' / 'layout' / 'scroller_view.c',
 		'src' / 'layout' / 'tree.c',
 		'src' / 'log.c',
 		'src' / 'main.c',

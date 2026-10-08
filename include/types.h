@@ -107,6 +107,33 @@ typedef enum {
 	WORKSPACE_ANIM_HORIZONTAL
 } workspace_anim_direction_t;
 
+typedef enum {
+	SCROLLER_SIZE_PROPORTION,
+	SCROLLER_SIZE_FIXED,
+} scroller_size_type_t;
+
+typedef struct {
+	scroller_size_type_t type;
+	double value;
+} scroller_size_t;
+
+typedef enum {
+	SCROLLER_HEIGHT_AUTO,
+	SCROLLER_HEIGHT_PROPORTION,
+	SCROLLER_HEIGHT_FIXED,
+} scroller_height_type_t;
+
+typedef struct {
+	scroller_height_type_t type;
+	double value;
+} scroller_window_height_t;
+
+typedef enum {
+	SCROLLER_CENTER_NEVER,
+	SCROLLER_CENTER_ALWAYS,
+	SCROLLER_CENTER_ON_OVERFLOW,
+} scroller_center_mode_t;
+
 // structures
 typedef struct {
 	int top, right, bottom, left;
@@ -299,9 +326,15 @@ typedef struct {
 	int border_width;
 	int window_gap;
 
-	float scroller_default_proportion;
-	float *scroller_proportion_preset;
-	int scroller_proportion_preset_count;
+	scroller_size_t scroller_default_column_width;
+	scroller_size_t *scroller_preset_column_widths;
+	int scroller_preset_column_widths_count;
+	scroller_size_t *scroller_preset_window_heights;
+	int scroller_preset_window_heights_count;
+	scroller_center_mode_t scroller_center_focused_column;
+	bool scroller_always_center_single_column;
+	padding_t scroller_struts;
+
 	bool smart_gaps;
 	bool smart_borders;
 	bool respect_tiled_min_size;
