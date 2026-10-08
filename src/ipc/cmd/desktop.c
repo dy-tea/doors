@@ -2,6 +2,7 @@
 #include "ipc/args.h"
 #include "ipc/helpers.h"
 #include "ipc/registry.h"
+#include "layout/floating.h"
 #include "layout/layout.h"
 #include "output/output.h"
 #include "protocol/workspace.h"
@@ -64,6 +65,19 @@ static const cfg_enum_value_t bubble_values[] = {
 	IPC_ENUM_END,
 };
 
+typedef struct {
+	desktop_t *selected;
+} desktop_ctx_t;
+
+static desktop_t *desk_target(ipc_args_t *a, output_t **mon) {
+	desktop_ctx_t *ctx = a->ctx;
+	if (ctx && ctx->selected) {
+		*mon = ctx->selected->output;
+		return ctx->selected;
+	}
+	return ipc_focused_desk(a, mon);
+}
+
 // desktop <name> switches focus without a subcommand
 static void desk_focus(ipc_args_t *a, desktop_t *desk) {
 	workspace_switch_to_desktop(desk->name);
@@ -73,7 +87,7 @@ static void desk_focus(ipc_args_t *a, desktop_t *desk) {
 // desktop [-f] [next|last|prev]
 static void desk_focus_relative(ipc_args_t *a, const char *rel) {
 	output_t *m;
-	desktop_t *desk = ipc_focused_desk(a, &m);
+	desktop_t *desk = desk_target(a, &m);
 	if (!desk)
 		return;
 
@@ -81,13 +95,13 @@ static void desk_focus_relative(ipc_args_t *a, const char *rel) {
 		desk_focus(a, desk);
 	} else if (streq(rel, "last")) {
 		focus_last_desktop();
-		ipc_ok(a, "Focused\n");
+		ipc_ok(a, "focused\n");
 	} else if (streq(rel, "next") || streq(rel, "next.local")) {
 		focus_next_desktop();
-		ipc_ok(a, "Focused\n");
+		ipc_ok(a, "focused\n");
 	} else if (streq(rel, "prev") || streq(rel, "prev.local") || streq(rel, "previous")) {
 		focus_prev_desktop();
-		ipc_ok(a, "Focused\n");
+		ipc_ok(a, "focused\n");
 	} else {
 		desk_focus(a, desk);
 	}
@@ -95,17 +109,29 @@ static void desk_focus_relative(ipc_args_t *a, const char *rel) {
 
 static void desk_layout(ipc_args_t *a) {
 	output_t *m;
-	desktop_t *desk = ipc_focused_desk(a, &m);
+	desktop_t *desk = desk_target(a, &m);
 	if (!desk)
 		return;
+
+	const char *arg = ipc_peek(a);
+	bool all = arg && streq(arg, "--all");
+	if (all)
+		ipc_take(a);
 
 	long value;
 	if (!ipc_enum(a, "layout", layout_values, &value))
 		return;
 
-	const char *all = ipc_peek(a);
-	if (all && streq(all, "--all")) {
+	arg = ipc_peek(a);
+	if (arg && streq(arg, "--all")) {
+		all = true;
 		ipc_take(a);
+	}
+
+	if (!ipc_end(a))
+		return;
+
+	if (all) {
 		output_t *o;
 		wl_list_for_each(o, &mon_list, link) {
 			desktop_t *d;
@@ -125,12 +151,12 @@ static void desk_layout(ipc_args_t *a) {
 			layout_to_char(desk->layout));
 	}
 
-	ipc_ok(a, "Layout changed\n");
+	ipc_ok(a, "layout changed\n");
 }
 
 static void desk_rename(ipc_args_t *a) {
 	output_t *m;
-	desktop_t *desk = ipc_focused_desk(a, &m);
+	desktop_t *desk = desk_target(a, &m);
 	if (!desk)
 		return;
 
@@ -139,12 +165,12 @@ static void desk_rename(ipc_args_t *a) {
 
 	ipc_put_status(SUB_MASK_DESKTOP_CHANGE, "desktop_change[%s]\n", desk->name);
 	transaction_commit_dirty();
-	ipc_ok(a, "Renamed\n");
+	ipc_ok(a, "renamed\n");
 }
 
 static void desk_swap(ipc_args_t *a) {
 	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
+	desktop_t *desk = desk_target(a, &mon);
 	if (!desk)
 		return;
 
@@ -177,12 +203,12 @@ static void desk_swap(ipc_args_t *a) {
 		mon->desk = desk;
 
 	transaction_commit_dirty();
-	ipc_ok(a, "Swapped\n");
+	ipc_ok(a, "swapped\n");
 }
 
 static void desk_remove(ipc_args_t *a) {
 	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
+	desktop_t *desk = desk_target(a, &mon);
 	if (!desk)
 		return;
 
@@ -190,14 +216,15 @@ static void desk_remove(ipc_args_t *a) {
 		ipc_fail(a, "Cannot remove the only desktop\n");
 		return;
 	}
+	if (desktop_has_toplevels(desk)) {
+		ipc_fail(a, "Cannot remove a desktop with windows\n");
+		return;
+	}
 
 	desktop_t *next = desk->link.next != &mon->desk_list ? wl_container_of(desk->link.next, desk,
 		link) : NULL;
 	desktop_t *prev = desk->link.prev != &mon->desk_list ? wl_container_of(desk->link.prev, desk,
 		link) : NULL;
-
-	if (desk->link.prev == &mon->desk_list && mon->desk)
-		mon->desk = next;
 
 	wl_list_remove(&desk->link);
 
@@ -213,12 +240,12 @@ static void desk_remove(ipc_args_t *a) {
 	desktop_minimized_clear(desk);
 	free(desk);
 	transaction_commit_dirty();
-	ipc_ok(a, "Removed\n");
+	ipc_ok(a, "removed\n");
 }
 
 static void desk_bubble(ipc_args_t *a) {
 	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
+	desktop_t *desk = desk_target(a, &mon);
 	if (!desk)
 		return;
 
@@ -232,12 +259,12 @@ static void desk_bubble(ipc_args_t *a) {
 		swap_desktops(desk, wl_container_of(desk->link.next, desk, link));
 
 	transaction_commit_dirty();
-	ipc_ok(a, "Bubbled\n");
+	ipc_ok(a, "bubbled\n");
 }
 
 static void desk_to_monitor(ipc_args_t *a) {
 	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
+	desktop_t *desk = desk_target(a, &mon);
 	if (!desk)
 		return;
 
@@ -252,6 +279,10 @@ static void desk_to_monitor(ipc_args_t *a) {
 		ipc_fail(a, "Already on target monitor\n");
 		return;
 	}
+	if (wl_list_length(&mon->desk_list) == 1) {
+		ipc_fail(a, "Cannot move the only desktop\n");
+		return;
+	}
 	if (wl_list_empty(&target->desk_list)) {
 		ipc_fail(a, "Target monitor has no desktop\n");
 		return;
@@ -261,6 +292,7 @@ static void desk_to_monitor(ipc_args_t *a) {
 	wl_list_remove(&desk->link);
 	wl_list_insert(target->desk_list.prev, &desk->link);
 	desk->output = target;
+	desktop_clear_output(desk, target);
 
 	if (src_mon->desk == desk) {
 		src_mon->desk = wl_list_empty(&src_mon->desk_list) ? NULL :
@@ -268,9 +300,11 @@ static void desk_to_monitor(ipc_args_t *a) {
 		if (src_mon->desk)
 			focus_node(src_mon, src_mon->desk, src_mon->desk->focus);
 	}
+	if (src_mon->last_desk == desk)
+		src_mon->last_desk = src_mon->desk;
 
 	transaction_commit_dirty();
-	ipc_ok(a, "Desktop moved to monitor\n");
+	ipc_ok(a, "desktop moved to monitor\n");
 }
 
 static void desk_focus_sub(ipc_args_t *a) {
@@ -300,6 +334,11 @@ static bool is_relative_word(const char *arg) {
 
 void ipc_cmd_desktop(ipc_args_t *a) {
 	const char *arg = ipc_peek(a);
+	if (!arg) {
+		ipc_fail(a, "Missing arguments\n");
+		return;
+	}
+
 	if (arg && is_relative_word(arg)) {
 		desk_focus_relative(a, ipc_take(a));
 		return;
@@ -311,6 +350,7 @@ void ipc_cmd_desktop(ipc_args_t *a) {
 		return;
 	}
 
+	desktop_ctx_t ctx = {0};
 	output_t *mon = server.focused_output;
 	if (arg && arg[0] != '-') {
 		desktop_t *desk = find_desktop_by_name_in_monitor(mon, arg);
@@ -319,12 +359,13 @@ void ipc_cmd_desktop(ipc_args_t *a) {
 			long idx = strtol(arg, &end, 10);
 			if (*end == '\0' && idx >= 1 && idx <= 10) {
 				workspace_switch_to_desktop_by_index(idx - 1);
-				ipc_ok(a, "Focused\n");
+				ipc_ok(a, "focused\n");
 				return;
 			}
 			ipc_fail(a, "Unknown desktop \"%s\"\n", arg);
 			return;
 		}
+		ctx.selected = desk;
 		ipc_take(a);
 
 		// with nothing else to do the command was a plain focus request
@@ -334,6 +375,11 @@ void ipc_cmd_desktop(ipc_args_t *a) {
 		}
 	}
 
-	if (!ipc_sub_dispatch(a, desktop_subs))
+	void *saved = a->ctx;
+	a->ctx = &ctx;
+	bool handled = ipc_sub_dispatch(a, desktop_subs);
+	a->ctx = saved;
+
+	if (!handled)
 		ipc_fail_unknown(a, desktop_subs);
 }
