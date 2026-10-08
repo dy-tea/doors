@@ -164,21 +164,27 @@ static void layer_surface_commit(struct wl_listener *listener, void *data) {
 		arrange_layers(layer->output);
 	}
 
-	// check ext_background_effect_v1 state
+	// check ext_background_effect_v1 state, the blur region is clipped to the surface size
 	const struct wlr_ext_background_effect_surface_v1_state *fx =
 		wlr_ext_background_effect_v1_get_surface_state(layer_surface->surface);
-	bool wants_blur = fx && !pixman_region32_empty(&fx->blur_region);
+	pixman_region32_t blur_region;
+	pixman_region32_init(&blur_region);
+	if (fx)
+		surface_blur_region_clip(&blur_region, &fx->blur_region, (int)layer_surface->current.actual_width,
+			(int)layer_surface->current.actual_height);
+
+	bool wants_blur = fx && !pixman_region32_empty(&blur_region);
 	bool had_blur = blur_pool_count(&layer->blur_pool) > 0;
 	if (wants_blur != had_blur)
 		layer_surface_set_blur(layer, wants_blur);
 
 	// update blur region if blur is enabled
-	if (fx && blur_pool_count(&layer->blur_pool) > 0) {
-		if (!pixman_region32_equal(&layer->blur_region, &fx->blur_region)) {
-			pixman_region32_copy(&layer->blur_region, &fx->blur_region);
-			layer->blur_region_dirty = true;
-		}
+	if (blur_pool_count(&layer->blur_pool) > 0 && !pixman_region32_equal(&layer->blur_region,
+			&blur_region)) {
+		pixman_region32_copy(&layer->blur_region, &blur_region);
+		layer->blur_region_dirty = true;
 	}
+	pixman_region32_fini(&blur_region);
 
 	output_schedule_frame(layer->output);
 }

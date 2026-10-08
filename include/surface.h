@@ -72,6 +72,9 @@ static inline void blur_destroy_nodes(surface_blur_t *b) {
 		blur_pool_destroy(&b->blur_pool);
 }
 
+void surface_blur_region_clip(pixman_region32_t *dst, const pixman_region32_t *region, int surface_w,
+	int surface_h);
+
 typedef struct surface_rounded_t {
 	struct wlr_scene_buffer *border_shader_node;
 	struct wlr_buffer *border_shader_buf;

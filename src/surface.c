@@ -171,6 +171,23 @@ void surface_set_effect(struct wlr_scene_tree *scene_tree, node_t *node, surface
 	}
 }
 
+void surface_blur_region_clip(pixman_region32_t *dst, const pixman_region32_t *region, int surface_w,
+		int surface_h) {
+	if (!dst || !region)
+		return;
+
+	if (surface_w <= 0 || surface_h <= 0) {
+		pixman_region32_clear(dst);
+		return;
+	}
+
+	pixman_region32_t clipped;
+	pixman_region32_init_rect(&clipped, 0, 0, surface_w, surface_h);
+	pixman_region32_intersect(&clipped, &clipped, region);
+	pixman_region32_copy(dst, &clipped);
+	pixman_region32_fini(&clipped);
+}
+
 void surface_set_border_radius(struct wlr_scene_tree *scene_tree,
 		struct wlr_scene_tree *content_tree, struct wlr_scene_tree *border_tree, node_t *node,
 		surface_rounded_t **rounded, surface_shadow_t **shadow, float radius) {

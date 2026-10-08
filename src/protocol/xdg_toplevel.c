@@ -637,23 +637,30 @@ void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 			view_center_and_clip_surface(&toplevel->view);
 	}
 
-	// check ext_background_effect_v1 state
+	// check ext_background_effect_v1 state, the blur region is clipped to the surface size
 	const struct wlr_ext_background_effect_surface_v1_state *fx =
 		wlr_ext_background_effect_v1_get_surface_state(xdg_surface->surface);
-	bool wants_blur = fx && !pixman_region32_empty(&fx->blur_region);
+	pixman_region32_t blur_region;
+	pixman_region32_init(&blur_region);
+	if (fx)
+		surface_blur_region_clip(&blur_region, &fx->blur_region, (int)toplevel->view.geometry.width,
+			(int)toplevel->view.geometry.height);
+
+	bool wants_blur = fx && !pixman_region32_empty(&blur_region);
 	bool has_blur = blur_count(toplevel->view.blur) > 0;
 
 	// only update blur from protocol if it wasn't set by a rule
 	if (toplevel->view.client && !toplevel->view.client->flags.blur_from_rule) {
 		if (wants_blur != has_blur)
 			surface_client_set_effect(toplevel->view.client, EFFECT_BLUR, wants_blur);
-		if (toplevel->view.blur && fx) {
-			if (!pixman_region32_equal(&toplevel->view.blur->blur_region, &fx->blur_region)) {
-				pixman_region32_copy(&toplevel->view.blur->blur_region, &fx->blur_region);
-				toplevel->view.blur->blur_region_dirty = true;
-			}
+		if (toplevel->view.blur && fx && !pixman_region32_equal(&toplevel->view.blur->blur_region,
+				&blur_region)) {
+			pixman_region32_copy(&toplevel->view.blur->blur_region, &blur_region);
+			toplevel->view.blur->blur_region_dirty = true;
 		}
 	}
+
+	pixman_region32_fini(&blur_region);
 
 	// update opacity
 	if (toplevel->view.client && !animation_is_opacity_fading(&toplevel->view))

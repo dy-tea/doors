@@ -57,7 +57,6 @@ static bool cfg_parse_size_arg(ipc_args_t *a, const char *what, scroller_size_t 
 		return true;
 	}
 
-
 	char *end;
 	double val = strtod(value, &end);
 	if (end == value || *end != '\0' || val <= 0.0 || val > 1.0)
