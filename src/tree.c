@@ -795,6 +795,10 @@ bool client_set_maximized(output_t *m, desktop_t *d, node_t *n, bool value) {
 	if (c->flags.maximized == value)
 		return false;
 
+	// when maximize is disabled, restoring still works but nothing may be maximized
+	if (value && !settings.enable_maximize)
+		return false;
+
 	if (value && c->state == STATE_FULLSCREEN)
 		return false;
 

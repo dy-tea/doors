@@ -265,6 +265,12 @@ doorsctl config enable_minimize true|false
 When false, minimizing is disabled entirely. Windows minimized while the option was enabled (or by a `minimized=on` window rule) can still be brought back with `doorsctl toggle restore_minimized`. Default: true.
 
 ```
+doorsctl config enable_maximize true|false
+```
+
+When false, maximizing is disabled entirely. Windows maximized while the option was enabled (or by a `maximized=on` window rule) can still be unmaximized. Default: true.
+
+```
 doorsctl config minimize_to_scratchpad true|false
 ```
 
@@ -613,8 +619,6 @@ doorsctl node --state minimized   # Minimize the focused window
 doorsctl toggle minimize          # Toggles minimize
 doorsctl toggle restore_minimized # Restore the most recently minimized window
 ```
-
-Minimize can be turned off entirely with `doorsctl config enable_minimize false`; restoring already minimized windows keeps working.
 
 #### Scratchpad Commands
 
@@ -987,6 +991,7 @@ doorsctl config focus_on_activate focus|none|smart|urgent
 doorsctl config gapless_monocle [true|false]
 doorsctl config enable_animations [true|false]
 doorsctl config enable_minimize [true|false]
+doorsctl config enable_maximize [true|false]
 doorsctl config scroller_default_column_width [<0-1|Npx>]
 doorsctl config scroller_preset_column_widths [<values>]
 doorsctl config scroller_preset_window_heights [<values>]

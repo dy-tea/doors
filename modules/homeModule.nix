@@ -208,6 +208,9 @@ let
       ++ optionals (oc.enable-minimize != null) [
         "doorsctl config enable_minimize ${boolString oc.enable-minimize}"
       ]
+      ++ optionals (oc.enable-maximize != null) [
+        "doorsctl config enable_maximize ${boolString oc.enable-maximize}"
+      ]
       ++ optionals (oc.minimize-to-scratchpad != null) [
         "doorsctl config minimize_to_scratchpad ${boolString oc.minimize-to-scratchpad}"
       ]
@@ -1053,6 +1056,12 @@ in
                             type = types.bool;
                             default = true;
                             description = "When false, minimizing is disabled entirely: the minimize capability is no longer advertised to clients, minimize requests from clients are ignored, and the minimize commands do nothing. Restoring already minimized windows keeps working.";
+                          };
+
+                          enable-maximize = mkOption {
+                            type = types.bool;
+                            default = true;
+                            description = "When false, maximizing is disabled entirely: the maximize capability is no longer advertised to clients, maximize requests from clients are ignored, and the maximize commands do nothing. Unmaximizing already maximized windows keeps working.";
                           };
 
                           minimize-to-scratchpad = mkOption {

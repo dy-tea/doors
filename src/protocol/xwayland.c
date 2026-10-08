@@ -807,6 +807,10 @@ static void handle_request_maximize(struct wl_listener *listener, void *data) {
 	if (requested == client_is_maximized(node->client))
 		return;
 
+	// when maximize is disabled, don't report the window as maximized either
+	if (requested && !settings.enable_maximize)
+		return;
+
 	output_t *m = node->output;
 	desktop_t *d = node->desktop;
 

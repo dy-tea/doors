@@ -309,6 +309,9 @@ typedef struct {
 	// when false, disables minimizing completely, still allows you to unminimize
 	bool enable_minimize;
 
+	// when false, disables maximizing completely, still allows you to unmaximize
+	bool enable_maximize;
+
 	// Scratchpad behavior
 	bool minimize_to_scratchpad;
 

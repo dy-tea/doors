@@ -80,6 +80,7 @@ doors_settings_t settings = {
 	.focus_on_activate = FOCUS_ON_ACTIVATE_FOCUS,
 	.split_ratio = 0.5,
 	.enable_minimize = true,
+	.enable_maximize = true,
 	.minimize_to_scratchpad = false,
 	.scratchpad_restore_to_origin = true,
 

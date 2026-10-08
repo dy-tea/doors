@@ -53,9 +53,10 @@ static const view_impl_t xdg_view_impl = {
 };
 
 static uint32_t xdg_toplevel_wm_capabilities(void) {
-	uint32_t caps = WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN |
-		WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE;
+	uint32_t caps = WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN;
 
+	if (settings.enable_maximize)
+		caps |= WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE;
 	if (settings.enable_minimize)
 		caps |= WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE;
 
