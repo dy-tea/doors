@@ -552,9 +552,9 @@ doorsctl desktop --layout master_stack # Toggle master-stack layout on desktop
 doorsctl desktop --layout floating     # Toggle floating layout on desktop
 doorsctl desktop --rename <newname>    # Rename desktop
 doorsctl desktop --swap <name>         # Swap contents with another desktop on same monitor
-doorsctl desktop --remove              # Remove current desktop (fails if only desktop)
+doorsctl desktop --remove              # Remove current empty desktop (fails if only desktop)
 doorsctl desktop --bubble up|prev|down|next  # Reorder desktop in list
-doorsctl desktop --to-monitor <name>   # Move desktop to another monitor
+doorsctl desktop --to-monitor <name>   # Move desktop, keeping one on the source monitor
 ```
 
 #### Layouts
