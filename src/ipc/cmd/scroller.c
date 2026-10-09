@@ -8,6 +8,7 @@
 #include "server.h"
 #include "tree.h"
 #include <limits.h>
+#include <string.h>
 
 // find column and tile index for a focused client in the scroller state
 static bool find_focused_tile(ipc_args_t *a, desktop_t *desk, int *out_col) {
