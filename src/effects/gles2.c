@@ -784,8 +784,6 @@ static bool gles2_blit(be_effect_resource_t src, be_effect_resource_t dst, int w
 			"dst.valid=%d dst.handle=%lu", src.valid, src.state, dst.valid, (unsigned long)dst.handle);
 		return false;
 	}
-	wlr_log(WLR_DEBUG, "Src tex=%lu, dst fbo=%lu, %dx%d", (unsigned long)src.handle,
-		(unsigned long)dst.handle, w, h);
 	gles2_draw_begin((GLuint)dst.handle, (GLuint)src.handle, GL_TEXTURE_2D, g->prog_blit, g->u_blit.tex,
 		w, h);
 	gles2_draw_end(h, scissor, n_scissor, true);
@@ -801,11 +799,6 @@ static bool gles2_blur(be_output_state_t *state, be_effect_resource_t src, int s
 		return false;
 	}
 	uint64_t src_handle = src.handle;
-
-	wlr_log(WLR_DEBUG, "Src=%lu %dx%d, passes=%d, full_res=%d, algorithm=%d, "
-		"offset=%.2f, bright=%.2f, contrast=%.2f, sat=%.2f, dst.valid=%d, "
-		"dst.handle=%lu", (unsigned long)src.handle, src_w, src_h, p->passes, p->full_res, p->algorithm,
-			p->offset, p->brightness, p->contrast, p->saturation, dst.valid, (unsigned long)dst.handle);
 
 	if (p->passes <= 0 || p->algorithm == BLUR_ALGORITHM_NONE) {
 		if (dst.valid) {
@@ -882,8 +875,6 @@ static bool gles2_blur(be_output_state_t *state, be_effect_resource_t src, int s
 				.state = BE_RESOURCE_SHADER_READ,
 				.valid = true
 			};
-		wlr_log(WLR_DEBUG, "Full-res kawase done, scratch tex=%lu, src=%dx%d",
-			(unsigned long)state->blur_scratch.native_handle[1], src_w, src_h);
 		return true;
 	}
 
@@ -1152,10 +1143,6 @@ static bool gles2_capture_readback(struct wlr_buffer *capture_buffer, be_output_
 		return false;
 	}
 
-	wlr_log(WLR_DEBUG, "Src=%dx%d at (%d,%d), dst=%dx%d at (%d,%d), "
-		"dst_fbo=%lu, capture_fbo=%lu, dst.valid=%d", src_w, src_h, src_x, src_y, dst_w, dst_h, dst_x,
-			dst_y, (unsigned long)dst_fbo, (unsigned long)capture_fbo, dst.valid);
-
 	GLuint result_tex = 0;
 
 	glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
@@ -1242,7 +1229,6 @@ static bool gles2_capture_readback(struct wlr_buffer *capture_buffer, be_output_
 			attach_name);
 		return false;
 	}
-	wlr_log(WLR_DEBUG, "Success, result_tex=%lu, %dx%d", (unsigned long)result_tex, dst_w, dst_h);
 	out_resource->handle = (uint64_t)result_tex;
 	out_resource->width = dst_w;
 	out_resource->height = dst_h;

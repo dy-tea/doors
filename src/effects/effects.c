@@ -2460,41 +2460,6 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 	bool blur_stale = blur_enabled && has_window_blur && (!ctx->blur_buf || !ctx->blur_native[0] ||
 		ctx->blur_gen != ctx->backdrop_gen);
 	bool effects_work = bg_damaged || mica_dirty || blur_stale;
-
-	// one-shot-per-second visibility into the effect trigger conditions
-	// (debug instrument, cheap: a single branch on a cached timestamp)
-	{
-		static int64_t last_diag_ms;
-		struct timespec dts;
-		clock_gettime(CLOCK_MONOTONIC, &dts);
-		int64_t now_ms = (int64_t)dts.tv_sec * 1000 + dts.tv_nsec / 1000000;
-		if (now_ms - last_diag_ms >= 1000) {
-			last_diag_ms = now_ms;
-			int n_blur_nodes = 0;
-			char per_win[256] = "";
-			size_t per_left = sizeof(per_win);
-			view_t *tl;
-			wl_list_for_each(tl, &server.views, link) {
-				n_blur_nodes += (int)blur_count(tl->blur);
-				if (!tl->blur)
-					continue;
-				const char *appid = tl->node && tl->node->client ? tl->node->client->app_id : "?";
-				int appended = snprintf(per_win + (sizeof(per_win) - per_left), per_left,
-					"%s%s(bc=%zu,mica=%d,acr=%d,shown=%d)", per_win[0] ? " " : "", appid ? appid : "?",
-					blur_count(tl->blur), !!tl->blur->mica_node, !!tl->blur->acrylic_node,
-					tl->node && tl->node->client ? !!tl->node->client->flags.shown : 0);
-				if (appended > 0 && (size_t)appended < per_left)
-					per_left -= (size_t)appended;
-				else
-					per_left = 0;
-			}
-			wlr_log(WLR_INFO, "Effects diag: work=%d bg_damaged=%d mica_dirty=%d "
-				"blur_stale=%d has_win_blur=%d has_layer_blur=%d blur_nodes=%d unified=%d "
-				"[%s]", effects_work, bg_damaged, mica_dirty, blur_stale, has_window_blur, has_layer_blur,
-					n_blur_nodes, unified, per_win);
-		}
-	}
-
 	if (!effects_work && !effects_border_pending(output) && !screen_shader_enabled)
 		return;
 
