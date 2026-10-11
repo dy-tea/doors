@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,6 +44,13 @@ static int log_compare(const void *a, const void *b) {
 	return strcmp(*eb, *ea);
 }
 
+static bool is_log_entry(const struct dirent *entry) {
+	if (entry->d_type == DT_DIR)
+		return false;
+	size_t len = strlen(entry->d_name);
+	return len > 4 && strcmp(entry->d_name + len - 4, ".log") == 0;
+}
+
 static void cleanup_old_logs(void) {
 	DIR *dir = opendir(log_dir);
 	if (!dir)
@@ -51,7 +59,7 @@ static void cleanup_old_logs(void) {
 	int count = 0;
 	struct dirent *entry;
 	while ((entry = readdir(dir)) != NULL) {
-		if (strstr(entry->d_name, ".log"))
+		if (is_log_entry(entry))
 			count++;
 	}
 	rewinddir(dir);
@@ -69,7 +77,7 @@ static void cleanup_old_logs(void) {
 
 	int i = 0;
 	while (i < count && (entry = readdir(dir)) != NULL) {
-		if (!strstr(entry->d_name, ".log"))
+		if (!is_log_entry(entry))
 			continue;
 		names[i] = strdup(entry->d_name);
 		if (!names[i])
@@ -94,11 +102,14 @@ static void cleanup_old_logs(void) {
 static void log_callback(enum wlr_log_importance importance, const char *fmt, va_list args) {
 	// get current time
 	time_t now = time(NULL);
-	struct tm *tm_info = localtime(&now);
+	struct tm tm_info;
+	localtime_r(&now, &tm_info);
 	char time_str[32];
-	strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", tm_info);
+	strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", &tm_info);
 
 	// map importance level to string and color
+	if (importance < 0 || importance >= WLR_LOG_IMPORTANCE_LAST)
+		importance = WLR_ERROR;
 	const char *level_str = verbosity_headers[importance];
 	const char *color = verbosity_colors[importance];
 
@@ -120,6 +131,38 @@ static void log_callback(enum wlr_log_importance importance, const char *fmt, va
 		fprintf(log_file, "\n");
 		fflush(log_file);
 	}
+}
+
+static void sig_write_all(int fd, const char *buf, size_t len) {
+	while (len > 0) {
+		ssize_t n = write(fd, buf, len);
+		if (n > 0) {
+			buf += n;
+			len -= (size_t)n;
+		} else if (n < 0 && errno == EINTR) {
+			continue;
+		} else {
+			return;
+		}
+	}
+}
+
+static void sig_write_str(int fd, const char *s) {
+	sig_write_all(fd, s, strlen(s));
+}
+
+static void sig_write_int(int fd, int v) {
+	char buf[12];
+	size_t i = sizeof(buf);
+	if (v < 0) {
+		sig_write_str(fd, "-");
+		v = -v;
+	}
+	do {
+		buf[--i] = (char)('0' + (v % 10));
+		v /= 10;
+	} while (v > 0);
+	sig_write_all(fd, buf + i, sizeof(buf) - i);
 }
 
 static void signal_handler(int sig) {
@@ -146,23 +189,20 @@ static void signal_handler(int sig) {
 	// get backtrace
 	void *addrlist[32];
 	int addrlen = (int)backtrace(addrlist, 32);
+	int log_fd = log_file ? fileno(log_file) : -1;
 
-	// log to stdout
-	write(STDOUT_FILENO, "\n########## CRASH REPORT ##########\n", 36);
-	write(STDOUT_FILENO, "Signal: ", 8);
-	write(STDOUT_FILENO, sig_name, strlen(sig_name));
-	write(STDOUT_FILENO, "\nBacktrace:\n", 12);
-	backtrace_symbols_fd(addrlist, addrlen, STDOUT_FILENO);
-	write(STDOUT_FILENO, "##################################\n\n", 35);
-
-	// log to file
-	if (log_file) {
-		fprintf(log_file, "\n########## CRASH REPORT ##########\n");
-		fprintf(log_file, "Signal: %s (%d)\n", sig_name, sig);
-		fprintf(log_file, "Backtrace:\n");
-		backtrace_symbols_fd(addrlist, addrlen, fileno(log_file));
-		fprintf(log_file, "##################################\n\n");
-		fflush(log_file);
+	for (int pass = 0; pass < 2; pass++) {
+		int fd = pass == 0 ? STDOUT_FILENO : log_fd;
+		if (fd < 0)
+			continue;
+		sig_write_str(fd, "\n########## CRASH REPORT ##########\n");
+		sig_write_str(fd, "Signal: ");
+		sig_write_str(fd, sig_name);
+		sig_write_str(fd, " (");
+		sig_write_int(fd, sig);
+		sig_write_str(fd, ")\nBacktrace:\n");
+		backtrace_symbols_fd(addrlist, addrlen, fd);
+		sig_write_str(fd, "##################################\n\n");
 	}
 #else
 	write(STDOUT_FILENO, "Backtrace not available on musl.", 32);
@@ -177,7 +217,13 @@ int log_setup_signals(void) {
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = signal_handler;
 	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = SA_NODEFER;
+	sa.sa_flags = SA_RESETHAND;
+
+#if defined(__linux__) && (defined(__GLIBC__) || defined(__GNU_LIBRARY__))
+	void *prime[4];
+	int primelen = (int)backtrace(prime, 4);
+	backtrace_symbols_fd(prime, primelen, -1);
+#endif
 
 	sigaction(SIGSEGV, &sa, NULL);
 	sigaction(SIGBUS, &sa, NULL);
@@ -200,12 +246,12 @@ int log_init(const char *log_file_path) {
 		snprintf(log_path, sizeof(log_path), "%s", log_file_path);
 
 		// extract dir from path
-		strcpy(log_dir, log_file_path);
+		snprintf(log_dir, sizeof(log_dir), "%s", log_file_path);
 		char *last_slash = strrchr(log_dir, '/');
 		if (last_slash)
 			*last_slash = '\0';
 		else
-			strcpy(log_dir, ".");
+			snprintf(log_dir, sizeof(log_dir), "%s", ".");
 	} else {
 		const char *home = getenv("HOME");
 		if (!home) {
@@ -224,14 +270,16 @@ int log_init(const char *log_file_path) {
 			}
 		}
 
-		cleanup_old_logs();
-
 		time_t now = time(NULL);
-		struct tm *tm_info = localtime(&now);
+		struct tm tm_info;
+		localtime_r(&now, &tm_info);
 		char time_str[32];
-		strftime(time_str, sizeof(time_str), "%Y.%m.%d_%H-%M-%S", tm_info);
+		strftime(time_str, sizeof(time_str), "%Y.%m.%d_%H-%M-%S", &tm_info);
 		snprintf(log_path, sizeof(log_path), "%s/%s_%d.log", log_dir, time_str, getpid());
 	}
+
+	// rotate old logs for both the default and the caller-supplied location
+	cleanup_old_logs();
 
 	// open log file for appending
 	log_file = fopen(log_path, "a");
@@ -245,9 +293,10 @@ int log_init(const char *log_file_path) {
 	// log startup
 	fprintf(log_file, "\n");
 	time_t now = time(NULL);
-	struct tm *tm_info = localtime(&now);
+	struct tm tm_info;
+	localtime_r(&now, &tm_info);
 	char time_str[32];
-	strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", tm_info);
+	strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", &tm_info);
 	fprintf(log_file, "########## doors startup (%s) ##########\n", time_str);
 	fflush(log_file);
 
