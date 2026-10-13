@@ -15,6 +15,7 @@
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = [ "x86_64-linux" ];
 
+      flake.nixosModules.doors = import ./modules/nixosModule.nix self;
       flake.homeModules.doors = import ./modules/homeModule.nix self;
 
       perSystem =
