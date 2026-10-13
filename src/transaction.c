@@ -161,6 +161,7 @@ static void copy_node_current_state(node_t *node, transaction_inst_t *instructio
 	node->client->tiled_rectangle = instruction->tiled_rectangle;
 	node->client->floating_rectangle = instruction->floating_rectangle;
 	node->client->committed_tiled_rectangle = instruction->tiled_rectangle;
+	instruction->applied = true;
 }
 
 static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction) {
@@ -219,11 +220,6 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 		return;
 	}
 
-	if (node->client->view && node->client->view->saved_surface_tree) {
-		view_remove_saved_buffer(node->client->view);
-		wlr_log(WLR_DEBUG, "Removed saved buffer for node %u", node->id);
-	}
-
 	wlr_log(WLR_DEBUG, "Arranging geometry for node %u: pos=(%d,%d) size=(%dx%d) serial=%u", node->id,
 		rect->x, rect->y, rect->width, rect->height, instruction->serial);
 
@@ -274,7 +270,18 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 			instruction->previous_tiled_rectangle.height, rect->width, rect->height, snapshot_resize);
 	}
 
-	if (!snapshot_resize) {
+	bool resizing = snapshot_resize || animation_is_resizing(node);
+	bool shrinking = instruction->previous_tiled_rectangle.width > 0 &&
+		instruction->previous_tiled_rectangle.height > 0 &&
+		rect->width <= instruction->previous_tiled_rectangle.width &&
+		rect->height <= instruction->previous_tiled_rectangle.height;
+
+	if (node->client->view && node->client->view->saved_surface_tree && !(resizing && shrinking)) {
+		view_remove_saved_buffer(node->client->view);
+		wlr_log(WLR_DEBUG, "Removed saved buffer for node %u", node->id);
+	}
+
+	if (!resizing) {
 		if (node->client->view && node->client->view->wants_fade) {
 			node->client->view->wants_fade = false;
 			wlr_scene_node_set_position(&scene_tree->node, rect->x, rect->y);
@@ -289,7 +296,7 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 	}
 
 	// skip border/clip updates during resize animation (handled by animation tick)
-	if (!snapshot_resize) {
+	if (!resizing) {
 		struct wlr_scene_tree *border_tree = client_border_tree(node->client);
 		if (effective_border_width(node->desktop) != 0) {
 			unsigned int bw = effective_border_width(node->desktop);
@@ -335,7 +342,7 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 		}
 	}
 
-	if (!snapshot_resize && node->client->view)
+	if (!resizing && node->client->view)
 		view_center_and_clip_surface(node->client->view);
 
 	if (node->client->flags.shown && !node->client->flags.minimized) {
@@ -660,6 +667,32 @@ static void set_instruction_ready(transaction_inst_t *instruction) {
 		txn->num_waiting);
 
 	transaction_progress();
+}
+
+bool transaction_layout_pending(node_t *node) {
+	if (!node || !node->instruction)
+		return false;
+
+	transaction_inst_t *instruction = node->instruction;
+	if (instruction->applied)
+		return false;
+
+	if (!node->client)
+		return true;
+
+	const struct wlr_box *pending = &instruction->tiled_rectangle;
+	const struct wlr_box *applied = &node->client->tiled_rectangle;
+
+	return pending->x != applied->x || pending->y != applied->y || pending->width != applied->width ||
+		pending->height != applied->height;
+}
+
+bool transaction_view_acks_configure(view_t *view, uint32_t serial) {
+	if (!view || !view->node || !view->node->instruction)
+		return false;
+
+	transaction_inst_t *instruction = view->node->instruction;
+	return instruction->waiting && instruction->serial == serial;
 }
 
 bool transaction_notify_view_ready_by_serial(view_t *view, uint32_t serial) {

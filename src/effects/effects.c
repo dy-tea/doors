@@ -5,6 +5,7 @@
 #include "output/output.h"
 #include "protocol/layer.h"
 #include "server.h"
+#include "transaction.h"
 #include "tree.h"
 #include "types.h"
 #include <drm_fourcc.h>
@@ -2639,10 +2640,20 @@ after_capture:
 				continue;
 			}
 
+			if (transaction_layout_pending(tl->node))
+				continue;
+
 			struct wlr_box container = get_animated_client_rect(tl);
 			struct wlr_box content_offset = {0};
 			struct wlr_box border_size = {0};
 			view_resolve_content_layout(tl, container, &content_offset, &border_size);
+
+			struct wlr_box anim_offset = {0};
+			struct wlr_box anim_size = {0};
+			if (animation_get_resize_border(tl, &anim_offset, &anim_size)) {
+				content_offset = anim_offset;
+				border_size = anim_size;
+			}
 
 			struct wlr_box content = {
 				.x = container.x + content_offset.x,

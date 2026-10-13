@@ -8,7 +8,6 @@
 #include "ipc/ipc.h"
 #include "layout/tree.h"
 #include "output/output.h"
-#include "protocol/copy_capture.h"
 #include "protocol/workspace.h"
 #include "protocol/xdg_toplevel.h"
 #include "protocol/xwayland.h"
@@ -723,10 +722,56 @@ void view_save_buffer(view_t *view) {
 		view->saved_surface_tree = NULL;
 		wlr_log(WLR_DEBUG, "No buffers to save for toplevel - destroyed saved tree");
 	} else {
+		view->saved_content_offset.x = view->content_tree->node.x;
+		view->saved_content_offset.y = view->content_tree->node.y;
 		wlr_scene_node_set_enabled(&view->content_tree->node, false);
 		wlr_scene_node_set_enabled(&view->saved_surface_tree->node, true);
 		wlr_log(WLR_DEBUG, "Saved buffer for toplevel - swapped content_tree for saved_surface_tree");
 	}
+}
+
+static void crop_saved_buffer(struct wlr_scene_buffer *buffer, int sx, int sy, void *data) {
+	struct wlr_box *box = data;
+	int bx = box->x;
+	int by = box->y;
+	int bw = box->width;
+	int bh = box->height;
+	int vx = sx > bx ? sx : bx;
+	int vy = sy > by ? sy : by;
+	int vx2 = sx + buffer->dst_width;
+	int vy2 = sy + buffer->dst_height;
+	if (vx2 > bx + bw)
+		vx2 = bx + bw;
+	if (vy2 > by + bh)
+		vy2 = by + bh;
+
+	if (vx2 <= vx || vy2 <= vy) {
+		wlr_scene_node_set_enabled(&buffer->node, false);
+		return;
+	}
+
+	wlr_scene_node_set_enabled(&buffer->node, true);
+
+	double kx = buffer->dst_width > 0 ? (double)buffer->src_box.width / buffer->dst_width : 1.0;
+	double ky = buffer->dst_height > 0 ? (double)buffer->src_box.height / buffer->dst_height : 1.0;
+
+	struct wlr_fbox src = {
+		.x = buffer->src_box.x + (vx - sx) * kx,
+		.y = buffer->src_box.y + (vy - sy) * ky,
+		.width = (vx2 - vx) * kx,
+		.height = (vy2 - vy) * ky,
+	};
+
+	wlr_scene_node_set_position(&buffer->node, vx, vy);
+	wlr_scene_buffer_set_source_box(buffer, &src);
+	wlr_scene_buffer_set_dest_size(buffer, vx2 - vx, vy2 - vy);
+}
+
+void view_crop_saved_buffer(view_t *view, struct wlr_box box) {
+	if (!view || !view->saved_surface_tree)
+		return;
+
+	wlr_scene_node_for_each_buffer(&view->saved_surface_tree->node, crop_saved_buffer, &box);
 }
 
 void view_remove_saved_buffer(view_t *view) {

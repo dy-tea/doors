@@ -60,3 +60,4 @@ void animation_update_slide_blur(output_t *output);
 
 bool animation_is_resizing(node_t *node);
 bool animation_get_geometry_progress(view_t *view, struct wlr_box *out);
+bool animation_get_resize_border(view_t *view, struct wlr_box *offset, struct wlr_box *size);

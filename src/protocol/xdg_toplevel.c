@@ -579,7 +579,8 @@ void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 		bool new_size = new_geo->width != toplevel->view.geometry.width ||
 			new_geo->height != toplevel->view.geometry.height || new_geo->x != toplevel->view.geometry.x ||
 			new_geo->y != toplevel->view.geometry.y;
-
+		uint32_t serial = toplevel->xdg_toplevel->base->current.configure_serial;
+		bool acks_configure = transaction_view_acks_configure(&toplevel->view, serial);
 		if (new_size) {
 			// update stored geometry
 			memcpy(&toplevel->view.geometry, new_geo, sizeof(struct wlr_box));
@@ -602,7 +603,7 @@ void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 						transaction_commit_dirty_client();
 					}
 				} else if (IS_TILED(c)) {
-					if (c->tiled_rectangle.width > 0 && c->tiled_rectangle.height > 0 &&
+					if (!acks_configure && c->tiled_rectangle.width > 0 && c->tiled_rectangle.height > 0 &&
 							(toplevel->view.geometry.width != c->tiled_rectangle.width ||
 							toplevel->view.geometry.height != c->tiled_rectangle.height)) {
 						if (!(toplevel->view.last_requested.width > 0 &&
@@ -618,7 +619,6 @@ void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 			}
 		}
 
-		uint32_t serial = toplevel->xdg_toplevel->base->current.configure_serial;
 		bool successful = transaction_notify_view_ready_by_serial(&toplevel->view, serial);
 
 		if (successful)
@@ -634,7 +634,8 @@ void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 		if (toplevel->view.saved_surface_tree && !successful)
 			view_send_frame_done(&toplevel->view);
 
-		if (!animation_is_resizing(toplevel->view.node))
+		if (!animation_is_resizing(toplevel->view.node) &&
+			!transaction_layout_pending(toplevel->view.node))
 			view_center_and_clip_surface(&toplevel->view);
 	}
 

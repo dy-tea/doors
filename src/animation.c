@@ -36,6 +36,7 @@ typedef struct {
 	struct wlr_scene_tree *saved_tree;
 	struct wlr_box from;
 	struct wlr_box to;
+	struct wlr_box border_offset, border_size;
 	struct timespec start;
 	uint32_t duration_ms;
 	output_t *output;
@@ -317,8 +318,11 @@ void animation_cancel_node(node_t *node) {
 
 	wlr_log(WLR_DEBUG, "Cancel node %u entry=%p", node ? node->id : 0, (void *)entry);
 
-	if (entry->kind == ANIM_KIND_RESIZE && entry->view && entry->view->content_tree)
-		wlr_scene_subsurface_tree_set_clip(&entry->view->content_tree->node, NULL);
+	if (entry->kind == ANIM_KIND_RESIZE && entry->view) {
+		if (entry->view->content_tree)
+			wlr_scene_subsurface_tree_set_clip(&entry->view->content_tree->node, NULL);
+		view_remove_saved_buffer(entry->view);
+	}
 
 	if (entry->from_opacity != entry->to_opacity && entry->scene_tree)
 		surface_set_opacity(&entry->scene_tree->node, entry->to_opacity);
@@ -339,6 +343,12 @@ void animation_cancel_view(view_t *view) {
 
 		wlr_log(WLR_DEBUG, "Cancel toplevel entry=%p node=%u", (void *)entry,
 			entry->node ? entry->node->id : 0);
+
+		if (entry->kind == ANIM_KIND_RESIZE && entry->view) {
+			if (entry->view->content_tree)
+				wlr_scene_subsurface_tree_set_clip(&entry->view->content_tree->node, NULL);
+			view_remove_saved_buffer(entry->view);
+		}
 
 		if (entry->from_opacity != entry->to_opacity && entry->scene_tree) {
 			surface_set_opacity(&entry->scene_tree->node, entry->to_opacity);
@@ -661,6 +671,22 @@ bool animation_start_resize(view_t *view, struct wlr_box from, struct wlr_box to
 	return true;
 }
 
+static int resize_surface_offset(int anim_start, int anim_span, int target_start, int target_span,
+		int geo_span, int resting) {
+	bool near_fixed = anim_start == target_start;
+	bool far_fixed = anim_start + anim_span == target_start + target_span;
+
+	int offset;
+	if (near_fixed)
+		offset = resting;
+	else if (far_fixed)
+		offset = anim_span - geo_span;
+	else
+		offset = (anim_span - geo_span) / 2;
+
+	return offset > 0 ? offset : 0;
+}
+
 static void update_resize_entry(animation_entry_t *entry) {
 	if (!entry->view || !entry->view->content_tree)
 		return;
@@ -680,26 +706,52 @@ static void update_resize_entry(animation_entry_t *entry) {
 	// update scene tree position
 	wlr_scene_node_set_position(&entry->view->scene_tree->node, x, y);
 
-	// clip content tree to the animated size
-	struct wlr_box clip = {
-		.x = entry->view->geometry.x,
-		.y = entry->view->geometry.y,
-		.width = width,
-		.height = height,
-	};
-	wlr_scene_subsurface_tree_set_clip(&entry->view->content_tree->node, &clip);
-
-	struct wlr_box container = {
-		.x = entry->view->geometry.x,
-		.y = entry->view->geometry.y,
-		.width = width,
-		.height = height,
-	};
+	bool frozen = entry->view->saved_surface_tree != NULL;
 	struct wlr_box content_offset = {0};
-	struct wlr_box border_size = {0};
-	view_resolve_content_layout(entry->view, container, &content_offset, &border_size);
+	struct wlr_box border_size = box;
 
-	if (entry->node && entry->node->client) {
+	if (frozen) {
+		content_offset = entry->view->saved_content_offset;
+		view_crop_saved_buffer(entry->view, (struct wlr_box){
+			0,
+			0,
+			width,
+			height
+		});
+	} else {
+		struct wlr_box animating = {
+			.x = entry->view->geometry.x,
+			.y = entry->view->geometry.y,
+			.width = width,
+			.height = height,
+		};
+		struct wlr_box target = {
+			.x = entry->to.x,
+			.y = entry->to.y,
+			.width = entry->to.width,
+			.height = entry->to.height,
+		};
+		view_resolve_content_layout(entry->view, animating, NULL, &border_size);
+		view_resolve_content_layout(entry->view, target, &content_offset, NULL);
+
+		content_offset.x = resize_surface_offset(x, width, entry->to.x, entry->to.width,
+			(int)entry->view->geometry.width, content_offset.x);
+		content_offset.y = resize_surface_offset(y, height, entry->to.y, entry->to.height,
+			(int)entry->view->geometry.height, content_offset.y);
+
+		struct wlr_box clip = {
+			.x = entry->view->geometry.x,
+			.y = entry->view->geometry.y,
+			.width = border_size.width,
+			.height = border_size.height,
+		};
+		wlr_scene_subsurface_tree_set_clip(&entry->view->content_tree->node, &clip);
+	}
+
+	entry->border_offset = content_offset;
+	entry->border_size = border_size;
+
+	if (!frozen && entry->node && entry->node->client) {
 		client_t *c = entry->node->client;
 		if (IS_TILED(c) || c->state == STATE_FLOATING || c->state == STATE_FULLSCREEN)
 			wlr_scene_node_set_position(&entry->view->content_tree->node, content_offset.x,
@@ -753,6 +805,21 @@ bool animation_get_geometry_progress(view_t *view, struct wlr_box *out) {
 	}
 
 	return false;
+}
+
+bool animation_get_resize_border(view_t *view, struct wlr_box *offset, struct wlr_box *size) {
+	if (!view || !view->node)
+		return false;
+
+	animation_entry_t *entry = find_animation(view->node);
+	if (!entry || entry->kind != ANIM_KIND_RESIZE)
+		return false;
+
+	if (offset)
+		*offset = entry->border_offset;
+	if (size)
+		*size = entry->border_size;
+	return true;
 }
 
 bool animation_has_fade_out(struct wlr_scene_tree *scene_tree) {
@@ -1012,8 +1079,11 @@ bool animation_update_output(output_t *output, struct timespec now) {
 
 		if (!entry->node->client->flags.shown || !entry->scene_tree->node.enabled) {
 			// if this is a resize animation finishing early, clean up the clip
+			// and hand the surface back
 			if (entry->kind == ANIM_KIND_RESIZE && entry->view && entry->view->content_tree)
 				wlr_scene_subsurface_tree_set_clip(&entry->view->content_tree->node, NULL);
+			if (entry->kind == ANIM_KIND_RESIZE && entry->view)
+				view_remove_saved_buffer(entry->view);
 			wl_list_remove(&entry->link);
 			free(entry);
 			continue;
@@ -1027,10 +1097,10 @@ bool animation_update_output(output_t *output, struct timespec now) {
 
 			if (is_entry_done(entry)) {
 				wlr_scene_node_set_position(&entry->scene_tree->node, entry->to.x, entry->to.y);
-				// re-apply centering, borders, and clip immediately so the
-				// surface doesn't lose its clip until the next client commit
-				if (entry->view)
+				if (entry->view) {
 					view_center_and_clip_surface(entry->view);
+					view_remove_saved_buffer(entry->view);
+				}
 				wlr_log(WLR_DEBUG, "Resize complete entry=%p node=%u", (void *)entry,
 					entry->node ? entry->node->id : 0);
 				wl_list_remove(&entry->link);

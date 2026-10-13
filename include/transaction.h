@@ -30,6 +30,7 @@ typedef struct transaction_inst_t {
 	struct wlr_box previous_tiled_rectangle;
 	uint32_t serial;
 	bool waiting;
+	bool applied;
 	bool server_request;
 	bool require_geometry_match;
 } transaction_inst_t;
@@ -52,6 +53,17 @@ void transaction_commit_dirty(void);
  * client-initiated change that has already taken effect.
  */
 void transaction_commit_dirty_client(void);
+
+/**
+ * Whether a layout change for this node has been committed but not applied yet.
+ */
+bool transaction_layout_pending(node_t *node);
+
+/**
+ * Whether this commit's configure serial answers a configure the transaction
+ * is currently waiting on.
+ */
+bool transaction_view_acks_configure(view_t *view, uint32_t serial);
 
 /**
  * Notify the transaction system that a view is ready for the new layout.

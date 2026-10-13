@@ -19,6 +19,7 @@ struct view_t {
 	struct wlr_scene_tree *scene_tree; // Parent container
 	struct wlr_scene_tree *content_tree; // Client content
 	struct wlr_scene_tree *saved_surface_tree; // Saved buffer snapshot
+	struct wlr_box saved_content_offset; // content_tree offset the snapshot was taken at
 	struct wlr_scene_buffer *output_handler; // For tracking output enter/leave events
 
 	surface_blur_t *blur;
@@ -86,6 +87,7 @@ void view_create_foreign_toplevels(view_t *view, const char *app_id, const char 
 void view_destroy_foreign_toplevels(view_t *view);
 
 void view_save_buffer(view_t *view);
+void view_crop_saved_buffer(view_t *view, struct wlr_box box);
 void view_remove_saved_buffer(view_t *view);
 void view_send_frame_done(view_t *view);
 void view_send_frame_done_iterator(struct wlr_scene_buffer *scene_buffer, int x, int y, void *data);
