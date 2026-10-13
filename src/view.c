@@ -722,16 +722,46 @@ void view_save_buffer(view_t *view) {
 		view->saved_surface_tree = NULL;
 		wlr_log(WLR_DEBUG, "No buffers to save for toplevel - destroyed saved tree");
 	} else {
-		view->saved_content_offset.x = view->content_tree->node.x;
-		view->saved_content_offset.y = view->content_tree->node.y;
 		wlr_scene_node_set_enabled(&view->content_tree->node, false);
 		wlr_scene_node_set_enabled(&view->saved_surface_tree->node, true);
 		wlr_log(WLR_DEBUG, "Saved buffer for toplevel - swapped content_tree for saved_surface_tree");
 	}
 }
 
+typedef struct {
+	struct wlr_box box;
+	struct wlr_box visible;
+} saved_crop_t;
+
+static void saved_crop_union(struct wlr_box *box, int x, int y, int width, int height) {
+	if (width < 1 || height < 1)
+		return;
+
+	if (box->width < 1 || box->height < 1) {
+		box->x = x;
+		box->y = y;
+		box->width = width;
+		box->height = height;
+		return;
+	}
+
+	int x2 = box->x + box->width;
+	int y2 = box->y + box->height;
+	if (x + width > x2)
+		x2 = x + width;
+	if (y + height > y2)
+		y2 = y + height;
+	if (x < box->x)
+		box->x = x;
+	if (y < box->y)
+		box->y = y;
+	box->width = x2 - box->x;
+	box->height = y2 - box->y;
+}
+
 static void crop_saved_buffer(struct wlr_scene_buffer *buffer, int sx, int sy, void *data) {
-	struct wlr_box *box = data;
+	saved_crop_t *crop = data;
+	struct wlr_box *box = &crop->box;
 	int bx = box->x;
 	int by = box->y;
 	int bw = box->width;
@@ -765,13 +795,23 @@ static void crop_saved_buffer(struct wlr_scene_buffer *buffer, int sx, int sy, v
 	wlr_scene_node_set_position(&buffer->node, vx, vy);
 	wlr_scene_buffer_set_source_box(buffer, &src);
 	wlr_scene_buffer_set_dest_size(buffer, vx2 - vx, vy2 - vy);
+
+	saved_crop_union(&crop->visible, vx, vy, vx2 - vx, vy2 - vy);
 }
 
-void view_crop_saved_buffer(view_t *view, struct wlr_box box) {
+void view_crop_saved_buffer(view_t *view, struct wlr_box box, struct wlr_box *visible) {
+	saved_crop_t crop = { .box = box };
+
+	if (visible)
+		*visible = (struct wlr_box){ 0 };
+
 	if (!view || !view->saved_surface_tree)
 		return;
 
-	wlr_scene_node_for_each_buffer(&view->saved_surface_tree->node, crop_saved_buffer, &box);
+	wlr_scene_node_for_each_buffer(&view->saved_surface_tree->node, crop_saved_buffer, &crop);
+
+	if (visible)
+		*visible = crop.visible;
 }
 
 void view_remove_saved_buffer(view_t *view) {

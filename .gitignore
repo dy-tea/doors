@@ -3,3 +3,7 @@
 *.mesh*
 !meson.build
 !.github
+!.clang-format
+!.editorconfig
+!.gitattributes
+!.gitginore

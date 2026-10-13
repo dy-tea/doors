@@ -711,13 +711,22 @@ static void update_resize_entry(animation_entry_t *entry) {
 	struct wlr_box border_size = box;
 
 	if (frozen) {
-		content_offset = entry->view->saved_content_offset;
+		// the snapshot can be smaller than the area the server allocated for the
+		// client, so size the border around what is actually visible
+		struct wlr_box visible = {0};
 		view_crop_saved_buffer(entry->view, (struct wlr_box){
 			0,
 			0,
 			width,
 			height
-		});
+		}, &visible);
+
+		if (visible.width > 0 && visible.height > 0) {
+			content_offset.x = visible.x;
+			content_offset.y = visible.y;
+			border_size.width = visible.width;
+			border_size.height = visible.height;
+		}
 	} else {
 		struct wlr_box animating = {
 			.x = entry->view->geometry.x,
