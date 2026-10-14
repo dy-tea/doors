@@ -169,7 +169,7 @@ typedef struct {
 } hotcornerbind_t;
 
 struct submap {
-	char name[MAXLEN];
+	char name[MAXLEN * 2];
 	keybind_t keybinds[MAX_KEYBINDS];
 	size_t num_keybinds;
 	submap_t *parent;
