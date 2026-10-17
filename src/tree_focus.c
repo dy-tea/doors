@@ -1,5 +1,6 @@
 #include "borders.h"
 #include "client.h"
+#include "dim.h"
 #include "ipc/ipc.h"
 #include "layout/floating.h"
 #include "layout/layout.h"
@@ -130,6 +131,8 @@ static bool focus_node_impl(output_t *m, desktop_t *d, node_t *n, bool give_keyb
 	}
 
 	server.focus_from_click = false;
+
+	dim_update_output(m);
 
 	if (give_keyboard_focus) {
 		ipc_put_status(SUB_MASK_REPORT, NULL);

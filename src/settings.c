@@ -56,6 +56,13 @@ doors_settings_t settings = {
 	.hide_lone_tab = false,
 	.workspace_anim_direction = WORKSPACE_ANIM_VERTICAL,
 	.workspace_anim_slide_up = false,
+
+	// dimming
+	.dim_inactive = false,
+	.dim_below = false,
+	.dim_strength = 0.1f,
+	.dim_color = {0.0f, 0.0f, 0.0f, 1.0f},
+
 	.ignore_ewmh_fullscreen = 0,
 	.idle_timeout = 0,
 	.idle_dpms = true,
@@ -63,6 +70,7 @@ doors_settings_t settings = {
 	.monocle_padding = {0},
 	.border_width = 2,
 	.window_gap = 10,
+
 	.scroller_default_column_width = {SCROLLER_SIZE_PROPORTION, 0.5},
 	.scroller_preset_column_widths = (scroller_size_t *)scroller_default_preset_widths,
 	.scroller_preset_column_widths_count = (int)(sizeof(scroller_default_preset_widths) /
@@ -73,6 +81,7 @@ doors_settings_t settings = {
 	.scroller_center_focused_column = SCROLLER_CENTER_NEVER,
 	.scroller_always_center_single_column = false,
 	.scroller_struts = {0},
+
 	.smart_gaps = false,
 	.smart_borders = false,
 	.respect_tiled_min_size = false,

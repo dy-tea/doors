@@ -13,7 +13,7 @@ static const ipc_cmd_t commands[] = {
 	CMD("balance", "even out the focused desktop", ipc_cmd_actions),
 	CMD("bezier", "register a bezier easing curve", ipc_cmd_actions),
 	CMD("commands", "list every command and its subcommands", ipc_cmd_commands),
-	CMD("config", "get or set a setting", ipc_cmd_config),
+	{"config", "get or set a setting", ipc_cmd_config, config_subs},
 	{"desktop", "focus, create, rename or reorder desktops", ipc_cmd_desktop, desktop_subs},
 	{"env", "set or unset environment variables for launched clients", ipc_cmd_env, env_subs},
 	CMD("equalize", "split the tree evenly", ipc_cmd_actions),

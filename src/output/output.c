@@ -1,5 +1,6 @@
 #include "animation.h"
 #include "client.h"
+#include "dim.h"
 #include "effects/effects.h"
 #include "ipc/ipc.h"
 #include "layout/floating.h"
@@ -202,6 +203,8 @@ static bool output_try_direct_scanout(output_t *output) {
 	if (output_needs_software_cursor(output))
 		return false;
 	if (fullscreen_has_effects(output))
+		return false;
+	if (dim_output_visible(output))
 		return false;
 	if (server.locked || screen_shader_enabled)
 		return false;
@@ -422,6 +425,7 @@ void output_teardown(output_t *output) {
 	output->color_transform = NULL;
 	effects_output_fini(output->effects);
 	output->effects = NULL;
+	dim_destroy_output(output);
 
 	desktop_t *d, *dtmp;
 	wl_list_for_each_safe(d, dtmp, &output->desk_list, link) {
@@ -695,6 +699,7 @@ void output_update_geometry(output_t *output) {
 	output->width = layout_box.width;
 	output->height = layout_box.height;
 
+	dim_update_output(output);
 	arrange_layers(output);
 
 	desktop_t *d;

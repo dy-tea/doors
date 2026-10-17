@@ -489,6 +489,7 @@ doorsctl node --flag acrylic=on|off    						# Toggle acrylic effect on window
 doorsctl node --flag border_radius=<float>  			# Set border radius on window
 doorsctl node --flag shadow=on|off       					# Toggle shadow effect on window
 doorsctl node --flag opacity=<0.0-1.0>  					# Set opacity on window
+doorsctl node --flag no_dim=on|off       					# Opt window out of dimming (see Dim Settings)
 doorsctl node --move <dx> <dy>         						# Move floating window by delta x,y
 doorsctl node --resize <handle> <dx> <dy>  				# Resize floating window (handle: northwest/nw/north/n/ne/east/e/southeast/se/south/s/southwest/sw/west/w/center/c)
 doorsctl node --activate               						# Activate focused window
@@ -721,6 +722,7 @@ doorsctl rule -a vesktop desktop=III
 - `shadow=on|off` - Whether a window should have the shadow effect set
 - `render_unfocused_fps=<n>` - Keep the window rendering while hidden/unfocused at the given FPS throttle. A value of `0` disables this behavior.
 - `opacity=<0.0-1.0>` - Set the opacity of the matched window(s)
+- `no_dim=on|off` - Opt the matched window(s) out of dimming, both their own `dim_below` scrim and `dim_inactive` around them.
 
 **Matching by Title or Tag:**
 
@@ -991,6 +993,29 @@ doorsctl config idle_dpms [true|false]     # Get or set automatic DPMS on idle (
 doorsctl config realtime_scheduling [true|false]  # Get or set real-time scheduling (default false)
 ```
 
+#### Listing settings
+
+`doorsctl config --list` prints every setting with its type, current value,
+built-in default and the values it accepts.
+
+```
+doorsctl config --list [--json] [--changed] [--no-header]
+```
+
+| Option | Effect |
+| --- | --- |
+| `--json` | Emit a JSON array instead of an aligned table |
+| `--changed` | Only list settings whose current value differs from the default |
+| `--no-header` | Omit the header row (text output only) |
+
+Defaults are captured at startup before `doorsrc` runs, so `--changed` reports exactly what your config altered:
+
+```
+$ doorsctl config --list --changed --no-header
+window_gap    int    12    10    any
+blur_radius   float  7.00  5.00  >0
+```
+
 ### Animation Settings
 
 Doors supports per-type animation configuration with custom bezier curves.
@@ -1251,6 +1276,35 @@ doorsctl config acrylic_blur_passes <n>
 ```
 
 Sets the number of blur passes for acrylic effect (0-10, default: 4). Higher values create stronger blur.
+
+### Dim Settings
+
+Doors can darken the scene with a scrim, either around the focused window or
+behind every window.
+
+```
+doorsctl config dim_inactive [true|false]  # darken everything but the focused window
+doorsctl config dim_below [true|false]     # darken the area behind every window
+doorsctl config dim_strength <0.0-1.0>     # how dark the scrim is (default 0.1)
+doorsctl config dim_color "<r> <g> <b> [a]" # scrim colour (default 0 0 0 1)
+```
+
+`dim_inactive` draws one scrim covering the output directly below the focused
+window, so the background and every other window are darkened while the focused window stays bright.
+
+`dim_below` gives each window its own scrim, so the area directly behind every window is darkened. The scrim lives inside the window's own scene tree, which means it follows the window through animations.
+
+The effective opacity is `dim_color`'s alpha multiplied by `dim_strength`, so
+you can keep the colour in one setting and vary only the strength.
+
+Disable dim on a single window with:
+
+```
+doorsctl node -g no_dim=true     # focused window
+doorsctl rule -a mpv no_dim=on   # by app_id
+```
+
+A window with `no_dim` set neither gets its own `dim_below` scrim, nor does it allow `dim_inactive` to dim the rest of the screen around it.
 
 ### Shadow Settings
 

@@ -50,6 +50,7 @@ int main(int argc, char *argv[]) {
 	}
 #endif
 
+	config_snapshot_defaults();
 	config_init_with_config_dir(config_dir);
 	server_init();
 	if (settings.realtime_scheduling)

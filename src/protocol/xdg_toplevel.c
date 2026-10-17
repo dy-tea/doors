@@ -1,4 +1,5 @@
 #include "animation.h"
+#include "dim.h"
 #include "effects/effects.h"
 #include "input/cursor.h"
 #include "input/input_method.h"
@@ -320,6 +321,7 @@ void xdg_toplevel_adopt(xdg_toplevel_t *toplevel) {
 
 	rule_apply_consequence(n, n->client, rule);
 	rule_apply_view_consequence(&toplevel->view, rule);
+	dim_update_view(&toplevel->view);
 
 	view_create_foreign_toplevels(&toplevel->view, app_id, title);
 

@@ -61,20 +61,12 @@ int ipc_get_socket_fd(void) {
 }
 
 static void send_response(int client_fd, bool success, const char *msg) {
-	char buf[DOORS_BUFSIZ];
-	size_t offset = 0;
-	buf[offset++] = success ? '\0' : '\x01';
+	char status = success ? '\0' : '\x01';
+	wlr_log(WLR_DEBUG, "Sending response: %s", msg ? msg : "");
+	ipc_write_all(client_fd, &status, 1);
 
-	if (msg) {
-		size_t len = strlen(msg);
-		if (len > sizeof(buf) - 1)
-			len = sizeof(buf) - 1;
-		memcpy(buf + offset, msg, len);
-		offset += len;
-	}
-
-	wlr_log(WLR_DEBUG, "Sending response: %.*s", (int)(offset - 1), buf + 1);
-	ipc_write_all(client_fd, buf, offset);
+	if (msg && *msg)
+		ipc_write_all(client_fd, msg, strlen(msg));
 }
 
 void send_success(int client_fd, const char *msg) {

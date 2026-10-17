@@ -30,6 +30,7 @@ void ipc_cmd_sessions(ipc_args_t *a);
 bool ipc_cmd_subscribe(ipc_args_t *a); // true when the handler keeps the socket
 void ipc_cmd_wm(ipc_args_t *a);
 
+extern const ipc_sub_t config_subs[];
 extern const ipc_sub_t desktop_subs[];
 extern const ipc_sub_t env_subs[];
 extern const ipc_sub_t master_stack_subs[];

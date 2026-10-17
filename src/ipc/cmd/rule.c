@@ -24,6 +24,7 @@ static const cfg_enum_value_t rule_flag_names[] = {
 	{"allow_tearing", RULE_TYPE_ALLOW_TEARING},
 	{"shortcuts_inhibitor", RULE_TYPE_SHORTCUTS_INHIBITOR},
 	{"animations_disable", RULE_TYPE_ANIM_DISABLE},
+	{"no_dim", RULE_TYPE_NO_DIM},
 	IPC_ENUM_END,
 };
 

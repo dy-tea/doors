@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <stdio.h>
@@ -15,10 +16,53 @@ static void err(const char *msg) {
 	exit(EXIT_FAILURE);
 }
 
+static char *read_reply(int sock_fd, size_t *out_len) {
+	size_t cap = DOORS_BUFSIZ, len = 0;
+	char *buf = malloc(cap);
+
+	if (!buf)
+		err("Failed to allocate memory.\n");
+
+	for (; ; ) {
+		// keep room for the terminator
+		if (len + 1 >= cap) {
+			char *grown = realloc(buf, cap * 2);
+
+			if (!grown) {
+				free(buf);
+				err("Failed to allocate memory.\n");
+			}
+
+			buf = grown;
+			cap *= 2;
+		}
+
+		ssize_t n = recv(sock_fd, buf + len, cap - len - 1, 0);
+
+		if (n > 0) {
+			len += (size_t)n;
+
+			if (len > 1 && buf[1] == '/')
+				break;
+
+			continue;
+		}
+
+		if (n < 0 && errno == EINTR)
+			continue;
+
+		break;
+	}
+
+	buf[len] = '\0';
+	*out_len = len;
+	return buf;
+}
+
 int main(int argc, char *argv[]) {
 	int sock_fd;
 	struct sockaddr_un sock_address;
-	char msg[DOORS_BUFSIZ], rsp[DOORS_BUFSIZ];
+	char msg[DOORS_BUFSIZ];
 
 	if (argc < 2)
 		err("No arguments given.\n");
@@ -64,7 +108,7 @@ int main(int argc, char *argv[]) {
 		err("Failed to send the data.\n");
 	}
 
-	int ret = EXIT_SUCCESS, nb;
+	int ret = EXIT_SUCCESS;
 
 	struct pollfd fds[] = {
 		{sock_fd, POLLIN | POLLHUP, 0},
@@ -72,35 +116,45 @@ int main(int argc, char *argv[]) {
 
 	while (poll(fds, 1, -1) > 0) {
 		if (fds[0].revents & (POLLHUP | POLLIN)) {
-			if ((nb = recv(sock_fd, rsp, sizeof(rsp) - 1, 0)) > 0) {
-				rsp[nb] = '\0';
-				if (rsp[0] == '\x01') {
-					ret = EXIT_FAILURE;
-					fprintf(stderr, "%s", rsp + 1);
-					fflush(stderr);
-				} else {
-					fprintf(stdout, "%s", rsp + 1);
-					fflush(stdout);
-					if (rsp[1] == '/') {
-						size_t len = strlen(rsp + 1);
-						if (len > 0 && rsp[1 + len - 1] == '\n')
-							rsp[1 + len - 1] = '\0';
-						int fifo_fd = open(rsp + 1, O_RDONLY);
-						if (fifo_fd < 0) {
-							close(sock_fd);
-							err("subscribe: failed to open fifo for reading\n");
-						}
+			size_t rsp_len;
+			char *rsp = read_reply(sock_fd, &rsp_len);
+
+			if (rsp_len == 0) {
+				free(rsp);
+				break;
+			}
+
+			if (rsp[0] == '\x01') {
+				ret = EXIT_FAILURE;
+				fprintf(stderr, "%s", rsp + 1);
+				fflush(stderr);
+			} else {
+				fprintf(stdout, "%s", rsp + 1);
+				fflush(stdout);
+				if (rsp[1] == '/') {
+					size_t len = strlen(rsp + 1);
+					if (len > 0 && rsp[1 + len - 1] == '\n')
+						rsp[1 + len - 1] = '\0';
+					int fifo_fd = open(rsp + 1, O_RDONLY);
+					if (fifo_fd < 0) {
+						free(rsp);
 						close(sock_fd);
-						char buf[DOORS_BUFSIZ];
-						while ((nb = read(fifo_fd, buf, sizeof(buf))) > 0) {
-							fwrite(buf, 1, nb, stdout);
-							fflush(stdout);
-						}
-						close(fifo_fd);
-						return ret;
+						err("subscribe: failed to open fifo for reading\n");
 					}
+					free(rsp);
+					close(sock_fd);
+					char buf[DOORS_BUFSIZ];
+					ssize_t nb;
+					while ((nb = read(fifo_fd, buf, sizeof(buf))) > 0) {
+						fwrite(buf, 1, nb, stdout);
+						fflush(stdout);
+					}
+					close(fifo_fd);
+					return ret;
 				}
 			}
+
+			free(rsp);
 			break;
 		}
 	}

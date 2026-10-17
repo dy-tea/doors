@@ -165,6 +165,7 @@ typedef struct {
 	uint32_t allow_tearing : 1;
 	uint32_t allow_tearing_from_rule : 1;
 	uint32_t anim_disabled : 1;
+	uint32_t no_dim : 1;
 } client_flags_t;
 
 typedef enum {
@@ -291,6 +292,12 @@ typedef struct {
 	bool hide_lone_tab;
 	workspace_anim_direction_t workspace_anim_direction;
 	bool workspace_anim_slide_up;
+
+	// dimming
+	bool dim_inactive; // darken everything but the focused window
+	bool dim_below; // darken the area behind each window
+	float dim_strength;
+	float dim_color[4];
 
 	// Transaction system settings
 	int txn_timeout_ms;

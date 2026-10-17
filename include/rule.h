@@ -34,7 +34,8 @@ typedef enum {
 	RULE_TYPE_ANIM_DISABLE = 1 << 21,
 	RULE_TYPE_MAXIMIZED = 1 << 22,
 	RULE_TYPE_MINIMIZED = 1 << 23,
-	RULE_TYPE_LAST = 1 << 24,
+	RULE_TYPE_NO_DIM = 1 << 24,
+	RULE_TYPE_LAST = 1 << 25,
 } rule_type_t;
 
 typedef enum {

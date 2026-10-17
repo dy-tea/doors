@@ -25,6 +25,9 @@ struct view_t {
 	surface_rounded_t *rounded;
 	surface_shadow_t *shadow;
 
+	// scrim behind this window's own content, see dim.h
+	struct wlr_scene_rect *dim_node;
+
 	struct wlr_ext_foreign_toplevel_handle_v1 *ext_foreign_toplevel;
 	struct wlr_foreign_toplevel_handle_v1 *foreign_toplevel;
 	char *foreign_identifier;

@@ -192,6 +192,9 @@ void list_rules(char *buf, size_t buf_size) {
 		if (r->consequence.has & RULE_TYPE_ANIM_DISABLE)
 			offset = ipc_buf_append(buf, buf_size, offset, "animations_disable=%s ",
 				r->consequence.flags & RULE_TYPE_ANIM_DISABLE ? "on" : "off");
+		if (r->consequence.has & RULE_TYPE_NO_DIM)
+			offset = ipc_buf_append(buf, buf_size, offset, "no_dim=%s ",
+				r->consequence.flags & RULE_TYPE_NO_DIM ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_BLOCK_OUT_FROM_SCREENSHARE)
 			offset = ipc_buf_append(buf, buf_size, offset, "block_out_from_screenshare=%s ",
 				r->consequence.flags & RULE_TYPE_BLOCK_OUT_FROM_SCREENSHARE ? "on" : "off");
@@ -520,6 +523,9 @@ void rule_apply_consequence(node_t *node, client_t *client, const rule_consequen
 
 	if (rule->has & RULE_TYPE_ANIM_DISABLE)
 		client->flags.anim_disabled = rule_flag(rule, RULE_TYPE_ANIM_DISABLE);
+
+	if (rule->has & RULE_TYPE_NO_DIM)
+		client->flags.no_dim = rule_flag(rule, RULE_TYPE_NO_DIM);
 
 	if (rule->has & RULE_TYPE_SHADOW) {
 		client->flags.shadow = rule_flag(rule, RULE_TYPE_SHADOW);

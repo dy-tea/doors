@@ -59,6 +59,9 @@ typedef struct output_t {
 	desktop_t *desk, *last_desk;
 	struct wl_list desk_list;
 	struct wl_list link;
+
+	// scrim drawn below the focused window
+	struct wlr_scene_rect *dim_node;
 } output_t;
 
 void output_create(struct wlr_output *wlr_output);

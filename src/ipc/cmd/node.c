@@ -1,4 +1,5 @@
 #include "animation.h"
+#include "dim.h"
 #include "effects/effects.h"
 #include "input/keyboard.h"
 #include "ipc/args.h"
@@ -340,6 +341,14 @@ static void node_flag(ipc_args_t *a) {
 		n->client->shadow_offset_y = settings.shadow_offset_y;
 		memcpy(n->client->shadow_color, settings.shadow_color, sizeof(settings.shadow_color));
 		surface_client_set_shadow(n->client, on);
+		ipc_ok(a, "flag changed\n");
+	} else if (streq(key, "no_dim")) {
+		if (!n->client) {
+			ipc_fail(a, "Focused node has no client\n");
+			return;
+		}
+		n->client->flags.no_dim = val ? want : !n->client->flags.no_dim;
+		dim_update();
 		ipc_ok(a, "flag changed\n");
 	} else if (numeric) {
 		if (!val) {

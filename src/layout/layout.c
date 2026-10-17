@@ -1,4 +1,5 @@
 #include "client.h"
+#include "dim.h"
 #include "layout/floating.h"
 #include "layout/layout.h"
 #include "layout/master_stack.h"
@@ -26,6 +27,8 @@ void arrange(output_t *m, desktop_t *d, bool use_transaction) {
 
 	if (use_transaction)
 		transaction_commit_dirty();
+
+	dim_update_output(m);
 }
 
 static void tiled_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
