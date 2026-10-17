@@ -227,24 +227,7 @@ void handle_new_layer_surface(struct wl_listener *listener, void *data) {
 	layer_surface->data = layer;
 	pixman_region32_init(&layer->blur_region);
 
-	struct wlr_scene_tree *layer_tree;
-	switch (layer_surface->pending.layer) {
-	case ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND:
-		layer_tree = output->layer_bg;
-		break;
-	case ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM:
-		layer_tree = output->layer_bottom;
-		break;
-	case ZWLR_LAYER_SHELL_V1_LAYER_TOP:
-		layer_tree = output->layer_top;
-		break;
-	case ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY:
-		layer_tree = output->layer_overlay;
-		break;
-	default:
-		layer_tree = output->layer_top;
-		break;
-	}
+	struct wlr_scene_tree *layer_tree = output_shell_layer(output, layer_surface->pending.layer);
 
 	layer->scene_layer = wlr_scene_layer_surface_v1_create(layer_tree, layer_surface);
 	layer->scene_tree = layer->scene_layer->tree;

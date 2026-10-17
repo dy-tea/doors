@@ -610,6 +610,8 @@ static void gles2_fini(void) {
 		return;
 	egl_make_current();
 	glDeleteProgram(g->prog_kawase);
+	glDeleteProgram(g->prog_blur_down);
+	glDeleteProgram(g->prog_blur_up);
 	glDeleteProgram(g->prog_gauss_h);
 	glDeleteProgram(g->prog_gauss_v);
 	glDeleteProgram(g->prog_box_h);

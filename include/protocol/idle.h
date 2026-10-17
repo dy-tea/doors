@@ -8,6 +8,7 @@ typedef struct {
 	struct wl_listener destroy;
 } idle_inhibitor_t;
 
+bool idle_inhibitors_active(struct wlr_surface *sans);
 void update_idle_inhibitors(struct wlr_surface *sans);
 
 void idle_init(void);

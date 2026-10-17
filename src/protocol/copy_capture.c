@@ -380,6 +380,16 @@ void image_copy_capture_init(void) {
 
 void image_copy_capture_fini(void) {
 	ONCE();
+
+	copy_capture_manager = NULL;
+
+	if (!output_source_manager)
+		return;
+
+	wl_list_remove(&output_source_manager->display_destroy.link);
+	wl_global_destroy(output_source_manager->global);
+	free(output_source_manager);
+	output_source_manager = NULL;
 }
 
 struct wl_global *image_copy_capture_get_global(void) {

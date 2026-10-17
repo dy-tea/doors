@@ -1,5 +1,4 @@
 #include "config.h"
-#include "input/keyboard.h"
 #include "input/seat.h"
 #include "ipc/args.h"
 #include "ipc/registry.h"
@@ -44,6 +43,5 @@ void ipc_cmd_keyboard_grouping(ipc_args_t *a) {
 		return;
 
 	set_keyboard_grouping((keyboard_grouping_t)mode);
-	keyboard_reapply_grouping();
 	ipc_ok(a, "keyboard_grouping set\n");
 }

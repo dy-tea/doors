@@ -1,5 +1,7 @@
 #pragma once
 
+#include "types.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <wayland-server.h>
@@ -7,8 +9,6 @@
 
 struct output_t;
 struct wlr_output;
-
-#define MAXLEN 256
 
 enum output_config_enable {
 	OUTPUT_CONFIG_ENABLE_AUTO = -1,

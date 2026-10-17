@@ -238,12 +238,6 @@ doorsctl config pointer_follows_focus true|false
 When true, the pointer is warped to follow window focus changes.
 
 ```
-doorsctl config click_to_focus true|false
-```
-
-When true, clicking a window focuses it.
-
-```
 doorsctl config allow_tearing true|false
 ```
 
@@ -277,22 +271,10 @@ doorsctl config minimize_to_scratchpad true|false
 When true, minimizing a window (the decoration button, `doorsctl node --state minimized` or `doorsctl toggle minimize`) sends it to the scratchpad instead of just hiding it. Minimized windows are then restored either with `doorsctl scratchpad show` or with `doorsctl toggle restore_minimized`, Default: false.
 
 ```
-doorsctl config directional_focus_tightness <0-100>
-```
-
-Sets how tightly directional focus navigation favors close windows. 0=least strict, 100=most strict.
-
-```
 doorsctl config record_history true|false
 ```
 
 When true, focus history is recorded for cycling through previous windows.
-
-```
-doorsctl config mapping_events_count <n>
-```
-
-Sets the number of recent mapping events to track (non-negative integer).
 
 ```
 doorsctl config ignore_ewmh_fullscreen <0-2>
@@ -319,28 +301,28 @@ doorsctl config initial_polarity first_child|second_child
 Sets the initial insertion side for new windows (first_child=left/top, second_child=right/bottom).
 
 ```
-doorsctl config top_padding <pixels>
+doorsctl config monocle_top_padding <pixels>
 ```
 
-Sets the top padding (margin) for all desktops.
+Sets the top padding (margin) for desktops using the monocle layout.
 
 ```
-doorsctl config right_padding <pixels>
+doorsctl config monocle_right_padding <pixels>
 ```
 
-Sets the right padding for all desktops.
+Sets the right padding for desktops using the monocle layout.
 
 ```
-doorsctl config bottom_padding <pixels>
+doorsctl config monocle_bottom_padding <pixels>
 ```
 
-Sets the bottom padding for all desktops.
+Sets the bottom padding for desktops using the monocle layout.
 
 ```
-doorsctl config left_padding <pixels>
+doorsctl config monocle_left_padding <pixels>
 ```
 
-Sets the left padding for all desktops.
+Sets the left padding for desktops using the monocle layout.
 
 ```
 doorsctl config respect_tiled_min_size <true|false>

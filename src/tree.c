@@ -303,7 +303,7 @@ int collect_tiled_leaves(desktop_t *d, node_t ***out_nodes) {
 
 	int count = 0;
 	FOR_EACH_LEAF(n, d->root)
-		if (n->client && IS_TILED(n->client))
+		if (node_is_visible_tiled(n))
 			count++;
 
 	if (count == 0)
@@ -315,7 +315,7 @@ int collect_tiled_leaves(desktop_t *d, node_t ***out_nodes) {
 
 	int index = 0;
 	FOR_EACH_LEAF(n, d->root)
-		if (n->client && IS_TILED(n->client))
+		if (node_is_visible_tiled(n))
 			nodes[index++] = n;
 
 	*out_nodes = nodes;

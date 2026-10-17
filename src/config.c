@@ -1403,7 +1403,6 @@ void set_keyboard_grouping(keyboard_grouping_t grouping) {
 	if (keyboard_grouping != grouping) {
 		keyboard_grouping = grouping;
 		wlr_log(WLR_INFO, "Keyboard grouping set to %d", (int)grouping);
-		extern void keyboard_reapply_grouping(void);
 		keyboard_reapply_grouping();
 	}
 }
@@ -1552,8 +1551,8 @@ const char *bind_action_name(bind_action_t action) {
 		"move_column_right",
 		"move_column_up",
 		"move_column_down",
-		"move_column_first",
-		"move_column_last",
+		"move_column_to_first",
+		"move_column_to_last",
 	};
 	_Static_assert(sizeof(names) / sizeof(names[0]) == BIND_ACTION_COUNT,
 		"bind_action_name() must have exactly one name per bind_action_t value");

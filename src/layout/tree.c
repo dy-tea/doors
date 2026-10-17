@@ -276,10 +276,8 @@ int tiled_count(node_t *n, bool include_receptacles) {
 	if (is_leaf(n)) {
 		if (n->client == NULL)
 			return include_receptacles ? 1 : 0;
-		if (node_is_minimized(n) || n->hidden)
-			return 0;
 
-		return IS_TILED(n->client) ? 1 : 0;
+		return node_is_visible_tiled(n) ? 1 : 0;
 	}
 
 	return tiled_count(n->first_child, include_receptacles) + tiled_count(n->second_child,

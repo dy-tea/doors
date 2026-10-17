@@ -5,25 +5,11 @@
 #include "server.h"
 #include "settings.h"
 #include <wayland-server-core.h>
-#include <wlr/types/wlr_idle_inhibit_v1.h>
 #include <wlr/types/wlr_output.h>
-#include <wlr/types/wlr_scene.h>
 
 static struct wl_event_source *idle_timer = NULL;
 static struct wl_event_source *dpms_poll_timer = NULL;
 static bool displays_off = false;
-
-static bool is_inhibited(void) {
-	struct wlr_idle_inhibitor_v1 *idle;
-	wl_list_for_each(idle, &server.idle_inhibit_manager->inhibitors, link) {
-		struct wlr_surface *surface = wlr_surface_get_root_surface(idle->surface);
-		struct wlr_scene_tree *tree = surface->data;
-		int x, y;
-		if (tree != NULL && wlr_scene_node_coords(&tree->node, &x, &y))
-			return true;
-	}
-	return false;
-}
 
 static void turn_displays_on(void) {
 	if (!displays_off)
@@ -65,7 +51,7 @@ static int handle_dpms_poll_timer(void *data) {
 		return 0;
 
 	update_idle_inhibitors(NULL);
-	if (is_inhibited()) {
+	if (idle_inhibitors_active(NULL)) {
 		turn_displays_on();
 		return 0;
 	}
@@ -80,7 +66,7 @@ static int handle_idle_timer(void *data) {
 		return 0;
 
 	update_idle_inhibitors(NULL);
-	if (is_inhibited())
+	if (idle_inhibitors_active(NULL))
 		return 0;
 
 	turn_displays_off();

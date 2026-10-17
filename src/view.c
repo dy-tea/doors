@@ -800,10 +800,12 @@ static void crop_saved_buffer(struct wlr_scene_buffer *buffer, int sx, int sy, v
 }
 
 void view_crop_saved_buffer(view_t *view, struct wlr_box box, struct wlr_box *visible) {
-	saved_crop_t crop = { .box = box };
+	saved_crop_t crop = {
+		.box = box
+	};
 
 	if (visible)
-		*visible = (struct wlr_box){ 0 };
+		*visible = (struct wlr_box){0};
 
 	if (!view || !view->saved_surface_tree)
 		return;

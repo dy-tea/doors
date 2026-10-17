@@ -18,49 +18,60 @@
 #include <wlr/types/wlr_xdg_output_v1.h>
 #include <wlr/util/log.h>
 
-static size_t collect_privileged_globals(struct wl_global **out, size_t max) {
-#define PRIV(p) do { \
-		if ((p) && (n) < max) \
-			out[n++] = p; \
-	} while (0)
-	size_t n = 0;
+#define PRIVILEGED_GLOBALS(X) \
+	X(server.output_manager->global) \
+	X(server.output_power_manager->global) \
+	X(server.input_method_manager->global) \
+	X(server.foreign_toplevel_list->global) \
+	X(server.foreign_toplevel_manager->global) \
+	X(server.data_control_manager->global) \
+	X(server.ext_data_control_manager->global) \
+	X(server.export_dmabuf_manager->global) \
+	X(server.gamma_control_manager->global) \
+	X(server.security_context_manager_v1->global) \
+	X(server.layer_shell->global) \
+	X(server.session_lock_manager->global) \
+	X(server.keyboard_shortcuts_inhibit_manager->global) \
+	X(server.virtual_keyboard_manager->global) \
+	X(server.virtual_pointer_manager->global) \
+	X(server.xdg_output_manager->global) \
+	X(server.workspace_manager->global) \
+	X(screencopy_get_global()) \
+	X(image_capture_source_get_global()) \
+	X(image_copy_capture_get_global()) \
+	X(session_mgr_get_global())
 
-	PRIV(server.output_manager->global);
-	PRIV(server.output_power_manager->global);
-	PRIV(server.input_method_manager->global);
-	PRIV(server.foreign_toplevel_list->global);
-	PRIV(server.foreign_toplevel_manager->global);
-	PRIV(server.data_control_manager->global);
-	PRIV(server.ext_data_control_manager->global);
-	PRIV(server.export_dmabuf_manager->global);
-	PRIV(server.gamma_control_manager->global);
-	PRIV(server.security_context_manager_v1->global);
-	PRIV(server.layer_shell->global);
-	PRIV(server.session_lock_manager->global);
-	PRIV(server.keyboard_shortcuts_inhibit_manager->global);
-	PRIV(server.virtual_keyboard_manager->global);
-	PRIV(server.virtual_pointer_manager->global);
-	PRIV(server.xdg_output_manager->global);
-	PRIV(server.workspace_manager->global);
-	PRIV(screencopy_get_global());
-	PRIV(image_capture_source_get_global());
-	PRIV(image_copy_capture_get_global());
-	PRIV(session_mgr_get_global());
+#define PRIVILEGED_COUNT_ONE(...) + 1
+enum {
+	PRIVILEGED_COUNT = 0 PRIVILEGED_GLOBALS(PRIVILEGED_COUNT_ONE)
+};
+
+static struct wl_global *privileged_globals[PRIVILEGED_COUNT];
+static size_t privileged_count = 0;
+static bool privileged_resolved = false;
+
+static void resolve_privileged_globals(void) {
+	if (privileged_resolved)
+		return;
+
+#define PRIV(p) do { \
+		struct wl_global *priv_global = (p); \
+		if (priv_global) \
+			privileged_globals[privileged_count++] = priv_global; \
+	} while (0);
+
+	PRIVILEGED_GLOBALS(PRIV)
 
 #undef PRIV
 
-	return n;
+	privileged_resolved = true;
 }
 
-
-#define PRIVILEGED_MAX 26
-
 static bool is_privileged(const struct wl_global *global) {
-	struct wl_global *priv[PRIVILEGED_MAX];
-	size_t n = collect_privileged_globals(priv, PRIVILEGED_MAX);
+	resolve_privileged_globals();
 
-	for (size_t i = 0; i < n; i++) {
-		if (priv[i] == global)
+	for (size_t i = 0; i < privileged_count; i++) {
+		if (privileged_globals[i] == global)
 			return true;
 	}
 

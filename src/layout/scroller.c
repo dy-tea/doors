@@ -235,14 +235,13 @@ static void scroller_recenter_view(scroller_state_t *s, int prev_idx) {
 		return;
 
 	int idx = scroller_camera_column(s);
-	if (idx < 0 || idx >= s->column_count)
-		return;
+	if (idx >= 0 && idx < s->column_count) {
+		if (prev_idx < 0 || prev_idx >= s->column_count || prev_idx == idx)
+			prev_idx = idx;
 
-	if (prev_idx < 0 || prev_idx >= s->column_count || prev_idx == idx)
-		prev_idx = idx;
-
-	double cur_x = v.xs[prev_idx] + s->view_offset;
-	s->view_offset = scroller_view_offset_for_column(s, &v, cur_x, idx, prev_idx);
+		double cur_x = v.xs[prev_idx] + s->view_offset;
+		s->view_offset = scroller_view_offset_for_column(s, &v, cur_x, idx, prev_idx);
+	}
 
 	scroller_view_release(&v);
 }

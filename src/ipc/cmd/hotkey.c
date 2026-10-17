@@ -111,6 +111,7 @@ static void hotkey_add(ipc_args_t *a) {
 
 static const ipc_sub_t hotkey_subs[] = {
 	IPC_SUB("list", NULL, "hotkey list", hotkey_list),
+	IPC_SUB("add", NULL, "hotkey add <modifiers+key> <command>", hotkey_add),
 	IPC_SUB_END,
 };
 
@@ -121,6 +122,9 @@ void ipc_cmd_hotkey(ipc_args_t *a) {
 		hotkey_list(a);
 		return;
 	}
+
+	if (first && streq(first, "add"))
+		ipc_take(a);
 
 	if (!ipc_peek(a)) {
 		ipc_fail_unknown(a, hotkey_subs);

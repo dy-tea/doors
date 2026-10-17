@@ -109,15 +109,17 @@ let
       ++ optionals (oc.decoration-mode != null) [
         "doorsctl config decoration_mode ${toString oc.decoration-mode}"
       ]
-      ++ optionals (oc.padding.top != null) [ "doorsctl config top_padding ${toString oc.padding.top}" ]
+      ++ optionals (oc.padding.top != null) [
+        "doorsctl config monocle_top_padding ${toString oc.padding.top}"
+      ]
       ++ optionals (oc.padding.right != null) [
-        "doorsctl config right_padding ${toString oc.padding.right}"
+        "doorsctl config monocle_right_padding ${toString oc.padding.right}"
       ]
       ++ optionals (oc.padding.bottom != null) [
-        "doorsctl config bottom_padding ${toString oc.padding.bottom}"
+        "doorsctl config monocle_bottom_padding ${toString oc.padding.bottom}"
       ]
       ++ optionals (oc.padding.left != null) [
-        "doorsctl config left_padding ${toString oc.padding.left}"
+        "doorsctl config monocle_left_padding ${toString oc.padding.left}"
       ]
       ++ optionals (oc.respect-tiled-min-size != null) [
         "doorsctl config respect_tiled_min_size ${boolString oc.respect-tiled-min-size}"
@@ -144,9 +146,6 @@ let
       ]
       ++ optionals (oc.pointer-follows-focus != null) [
         "doorsctl config pointer_follows_focus ${boolString oc.pointer-follows-focus}"
-      ]
-      ++ optionals (oc.click-to-focus != null) [
-        "doorsctl config click_to_focus ${boolString oc.click-to-focus}"
       ]
     ) cfg.settings.config.pointer
   );
@@ -175,23 +174,8 @@ let
   scrollerSettingsLines = concatLists (
     mapAttrsToList (
       _: oc:
-      optionals (oc.edge-scroller-pointer-focus != null) [
-        "doorsctl config edge_scroller_pointer_focus ${boolString oc.edge-scroller-pointer-focus}"
-      ]
       ++ optionals (oc.scroller-default-proportion != null) [
         "doorsctl config scroller_default_proportion ${toString oc.scroller-default-proportion}"
-      ]
-      ++ optionals (oc.scroller-focus-center != null) [
-        "doorsctl config scroller_focus_center ${boolString oc.scroller-focus-center}"
-      ]
-      ++ optionals (oc.scroller-prefer-center != null) [
-        "doorsctl config scroller_prefer_center ${boolString oc.scroller-prefer-center}"
-      ]
-      ++ optionals (oc.scroller-prefer-overspread != null) [
-        "doorsctl config scroller_prefer_overspread ${boolString oc.scroller-prefer-overspread}"
-      ]
-      ++ optionals (oc.scroller-structs != null) [
-        "doorsctl config scroller_structs ${toString oc.scroller-structs}"
       ]
     ) cfg.settings.config.scroller
   );
@@ -214,14 +198,8 @@ let
       ++ optionals (oc.minimize-to-scratchpad != null) [
         "doorsctl config minimize_to_scratchpad ${boolString oc.minimize-to-scratchpad}"
       ]
-      ++ optionals (oc.directional-focus-tightness != null) [
-        "doorsctl config directional_focus_tightness ${toString oc.directional-focus-tightness}"
-      ]
       ++ optionals (oc.record-history != null) [
         "doorsctl config record_history ${boolString oc.record-history}"
-      ]
-      ++ optionals (oc.mapping-events-count != null) [
-        "doorsctl config mapping_events_count ${toString oc.mapping-events-count}"
       ]
       ++ optionals (oc.ignore-ewmh-fullscreen != null) [
         "doorsctl config ignore_ewmh_fullscreen ${toString oc.ignore-ewmh-fullscreen}"
@@ -576,25 +554,25 @@ in
                                   type = types.nullOr types.int;
                                   default = null;
                                   example = 0;
-                                  description = "Sets the top padding (margin) for all desktops";
+                                  description = "Sets the top padding (margin) for desktops using the monocle layout";
                                 };
                                 right = mkOption {
                                   type = types.nullOr types.int;
                                   default = null;
                                   example = 0;
-                                  description = "Sets the right padding for all desktops";
+                                  description = "Sets the right padding for desktops using the monocle layout";
                                 };
                                 bottom = mkOption {
                                   type = types.nullOr types.int;
                                   default = null;
                                   example = 0;
-                                  description = "Sets the bottom padding for all desktops";
+                                  description = "Sets the bottom padding for desktops using the monocle layout";
                                 };
                                 left = mkOption {
                                   type = types.nullOr types.int;
                                   default = null;
                                   example = 0;
-                                  description = "Sets the left padding for all desktops";
+                                  description = "Sets the left padding for desktops using the monocle layout";
                                 };
                               };
                             };
@@ -898,11 +876,6 @@ in
                             description = "When true, the pointer is warped to follow window focus changes.";
                           };
 
-                          click-to-focus = mkOption {
-                            type = types.bool;
-                            default = false;
-                            description = "When true, clicking a window focuses it.";
-                          };
                         };
                       }
                     );
@@ -986,11 +959,6 @@ in
                     type = types.attrsOf (
                       types.submodule {
                         options = {
-                          edge-scroller-pointer-focus = mkOption {
-                            type = types.nullOr types.bool;
-                            default = null;
-                            description = "When true, pointer focus affects scroller behavior at edges.";
-                          };
 
                           scroller-default-proportion = mkOption {
                             type = types.nullOr (
@@ -1002,32 +970,6 @@ in
                             default = null;
                             example = 1.0;
                             description = "Sets the default proportion for scroller layout (0.1-1.0)";
-                          };
-
-                          scroller-focus-center = mkOption {
-                            type = types.nullOr types.bool;
-                            default = null;
-                            description = "When true, the focused window is centered in the scroller viewpoint.";
-                          };
-
-                          scroller-prefer-center = mkOption {
-                            type = types.nullOr types.bool;
-                            default = null;
-                            description = "When true, scroller layout prefers centering the focused window.";
-                          };
-
-                          scroller-prefer-overspread = mkOption {
-                            type = types.nullOr types.bool;
-                            default = null;
-                            description = "When true, scroller layout prefers spreading windows to fill available space.";
-                          };
-
-                          scroller-structs = mkOption {
-                            type = types.nullOr (
-                              types.addCheck types.number (x: x >= 0.0) // { description = "A non-negative integer"; }
-                            );
-                            default = null;
-                            description = "Sets the number of visible scroller structs (non-negative integer).";
                           };
 
                         };
@@ -1070,29 +1012,10 @@ in
                             description = "When true, minimizing a window sends it to the scratchpad instead of just hiding it. Minimized windows are then restored wither with `doorsctl scratchpad show` or with `doorsctl toggle restore_minimized`";
                           };
 
-                          directional-focus-tightness = mkOption {
-                            type = types.nullOr (
-                              types.addCheck types.number (x: x >= 0 && x <= 100)
-                              // {
-                                description = "An option between 0 and 100";
-                              }
-                            );
-                            default = null;
-                            description = "Sets how tightly directional focus navigation favors close windows. 0=least strict, 100=most strict.";
-                          };
-
                           record-history = mkOption {
                             type = types.bool;
                             default = true;
                             description = "When true, focus history is recorded for cycling through previous windows.";
-                          };
-
-                          mapping-events-count = mkOption {
-                            type = types.nullOr (
-                              types.addCheck types.number (x: x >= 0) // { description = "A non negative integer"; }
-                            );
-                            default = null;
-                            description = "Sets the number of recent mapping events to track (non-negative integer)";
                           };
 
                           ignore-ewmh-fullscreen = mkOption {
