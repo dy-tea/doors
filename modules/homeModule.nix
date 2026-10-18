@@ -174,7 +174,7 @@ let
   scrollerSettingsLines = concatLists (
     mapAttrsToList (
       _: oc:
-      ++ optionals (oc.scroller-default-proportion != null) [
+      optionals (oc.scroller-default-proportion != null) [
         "doorsctl config scroller_default_proportion ${toString oc.scroller-default-proportion}"
       ]
     ) cfg.settings.config.scroller
