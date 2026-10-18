@@ -741,9 +741,18 @@ static void tell_client_fullscreen(node_t *n, bool value) {
 	view_t *view = n->client ? n->client->view : NULL;
 	xdg_toplevel_t *xdg = view_to_xdg(view);
 	xwayland_toplevel_t *xwayland = view_to_xwayland(view);
-	if (xdg != NULL && xdg->xdg_toplevel != NULL)
+	if (xdg != NULL && xdg->xdg_toplevel != NULL) {
 		wlr_xdg_toplevel_set_fullscreen(xdg->xdg_toplevel, value);
-	else if (xwayland != NULL)
+		// wlr_xdg_toplevel_set_fullscreen only flips the state bit, the configure
+		// it schedules keeps whatever size was scheduled last. Seed the fullscreen
+		// size here so the configure can never pair the fullscreen state with the
+		// stale, pre-fullscreen size.
+		if (value && n->output != NULL) {
+			struct wlr_box r = n->output->rectangle;
+			wlr_xdg_toplevel_set_size(xdg->xdg_toplevel, r.width, r.height);
+			view->last_requested = r;
+		}
+	} else if (xwayland != NULL)
 		wlr_xwayland_surface_set_fullscreen(xwayland->xwayland_surface, value);
 }
 

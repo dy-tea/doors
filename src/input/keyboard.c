@@ -419,6 +419,7 @@ void toggle_fullscreen(void) {
 		return;
 
 	mon->desk->fullscreen_recreate_pending_window_id = 0;
+	mon->desk->fullscreen_recreate_pending_pid = 0;
 	node_t *n = mon->desk->focus;
 	if (n->client == NULL)
 		return;

@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <sys/types.h>
 #include <wayland-server-core.h>
 #include <wlr/util/box.h>
 
@@ -251,6 +252,7 @@ typedef struct desktop_t {
 	int window_gap;
 	struct output_t *output;
 	uint32_t fullscreen_recreate_pending_window_id;
+	pid_t fullscreen_recreate_pending_pid;
 	struct {
 		float ratio;
 		int orientation; // master_area_orientation_t

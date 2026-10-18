@@ -625,13 +625,17 @@ static void handle_map(struct wl_listener *listener, void *data) {
 		activate_node(target_monitor, target_desktop, node);
 
 	if (xsurface->fullscreen &&
-			target_desktop->fullscreen_recreate_pending_window_id == xsurface->window_id) {
+			target_desktop->fullscreen_recreate_pending_window_id == xsurface->window_id &&
+			target_desktop->fullscreen_recreate_pending_pid == xsurface->pid) {
 		target_desktop->fullscreen_recreate_pending_window_id = 0;
+		target_desktop->fullscreen_recreate_pending_pid = 0;
 	} else if (rule && rule->has & RULE_TYPE_STATE && rule->state == STATE_FULLSCREEN) {
 		target_desktop->fullscreen_recreate_pending_window_id = 0;
+		target_desktop->fullscreen_recreate_pending_pid = 0;
 		client_set_fullscreen(target_monitor, target_desktop, node, true);
 	} else if (xsurface->fullscreen && settings.ignore_ewmh_fullscreen != 1) {
 		target_desktop->fullscreen_recreate_pending_window_id = 0;
+		target_desktop->fullscreen_recreate_pending_pid = 0;
 		client_set_fullscreen(target_monitor, target_desktop, node, true);
 		xwayland_toplevel->fullscreen_at_map = true;
 	} else if (xsurface->maximized_vert || xsurface->maximized_horz) {
@@ -700,6 +704,7 @@ static void handle_unmap(struct wl_listener *listener, void *data) {
 			if (xwayland_toplevel->view.client &&
 					xwayland_toplevel->view.client->state == STATE_FULLSCREEN) {
 				desk->fullscreen_recreate_pending_window_id = xwayland_toplevel->xwayland_surface->window_id;
+				desk->fullscreen_recreate_pending_pid = xwayland_toplevel->xwayland_surface->pid;
 			}
 			ipc_put_status(SUB_MASK_NODE_REMOVE, "node_remove[%s,%s,%u]\n",
 				xwayland_toplevel->view.client &&
@@ -786,6 +791,7 @@ static void handle_request_fullscreen(struct wl_listener *listener, void *data) 
 		return;
 
 	d->fullscreen_recreate_pending_window_id = 0;
+	d->fullscreen_recreate_pending_pid = 0;
 
 	client_set_fullscreen(m, d, node, requested_fullscreen);
 }
