@@ -1,9 +1,17 @@
 #pragma once
 
-#include "types.h"
+#include <stdbool.h>
+
+struct wlr_scene_buffer;
 
 struct output_t;
 struct view_t;
+
+struct dim_scrim_t {
+	struct wlr_scene_buffer *node;
+	float color[4];
+	bool has_color;
+};
 
 // recompute scrims of output
 void dim_update_output(struct output_t *output);

@@ -12,6 +12,8 @@
 typedef struct effects_output_t effects_output_t;
 typedef struct desktop_t desktop_t;
 
+struct dim_scrim_t;
+
 enum scale_filter_mode {
 	SCALE_FILTER_AUTO,
 	SCALE_FILTER_LINEAR,
@@ -61,7 +63,7 @@ typedef struct output_t {
 	struct wl_list link;
 
 	// scrim drawn below the focused window
-	struct wlr_scene_rect *dim_node;
+	struct dim_scrim_t *dim_node;
 } output_t;
 
 void output_create(struct wlr_output *wlr_output);

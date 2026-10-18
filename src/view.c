@@ -1,6 +1,7 @@
 #include "animation.h"
 #include "borders.h"
 #include "client.h"
+#include "dim.h"
 #include "effects/effects.h"
 #include "input/input_method.h"
 #include "input/seat.h"
@@ -947,6 +948,8 @@ void view_destroy(view_t *view) {
 		wlr_scene_node_destroy(&view->output_handler->node);
 		view->output_handler = NULL;
 	}
+
+	dim_destroy_view(view);
 
 	if (view->scene_tree) {
 		wlr_scene_node_destroy(&view->scene_tree->node);

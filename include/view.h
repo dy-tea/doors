@@ -10,6 +10,8 @@
 #include <wlr/types/wlr_tearing_control_v1.h>
 #include <wlr/util/box.h>
 
+struct dim_scrim_t;
+
 struct view_t {
 	view_type_t type;
 	const struct view_impl_t *impl;
@@ -26,7 +28,7 @@ struct view_t {
 	surface_shadow_t *shadow;
 
 	// scrim behind this window's own content, see dim.h
-	struct wlr_scene_rect *dim_node;
+	struct dim_scrim_t *dim_node;
 
 	struct wlr_ext_foreign_toplevel_handle_v1 *ext_foreign_toplevel;
 	struct wlr_foreign_toplevel_handle_v1 *foreign_toplevel;
