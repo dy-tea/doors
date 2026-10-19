@@ -1253,7 +1253,10 @@ static bool scroller_move_tile_vertically(scroller_state_t *s, int dir) {
 		return false;
 
 	scroller_tile_t tile = col->tiles[from];
-	memmove(&col->tiles[from], &col->tiles[from + 1], (size_t)(to - from) * sizeof(scroller_tile_t));
+	if (to > from)
+		memmove(&col->tiles[from], &col->tiles[from + 1], (size_t)(to - from) * sizeof(scroller_tile_t));
+	else if (to < from)
+		memmove(&col->tiles[to], &col->tiles[from], (size_t)(from - to) * sizeof(scroller_tile_t));
 	col->tiles[to] = tile;
 	col->active_tile_idx = to;
 	return true;
