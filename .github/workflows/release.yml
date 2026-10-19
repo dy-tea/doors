@@ -1,0 +1,139 @@
+name: Weekly release
+
+on:
+  schedule:
+    # Mondays 09:00 UTC
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: write
+
+concurrency:
+  group: weekly-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Tag weekly snapshot
+        id: prep
+        run: |
+          set -euo pipefail
+          TAG="weekly-$(date -u +%F)"
+          if git ls-remote --exit-code origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists; skipping release."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "prev=$(git tag --list 'weekly-*' --sort=-v:refname | head -n 1 || true)" >> "$GITHUB_OUTPUT"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$TAG"
+          git push origin "refs/tags/$TAG"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        if: steps.prep.outputs.skip == 'false'
+        env:
+          TAG: ${{ steps.prep.outputs.tag }}
+          PREV: ${{ steps.prep.outputs.prev }}
+        run: |
+          set -euo pipefail
+          {
+            if [ -n "$PREV" ]; then
+              echo "### Changes since $PREV"
+              echo
+              git log --format='- %h %s' "$PREV..$TAG"
+            else
+              echo "### $TAG (first weekly snapshot)"
+              echo
+              git log --format='- %h %s' -n 50 HEAD
+            fi
+          } > release-notes.md
+
+      - name: Create source tarball
+        if: steps.prep.outputs.skip == 'false'
+        env:
+          TAG: ${{ steps.prep.outputs.tag }}
+        run: git archive --format=tar.gz --prefix="doors-$TAG/" -o "doors-$TAG.tar.gz" "$TAG"
+
+      - name: Build release binaries (musl, alpine)
+        if: steps.prep.outputs.skip == 'false'
+        env:
+          TAG: ${{ steps.prep.outputs.tag }}
+        run: |
+          docker run --interactive --rm --volume "$PWD:/work" --workdir /work -e TAG \
+            alpine:edge sh -s <<'SCRIPT'
+          set -eu
+          apk add --no-cache git gcc musl-dev cairo-dev eudev-dev gdk-pixbuf-dev \
+            libdisplay-info-dev libevdev-dev libinput-dev libseat-dev libxcb-dev \
+            libxkbcommon-dev mesa-dev meson pango-dev pcre2-dev pixman-dev \
+            wayland-dev wayland-protocols xcb-util-image-dev xcb-util-wm-dev \
+            xwayland-dev hwdata-dev shaderc-dev vulkan-headers vulkan-loader-dev \
+            xcb-util-cursor xcb-util-renderutil-dev glslang
+
+          git clone --depth 1 https://gitlab.freedesktop.org/wlroots/wlroots.git /tmp/wlroots
+          meson setup /tmp/wlroots /tmp/wlroots/build -Dbuildtype=release -Dexamples=false -Dtests=false \
+            -Dxwayland=enabled -Drenderers=gles2,vulkan -Dbackends=drm,libinput,x11
+          ninja -C /tmp/wlroots/build
+          meson install -C /tmp/wlroots/build
+          rm -rf /tmp/wlroots
+
+          meson setup build --buildtype=release
+          ninja -C build
+
+          DIR="doors-${TAG}-musl-x86_64"
+          mkdir -p "$DIR"
+          cp build/doors build/doorsctl "$DIR/"
+          strip "$DIR"/doors "$DIR"/doorsctl || true
+          tar czf "doors-${TAG}-musl-x86_64.tar.gz" "$DIR"
+          SCRIPT
+
+      - name: Create GitHub release
+        if: steps.prep.outputs.skip == 'false'
+        env:
+          TAG: ${{ steps.prep.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" "doors-$TAG.tar.gz" "doors-$TAG-musl-x86_64.tar.gz" \
+            --title "$TAG" --notes-file release-notes.md
+
+      - name: Create Forgejo release
+        if: steps.prep.outputs.skip == 'false'
+        env:
+          TAG: ${{ steps.prep.outputs.tag }}
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+          FORGEJO_URL: https://dawn.wine/api/v1/repos/CreeperFace/doors
+        run: |
+          set -euo pipefail
+          if [ -z "$FORGEJO_TOKEN" ]; then
+            echo "::warning::FORGEJO_TOKEN secret not set; skipping Forgejo release."
+            exit 0
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg tag "$TAG" \
+            --arg sha "$(git rev-parse "$TAG")" \
+            --rawfile body release-notes.md \
+            '{tag_name: $tag, target_commitish: $sha, name: $tag, body: $body}')
+
+          RELEASE=$(curl -fsS -X POST -H "Authorization: token $FORGEJO_TOKEN" \
+            -H "Content-Type: application/json" -d "$PAYLOAD" "$FORGEJO_URL/releases") \
+            || RELEASE=$(curl -fsS "$FORGEJO_URL/releases/tags/$TAG")
+
+          ID=$(printf '%s' "$RELEASE" | jq -r '.id')
+          for f in "doors-$TAG.tar.gz" "doors-$TAG-musl-x86_64.tar.gz"; do
+            curl -fsS -X POST -H "Authorization: token $FORGEJO_TOKEN" \
+              -F "attachment=@$f" "$FORGEJO_URL/releases/$ID/assets?name=$f" >/dev/null
+          done
