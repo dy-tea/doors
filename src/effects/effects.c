@@ -1,4 +1,5 @@
 #include "animation.h"
+#include "dim.h"
 #include "effects/backend.h"
 #include "effects/effects.h"
 #include "once.h"
@@ -1883,6 +1884,13 @@ static be_effect_resource_t capture_corner_mask_bg(output_t *output, effects_out
 		hidden = true;
 	}
 
+	bool scrim_hidden = false;
+	struct dim_scrim_t *scrim = output->dim_node;
+	if (scrim != NULL && scrim->node->node.enabled && !dim_scrim_below_view(tl, output)) {
+		wlr_scene_node_set_enabled(&scrim->node->node, false);
+		scrim_hidden = true;
+	}
+
 	wlr_damage_ring_add_whole(&ctx->capture_scene_output->damage_ring);
 	struct wlr_output_state cap_state;
 	wlr_output_state_init(&cap_state);
@@ -1894,6 +1902,8 @@ static be_effect_resource_t capture_corner_mask_bg(output_t *output, effects_out
 	};
 	bool ok = wlr_scene_output_build_state(ctx->capture_scene_output, &cap_state, &opts);
 
+	if (scrim_hidden)
+		wlr_scene_node_set_enabled(&scrim->node->node, true);
 	if (hidden)
 		wlr_scene_node_set_enabled(&tl->scene_tree->node, true);
 	if (!server.top_tree->node.enabled)
