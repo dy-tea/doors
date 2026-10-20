@@ -1,24 +1,22 @@
 #include "ipc/helpers.h"
+#include "ipc/helpers.h"
+#include "protocol/workspace.h"
 #include "protocol/workspace.h"
 #include "server.h"
+#include "server.h"
+#include <stdbool.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <stdlib.h>
 #include <string.h>
+#include <string.h>
 
-bool streq(const char *a, const char *b) {
-	return strcmp(a, b) == 0;
-}
-
-// parse a hex-digit character
+// parse a hex-digit character, invalid ends up as 0
 static int ipc_parse_hex_digit(char c) {
-	if (c >= '0' && c <= '9')
-		return c - '0';
-	if (c >= 'a' && c <= 'f')
-		return 10 + (c - 'a');
-	if (c >= 'A' && c <= 'F')
-		return 10 + (c - 'A');
-	return 0;
+	int d = str_hex_digit(c);
+	return d < 0 ? 0 : d;
 }
 
 // parse a single RRGGBBAA or RRGGBB color into a float[4]
@@ -63,13 +61,14 @@ bool ipc_parse_gradient(const char *str, float out[BORDER_GRADIENT_MAX_STOPS * 4
 
 	char *tok = strtok(buf, " \t");
 	while (tok) {
-		size_t tlen = strlen(tok);
-		if (tlen > 3 && strcmp(tok + tlen - 3, "deg") == 0) {
+		if (str_ends(tok, "deg")) {
 			char tmp[16];
-			strncpy(tmp, tok, sizeof(tmp) - 1);
-			tmp[tlen - 3] = '\0';
-			*angle_out = (float)atof(tmp) * 3.14159265f / 180.0f;
-		} else if (tlen >= 6) {
+			size_t tlen = str_copy(tmp, sizeof(tmp), tok);
+			if (tlen >= 3) {
+				tmp[tlen - 3] = '\0';
+				*angle_out = (float)atof(tmp) * 3.14159265f / 180.0f;
+			}
+		} else if (strlen(tok) >= 6) {
 			if (*count >= BORDER_GRADIENT_MAX_STOPS)
 				break;
 			float rgba[4];

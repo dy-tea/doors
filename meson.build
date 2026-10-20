@@ -191,6 +191,7 @@ executable(
 		'src' / 'server.c',
 		'src' / 'settings.c',
 		'src' / 'spring.c',
+		'src' / 'str.c',
 		'src' / 'surface.c',
 		'src' / 'tabs.c',
 		'src' / 'text.c',

@@ -2,6 +2,7 @@
 #include "layout/scroller.h"
 #include "once.h"
 #include "rule.h"
+#include "str.h"
 #include "settings.h"
 #include "surface.h"
 #include "tree.h"
@@ -390,7 +391,7 @@ bool rule_pattern_match(const rule_pattern_t *p, const char *value) {
 		return false;
 
 	if (p->mode == RULE_MATCH_EXACT)
-		return p->caseless ? strcasecmp(p->pattern, value) == 0 : strcmp(p->pattern, value) == 0;
+		return p->caseless ? streqi(p->pattern, value) : streq(p->pattern, value);
 
 	pcre2_code *re = p->code;
 	if (!re)

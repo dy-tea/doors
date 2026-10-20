@@ -47,7 +47,7 @@ static bool cfg_parse_size_arg(ipc_args_t *a, const char *what, scroller_size_t 
 		return false;
 
 	size_t len = strlen(value);
-	if (len > 2 && strcmp(value + len - 2, "px") == 0) {
+	if (len > 2 && streq(value + len - 2, "px")) {
 		char *end;
 		double val = strtod(value, &end);
 		if (end != value + len - 2 || val <= 0.0 || val > 65535.0)
@@ -162,9 +162,9 @@ static void scr_cycle_preset(ipc_args_t *a, bool heights) {
 	int step = 1;
 	const char *dir = ipc_peek(a);
 	if (dir != NULL) {
-		if (strcmp(dir, "backward") == 0 || strcmp(dir, "backwards") == 0)
+		if (streq(dir, "backward") || streq(dir, "backwards"))
 			step = -1;
-		else if (strcmp(dir, "forward") != 0 && strcmp(dir, "forwards") != 0) {
+		else if (!streq(dir, "forward") && !streq(dir, "forwards")) {
 			ipc_fail(a, "Expected forward or backward\n");
 			return;
 		}
@@ -342,7 +342,7 @@ static void scr_action(ipc_args_t *a, int kind, bool swap) {
 
 	const scr_action_t *match = NULL;
 	for (size_t i = 0; i < IPC_ARRAY_LEN(scr_actions); i++) {
-		if (strcmp(scr_actions[i].name, what) != 0)
+		if (!streq(scr_actions[i].name, what))
 			continue;
 		if (kind >= 0 && (int)scr_actions[i].kind != kind)
 			continue;
@@ -372,15 +372,13 @@ static void scr_action(ipc_args_t *a, int kind, bool swap) {
 			return;
 		}
 
-		if (strcmp(what, "left") == 0 || strcmp(what, "west") == 0 || strcmp(what, "focus_left") == 0)
+		if (streq(what, "left") || streq(what, "west") || streq(what, "focus_left"))
 			ok = scroller_swap_dir(DIR_WEST, desk);
-		else if (strcmp(what, "right") == 0 || strcmp(what, "east") == 0 || strcmp(what,
-			"focus_right") == 0)
+		else if (streq(what, "right") || streq(what, "east") || streq(what, "focus_right"))
 			ok = scroller_swap_dir(DIR_EAST, desk);
-		else if (strcmp(what, "up") == 0 || strcmp(what, "north") == 0 || strcmp(what, "focus_up") == 0)
+		else if (streq(what, "up") || streq(what, "north") || streq(what, "focus_up"))
 			ok = scroller_swap_dir(DIR_NORTH, desk);
-		else if (strcmp(what, "down") == 0 || strcmp(what, "south") == 0 || strcmp(what,
-			"focus_down") == 0)
+		else if (streq(what, "down") || streq(what, "south") || streq(what, "focus_down"))
 			ok = scroller_swap_dir(DIR_SOUTH, desk);
 		else
 			ok = false;
@@ -439,7 +437,7 @@ void ipc_cmd_scroller(ipc_args_t *a) {
 		ipc_fail_unknown(a, scroller_subs);
 }
 
-static const cfg_enum_value_t orientation_values[] = {
+static const str_pair_t orientation_values[] = {
 	{"left", MASTER_LEFT},
 	{"right", MASTER_RIGHT},
 	{"top", MASTER_TOP},

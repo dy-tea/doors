@@ -7,6 +7,7 @@
 #include "output/output.h"
 #include "protocol/workspace.h"
 #include "server.h"
+#include "str.h"
 #include "tree.h"
 #include "types.h"
 #include <stdint.h>
@@ -19,7 +20,7 @@ static void update_all_toplevels_visibility(output_t *m, desktop_t *current_desk
 static struct wlr_ext_workspace_handle_v1 *find_workspace_by_name(const char *name) {
 	struct wlr_ext_workspace_handle_v1 *workspace;
 	wl_list_for_each(workspace, &server.workspace_manager->workspaces, link)
-		if (strcmp(workspace->name, name) == 0)
+		if (streq(workspace->name, name))
 			return workspace;
 
 	return NULL;
@@ -120,7 +121,7 @@ struct desktop_t *find_desktop_by_name(const char *name) {
 	wl_list_for_each(m, &mon_list, link) {
 		desktop_t *d;
 		wl_list_for_each(d, &m->desk_list, link) {
-			if (strcmp(d->name, name) == 0)
+			if (streq(d->name, name))
 				return d;
 		}
 	}
@@ -514,7 +515,7 @@ void workspace_switch_to_desktop(const char *name) {
 	desktop_t *d = NULL;
 	desktop_t *local;
 	wl_list_for_each(local, &output->desk_list, link) {
-		if (strcmp(local->name, name) == 0) {
+		if (streq(local->name, name)) {
 			d = local;
 			break;
 		}
@@ -697,7 +698,7 @@ void workspace_fini(void) {
 desktop_t *find_desktop_by_name_in_monitor(output_t *mon, const char *name) {
 	desktop_t *d;
 	wl_list_for_each(d, &mon->desk_list, link) {
-		if (strcmp(d->name, name) == 0)
+		if (streq(d->name, name))
 			return d;
 	}
 	return NULL;

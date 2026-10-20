@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ipc/ipc.h"
+#include "str.h"
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -40,18 +41,12 @@ bool ipc_str(ipc_args_t *a, const char *what, char *dst, size_t dstsz);
 bool ipc_delta_str(ipc_args_t *a, const char *what, const char *arg, double *out);
 
 bool ipc_toggle(ipc_args_t *a, bool *cur);
+bool ipc_enum(ipc_args_t *a, const char *what, const str_pair_t *tbl, long *out);
+bool ipc_enum_opt(ipc_args_t *a, const char *what, const str_pair_t *tbl, long *out);
 
-typedef struct {
-	const char *name;
-	long value;
-} cfg_enum_value_t;
+const char *ipc_enum_name(const str_pair_t *tbl, long value);
 
-bool ipc_enum(ipc_args_t *a, const char *what, const cfg_enum_value_t *tbl, long *out);
-bool ipc_enum_opt(ipc_args_t *a, const char *what, const cfg_enum_value_t *tbl, long *out);
-
-const char *ipc_enum_name(const cfg_enum_value_t *tbl, long value);
-
-bool ipc_enum_names(ipc_args_t *a, const char *what, const char *arg, const cfg_enum_value_t *tbl,
+bool ipc_enum_names(ipc_args_t *a, const char *what, const char *arg, const str_pair_t *tbl,
 	long *out);
 bool ipc_int_str(ipc_args_t *a, const char *arg, const char *what, long min, long max, int *out);
 bool ipc_bool_str(ipc_args_t *a, const char *arg, const char *what, bool *out);
@@ -72,6 +67,8 @@ typedef struct {
 
 void ipc_buf_init(ipc_buf_t *b, char *buf, size_t cap);
 void ipc_buff(ipc_buf_t * b, const char *fmt, ...);
+// appends the separator first when the buffer is not empty, then formats in
+void ipc_buff_sep(ipc_buf_t * b, const char *sep, const char *fmt, ...);
 void ipc_buf_send(ipc_args_t *a, const ipc_buf_t *b);
 
 // declares a reply buffer and its writer, ready to be sent with ipc_buf_send
@@ -82,7 +79,7 @@ void ipc_buf_send(ipc_args_t *a, const ipc_buf_t *b);
 // appends `"a", "b", "c"` for a fixed-length array whose first member is `name`
 #define IPC_FORMAT_NAMES(b, arr, n) \
 	for (size_t _i = 0; _i < (size_t)(n); _i++) \
-		ipc_buff((b), "%s\"%s\"", _i > 0 ? ", " : "", (arr)[_i].name)
+		ipc_buff_sep((b), ", ", "\"%s\"", (arr)[_i].name)
 
 typedef struct ipc_sub_t ipc_sub_t;
 

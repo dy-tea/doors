@@ -8,6 +8,7 @@
 #include "server.h"
 #include "settings.h"
 #include "spring.h"
+#include "str.h"
 #include "tabs.h"
 #include "transaction.h"
 #include "tree.h"
@@ -62,7 +63,7 @@ static void cfg_tab_color(ipc_args_t *a, const char *suffix) {
 static bool cfg_parse_scroller_size(const char *tok, scroller_size_t *out) {
 	size_t len = strlen(tok);
 
-	if (len > 2 && strcmp(tok + len - 2, "px") == 0) {
+	if (len > 2 && streq(tok + len - 2, "px")) {
 		char *end;
 		double val = strtod(tok, &end);
 		if (end != tok + len - 2 || !isfinite(val) || val <= 0.0 || val > 65535.0)
@@ -429,7 +430,7 @@ static void cfg_animation(ipc_args_t *a) {
 		else
 			ipc_buff(&b, "bezier: %s\n", bezier ? bezier : "(global default)");
 		ipc_buff(&b, "duration: %u\n", dur > 0 ? dur : animation_get_duration());
-		ipc_buff(&b, "enabled: %s\n", enabled ? "true" : "false");
+		ipc_buff(&b, "enabled: %s\n", str_bool_text(enabled));
 		ipc_ok(a, buf);
 		return;
 	}
@@ -520,8 +521,9 @@ static const cfg_named_handler_t special_settings[] = {
 
 // settings that need their own syntax rather than the plain table entry
 bool cfg_special_dispatch(ipc_args_t *a, const char *name) {
-	if (strncmp(name, "tab_color_", 10) == 0) {
-		cfg_tab_color(a, name + 10);
+	const char *tab_color = str_skip_prefix(name, "tab_color_");
+	if (tab_color) {
+		cfg_tab_color(a, tab_color);
 		return true;
 	}
 

@@ -1,6 +1,5 @@
 #include "config.h"
 #include "ipc/args.h"
-#include "ipc/helpers.h"
 #include "ipc/registry.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,15 +14,13 @@ static void hotkey_list(ipc_args_t *a) {
 
 		char mods[64] = {0};
 		if (kb->modifiers & WLR_MODIFIER_LOGO)
-			strcat(mods, "super+");
+			str_append_sep(mods, sizeof(mods), "+", "super");
 		if (kb->modifiers & WLR_MODIFIER_ALT)
-			strcat(mods, "alt+");
+			str_append_sep(mods, sizeof(mods), "+", "alt");
 		if (kb->modifiers & WLR_MODIFIER_CTRL)
-			strcat(mods, "ctrl+");
+			str_append_sep(mods, sizeof(mods), "+", "ctrl");
 		if (kb->modifiers & WLR_MODIFIER_SHIFT)
-			strcat(mods, "shift+");
-		if (mods[0])
-			mods[strlen(mods) - 1] = '\0';
+			str_append_sep(mods, sizeof(mods), "+", "shift");
 
 		char key_name[64] = {0};
 		if (kb->use_keycode)
@@ -45,9 +42,11 @@ static void hotkey_list(ipc_args_t *a) {
 
 		char flags_buf[64];
 		bind_flags_text(kb->flags, flags_buf, sizeof(flags_buf));
-		if (flags_buf[0])
-			snprintf(action_buf + strlen(action_buf), sizeof(action_buf) - strlen(action_buf), " [flags: %s]",
-				flags_buf);
+		if (flags_buf[0]) {
+			char flag_part[80];
+			snprintf(flag_part, sizeof(flag_part), " [flags: %s]", flags_buf);
+			str_append(action_buf, sizeof(action_buf), flag_part);
+		}
 
 		ipc_buff(&b, "%zu\t%s\t%s\t%s\n", i, mods[0] ? mods : "(none)", key_name, action_buf);
 	}
@@ -83,11 +82,10 @@ static void hotkey_add(ipc_args_t *a) {
 
 	// the rest of the line is the external command to run
 	char cmd[MAXLEN] = {0};
-	int offset = snprintf(cmd, sizeof(cmd), "%s", command);
+	str_copy(cmd, sizeof(cmd), command);
 	ipc_foreach(a, rest) {
-		if ((size_t)offset + 1 >= sizeof(cmd))
+		if (!str_append_sep(cmd, sizeof(cmd), " ", rest))
 			break;
-		offset += snprintf(cmd + offset, sizeof(cmd) - offset, " %s", rest);
 	}
 
 	int desktop_index = 0;

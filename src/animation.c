@@ -4,6 +4,7 @@
 #include "output/output.h"
 #include "protocol/layer.h"
 #include "spring.h"
+#include "str.h"
 #include "surface.h"
 #include "tree.h"
 #include "types.h"
@@ -102,7 +103,7 @@ static void apply_config_to_entry(animation_entry_t *entry, int type_index) {
 
 int animation_type_from_name(const char *name) {
 	for (int i = 0; i < ANIM_TYPE_COUNT; i++)
-		if (strcmp(name, anim_type_names[i]) == 0)
+		if (streq(name, anim_type_names[i]))
 			return i;
 
 	return -1;
@@ -182,7 +183,7 @@ static double elapsed_ms(struct timespec start, struct timespec now) {
 void animation_set_bezier(const char *name) {
 	if (name && name[0] != '\0') {
 		if (bezier_exists(name)) {
-			snprintf(default_bezier_name, sizeof(default_bezier_name), "%s", name);
+			str_copy(default_bezier_name, sizeof(default_bezier_name), name);
 			wlr_log(WLR_DEBUG, "Default bezier set to '%s'", name);
 		} else {
 			wlr_log(WLR_ERROR, "No such bezier curve '%s'", name);

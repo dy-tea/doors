@@ -1,5 +1,4 @@
 #include "ipc/args.h"
-#include "ipc/helpers.h"
 #include "ipc/registry.h"
 #include "rule.h"
 #include <limits.h>
@@ -7,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static const cfg_enum_value_t rule_flag_names[] = {
+static const str_pair_t rule_flag_names[] = {
 	{"follow", RULE_TYPE_FOLLOW},
 	{"focus", RULE_TYPE_FOCUS},
 	{"manage", RULE_TYPE_MANAGE},
@@ -28,7 +27,7 @@ static const cfg_enum_value_t rule_flag_names[] = {
 	IPC_ENUM_END,
 };
 
-static const cfg_enum_value_t rule_state_names[] = {
+static const str_pair_t rule_state_names[] = {
 	{"tiled", STATE_TILED},
 	{"floating", STATE_FLOATING},
 	{"fullscreen", STATE_FULLSCREEN},
@@ -36,7 +35,7 @@ static const cfg_enum_value_t rule_state_names[] = {
 	IPC_ENUM_END,
 };
 
-static const cfg_enum_value_t rule_onoff_names[] = {
+static const str_pair_t rule_onoff_names[] = {
 	{"on", 1},
 	{"off", 0},
 	IPC_ENUM_END,
@@ -50,7 +49,7 @@ static size_t key_prefix_len(const char *arg, const char *name) {
 static bool rule_apply_flag(ipc_args_t *a, rule_t *r, const char *arg, bool *ok) {
 	*ok = true;
 
-	for (const cfg_enum_value_t *e = rule_flag_names; e->name; e++) {
+	for (const str_pair_t *e = rule_flag_names; e->name; e++) {
 		size_t len = key_prefix_len(arg, e->name);
 		if (!len)
 			continue;

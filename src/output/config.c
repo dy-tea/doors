@@ -4,6 +4,7 @@
 #include "output/output.h"
 #include "server.h"
 #include "settings.h"
+#include "str.h"
 #include <drm_fourcc.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -60,7 +61,7 @@ void output_config_destroy(struct output_config *oc) {
 struct output_config *output_config_find(const char *name) {
 	struct output_config *oc;
 	wl_list_for_each(oc, &output_configs, link)
-		if (strcmp(oc->name, name) == 0)
+		if (streq(oc->name, name))
 			return oc;
 	return NULL;
 }
@@ -107,7 +108,7 @@ void output_config_apply(struct output_config *oc) {
 
 	output_t *o;
 	wl_list_for_each(o, &mon_list, link) {
-		if (strcmp(o->wlr_output->name, oc->name) == 0) {
+		if (streq(o->wlr_output->name, oc->name)) {
 			output = o;
 			wlr_output = o->wlr_output;
 			break;

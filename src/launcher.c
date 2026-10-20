@@ -2,6 +2,7 @@
 #include "once.h"
 #include "output/output.h"
 #include "server.h"
+#include "str.h"
 #include "tree.h"
 #include <pthread.h>
 #include <signal.h>
@@ -272,13 +273,11 @@ void launcher_exec(const char *cmd) {
 		return;
 
 	bool no_startup_id = false;
+	const char *after = str_skip_prefix(cmd, "--no-startup-id");
 	const char *cmd_str = cmd;
-
-	if (strncmp(cmd_str, "--no-startup-id", 15) == 0 && (cmd_str[15] == ' ' || cmd_str[15] == '\t')) {
+	if (after && (after[0] == ' ' || after[0] == '\t')) {
 		no_startup_id = true;
-		cmd_str += 15;
-		while (*cmd_str == ' ' || *cmd_str == '\t')
-			cmd_str++;
+		cmd_str = str_ltrim(after);
 	}
 
 	if (cmd_str[0] == '\0')

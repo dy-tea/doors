@@ -11,6 +11,7 @@
 #include "protocol/xdg_toplevel.h"
 #include "realtime.h"
 #include "server.h"
+#include "str.h"
 #include "tabs.h"
 #include "text.h"
 #include "transaction.h"
@@ -106,7 +107,7 @@ static void on_dim(void) {
 		output_schedule_frame(m);
 }
 
-static const cfg_enum_value_t focus_on_activate_values[] = {
+static const str_pair_t focus_on_activate_values[] = {
 	{"focus", FOCUS_ON_ACTIVATE_FOCUS},
 	{"none", FOCUS_ON_ACTIVATE_NONE},
 	{"smart", FOCUS_ON_ACTIVATE_SMART},
@@ -114,7 +115,7 @@ static const cfg_enum_value_t focus_on_activate_values[] = {
 	IPC_ENUM_END,
 };
 
-static const cfg_enum_value_t decoration_mode_values[] = {
+static const str_pair_t decoration_mode_values[] = {
 	{"none", DECORATION_NONE},
 	{"tabs", DECORATION_TABS},
 	{"always", DECORATION_ALWAYS},
@@ -122,7 +123,7 @@ static const cfg_enum_value_t decoration_mode_values[] = {
 	IPC_ENUM_END,
 };
 
-static const cfg_enum_value_t focus_follows_pointer_values[] = {
+static const str_pair_t focus_follows_pointer_values[] = {
 	{"no", FOLLOWS_NO},
 	{"false", FOLLOWS_NO},
 	{"yes", FOLLOWS_YES},
@@ -131,13 +132,13 @@ static const cfg_enum_value_t focus_follows_pointer_values[] = {
 	IPC_ENUM_END,
 };
 
-static const cfg_enum_value_t workspace_anim_direction_values[] = {
+static const str_pair_t workspace_anim_direction_values[] = {
 	{"vertical", WORKSPACE_ANIM_VERTICAL},
 	{"horizontal", WORKSPACE_ANIM_HORIZONTAL},
 	IPC_ENUM_END,
 };
 
-static const cfg_enum_value_t automatic_scheme_values[] = {
+static const str_pair_t automatic_scheme_values[] = {
 	{"longest_side", SCHEME_LONGEST_SIDE},
 	{"longest-side", SCHEME_LONGEST_SIDE},
 	{"alternate", SCHEME_ALTERNATE},
@@ -145,7 +146,7 @@ static const cfg_enum_value_t automatic_scheme_values[] = {
 	IPC_ENUM_END,
 };
 
-static const cfg_enum_value_t initial_polarity_values[] = {
+static const str_pair_t initial_polarity_values[] = {
 	{"first_child", FIRST_CHILD},
 	{"first-child", FIRST_CHILD},
 	{"second_child", SECOND_CHILD},
@@ -153,7 +154,7 @@ static const cfg_enum_value_t initial_polarity_values[] = {
 	IPC_ENUM_END,
 };
 
-static const cfg_enum_value_t scroller_center_mode_values[] = {
+static const str_pair_t scroller_center_mode_values[] = {
 	{"never", SCROLLER_CENTER_NEVER},
 	{"always", SCROLLER_CENTER_ALWAYS},
 	{"on-overflow", SCROLLER_CENTER_ON_OVERFLOW},
@@ -349,18 +350,17 @@ static void cfg_store_enum(const cfg_setting_t *s, long value) {
 }
 
 static bool cfg_set_enum(const cfg_setting_t *s, const char *arg, char *err, size_t errsz) {
-	for (const cfg_enum_value_t *e = s->values; e->name; e++) {
-		if (strcmp(arg, e->name) == 0) {
-			cfg_store_enum(s, e->value);
-			return true;
-		}
+	const str_pair_t *e = str_table_find(s->values, arg);
+	if (e) {
+		cfg_store_enum(s, e->value);
+		return true;
 	}
 
 	ipc_buf_t b;
 	char list[256];
 	ipc_buf_init(&b, list, sizeof(list));
-	for (const cfg_enum_value_t *e = s->values; e->name; e++)
-		ipc_buff(&b, "%s\"%s\"", b.len > 0 ? ", " : "", e->name);
+	for (e = s->values; e->name; e++)
+		ipc_buff_sep(&b, ", ", "\"%s\"", e->name);
 
 	cfg_errf(err, errsz, "%s: expected value to be one of: %s\n", s->name, list);
 	return false;
@@ -472,7 +472,7 @@ static bool cfg_set_rgba(const cfg_setting_t *s, const char *arg, char *err, siz
 void cfg_format_value(const cfg_setting_t *s, char *buf, size_t bufsz) {
 	switch (s->type) {
 	case CFG_BOOL:
-		snprintf(buf, bufsz, "%s", *(bool *)s->ptr ? "true" : "false");
+		snprintf(buf, bufsz, "%s", str_bool_text(*(bool *)s->ptr));
 		break;
 	case CFG_INT:
 		snprintf(buf, bufsz, s->fmt, *(int *)s->ptr);

@@ -37,7 +37,7 @@ typedef struct cfg_setting {
 	size_t size; // capacity for CFG_STR
 	double min, max;
 	const char *fmt; // get format for the numeric types
-	const cfg_enum_value_t *values; // CFG_ENUM
+	const str_pair_t *values; // CFG_ENUM
 	unsigned flags;
 	void (*on_set)(void); // side effects of a successful write
 } cfg_setting_t;

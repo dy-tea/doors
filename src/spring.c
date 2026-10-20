@@ -1,9 +1,9 @@
 #include "once.h"
 #include "spring.h"
+#include "str.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 static struct wl_list springs;
 
@@ -48,7 +48,7 @@ spring_curve_t *spring_find(const char *name) {
 
 	spring_curve_t *c;
 	wl_list_for_each(c, &springs, link)
-		if (strcmp(c->name, name) == 0)
+		if (streq(c->name, name))
 			return c;
 
 	return NULL;

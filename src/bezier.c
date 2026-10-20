@@ -1,8 +1,8 @@
 #include "bezier.h"
 #include "once.h"
+#include "str.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 static struct wl_list bezier_curves;
 
@@ -89,7 +89,7 @@ bezier_curve_t *bezier_find(const char *name) {
 
 	bezier_curve_t *curve;
 	wl_list_for_each(curve, &bezier_curves, link)
-		if (strcmp(curve->name, name) == 0)
+		if (streq(curve->name, name))
 			return curve;
 
 	return NULL;

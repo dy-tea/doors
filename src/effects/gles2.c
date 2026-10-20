@@ -1,4 +1,5 @@
 #include "effects/backend.h"
+#include "str.h"
 
 #include <drm_fourcc.h>
 #include <EGL/egl.h>
@@ -1267,13 +1268,13 @@ static void gles2_destroy_screen_shader(void) {
 }
 
 static const char *gles2_get_screen_shader_source(const char *name) {
-	if (strcmp(name, "grayscale") == 0)
+	if (streq(name, "grayscale"))
 		return gl_grayscale_frag_src;
-	if (strcmp(name, "invert") == 0)
+	if (streq(name, "invert"))
 		return gl_invert_frag_src;
-	if (strcmp(name, "sepia") == 0)
+	if (streq(name, "sepia"))
 		return gl_sepia_frag_src;
-	if (strcmp(name, "nightlight") == 0)
+	if (streq(name, "nightlight"))
 		return gl_nightlight_frag_src;
 	return NULL;
 }

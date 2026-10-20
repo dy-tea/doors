@@ -1,5 +1,6 @@
 #include "log.h"
 #include "fs.h"
+#include "str.h"
 #include "once.h"
 #include <dirent.h>
 #include <errno.h>
@@ -48,7 +49,7 @@ static bool is_log_entry(const struct dirent *entry) {
 	if (entry->d_type == DT_DIR)
 		return false;
 	size_t len = strlen(entry->d_name);
-	return len > 4 && strcmp(entry->d_name + len - 4, ".log") == 0;
+	return len > 4 && streq(entry->d_name + len - 4, ".log");
 }
 
 static void cleanup_old_logs(void) {
@@ -243,10 +244,10 @@ int log_init(const char *log_file_path) {
 	ONCE();
 	// determine log file path and directory
 	if (log_file_path) {
-		snprintf(log_path, sizeof(log_path), "%s", log_file_path);
+		str_copy(log_path, sizeof(log_path), log_file_path);
 
 		// extract dir from path
-		snprintf(log_dir, sizeof(log_dir), "%s", log_file_path);
+		str_copy(log_dir, sizeof(log_dir), log_file_path);
 		char *last_slash = strrchr(log_dir, '/');
 		if (last_slash)
 			*last_slash = '\0';

@@ -1,3 +1,4 @@
+#include "str.h"
 #include "text.h"
 #include <cairo.h>
 #include <drm_fourcc.h>
@@ -296,7 +297,7 @@ void text_node_set_text(text_node_t *node, const char *text) {
 	text_buffer_t *buffer = wl_container_of(node, buffer, props);
 	if (!text)
 		text = "";
-	if (strcmp(buffer->text, text) == 0)
+	if (streq(buffer->text, text))
 		return;
 
 	char *new_text = strdup(text);

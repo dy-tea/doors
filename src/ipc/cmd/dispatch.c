@@ -1,5 +1,4 @@
 #include "ipc/args.h"
-#include "ipc/helpers.h"
 #include "ipc/ipc.h"
 #include "ipc/registry.h"
 #include <stdlib.h>

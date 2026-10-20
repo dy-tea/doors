@@ -7,6 +7,7 @@
 #include "output/output.h"
 #include "protocol/workspace.h"
 #include "server.h"
+#include "str.h"
 #include "tabs.h"
 #include "transaction.h"
 #include "tree.h"
@@ -49,7 +50,7 @@ static void apply_ok(ipc_args_t *a, const char *what) {
 	ipc_okf(a, "%s set\n", what);
 }
 
-static const cfg_enum_value_t onoff_values[] = {
+static const str_pair_t onoff_values[] = {
 	{"on", 1},
 	{"enable", 1},
 	{"true", 1},
@@ -59,7 +60,7 @@ static const cfg_enum_value_t onoff_values[] = {
 	IPC_ENUM_END,
 };
 
-static const cfg_enum_value_t transform_values[] = {
+static const str_pair_t transform_values[] = {
 	{"normal", WL_OUTPUT_TRANSFORM_NORMAL},
 	{"0", WL_OUTPUT_TRANSFORM_NORMAL},
 	{"90", WL_OUTPUT_TRANSFORM_90},
@@ -72,7 +73,7 @@ static const cfg_enum_value_t transform_values[] = {
 	IPC_ENUM_END,
 };
 
-static const cfg_enum_value_t bit_depth_values[] = {
+static const str_pair_t bit_depth_values[] = {
 	{"8", OUTPUT_CONFIG_RENDER_BIT_DEPTH_8},
 	{"8-bit", OUTPUT_CONFIG_RENDER_BIT_DEPTH_8},
 	{"10", OUTPUT_CONFIG_RENDER_BIT_DEPTH_10},
@@ -108,8 +109,8 @@ static void out_list(ipc_args_t *a) {
 			"    \"enabled\": %s\n"
 			"  }", wo->name ? wo->name : "", wo->description ? wo->description : "", wo->make ? wo->make : "",
 				wo->model ? wo->model : "", wo->serial ? wo->serial : "", wo->width, wo->height,
-				wo->refresh / 1000.0f, wo->scale, wo->phys_width, wo->phys_height, o->hdr ? "true" : "false",
-				o->allow_tearing ? "true" : "false", wo->enabled ? "true" : "false");
+				wo->refresh / 1000.0f, wo->scale, wo->phys_width, wo->phys_height, str_bool_text(o->hdr),
+				str_bool_text(o->allow_tearing), str_bool_text(wo->enabled));
 	}
 	ipc_buff(&b, "\n]\n");
 
@@ -315,7 +316,7 @@ static struct wlr_color_transform *load_icc(const char *path) {
 }
 
 static void out_color_profile(ipc_args_t *a) {
-	static const cfg_enum_value_t kinds[] = {
+	static const str_pair_t kinds[] = {
 		{"gamma22", 0},
 		{"srgb", 1},
 		{"icc", 2},

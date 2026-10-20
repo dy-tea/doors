@@ -4,7 +4,6 @@
 #include "ipc/helpers.h"
 #include "settings.h"
 #include "tabs.h"
-#include <ctype.h>
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -32,13 +31,6 @@ typedef struct cfg_extra {
 	const void *ref; // what format reads, NULL when unused
 } cfg_extra_t;
 
-// the value formatters end with a newline, which would break the listing columns
-static void cfg_trim(char *s) {
-	size_t len = strlen(s);
-	while (len > 0 && isspace((unsigned char)s[len - 1]))
-		s[--len] = '\0';
-}
-
 const char *cfg_type_name(cfg_type_t type) {
 	switch (type) {
 	case CFG_BOOL:
@@ -61,7 +53,7 @@ const char *cfg_type_name(cfg_type_t type) {
 
 static void cfg_intro_format_setting(const void *self, char *buf, size_t bufsz) {
 	cfg_format_value(self, buf, bufsz);
-	cfg_trim(buf);
+	str_rtrim(buf);
 }
 
 // describes what a numeric setting accepts, e.g. "[0.5, 2]", "(0, 1)", ">0"
@@ -77,8 +69,8 @@ void cfg_format_range(const cfg_setting_t *s, char *buf, size_t bufsz) {
 	if (s->type == CFG_ENUM) {
 		ipc_buf_t b;
 		ipc_buf_init(&b, buf, bufsz);
-		for (const cfg_enum_value_t *e = s->values; e->name; e++)
-			ipc_buff(&b, "%s%s", b.len > 0 ? "|" : "", e->name);
+		for (const str_pair_t *e = s->values; e->name; e++)
+			ipc_buff_sep(&b, "|", "%s", e->name);
 		return;
 	}
 
@@ -253,7 +245,7 @@ static void cfg_extra_format(const cfg_extra_t *e, char *buf, size_t bufsz) {
 
 static void cfg_intro_format_extra(const void *self, char *buf, size_t bufsz) {
 	cfg_extra_format(self, buf, bufsz);
-	cfg_trim(buf);
+	str_rtrim(buf);
 }
 
 _Static_assert(CFG_SETTINGS_COUNT + IPC_ARRAY_LEN(cfg_extras) <= CFG_INTRO_MAX,
@@ -384,7 +376,7 @@ static void cfg_list_json(ipc_args_t *a, bool changed) {
 		in.format(in.self, value, sizeof(value));
 
 		const char *dflt = cfg_intro_default(i);
-		if (changed && strcmp(value, dflt) == 0)
+		if (changed && streq(value, dflt))
 			continue;
 
 		char range[256] = {0};
@@ -455,7 +447,7 @@ static void cfg_list_text(ipc_args_t *a, bool changed, bool header) {
 		in.format(in.self, value, sizeof(value));
 
 		const char *dflt = cfg_intro_default(i);
-		if (changed && strcmp(value, dflt) == 0)
+		if (changed && streq(value, dflt))
 			continue;
 
 		char range[256] = {0};

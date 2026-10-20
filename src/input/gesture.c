@@ -1,4 +1,5 @@
 #include "input/gesture.h"
+#include "str.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,35 +43,33 @@ const char *gesture_direction_string(enum gesture_direction direction) {
 	return "none";
 }
 
+static const str_pair_t gesture_type_names[] = {
+	{"hold", GESTURE_TYPE_HOLD},
+	{"pinch", GESTURE_TYPE_PINCH},
+	{"swipe", GESTURE_TYPE_SWIPE},
+};
+
+static const str_pair_t gesture_direction_names[] = {
+	{"up", GESTURE_DIRECTION_UP},
+	{"down", GESTURE_DIRECTION_DOWN},
+	{"left", GESTURE_DIRECTION_LEFT},
+	{"right", GESTURE_DIRECTION_RIGHT},
+	{"in", GESTURE_DIRECTION_INWARD},
+	{"inward", GESTURE_DIRECTION_INWARD},
+	{"out", GESTURE_DIRECTION_OUTWARD},
+	{"outward", GESTURE_DIRECTION_OUTWARD},
+	{"clockwise", GESTURE_DIRECTION_CLOCKWISE},
+	{"counterclockwise", GESTURE_DIRECTION_COUNTERCLOCKWISE},
+};
+
 static enum gesture_type gesture_parse_type(const char *type_str) {
-	if (strcasecmp(type_str, "hold") == 0)
-		return GESTURE_TYPE_HOLD;
-	else if (strcasecmp(type_str, "pinch") == 0)
-		return GESTURE_TYPE_PINCH;
-	else if (strcasecmp(type_str, "swipe") == 0)
-		return GESTURE_TYPE_SWIPE;
-	return GESTURE_TYPE_NONE;
+	const str_pair_t *e = str_table_find(gesture_type_names, type_str);
+	return e ? (enum gesture_type)e->value : GESTURE_TYPE_NONE;
 }
 
 static enum gesture_direction gesture_parse_direction(const char *dir_str) {
-	if (strcasecmp(dir_str, "up") == 0) {
-		return GESTURE_DIRECTION_UP;
-	} else if (strcasecmp(dir_str, "down") == 0) {
-		return GESTURE_DIRECTION_DOWN;
-	} else if (strcasecmp(dir_str, "left") == 0) {
-		return GESTURE_DIRECTION_LEFT;
-	} else if (strcasecmp(dir_str, "right") == 0) {
-		return GESTURE_DIRECTION_RIGHT;
-	} else if (strcasecmp(dir_str, "in") == 0 || strcasecmp(dir_str, "inward") == 0) {
-		return GESTURE_DIRECTION_INWARD;
-	} else if (strcasecmp(dir_str, "out") == 0 || strcasecmp(dir_str, "outward") == 0) {
-		return GESTURE_DIRECTION_OUTWARD;
-	} else if (strcasecmp(dir_str, "clockwise") == 0) {
-		return GESTURE_DIRECTION_CLOCKWISE;
-	} else if (strcasecmp(dir_str, "counterclockwise") == 0) {
-		return GESTURE_DIRECTION_COUNTERCLOCKWISE;
-	}
-	return GESTURE_DIRECTION_NONE;
+	const str_pair_t *e = str_table_find(gesture_direction_names, dir_str);
+	return e ? (enum gesture_direction)e->value : GESTURE_DIRECTION_NONE;
 }
 
 char *gesture_parse(const char *input, gesture_t *output) {
@@ -98,7 +97,7 @@ char *gesture_parse(const char *input, gesture_t *output) {
 
 	token = strtok_r(NULL, ":", &saveptr);
 	if (token) {
-		if (strcmp(token, "*") == 0) {
+		if (streq(token, "*")) {
 			output->fingers = GESTURE_FINGERS_ANY;
 		} else {
 			int fingers = atoi(token);

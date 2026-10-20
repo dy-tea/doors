@@ -3,6 +3,7 @@
 #include "realtime.h"
 #include "server.h"
 #include "settings.h"
+#include "str.h"
 #include "types.h"
 #include <stdio.h>
 #include <string.h>
@@ -17,14 +18,14 @@ int main(int argc, char *argv[]) {
 	const char *config_dir = NULL;
 
 	for (int i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--config") == 0) {
+		if (streq(argv[i], "-c") || streq(argv[i], "--config")) {
 			if (i + 1 >= argc) {
 				fprintf(stderr, "Error: %s requires an argument\n", argv[i]);
 				usage(argv[0]);
 				return 1;
 			}
 			config_dir = argv[++i];
-		} else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+		} else if (streq(argv[i], "-h") || streq(argv[i], "--help")) {
 			usage(argv[0]);
 			return 0;
 		} else {

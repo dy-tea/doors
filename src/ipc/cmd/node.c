@@ -10,6 +10,7 @@
 #include "protocol/workspace.h"
 #include "scratchpad.h"
 #include "server.h"
+#include "str.h"
 #include "surface.h"
 #include "tabs.h"
 #include "transaction.h"
@@ -89,7 +90,7 @@ static node_t *focused_client(ipc_args_t *a, output_t **mon) {
 	return n;
 }
 
-static const cfg_enum_value_t direction_values[] = {
+static const str_pair_t direction_values[] = {
 	{"north", DIR_NORTH},
 	{"n", DIR_NORTH},
 	{"south", DIR_SOUTH},
@@ -101,7 +102,7 @@ static const cfg_enum_value_t direction_values[] = {
 	IPC_ENUM_END,
 };
 
-static const cfg_enum_value_t circulate_values[] = {
+static const str_pair_t circulate_values[] = {
 	{"forward", 1},
 	{"f", 1},
 	{"backward", -1},
@@ -283,7 +284,7 @@ static void node_flag(ipc_args_t *a) {
 		key[klen] = '\0';
 		val = eq + 1;
 	} else {
-		snprintf(key, sizeof(key), "%s", arg);
+		str_copy(key, sizeof(key), arg);
 	}
 
 	// opacity and border_radius take a number, every other flag takes a bool
@@ -618,7 +619,7 @@ static void node_to_node(ipc_args_t *a) {
 	ipc_ok(a, "Node sent to node\n");
 }
 
-static const cfg_enum_value_t layer_values[] = {
+static const str_pair_t layer_values[] = {
 	{"below", CLIENT_LAYER_BELOW},
 	{"normal", CLIENT_LAYER_NORMAL},
 	{"above", CLIENT_LAYER_ABOVE},
@@ -710,7 +711,7 @@ static void node_type(ipc_args_t *a) {
 	if (!n)
 		return;
 
-	static const cfg_enum_value_t split_types[] = {
+	static const str_pair_t split_types[] = {
 		{"tabbed", TYPE_TABBED},
 		{"horizontal", TYPE_HORIZONTAL},
 		{"vertical", TYPE_VERTICAL},

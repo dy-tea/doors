@@ -8,6 +8,7 @@
 #include "output/output.h"
 #include "protocol/workspace.h"
 #include "server.h"
+#include "str.h"
 #include "tree.h"
 #include "types.h"
 #include <ctype.h>
@@ -68,6 +69,23 @@ static const char *get_config_home(void) {
 	return buf;
 }
 
+static const str_pair_t mod_map[] = {
+	{"super", WLR_MODIFIER_LOGO},
+	{"mod4", WLR_MODIFIER_LOGO},
+	{"alt", WLR_MODIFIER_ALT},
+	{"mod1", WLR_MODIFIER_ALT},
+	{"ctrl", WLR_MODIFIER_CTRL},
+	{"control", WLR_MODIFIER_CTRL},
+	{"shift", WLR_MODIFIER_SHIFT},
+	{"caps", WLR_MODIFIER_CAPS},
+	{"capslock", WLR_MODIFIER_CAPS},
+	{"num", WLR_MODIFIER_MOD2},
+	{"numlock", WLR_MODIFIER_MOD2},
+	{"mod2", WLR_MODIFIER_MOD2},
+	{"mod3", WLR_MODIFIER_MOD3},
+	{"mod5", WLR_MODIFIER_MOD5},
+};
+
 uint32_t parse_modifiers(const char *mod_str) {
 	uint32_t mods = 0;
 	if (!mod_str || mod_str[0] == '\0')
@@ -78,56 +96,12 @@ uint32_t parse_modifiers(const char *mod_str) {
 		wlr_log(WLR_ERROR, "Allocation failed");
 		return 0;
 	}
-	char *saveptr;
-	char *token = strtok_r(tmp, "+", &saveptr);
 
-	while (token) {
-		while (*token == ' ')
-			token++;
-		char *end = token + strlen(token) - 1;
-		while (end > token && *end == ' ')
-			*end-- = '\0';
-
-		typedef struct {
-			char *name;
-			enum wlr_keyboard_modifier modifier;
-		} mod_name_t;
-
-		mod_name_t mod_map[] = {
-			{"super", WLR_MODIFIER_LOGO},
-			{"Mod4", WLR_MODIFIER_LOGO},
-			{"mod4", WLR_MODIFIER_LOGO},
-			{"alt", WLR_MODIFIER_ALT},
-			{"Mod1", WLR_MODIFIER_ALT},
-			{"mod1", WLR_MODIFIER_ALT},
-			{"ctrl", WLR_MODIFIER_CTRL},
-			{"Control", WLR_MODIFIER_CTRL},
-			{"shift", WLR_MODIFIER_SHIFT},
-			{"Shift", WLR_MODIFIER_SHIFT},
-			{"caps", WLR_MODIFIER_CAPS},
-			{"Caps", WLR_MODIFIER_CAPS},
-			{"capslock", WLR_MODIFIER_CAPS},
-			{"Capslock", WLR_MODIFIER_CAPS},
-			{"num", WLR_MODIFIER_MOD2},
-			{"Num", WLR_MODIFIER_MOD2},
-			{"numlock", WLR_MODIFIER_MOD2},
-			{"Numlock", WLR_MODIFIER_MOD2},
-			{"mod2", WLR_MODIFIER_MOD2},
-			{"Mod2", WLR_MODIFIER_MOD2},
-			{"mod3", WLR_MODIFIER_MOD3},
-			{"Mod3", WLR_MODIFIER_MOD3},
-			{"mod5", WLR_MODIFIER_MOD5},
-			{"Mod5", WLR_MODIFIER_MOD5},
-		};
-
-		for (int i = 0; i != sizeof(mod_map) / sizeof(mod_name_t); ++i) {
-			if (strcmp(token, mod_map[i].name) == 0) {
-				mods |= mod_map[i].modifier;
-				break;
-			}
-		}
-
-		token = strtok_r(NULL, "+", &saveptr);
+	char *out[32];
+	for (int i = 0; i < str_split(tmp, "+", out, 32); i++) {
+		const str_pair_t *e = str_table_find(mod_map, str_trim(out[i]));
+		if (e)
+			mods |= (uint32_t)e->value;
 	}
 
 	free(tmp);
@@ -154,24 +128,19 @@ uint32_t parse_keycode(const char *name) {
 	};
 
 	for (size_t i = 0; i < sizeof(mouse_buttons) / sizeof(mouse_buttons[0]); i++)
-		if (strcmp(name, mouse_buttons[i]) == 0)
+		if (streq(name, mouse_buttons[i]))
 			return mouse_button_to_keycode(i);
 
 	if (name[0] >= '1' && name[0] <= '9' && name[1] == '\0')
 		return name[0] - '0' + 1;
 
-	if (strcmp(name, "0") == 0)
+	if (streq(name, "0"))
 		return 11;
 
 	return 0;
 }
 
-typedef struct {
-	const char *name;
-	uint32_t flag;
-} bind_flag_name_t;
-
-static const bind_flag_name_t bind_flag_names[] = {
+static const str_pair_t bind_flag_names[] = {
 	{"locked", BINDF_LOCKED},
 	{"release", BINDF_RELEASE},
 	{"repeat", BINDF_REPEAT},
@@ -190,23 +159,17 @@ bool parse_bind_flags(const char *str, uint32_t *out_flags) {
 		return true;
 
 	char buf[MAXLEN];
-	snprintf(buf, sizeof(buf), "%s", str);
+	str_copy(buf, sizeof(buf), str);
 
 	bool ok = true;
 	uint32_t flags = 0;
-	char *saveptr = NULL;
-	for (char *token = strtok_r(buf, ", \t", &saveptr); token; token = strtok_r(NULL, ", \t",
-			&saveptr)) {
-		bool found = false;
-		for (size_t i = 0; i < sizeof(bind_flag_names) / sizeof(bind_flag_names[0]); i++) {
-			if (strcasecmp(token, bind_flag_names[i].name) == 0) {
-				flags |= bind_flag_names[i].flag;
-				found = true;
-				break;
-			}
-		}
-		if (!found) {
-			wlr_log(WLR_ERROR, "Unknown bind flag '%s'", token);
+	char *tokens[32];
+	for (int i = 0; i < str_split(buf, ", \t", tokens, 32); i++) {
+		const str_pair_t *e = str_table_find(bind_flag_names, tokens[i]);
+		if (e)
+			flags |= (uint32_t)e->value;
+		else {
+			wlr_log(WLR_ERROR, "Unknown bind flag '%s'", tokens[i]);
 			ok = false;
 		}
 	}
@@ -221,13 +184,10 @@ char *bind_flags_text(uint32_t flags, char *buf, size_t size) {
 	if (flags == 0)
 		return buf;
 
-	for (size_t i = 0; i < sizeof(bind_flag_names) / sizeof(bind_flag_names[0]); i++) {
-		if (!(flags & bind_flag_names[i].flag))
+	for (const str_pair_t *e = bind_flag_names; e->name; e++) {
+		if (!(flags & (uint32_t)e->value))
 			continue;
-		if (buf[0])
-			snprintf(buf + strlen(buf), size - strlen(buf), ",%s", bind_flag_names[i].name);
-		else
-			snprintf(buf, size, "%s", bind_flag_names[i].name);
+		str_append_sep(buf, size, ",", e->name);
 	}
 	return buf;
 }
@@ -249,7 +209,7 @@ const char *parse_hotkey_spec(const char *spec, uint32_t *modifiers, xkb_keysym_
 		return "No hotkey given";
 
 	char buf[MAXLEN * 2];
-	snprintf(buf, sizeof(buf), "%s", spec);
+	str_copy(buf, sizeof(buf), spec);
 
 	char *bracket = strrchr(buf, '[');
 	if (bracket) {
@@ -275,13 +235,8 @@ const char *parse_hotkey_spec(const char *spec, uint32_t *modifiers, xkb_keysym_
 	if (left) {
 		*left = '\0';
 		mods = parse_modifiers(buf);
-		char *key_part = left + 1;
-		while (*key_part == ' ')
-			key_part++;
-		char *kp_end = key_part + strlen(key_part);
-		while (kp_end > key_part && kp_end[-1] == ' ')
-			*--kp_end = '\0';
-		if (strcasecmp(key_part, "catchall") == 0)
+		char *key_part = str_trim(left + 1);
+		if (streqi(key_part, "catchall"))
 			is_catchall = true;
 		else {
 			sym = parse_keysym(key_part);
@@ -290,13 +245,8 @@ const char *parse_hotkey_spec(const char *spec, uint32_t *modifiers, xkb_keysym_
 				use_kc = true;
 		}
 	} else {
-		char *key_part = buf;
-		while (*key_part == ' ')
-			key_part++;
-		char *kp_end = key_part + strlen(key_part);
-		while (kp_end > key_part && kp_end[-1] == ' ')
-			*--kp_end = '\0';
-		if (strcasecmp(key_part, "catchall") == 0)
+		char *key_part = str_trim(buf);
+		if (streqi(key_part, "catchall"))
 			is_catchall = true;
 		else {
 			sym = parse_keysym(key_part);
@@ -407,15 +357,15 @@ static const action_entry_t action_table[] = {
 static bind_action_t lookup_action(const char *args[3], int argc) {
 	for (size_t i = 0; i < sizeof(action_table) / sizeof(action_table[0]); i++) {
 		const action_entry_t *e = &action_table[i];
-		if (strcmp(args[0], e->cmd) != 0)
+		if (!streq(args[0], e->cmd))
 			continue;
 		if (e->subcmd == NULL)
 			return e->action;
-		if (argc < 2 || strcmp(args[1], e->subcmd) != 0)
+		if (argc < 2 || !streq(args[1], e->subcmd))
 			continue;
 		if (e->subsubcmd == NULL)
 			return e->action;
-		if (argc >= 3 && strcmp(args[2], e->subsubcmd) == 0)
+		if (argc >= 3 && streq(args[2], e->subsubcmd))
 			return e->action;
 	}
 	return BIND_NONE;
@@ -430,27 +380,22 @@ bind_action_t parse_action(const char *cmd, int *desktop_index, char *submap_nam
 		return BIND_NONE;
 
 	if (cmd[0] == '@') {
-		if (strcmp(cmd, "@exit") == 0)
+		if (streq(cmd, "@exit"))
 			return BIND_EXIT_SUBMAP;
 		if (submap_name)
-			snprintf(submap_name, MAXLEN, "%s", cmd + 1);
+			str_copy(submap_name, MAXLEN, cmd + 1);
 		return BIND_ENTER_SUBMAP;
 	}
 
-	if (strncmp(cmd, "doorsctl ", 9) != 0)
+	const char *rest = str_skip_prefix(cmd, "doorsctl ");
+	if (!rest)
 		return BIND_EXTERNAL;
 
 	char buf[MAXLEN];
-	snprintf(buf, sizeof(buf), "%s", cmd + 9);
+	str_copy(buf, sizeof(buf), rest);
 
 	char *args[16];
-	int argc = 0;
-	char *saveptr;
-	char *token = strtok_r(buf, " \t", &saveptr);
-	while (token && argc < 16) {
-		args[argc++] = token;
-		token = strtok_r(NULL, " \t", &saveptr);
-	}
+	int argc = str_split(buf, " \t", args, 16);
 
 	if (argc == 0)
 		return BIND_NONE;
@@ -461,8 +406,8 @@ bind_action_t parse_action(const char *cmd, int *desktop_index, char *submap_nam
 		return action;
 
 	// special cases that need extra logic
-	if (strcmp(args[0], "node") == 0 && argc >= 2) {
-		if (strcmp(args[1], "-d") == 0 || strcmp(args[1], "--to-desktop") == 0) {
+	if (streq(args[0], "node") && argc >= 2) {
+		if (streq(args[1], "-d") || streq(args[1], "--to-desktop")) {
 			if (argc >= 3) {
 				int d = atoi(args[2]);
 				if (d >= 1 && d <= 10) {
@@ -474,9 +419,9 @@ bind_action_t parse_action(const char *cmd, int *desktop_index, char *submap_nam
 		}
 	}
 
-	if (strcmp(args[0], "desktop") == 0 && argc >= 2) {
-		if (strcmp(args[1], "-f") == 0 || strcmp(args[1], "--focus") == 0)
-			return (argc >= 3 && strcmp(args[2], "last") == 0) ? BIND_DESKTOP_LAST : BIND_DESKTOP_FOCUS;
+	if (streq(args[0], "desktop") && argc >= 2) {
+		if (streq(args[1], "-f") || streq(args[1], "--focus"))
+			return (argc >= 3 && streq(args[2], "last")) ? BIND_DESKTOP_LAST : BIND_DESKTOP_FOCUS;
 
 		int d = atoi(args[1]);
 		if (d >= 1 && d <= 10) {
@@ -543,8 +488,8 @@ static void expand_braces_recursive(const char *input, char *prefix, size_t pref
 
 	if (depth != 0) {
 		if (result->count < MAX_EXPANSIONS) {
-			snprintf(new_prefix + strlen(new_prefix), MAXLEN - strlen(new_prefix), "%s", brace_start);
-			snprintf(result->strings[result->count], MAXLEN, "%s", new_prefix);
+			str_append(new_prefix, MAXLEN, brace_start);
+			str_copy(result->strings[result->count], MAXLEN, new_prefix);
 			result->count++;
 		}
 		return;
@@ -645,11 +590,7 @@ static void expand_braces_recursive(const char *input, char *prefix, size_t pref
 static char *expand_sequence(const char *input, char *output, size_t out_size) {
 	expansion_result_t result;
 	expand_braces(input, &result);
-	if (result.count > 0) {
-		snprintf(output, out_size, "%s", result.strings[0]);
-	} else {
-		snprintf(output, out_size, "%s", input);
-	}
+	str_copy(output, out_size, result.count > 0 ? result.strings[0] : input);
 	return output;
 }
 
@@ -721,11 +662,11 @@ void add_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode, bool
 	kb->desktop_index = desktop_index;
 	kb->flags = flags;
 	if (submap_name)
-		snprintf(kb->submap_name, sizeof(kb->submap_name), "%s", submap_name);
+		str_copy(kb->submap_name, sizeof(kb->submap_name), submap_name);
 	else
 		kb->submap_name[0] = '\0';
 	if (external_cmd)
-		snprintf(kb->external_cmd, sizeof(kb->external_cmd), "%s", external_cmd);
+		str_copy(kb->external_cmd, sizeof(kb->external_cmd), external_cmd);
 	else
 		kb->external_cmd[0] = '\0';
 
@@ -751,7 +692,7 @@ static void add_gesturebind(enum gesture_type type, uint8_t fingers, uint32_t di
 	gb->action = action;
 	gb->desktop_index = desktop_index;
 	if (external_cmd) {
-		snprintf(gb->external_cmd, sizeof(gb->external_cmd), "%s", external_cmd);
+		str_copy(gb->external_cmd, sizeof(gb->external_cmd), external_cmd);
 	} else {
 		gb->external_cmd[0] = '\0';
 	}
@@ -764,8 +705,8 @@ static void parse_gesture_hotkey_line(const char *gesture_str, const char *comma
 	char gesture_buf[MAXLEN];
 	char command_buf[MAXLEN];
 
-	snprintf(gesture_buf, sizeof(gesture_buf), "%s", gesture_str);
-	snprintf(command_buf, sizeof(command_buf), "%s", command_str);
+	str_copy(gesture_buf, sizeof(gesture_buf), gesture_str);
+	str_copy(command_buf, sizeof(command_buf), command_str);
 
 	char expanded_cmd[MAXLEN];
 	expand_sequence(command_buf, expanded_cmd, sizeof(expanded_cmd));
@@ -813,7 +754,7 @@ static void add_hotcornerbind(int corner_x, int corner_y, bind_action_t action, 
 	hc->action = action;
 	hc->desktop_index = desktop_index;
 	if (external_cmd)
-		snprintf(hc->external_cmd, sizeof(hc->external_cmd), "%s", external_cmd);
+		str_copy(hc->external_cmd, sizeof(hc->external_cmd), external_cmd);
 	else
 		hc->external_cmd[0] = '\0';
 
@@ -824,17 +765,16 @@ static void add_hotcornerbind(int corner_x, int corner_y, bind_action_t action, 
 static void parse_hotcorner_hotkey_line(const char *hotcorner_str, const char *command_str) {
 	int corner_x = 0, corner_y = 0;
 
-	// parse corner
-	if (strcasecmp(hotcorner_str, "topleft") == 0) {
+	if (streqi(hotcorner_str, "topleft")) {
 		corner_x = -1;
 		corner_y = -1;
-	} else if (strcasecmp(hotcorner_str, "topright") == 0) {
+	} else if (streqi(hotcorner_str, "topright")) {
 		corner_x = 1;
 		corner_y = -1;
-	} else if (strcasecmp(hotcorner_str, "bottomleft") == 0) {
+	} else if (streqi(hotcorner_str, "bottomleft")) {
 		corner_x = -1;
 		corner_y = 1;
-	} else if (strcasecmp(hotcorner_str, "bottomright") == 0) {
+	} else if (streqi(hotcorner_str, "bottomright")) {
 		corner_x = 1;
 		corner_y = 1;
 	} else {
@@ -854,17 +794,19 @@ static void parse_hotcorner_hotkey_line(const char *hotcorner_str, const char *c
 }
 
 static void parse_hotkey_line(const char *hotkey_str, const char *command_str) {
-	if (strncmp(hotkey_str, "gesture ", 8) == 0) {
-		parse_gesture_hotkey_line(hotkey_str + 8, command_str);
+	const char *gesture_spec = str_skip_prefix(hotkey_str, "gesture ");
+	if (gesture_spec) {
+		parse_gesture_hotkey_line(gesture_spec, command_str);
 		return;
 	}
 
-	if (strncmp(hotkey_str, "hotcorner ", 10) == 0) {
-		parse_hotcorner_hotkey_line(hotkey_str + 10, command_str);
+	const char *hotcorner_spec = str_skip_prefix(hotkey_str, "hotcorner ");
+	if (hotcorner_spec) {
+		parse_hotcorner_hotkey_line(hotcorner_spec, command_str);
 		return;
 	}
 
-	if (strcmp(hotkey_str, "bell") == 0) {
+	if (streq(hotkey_str, "bell")) {
 		int desktop_index = 0;
 		char submap_name[MAXLEN];
 		submap_name[0] = '\0';
@@ -875,7 +817,7 @@ static void parse_hotkey_line(const char *hotkey_str, const char *command_str) {
 				.desktop_index = desktop_index,
 			};
 		} else {
-			snprintf(bell_bind.external_cmd, sizeof(bell_bind.external_cmd), "%s", command_str);
+			str_copy(bell_bind.external_cmd, sizeof(bell_bind.external_cmd), command_str);
 			bell_bind.action = action;
 		}
 		wlr_log(WLR_DEBUG, "Parsed bell bind: action=%d cmd='%s'", action, command_str);
@@ -885,8 +827,8 @@ static void parse_hotkey_line(const char *hotkey_str, const char *command_str) {
 	char hotkey_buf[MAXLEN];
 	char command_buf[MAXLEN];
 
-	snprintf(hotkey_buf, sizeof(hotkey_buf), "%s", hotkey_str);
-	snprintf(command_buf, sizeof(command_buf), "%s", command_str);
+	str_copy(hotkey_buf, sizeof(hotkey_buf), hotkey_str);
+	str_copy(command_buf, sizeof(command_buf), command_str);
 
 	// expand braces
 	expansion_result_t hk_expansions;
@@ -959,7 +901,7 @@ void run_config(const char *config_path_arg) {
 	if (!config_path_arg || access(config_path_arg, R_OK) != 0)
 		return;
 
-	snprintf(config_path, sizeof(config_path), "%s", config_path_arg);
+	str_copy(config_path, sizeof(config_path), config_path_arg);
 }
 
 void run_config_idle(void *data) {
@@ -988,7 +930,7 @@ void load_hotkeys_idle(void *data) {
 
 static submap_t *find_or_create_submap(const char *name) {
 	for (size_t i = 0; i < num_submaps; i++)
-		if (strcmp(submaps[i].name, name) == 0)
+		if (streq(submaps[i].name, name))
 			return &submaps[i];
 
 	if (num_submaps >= MAX_SUBMAPS) {
@@ -997,7 +939,7 @@ static submap_t *find_or_create_submap(const char *name) {
 	}
 
 	submap_t *sm = &submaps[num_submaps++];
-	snprintf(sm->name, sizeof(sm->name), "%s", name);
+	str_copy(sm->name, sizeof(sm->name), name);
 	sm->num_keybinds = 0;
 	sm->parent = NULL;
 	return sm;
@@ -1044,9 +986,7 @@ void load_hotkeys(const char *config_path) {
 
 	while (fgets(line, sizeof(line), f)) {
 		wlr_log(WLR_DEBUG, "Config line: [%s]", line);
-		size_t len = strlen(line);
-		if (len > 0 && line[len - 1] == '\n')
-			line[len - 1] = '\0';
+		str_chomp(line);
 
 		size_t indent = 0;
 		while (line[indent] == ' ' || line[indent] == '\t')
@@ -1068,7 +1008,7 @@ void load_hotkeys(const char *config_path) {
 				char *submap_name = content_start + 1;
 				current_parsing_submap = find_or_create_submap(submap_name);
 			} else {
-				snprintf(pending.command, sizeof(pending.command), "%s", content_start);
+				str_copy(pending.command, sizeof(pending.command), content_start);
 				offset = strlen(pending.command);
 			}
 			continue;
@@ -1093,7 +1033,7 @@ void load_hotkeys(const char *config_path) {
 				char *cmd_part = arrow + 2;
 				while (*cmd_part == ' ')
 					cmd_part++;
-				snprintf(pending.command, sizeof(pending.command), "%s", cmd_part);
+				str_copy(pending.command, sizeof(pending.command), cmd_part);
 				pending.indent = indent;
 				offset = strlen(pending.command);
 				continue;
@@ -1110,15 +1050,15 @@ void load_hotkeys(const char *config_path) {
 						size_t cur_len = strlen(pending.command);
 						size_t rem = sizeof(pending.command) - cur_len - 1;
 						if (rem > 0)
-							snprintf(pending.command + cur_len, rem, " %s", content_start);
+							str_append_sep(pending.command, sizeof(pending.command), " ", content_start);
 					} else {
-						snprintf(pending.command, sizeof(pending.command), "%s", content_start);
+						str_copy(pending.command, sizeof(pending.command), content_start);
 					}
 					offset = strlen(pending.command);
 					continue;
 				}
 			}
-			snprintf(pending.hotkey, sizeof(pending.hotkey), "%s", content_start);
+			str_copy(pending.hotkey, sizeof(pending.hotkey), content_start);
 			pending.command[0] = '\0';
 			pending.indent = indent;
 			offset = 0;
@@ -1169,10 +1109,10 @@ static void setup_inotify_watch(const char *config_path) {
 		return;
 	}
 
-	snprintf(hotkey_config_path, sizeof(hotkey_config_path), "%s", config_path);
+	str_copy(hotkey_config_path, sizeof(hotkey_config_path), config_path);
 
 	char dir_path[CONFIG_PATH_MAX];
-	snprintf(dir_path, sizeof(dir_path), "%s", config_path);
+	str_copy(dir_path, sizeof(dir_path), config_path);
 	char *last_slash = strrchr(dir_path, '/');
 	uint32_t mask = IN_MODIFY | IN_CLOSE_WRITE | IN_MOVED_TO | IN_CREATE;
 	if (last_slash) {
@@ -1257,7 +1197,7 @@ static int hotkey_reload_handler(int fd, uint32_t mask, void *data) {
 	if (event->len > 0 && event->name[0] != '\0') {
 		const char *config_file_name = strrchr(hotkey_config_path, '/');
 		config_file_name = config_file_name ? config_file_name + 1 : hotkey_config_path;
-		match = (strcmp(event->name, config_file_name) == 0);
+		match = (streq(event->name, config_file_name));
 	} else {
 		match = true;
 	}
@@ -1351,7 +1291,7 @@ submap_t *find_submap_by_name(const char *name) {
 		return NULL;
 
 	for (size_t i = 0; i < num_submaps; i++)
-		if (strcmp(submaps[i].name, name) == 0)
+		if (streq(submaps[i].name, name))
 			return &submaps[i];
 
 	return NULL;
@@ -1661,7 +1601,7 @@ static void add_hotkey_listener_to_event_loop(void) {
 
 static submap_t *find_submap(const char *name) {
 	for (size_t i = 0; i < num_submaps; i++)
-		if (strcmp(submaps[i].name, name) == 0)
+		if (streq(submaps[i].name, name))
 			return &submaps[i];
 	return NULL;
 }
@@ -1863,7 +1803,7 @@ bind_action_t bind_action_from_name(const char *name) {
 		return BIND_NONE;
 
 #define ACTION_IF_MATCH(n, val)                                                                                        \
-	if (strcmp(name, n) == 0)                                                                                            \
+	if (streq(name, n))                                                                                            \
 	return val
 
 	ACTION_IF_MATCH("west", BIND_FOCUS_WEST);

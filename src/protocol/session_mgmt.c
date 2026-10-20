@@ -9,6 +9,7 @@
 #include "protocol/workspace.h"
 #include "protocol/xdg_toplevel.h"
 #include "server.h"
+#include "str.h"
 #include "tree.h"
 #include "xx-session-management-v1-protocol.h"
 #include <errno.h>
@@ -295,7 +296,7 @@ static void session_state_copy(session_state_t *dst, const session_state_t *src)
 
 static session_state_t *session_states_find(session_states_t *states, const char *name) {
 	for (size_t i = 0; i < states->count; i++) {
-		if (strcmp(states->items[i].name, name) == 0)
+		if (streq(states->items[i].name, name))
 			return &states->items[i];
 	}
 	return NULL;
@@ -328,7 +329,7 @@ static session_state_t *session_states_get(session_states_t *states, const char 
 
 static void session_states_remove(session_states_t *states, const char *name) {
 	for (size_t i = 0; i < states->count; i++) {
-		if (strcmp(states->items[i].name, name) != 0)
+		if (!streq(states->items[i].name, name))
 			continue;
 		free(states->items[i].name);
 		memmove(&states->items[i], &states->items[i + 1],
@@ -451,13 +452,13 @@ static bool session_states_save(session_t *session) {
 		fputs("\t\t{\"name\": \"", f);
 		session_write_json_string(f, state->name);
 		fputs("\", \"floating\": ", f);
-		fputs(state->floating ? "true" : "false", f);
+		fputs(str_bool_text(state->floating), f);
 		fputs(", \"maximized\": ", f);
-		fputs(state->maximized ? "true" : "false", f);
+		fputs(str_bool_text(state->maximized), f);
 		fputs(", \"fullscreen\": ", f);
-		fputs(state->fullscreen ? "true" : "false", f);
+		fputs(str_bool_text(state->fullscreen), f);
 		fputs(", \"minimized\": ", f);
-		fputs(state->minimized ? "true" : "false", f);
+		fputs(str_bool_text(state->minimized), f);
 		fputs(", \"output\": \"", f);
 		session_write_json_string(f, state->output);
 		fputs("\", \"desktop\": \"", f);
@@ -532,8 +533,8 @@ static void session_toplevel_save_state(session_toplevel_t *tl) {
 	// nothing worth writing to disk
 	if (state->floating == next.floating && state->maximized == next.maximized &&
 			state->fullscreen == next.fullscreen && state->minimized == next.minimized &&
-			wlr_box_equal(&state->rect, &next.rect) && strcmp(state->output,
-			next.output) == 0 && strcmp(state->desktop, next.desktop) == 0) {
+			wlr_box_equal(&state->rect, &next.rect) && streq(state->output,
+			next.output) && streq(state->desktop, next.desktop)) {
 		return;
 	}
 
@@ -554,7 +555,7 @@ static session_toplevel_t *session_find_toplevel(session_t *session,
 static session_toplevel_t *session_find_name(session_t *session, const char *name) {
 	session_toplevel_t *tl;
 	wl_list_for_each(tl, &session->toplevels, link) {
-		if (strcmp(tl->name, name) == 0)
+		if (streq(tl->name, name))
 			return tl;
 	}
 	return NULL;
@@ -864,7 +865,7 @@ static void session_replace(session_t *session) {
 static session_t *manager_find_session(session_mgr_t *manager, const char *id) {
 	session_t *session;
 	wl_list_for_each(session, &manager->sessions, link) {
-		if (session->id && strcmp(session->id, id) == 0)
+		if (session->id && streq(session->id, id))
 			return session;
 	}
 	return NULL;

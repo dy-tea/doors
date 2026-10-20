@@ -30,7 +30,7 @@ void ipc_cmd_seat(ipc_args_t *a) {
 		ipc_fail_unknown(a, seat_subs);
 }
 
-static const cfg_enum_value_t grouping_values[] = {
+static const str_pair_t grouping_values[] = {
 	{"none", KEYBOARD_GROUP_NONE},
 	{"smart", KEYBOARD_GROUP_SMART},
 	{"default", KEYBOARD_GROUP_DEFAULT},

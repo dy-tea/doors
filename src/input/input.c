@@ -4,6 +4,7 @@
 #include "input/touch.h"
 #include "once.h"
 #include "server.h"
+#include "str.h"
 #include <float.h>
 #include <libinput.h>
 #include <stdlib.h>
@@ -103,8 +104,8 @@ input_config_t *input_config_get(const char *identifier) {
 	if (!identifier)
 		return NULL;
 	for (size_t i = 0; i < num_input_configs; i++) {
-		if (input_configs[i] && input_configs[i]->identifier && strcmp(input_configs[i]->identifier,
-				identifier) == 0) {
+		if (input_configs[i] && input_configs[i]->identifier && streq(input_configs[i]->identifier,
+				identifier)) {
 			return input_configs[i];
 		}
 	}
@@ -128,7 +129,7 @@ input_config_t *input_config_get_for_device(const char *identifier, enum input_c
 
 	for (size_t i = 0; i < num_input_configs; i++) {
 		input_config_t *cfg = input_configs[i];
-		if (cfg && cfg->identifier && identifier && strcmp(cfg->identifier, identifier) == 0)
+		if (cfg && cfg->identifier && identifier && streq(cfg->identifier, identifier))
 			if (cfg->type == INPUT_CONFIG_TYPE_ANY || cfg->type == type)
 				input_config_merge(effective, cfg);
 	}
@@ -232,15 +233,11 @@ void input_config_merge(input_config_t *base, const input_config_t *overlay) {
 }
 
 static int parse_bool(const char *value, int default_val) {
-	if (!value)
+	bool v;
+	if (!value || !str_parse_bool(value, &v))
 		return default_val;
 
-	if (strcmp(value, "true") == 0 || strcmp(value, "enabled") == 0 || strcmp(value, "1") == 0)
-		return 1;
-	else if (strcmp(value, "false") == 0 || strcmp(value, "disabled") == 0 || strcmp(value, "0") == 0)
-		return 0;
-
-	return default_val;
+	return v ? 1 : 0;
 }
 
 static int parse_scancode(const char *value) {
@@ -257,92 +254,92 @@ bool input_config_set_value(input_config_t *config, const char *name, const char
 	if (!config || !name)
 		return false;
 
-	if (strcmp(name, "xkb_layout") == 0) {
+	if (streq(name, "xkb_layout")) {
 		free(config->xkb_layout);
 		config->xkb_layout = strdup(value);
-	} else if (strcmp(name, "xkb_model") == 0) {
+	} else if (streq(name, "xkb_model")) {
 		free(config->xkb_model);
 		config->xkb_model = strdup(value);
-	} else if (strcmp(name, "xkb_options") == 0) {
+	} else if (streq(name, "xkb_options")) {
 		free(config->xkb_options);
 		config->xkb_options = strdup(value);
-	} else if (strcmp(name, "xkb_rules") == 0) {
+	} else if (streq(name, "xkb_rules")) {
 		free(config->xkb_rules);
 		config->xkb_rules = strdup(value);
-	} else if (strcmp(name, "xkb_variant") == 0) {
+	} else if (streq(name, "xkb_variant")) {
 		free(config->xkb_variant);
 		config->xkb_variant = strdup(value);
-	} else if (strcmp(name, "xkb_file") == 0) {
+	} else if (streq(name, "xkb_file")) {
 		free(config->xkb_file);
 		config->xkb_file = strdup(value);
-	} else if (strcmp(name, "repeat_rate") == 0) {
+	} else if (streq(name, "repeat_rate")) {
 		config->repeat_rate = atoi(value);
-	} else if (strcmp(name, "repeat_delay") == 0) {
+	} else if (streq(name, "repeat_delay")) {
 		config->repeat_delay = atoi(value);
-	} else if (strcmp(name, "xkb_numlock") == 0) {
+	} else if (streq(name, "xkb_numlock")) {
 		config->xkb_numlock = parse_bool(value, -1);
-	} else if (strcmp(name, "xkb_capslock") == 0) {
+	} else if (streq(name, "xkb_capslock")) {
 		config->xkb_capslock = parse_bool(value, -1);
-	} else if (strcmp(name, "pointer_accel") == 0) {
+	} else if (streq(name, "pointer_accel")) {
 		config->pointer_accel = atof(value);
-	} else if (strcmp(name, "accel_profile") == 0) {
-		if (strcmp(value, "flat") == 0)
+	} else if (streq(name, "accel_profile")) {
+		if (streq(value, "flat"))
 			config->accel_profile = INPUT_CONFIG_ACCEL_PROFILE_FLAT;
-		else if (strcmp(value, "adaptive") == 0)
+		else if (streq(value, "adaptive"))
 			config->accel_profile = INPUT_CONFIG_ACCEL_PROFILE_ADAPTIVE;
 		else
 			config->accel_profile = INPUT_CONFIG_ACCEL_PROFILE_FLAT;
-	} else if (strcmp(name, "natural_scroll") == 0) {
+	} else if (streq(name, "natural_scroll")) {
 		config->natural_scroll = parse_bool(value, -1);
-	} else if (strcmp(name, "left_handed") == 0) {
+	} else if (streq(name, "left_handed")) {
 		config->left_handed = parse_bool(value, -1);
-	} else if (strcmp(name, "tap") == 0) {
+	} else if (streq(name, "tap")) {
 		config->tap = parse_bool(value, -1);
-	} else if (strcmp(name, "tap_button_map") == 0) {
-		if (strcmp(value, "lrm") == 0)
+	} else if (streq(name, "tap_button_map")) {
+		if (streq(value, "lrm"))
 			config->tap_button_map = INPUT_CONFIG_TAP_BUTTON_MAP_LRM;
-		else if (strcmp(value, "lmr") == 0)
+		else if (streq(value, "lmr"))
 			config->tap_button_map = INPUT_CONFIG_TAP_BUTTON_MAP_LMR;
 		else
 			config->tap_button_map = INPUT_CONFIG_TAP_BUTTON_MAP_LRM;
-	} else if (strcmp(name, "drag") == 0) {
+	} else if (streq(name, "drag")) {
 		config->drag = parse_bool(value, -1);
-	} else if (strcmp(name, "drag_lock") == 0) {
+	} else if (streq(name, "drag_lock")) {
 		config->drag_lock = parse_bool(value,
 			0) ? INPUT_CONFIG_DRAG_LOCK_ENABLED : INPUT_CONFIG_DRAG_LOCK_DISABLED;
-	} else if (strcmp(name, "dwt") == 0) {
+	} else if (streq(name, "dwt")) {
 		config->dwt = parse_bool(value, -1);
-	} else if (strcmp(name, "dwtp") == 0) {
+	} else if (streq(name, "dwtp")) {
 		config->dwtp = parse_bool(value, -1);
-	} else if (strcmp(name, "click_method") == 0) {
-		if (strcmp(value, "button_areas") == 0)
+	} else if (streq(name, "click_method")) {
+		if (streq(value, "button_areas"))
 			config->click_method = INPUT_CONFIG_CLICK_METHOD_BUTTON_AREAS;
-		else if (strcmp(value, "clickfinger") == 0)
+		else if (streq(value, "clickfinger"))
 			config->click_method = INPUT_CONFIG_CLICK_METHOD_CLICKFINGER;
-		else if (strcmp(value, "none") == 0)
+		else if (streq(value, "none"))
 			config->click_method = INPUT_CONFIG_CLICK_METHOD_NONE;
 		else
 			config->click_method = INPUT_CONFIG_CLICK_METHOD_BUTTON_AREAS;
-	} else if (strcmp(name, "middle_emulation") == 0) {
+	} else if (streq(name, "middle_emulation")) {
 		config->middle_emulation = parse_bool(value, -1);
-	} else if (strcmp(name, "scroll_method") == 0) {
-		if (strcmp(value, "edge") == 0)
+	} else if (streq(name, "scroll_method")) {
+		if (streq(value, "edge"))
 			config->scroll_method = INPUT_CONFIG_SCROLL_METHOD_EDGE;
-		else if (strcmp(value, "button") == 0)
+		else if (streq(value, "button"))
 			config->scroll_method = INPUT_CONFIG_SCROLL_METHOD_BUTTON;
-		else if (strcmp(value, "twofinger") == 0)
+		else if (streq(value, "twofinger"))
 			config->scroll_method = INPUT_CONFIG_SCROLL_METHOD_TWOFINGER;
-		else if (strcmp(value, "none") == 0)
+		else if (streq(value, "none"))
 			config->scroll_method = INPUT_CONFIG_SCROLL_METHOD_NONE;
 		else
 			config->scroll_method = INPUT_CONFIG_SCROLL_METHOD_TWOFINGER;
-	} else if (strcmp(name, "scroll_button") == 0) {
+	} else if (streq(name, "scroll_button")) {
 		config->scroll_button = parse_scancode(value);
-	} else if (strcmp(name, "scroll_button_lock") == 0) {
+	} else if (streq(name, "scroll_button_lock")) {
 		config->scroll_button_lock = parse_bool(value, -1);
-	} else if (strcmp(name, "scroll_factor") == 0) {
+	} else if (streq(name, "scroll_factor")) {
 		config->scroll_factor = atof(value);
-	} else if (strcmp(name, "rotation_angle") == 0) {
+	} else if (streq(name, "rotation_angle")) {
 		config->rotation_angle = atof(value);
 	} else {
 		return false;

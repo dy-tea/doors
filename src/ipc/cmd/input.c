@@ -2,11 +2,12 @@
 #include "input/input.h"
 #include "ipc/args.h"
 #include "ipc/registry.h"
+#include "str.h"
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
-static const cfg_enum_value_t input_type_values[] = {
+static const str_pair_t input_type_values[] = {
 	{"keyboard", INPUT_CONFIG_TYPE_KEYBOARD},
 	{"pointer", INPUT_CONFIG_TYPE_POINTER},
 	{"touchpad", INPUT_CONFIG_TYPE_TOUCHPAD},
@@ -23,14 +24,14 @@ void ipc_cmd_input(ipc_args_t *a) {
 	enum input_config_type type = INPUT_CONFIG_TYPE_ANY;
 
 	const char *first = ipc_peek(a);
-	if (first && strncmp(first, "type:", 5) != 0) {
+	if (first && !str_starts(first, "type:")) {
 		identifier = ipc_take(a);
 	}
 
-	if (ipc_peek(a) && strncmp(ipc_peek(a), "type:", 5) == 0) {
-		const char *spec = ipc_take(a) + 5;
-		while (*spec == ' ')
-			spec++;
+	const char *type_spec = str_skip_prefix(ipc_peek(a), "type:");
+	if (type_spec) {
+		ipc_take(a);
+		const char *spec = str_ltrim(type_spec);
 
 		long value;
 		if (!ipc_enum_names(a, "type", spec, input_type_values, &value))
@@ -45,7 +46,7 @@ void ipc_cmd_input(ipc_args_t *a) {
 
 	const char *value = ipc_peek(a) ? ipc_peek(a) : "";
 
-	if (strcmp(property, "xcursor_size") == 0) {
+	if (streq(property, "xcursor_size")) {
 		char *end;
 		errno = 0;
 		long size = strtol(value, &end, 10);
@@ -66,7 +67,7 @@ void ipc_cmd_input(ipc_args_t *a) {
 	for (size_t i = 0; i < num_input_configs; i++) {
 		input_config_t *cfg = input_configs[i];
 		if (identifier) {
-			if (cfg->identifier && strcmp(cfg->identifier, identifier) == 0) {
+			if (cfg->identifier && streq(cfg->identifier, identifier)) {
 				config = cfg;
 				break;
 			}

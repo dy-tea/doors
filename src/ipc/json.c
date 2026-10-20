@@ -1,4 +1,5 @@
 #include "ipc/json.h"
+#include "str.h"
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -73,17 +74,10 @@ static size_t json_utf8_encode(char *out, unsigned cp) {
 static bool json_hex4(json_parser_t *ps, unsigned *out) {
 	unsigned value = 0;
 	for (int i = 0; i < 4; i++) {
-		char c = ps->p[i];
-		unsigned digit;
-		if (c >= '0' && c <= '9')
-			digit = (unsigned)(c - '0');
-		else if (c >= 'a' && c <= 'f')
-			digit = (unsigned)(c - 'a') + 10;
-		else if (c >= 'A' && c <= 'F')
-			digit = (unsigned)(c - 'A') + 10;
-		else
+		int digit = str_hex_digit(ps->p[i]);
+		if (digit < 0)
 			return json_fail_at(ps, "invalid \\u escape");
-		value = (value << 4) | digit;
+		value = (value << 4) | (unsigned)digit;
 	}
 
 	ps->p += 4;
@@ -517,7 +511,7 @@ const json_value_t *json_get(const json_value_t *value, const char *key) {
 		return NULL;
 
 	for (size_t i = 0; i < value->value.list.count; i++) {
-		if (value->value.list.keys[i] != NULL && strcmp(value->value.list.keys[i], key) == 0)
+		if (value->value.list.keys[i] != NULL && streq(value->value.list.keys[i], key))
 			return value->value.list.items[i];
 	}
 

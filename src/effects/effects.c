@@ -6,6 +6,7 @@
 #include "output/output.h"
 #include "protocol/layer.h"
 #include "server.h"
+#include "str.h"
 #include "transaction.h"
 #include "tree.h"
 #include "types.h"
@@ -2746,17 +2747,17 @@ layer_only_frame:
 enum blur_algorithm blur_algorithm_from_str(const char *str) {
 	if (!str)
 		return BLUR_ALGORITHM_KAWASE;
-	if (strcmp(str, "kawase") == 0)
+	if (streq(str, "kawase"))
 		return BLUR_ALGORITHM_KAWASE;
-	if (strcmp(str, "gaussian") == 0)
+	if (streq(str, "gaussian"))
 		return BLUR_ALGORITHM_GAUSSIAN;
-	if (strcmp(str, "box") == 0)
+	if (streq(str, "box"))
 		return BLUR_ALGORITHM_BOX;
-	if (strcmp(str, "refraction") == 0)
+	if (streq(str, "refraction"))
 		return BLUR_ALGORITHM_REFRACTION;
-	if (strcmp(str, "lens_refraction") == 0)
+	if (streq(str, "lens_refraction"))
 		return BLUR_ALGORITHM_LENS_REFRACTION;
-	if (strcmp(str, "none") == 0)
+	if (streq(str, "none"))
 		return BLUR_ALGORITHM_NONE;
 	wlr_log(WLR_ERROR, "Unknown algorithm '%s', using kawase", str);
 	return BLUR_ALGORITHM_KAWASE;
@@ -2782,7 +2783,7 @@ const char *effects_algorithm_to_str(enum blur_algorithm algo) {
 bool screen_shader_set(const char *name) {
 	if (!effects_state.available)
 		return false;
-	if (!name || strcmp(name, "none") == 0) {
+	if (!name || streq(name, "none")) {
 		screen_shader_clear();
 		return true;
 	}
@@ -2796,7 +2797,7 @@ bool screen_shader_set(const char *name) {
 	bool ok = effects_backend->compile_screen_shader(frag_src);
 	if (ok) {
 		screen_shader_enabled = true;
-		snprintf(screen_shader_name_str, sizeof(screen_shader_name_str), "%s", name);
+		str_copy(screen_shader_name_str, sizeof(screen_shader_name_str), name);
 	}
 	effects_backend->frame_end();
 	return ok;
@@ -2837,7 +2838,7 @@ bool screen_shader_load_file(const char *path) {
 	free(src);
 	if (ok) {
 		screen_shader_enabled = true;
-		snprintf(screen_shader_name_str, sizeof(screen_shader_name_str), "%s", path);
+		str_copy(screen_shader_name_str, sizeof(screen_shader_name_str), path);
 	}
 	effects_backend->frame_end();
 	return ok;

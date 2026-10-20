@@ -1,4 +1,5 @@
 #include "effects/backend.h"
+#include "str.h"
 
 #include <drm_fourcc.h>
 #include <wlr/config.h>
@@ -2873,13 +2874,13 @@ static void vk_destroy_screen_shader(void) {
 }
 
 static const char *vk_get_screen_shader_source(const char *name) {
-	if (strcmp(name, "grayscale") == 0)
+	if (streq(name, "grayscale"))
 		return vk_grayscale_frag_src;
-	if (strcmp(name, "invert") == 0)
+	if (streq(name, "invert"))
 		return vk_invert_frag_src;
-	if (strcmp(name, "sepia") == 0)
+	if (streq(name, "sepia"))
 		return vk_sepia_frag_src;
-	if (strcmp(name, "nightlight") == 0)
+	if (streq(name, "nightlight"))
 		return vk_nightlight_frag_src;
 	return NULL;
 }

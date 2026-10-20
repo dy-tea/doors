@@ -1,7 +1,6 @@
 #include "bezier.h"
 #include "input/keyboard.h"
 #include "ipc/args.h"
-#include "ipc/helpers.h"
 #include "ipc/registry.h"
 #include "output/output.h"
 #include "server.h"
@@ -90,7 +89,7 @@ static void act_toggle(ipc_args_t *a) {
 }
 
 static void act_send(ipc_args_t *a) {
-	static const cfg_enum_value_t targets[] = {
+	static const str_pair_t targets[] = {
 		{"next", 1},
 		{"prev", -1},
 		{"previous", -1},

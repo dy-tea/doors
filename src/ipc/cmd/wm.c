@@ -1,5 +1,4 @@
 #include "ipc/args.h"
-#include "ipc/helpers.h"
 #include "ipc/ipc.h"
 #include "ipc/json.h"
 #include "ipc/registry.h"
@@ -9,6 +8,7 @@
 #include "protocol/xdg_toplevel.h"
 #include "server.h"
 #include "settings.h"
+#include "str.h"
 #include "transaction.h"
 #include "tree.h"
 #include <errno.h>
@@ -21,7 +21,7 @@
 #include <wlr/types/wlr_output_layout.h>
 
 static void wm_dump_state(ipc_args_t *a) {
-	static const cfg_enum_value_t focus_on_activate_values[] = {
+	static const str_pair_t focus_on_activate_values[] = {
 		{"focus", FOCUS_ON_ACTIVATE_FOCUS},
 		{"none", FOCUS_ON_ACTIVATE_NONE},
 		{"smart", FOCUS_ON_ACTIVATE_SMART},
@@ -29,14 +29,14 @@ static void wm_dump_state(ipc_args_t *a) {
 		IPC_ENUM_END,
 	};
 
-	static const cfg_enum_value_t follows_values[] = {
+	static const str_pair_t follows_values[] = {
 		{"no", FOLLOWS_NO},
 		{"yes", FOLLOWS_YES},
 		{"always", FOLLOWS_ALWAYS},
 		IPC_ENUM_END,
 	};
 
-	static const cfg_enum_value_t automatic_scheme_values[] = {
+	static const str_pair_t automatic_scheme_values[] = {
 		{"longest_side", SCHEME_LONGEST_SIDE},
 		{"alternate", SCHEME_ALTERNATE},
 		{"spiral", SCHEME_SPIRAL},
@@ -65,18 +65,18 @@ static void wm_dump_state(ipc_args_t *a) {
 	ipc_buff(&b, "    \"split_ratio\": %.2f,\n", settings.split_ratio);
 	const char *scheme = ipc_enum_name(automatic_scheme_values, settings.automatic_scheme);
 	ipc_buff(&b, "    \"automatic_scheme\": \"%s\",\n", scheme ? scheme : "?");
-	ipc_buff(&b, "    \"smart_gaps\": %s,\n", settings.smart_gaps ? "true" : "false");
-	ipc_buff(&b, "    \"smart_borders\": %s,\n", settings.smart_borders ? "true" : "false");
+	ipc_buff(&b, "    \"smart_gaps\": %s,\n", str_bool_text(settings.smart_gaps));
+	ipc_buff(&b, "    \"smart_borders\": %s,\n", str_bool_text(settings.smart_borders));
 	ipc_buff(&b, "    \"respect_tiled_min_size\": %s,\n",
-		settings.respect_tiled_min_size ? "true" : "false");
-	ipc_buff(&b, "    \"focus_wrapping\": %s,\n", settings.focus_wrapping ? "true" : "false");
+		str_bool_text(settings.respect_tiled_min_size));
+	ipc_buff(&b, "    \"focus_wrapping\": %s,\n", str_bool_text(settings.focus_wrapping));
 	const char *focus_on_activate = ipc_enum_name(focus_on_activate_values,
 		settings.focus_on_activate);
 	const char *follows = ipc_enum_name(follows_values, settings.focus_follows_mouse);
 
 	ipc_buff(&b, "    \"focus_on_activate\": \"%s\",\n", focus_on_activate ? focus_on_activate : "?");
 	ipc_buff(&b, "    \"focus_follows_mouse\": \"%s\",\n", follows ? follows : "?");
-	ipc_buff(&b, "    \"record_history\": %s,\n", settings.record_history ? "true" : "false");
+	ipc_buff(&b, "    \"record_history\": %s,\n", str_bool_text(settings.record_history));
 	ipc_buff(&b, "    \"shadow_size\": %.1f,\n", settings.shadow_size);
 	ipc_buff(&b, "    \"shadow_offset_x\": %.1f,\n", settings.shadow_offset_x);
 	ipc_buff(&b, "    \"shadow_offset_y\": %.1f,\n", settings.shadow_offset_y);
@@ -189,7 +189,7 @@ static char *state_read_file(const char *path, char *err, size_t errsz) {
 static bool state_value_arg(const json_value_t *value, char *buf, size_t bufsz) {
 	switch (value->type) {
 	case JSON_BOOL:
-		snprintf(buf, bufsz, "%s", value->value.boolean ? "true" : "false");
+		snprintf(buf, bufsz, "%s", str_bool_text(value->value.boolean));
 		return true;
 	case JSON_NUMBER:
 		snprintf(buf, bufsz, "%.10g", value->value.number);

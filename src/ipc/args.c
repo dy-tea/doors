@@ -118,28 +118,7 @@ bool ipc_parse_float(const char *s, float min, float max, float *out) {
 }
 
 bool ipc_parse_bool(const char *s, bool *out) {
-	static const cfg_enum_value_t bools[] = {
-		{"true", 1},
-		{"on", 1},
-		{"1", 1},
-		{"yes", 1},
-		{"false", 0},
-		{"off", 0},
-		{"0", 0},
-		{"no", 0},
-		IPC_ENUM_END,
-	};
-
-	if (s == NULL)
-		return false;
-
-	for (const cfg_enum_value_t *e = bools; e->name; e++) {
-		if (strcmp(s, e->name) == 0) {
-			*out = e->value != 0;
-			return true;
-		}
-	}
-	return false;
+	return str_parse_bool(s, out);
 }
 
 static void fail_range(ipc_args_t *a, const char *what, double min, double max) {
@@ -282,7 +261,7 @@ bool ipc_toggle(ipc_args_t *a, bool *cur) {
 	return true;
 }
 
-bool ipc_enum(ipc_args_t *a, const char *what, const cfg_enum_value_t *tbl, long *out) {
+bool ipc_enum(ipc_args_t *a, const char *what, const str_pair_t *tbl, long *out) {
 	const char *arg;
 	if (!ipc_need(a, what, &arg))
 		return false;
@@ -290,38 +269,34 @@ bool ipc_enum(ipc_args_t *a, const char *what, const cfg_enum_value_t *tbl, long
 	return ipc_enum_names(a, what, arg, tbl, out);
 }
 
-bool ipc_enum_names(ipc_args_t *a, const char *what, const char *arg, const cfg_enum_value_t *tbl,
+bool ipc_enum_names(ipc_args_t *a, const char *what, const char *arg, const str_pair_t *tbl,
 		long *out) {
-	for (const cfg_enum_value_t *e = tbl; e->name; e++) {
-		if (strcmp(arg, e->name) == 0) {
-			*out = e->value;
-			return true;
-		}
+	const str_pair_t *e = str_table_find(tbl, arg);
+	if (e) {
+		*out = e->value;
+		return true;
 	}
 
 	ipc_buf_t b;
 	char list[512];
 	ipc_buf_init(&b, list, sizeof(list));
-	for (const cfg_enum_value_t *e = tbl; e->name; e++)
-		ipc_buff(&b, "%s\"%s\"", b.len > 0 ? ", " : "", e->name);
+	for (e = tbl; e->name; e++)
+		ipc_buff_sep(&b, ", ", "\"%s\"", e->name);
 
 	ipc_fail(a, "Expected %s to be one of: %s\n", what, list);
 	return false;
 }
 
-bool ipc_enum_opt(ipc_args_t *a, const char *what, const cfg_enum_value_t *tbl, long *out) {
+bool ipc_enum_opt(ipc_args_t *a, const char *what, const str_pair_t *tbl, long *out) {
 	if (!ipc_peek(a))
 		return false;
 
 	return ipc_enum(a, what, tbl, out);
 }
 
-const char *ipc_enum_name(const cfg_enum_value_t *tbl, long value) {
-	for (const cfg_enum_value_t *e = tbl; e->name; e++) {
-		if (e->value == value)
-			return e->name;
-	}
-	return NULL;
+const char *ipc_enum_name(const str_pair_t *tbl, long value) {
+	const str_pair_t *e = str_table_find_value(tbl, value);
+	return e ? e->name : NULL;
 }
 
 void ipc_buf_init(ipc_buf_t *b, char *buf, size_t cap) {
@@ -334,7 +309,7 @@ void ipc_buf_init(ipc_buf_t *b, char *buf, size_t cap) {
 		buf[0] = '\0';
 }
 
-void ipc_buff(ipc_buf_t * b, const char *fmt, ...) {
+static void ipc_buffv(ipc_buf_t *b, const char *fmt, va_list ap) {
 	if (b->cap == 0)
 		return;
 
@@ -345,10 +320,7 @@ void ipc_buff(ipc_buf_t * b, const char *fmt, ...) {
 		return;
 	}
 
-	va_list ap;
-	va_start(ap, fmt);
 	int n = vsnprintf(b->buf + b->len, room + 1, fmt, ap);
-	va_end(ap);
 
 	if (n < 0) {
 		b->truncated = true;
@@ -362,6 +334,23 @@ void ipc_buff(ipc_buf_t * b, const char *fmt, ...) {
 	}
 }
 
+void ipc_buff(ipc_buf_t * b, const char *fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+	ipc_buffv(b, fmt, ap);
+	va_end(ap);
+}
+
+void ipc_buff_sep(ipc_buf_t * b, const char *sep, const char *fmt, ...) {
+	if (b->len > 0 && sep)
+		ipc_buff(b, "%s", sep);
+
+	va_list ap;
+	va_start(ap, fmt);
+	ipc_buffv(b, fmt, ap);
+	va_end(ap);
+}
+
 void ipc_buf_send(ipc_args_t *a, const ipc_buf_t *b) {
 	send_success(a->fd, b->buf);
 }
@@ -370,13 +359,13 @@ static bool sub_matches(const ipc_sub_t *sub, const char *arg) {
 	if (sub->match && sub->match(arg, sub))
 		return true;
 
-	if (sub->flag && strcmp(arg, sub->flag) == 0)
+	if (sub->flag && streq(arg, sub->flag))
 		return true;
-	if (sub->lname && strcmp(arg, sub->lname) == 0)
+	if (sub->lname && streq(arg, sub->lname))
 		return true;
 
 	for (const char *alias = sub->aliases; alias && *alias; alias += strlen(alias) + 1) {
-		if (strcmp(arg, alias) == 0)
+		if (streq(arg, alias))
 			return true;
 	}
 	return false;

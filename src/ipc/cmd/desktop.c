@@ -48,7 +48,7 @@ static void swap_desktops(desktop_t *d0, desktop_t *d1) {
 	}
 }
 
-static const cfg_enum_value_t layout_values[] = {
+static const str_pair_t layout_values[] = {
 	{"tiled", LAYOUT_TILED},
 	{"monocle", LAYOUT_MONOCLE},
 	{"scroller", LAYOUT_SCROLLER},
@@ -57,7 +57,7 @@ static const cfg_enum_value_t layout_values[] = {
 	IPC_ENUM_END,
 };
 
-static const cfg_enum_value_t bubble_values[] = {
+static const str_pair_t bubble_values[] = {
 	{"up", -1},
 	{"prev", -1},
 	{"down", 1},

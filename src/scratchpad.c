@@ -7,6 +7,7 @@
 #include "protocol/xwayland.h"
 #include "scratchpad.h"
 #include "server.h"
+#include "str.h"
 #include "transaction.h"
 #include "tree.h"
 #include "tree_focus.h"
@@ -365,8 +366,8 @@ node_t *scratchpad_find_by_app_id(const char *app_id) {
 
 	scratchpad_entry_t *entry;
 	wl_list_for_each(entry, &scratchpad_list, link) {
-		if (entry->node != NULL && entry->node->client != NULL && strcmp(entry->node->client->app_id,
-			app_id) == 0)
+		if (entry->node != NULL && entry->node->client != NULL && streq(entry->node->client->app_id,
+			app_id))
 			return entry->node;
 	}
 	return NULL;
@@ -378,8 +379,8 @@ node_t *scratchpad_find_by_title(const char *title) {
 
 	scratchpad_entry_t *entry;
 	wl_list_for_each(entry, &scratchpad_list, link) {
-		if (entry->node != NULL && entry->node->client != NULL && strcmp(entry->node->client->title,
-			title) == 0)
+		if (entry->node != NULL && entry->node->client != NULL && streq(entry->node->client->title,
+			title))
 			return entry->node;
 	}
 	return NULL;

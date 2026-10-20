@@ -13,6 +13,7 @@
 #include "protocol/workspace.h"
 #include "protocol/xwayland.h"
 #include "server.h"
+#include "str.h"
 #include "tree.h"
 #include "types.h"
 #include <stdlib.h>
@@ -775,7 +776,7 @@ output_t *output_at(double x, double y) {
 output_t *find_output_by_name(const char *name) {
 	output_t *m;
 	wl_list_for_each(m, &mon_list, link)
-		if (strcmp(m->name, name) == 0)
+		if (streq(m->name, name))
 			return m;
 	return NULL;
 }
