@@ -121,6 +121,17 @@ typedef enum {
 #define BIND_ACTION_COUNT (BIND_MOVE_COLUMN_LAST + 1)
 
 typedef enum {
+	BINDF_NONE = 0,
+	BINDF_LOCKED = 1 << 0,
+	BINDF_RELEASE = 1 << 1,
+	BINDF_REPEAT = 1 << 2,
+	BINDF_NON_CONSUMING = 1 << 3,
+	BINDF_IGNORE_MODS = 1 << 4,
+	BINDF_SUBMAP_UNIVERSAL = 1 << 5,
+	BINDF_CATCH_ALL = 1 << 6,
+} bind_flag_t;
+
+typedef enum {
 	KEYBOARD_GROUP_DEFAULT,
 	KEYBOARD_GROUP_NONE,
 	KEYBOARD_GROUP_SMART,
@@ -146,9 +157,17 @@ typedef struct {
 	bool use_keycode;
 	bind_action_t action;
 	int desktop_index;
+	uint32_t flags; // bind_flag_t bitmask
 	char submap_name[MAXLEN];
 	char external_cmd[MAXLEN];
 } keybind_t;
+
+#define bind_keycode_is_mouse(keycode) ((keycode) >= MOUSE_BUTTON_SYNTH_KEYCODE_BASE)
+
+typedef struct bind_event_result_t {
+	bool consumed, forward;
+	keybind_t *bind;
+} bind_event_result_t;
 
 typedef struct {
 	enum gesture_type type;
@@ -218,9 +237,20 @@ void execute_bind_action(bind_action_t action);
 bind_action_t bind_action_from_name(const char *name);
 const char *bind_action_name(bind_action_t action);
 
+bool parse_bind_flags(const char *str, uint32_t *out_flags);
+char *bind_flags_text(uint32_t flags, char *buf, size_t size);
+
+// parses a "<modifiers>+ <key>[ [flags]]> " hotkey specification.
+const char *parse_hotkey_spec(const char *spec, uint32_t *modifiers, xkb_keysym_t *keysym,
+	uint32_t *keycode, bool *use_keycode, uint32_t *flags);
+
 uint32_t parse_modifiers(const char *mod_str);
 xkb_keysym_t parse_keysym(const char *name);
 uint32_t parse_keycode(const char *name);
 bind_action_t parse_action(const char *cmd, int *desktop_index, char *submap_name);
 void add_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode, bool use_keycode,
-	bind_action_t action, int desktop_index, const char *external_cmd, const char *submap_name);
+	uint32_t flags, bind_action_t action, int desktop_index, const char *external_cmd,
+	const char *submap_name);
+submap_t *find_submap_by_name(const char *name);
+keybind_t *find_release_bind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode,
+	const char *submap_at_press);

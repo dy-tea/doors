@@ -431,6 +431,47 @@ Format:
 
 Combine modifiers with `+`, e.g., `alt + shift + q`
 
+Additional recognized modifier names: `mod1` (= alt), `mod2`/`num`/`numlock`, `mod3`, `mod5`, `caps`/`capslock` (Caps Lock modifier).
+
+### Bind Flags
+
+A hotkey spec may end with a bracketed, comma-separated list of flags that change how the bind is dispatched:
+
+```
+alt + f [locked, release]
+	blur toggle
+```
+
+- `release` - fire when the key/button is released instead of pressed. Matching happens against the modifiers and submap that were active at press time, so holding the right modifiers before pressing matters even if they change mid-press. Not usable with `repeat` or interactive actions.
+- `repeat` - hold-to-repeat: after the configured keyboard repeat delay, the command re-fires at the keyboard repeat rate. Not usable with mouse buttons or `release`.
+- `locked` - allow the bind to run while the session is locked (session-lock protocol, e.g. an active lock screen). Without this flag, binds are ignored while locked.
+- `non_consuming` - do not swallow the key: the bind runs AND the key event is still forwarded to the focused client.
+- `ignore_mods` - match this bind regardless of which extra modifiers are currently held.
+- `universal` (or `submap_universal`) - for a global bind (one written outside any `@submap` block): also dispatch while any submap is active, where globals are normally inactive.
+- `catch_all` (or `catchall`) - only valid inside a submap: matches every key press that no other bind in the submap claimed (without it, unclaimed keys fall through to clients). Also usable as the key itself:
+
+```
+@fkeys
+
+	alt + f
+		doorsctl hotkey ...
+
+	catchall
+		doorsctl notify "no bind for that key"
+
+	f [repeat, non_consuming]
+		@exit
+
+# any unindented line after this leaves the submap context
+```
+
+The digit key names `1`-`9` and `0` match their raw evdev keycodes (2-11), so they bind the top-row number keys regardless of layout:
+
+```
+1
+	doorsctl desktop goto 1
+```
+
 ### Mouse Button Bindings
 
 Mouse buttons can be used in hotkey bindings for both custom commands and built-in interactions on floating windows.
@@ -1535,25 +1576,20 @@ doorsctl hotkey list
 ```
 
 List all currently registered keybinds. Tab-separated columns: index, modifier combination, key name, and action (built-in name or external shell command).
-Submap membership is shown in brackets (e.g. `focus_west [submap: focus]`).
+Submap membership is shown in brackets (e.g. `focus_west [submap: focus]`), bind flags likewise (e.g. `[flags: release,repeat]`).
 
 ```
 doorsctl hotkey <modifiers+key> <command> [args...]
 ```
 
-Register a new keybind at runtime. The `<modifiers+key>` syntax matches
-`doorshkrc` (e.g. `alt+d`, `super+shift+Return`). The command and its
-arguments are joined and parsed the same way as the config file - commands
-prefixed with `doorsctl` are mapped to built-in actions; anything else is
-executed as a shell command.
-
 Examples:
 
 ```
-doorsctl hotkey "alt+d" doorsctl desktop --focus next
+doorsctl hotkey "alt+d" doorsctl desktop -f next
 doorsctl hotkey "super+Return" foot
 doorsctl hotkey "alt+shift+l" doorsctl toggle floating
 doorsctl hotkey "ctrl+alt+t" doorsctl node --state tiled
+doorsctl hotkey "alt+m [release, non_consuming]" doorsctl toggle monocle
 ```
 
 ### Equalize/Balance Commands

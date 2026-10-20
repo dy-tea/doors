@@ -93,5 +93,9 @@ void resize_down(void);
 void cancel_presel(void);
 
 // keybind processing
-bool handle_keybind(uint32_t modifiers, xkb_keysym_t sym);
-keybind_t *handle_keybind_raw(uint32_t modifiers, uint32_t keycode, bool pressed);
+bind_event_result_t handle_keybind(uint32_t modifiers, xkb_keysym_t sym);
+bind_event_result_t handle_keybind_raw(uint32_t modifiers, uint32_t keycode, bool pressed,
+	xkb_keysym_t keysym_for_arming);
+
+void bind_state_reset(void);
+void cancel_bind_repeat(void);

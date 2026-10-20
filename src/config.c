@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/inotify.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -87,18 +88,43 @@ uint32_t parse_modifiers(const char *mod_str) {
 		while (end > token && *end == ' ')
 			*end-- = '\0';
 
-		if (strcmp(token, "super") == 0 || strcmp(token, "Mod4") == 0) {
-			mods |= WLR_MODIFIER_LOGO;
-		} else if (strcmp(token, "alt") == 0 || strcmp(token, "Mod1") == 0) {
-			mods |= WLR_MODIFIER_ALT;
-		} else if (strcmp(token, "ctrl") == 0 || strcmp(token, "Control") == 0) {
-			mods |= WLR_MODIFIER_CTRL;
-		} else if (strcmp(token, "shift") == 0 || strcmp(token, "Shift") == 0) {
-			mods |= WLR_MODIFIER_SHIFT;
-		} else if (strcmp(token, "mod4") == 0) {
-			mods |= WLR_MODIFIER_LOGO;
-		} else if (strcmp(token, "mod1") == 0) {
-			mods |= WLR_MODIFIER_ALT;
+		typedef struct {
+			char *name;
+			enum wlr_keyboard_modifier modifier;
+		} mod_name_t;
+
+		mod_name_t mod_map[] = {
+			{"super", WLR_MODIFIER_LOGO},
+			{"Mod4", WLR_MODIFIER_LOGO},
+			{"mod4", WLR_MODIFIER_LOGO},
+			{"alt", WLR_MODIFIER_ALT},
+			{"Mod1", WLR_MODIFIER_ALT},
+			{"mod1", WLR_MODIFIER_ALT},
+			{"ctrl", WLR_MODIFIER_CTRL},
+			{"Control", WLR_MODIFIER_CTRL},
+			{"shift", WLR_MODIFIER_SHIFT},
+			{"Shift", WLR_MODIFIER_SHIFT},
+			{"caps", WLR_MODIFIER_CAPS},
+			{"Caps", WLR_MODIFIER_CAPS},
+			{"capslock", WLR_MODIFIER_CAPS},
+			{"Capslock", WLR_MODIFIER_CAPS},
+			{"num", WLR_MODIFIER_MOD2},
+			{"Num", WLR_MODIFIER_MOD2},
+			{"numlock", WLR_MODIFIER_MOD2},
+			{"Numlock", WLR_MODIFIER_MOD2},
+			{"mod2", WLR_MODIFIER_MOD2},
+			{"Mod2", WLR_MODIFIER_MOD2},
+			{"mod3", WLR_MODIFIER_MOD3},
+			{"Mod3", WLR_MODIFIER_MOD3},
+			{"mod5", WLR_MODIFIER_MOD5},
+			{"Mod5", WLR_MODIFIER_MOD5},
+		};
+
+		for (int i = 0; i != sizeof(mod_map) / sizeof(mod_name_t); ++i) {
+			if (strcmp(token, mod_map[i].name) == 0) {
+				mods |= mod_map[i].modifier;
+				break;
+			}
 		}
 
 		token = strtok_r(NULL, "+", &saveptr);
@@ -138,6 +164,171 @@ uint32_t parse_keycode(const char *name) {
 		return 11;
 
 	return 0;
+}
+
+typedef struct {
+	const char *name;
+	uint32_t flag;
+} bind_flag_name_t;
+
+static const bind_flag_name_t bind_flag_names[] = {
+	{"locked", BINDF_LOCKED},
+	{"release", BINDF_RELEASE},
+	{"repeat", BINDF_REPEAT},
+	{"non_consuming", BINDF_NON_CONSUMING},
+	{"ignore_mods", BINDF_IGNORE_MODS},
+	{"universal", BINDF_SUBMAP_UNIVERSAL},
+	{"submap_universal", BINDF_SUBMAP_UNIVERSAL},
+	{"catch_all", BINDF_CATCH_ALL},
+	{"catchall", BINDF_CATCH_ALL},
+};
+
+bool parse_bind_flags(const char *str, uint32_t *out_flags) {
+	if (out_flags)
+		*out_flags = 0;
+	if (!str || str[0] == '\0')
+		return true;
+
+	char buf[MAXLEN];
+	snprintf(buf, sizeof(buf), "%s", str);
+
+	bool ok = true;
+	uint32_t flags = 0;
+	char *saveptr = NULL;
+	for (char *token = strtok_r(buf, ", \t", &saveptr); token; token = strtok_r(NULL, ", \t",
+			&saveptr)) {
+		bool found = false;
+		for (size_t i = 0; i < sizeof(bind_flag_names) / sizeof(bind_flag_names[0]); i++) {
+			if (strcasecmp(token, bind_flag_names[i].name) == 0) {
+				flags |= bind_flag_names[i].flag;
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			wlr_log(WLR_ERROR, "Unknown bind flag '%s'", token);
+			ok = false;
+		}
+	}
+
+	if (ok && out_flags)
+		*out_flags = flags;
+	return ok;
+}
+
+char *bind_flags_text(uint32_t flags, char *buf, size_t size) {
+	buf[0] = '\0';
+	if (flags == 0)
+		return buf;
+
+	for (size_t i = 0; i < sizeof(bind_flag_names) / sizeof(bind_flag_names[0]); i++) {
+		if (!(flags & bind_flag_names[i].flag))
+			continue;
+		if (buf[0])
+			snprintf(buf + strlen(buf), size - strlen(buf), ",%s", bind_flag_names[i].name);
+		else
+			snprintf(buf, size, "%s", bind_flag_names[i].name);
+	}
+	return buf;
+}
+
+const char *parse_hotkey_spec(const char *spec, uint32_t *modifiers, xkb_keysym_t *keysym,
+		uint32_t *keycode, bool *use_keycode, uint32_t *flags) {
+	if (modifiers)
+		*modifiers = 0;
+	if (keysym)
+		*keysym = XKB_KEY_NoSymbol;
+	if (keycode)
+		*keycode = 0;
+	if (use_keycode)
+		*use_keycode = false;
+	if (flags)
+		*flags = 0;
+
+	if (!spec)
+		return "No hotkey given";
+
+	char buf[MAXLEN * 2];
+	snprintf(buf, sizeof(buf), "%s", spec);
+
+	char *bracket = strrchr(buf, '[');
+	if (bracket) {
+		char *end = strchr(bracket, ']');
+		if (end) {
+			uint32_t parsed = 0;
+			*end = '\0';
+			if (parse_bind_flags(bracket + 1, &parsed)) {
+				*bracket = '\0';
+				if (flags)
+					*flags = parsed;
+			}
+		}
+	}
+
+	uint32_t mods = 0;
+	xkb_keysym_t sym = XKB_KEY_NoSymbol;
+	uint32_t kc = 0;
+	bool use_kc = false;
+
+	bool is_catchall = false;
+	char *left = strrchr(buf, '+');
+	if (left) {
+		*left = '\0';
+		mods = parse_modifiers(buf);
+		char *key_part = left + 1;
+		while (*key_part == ' ')
+			key_part++;
+		char *kp_end = key_part + strlen(key_part);
+		while (kp_end > key_part && kp_end[-1] == ' ')
+			*--kp_end = '\0';
+		if (strcasecmp(key_part, "catchall") == 0)
+			is_catchall = true;
+		else {
+			sym = parse_keysym(key_part);
+			kc = parse_keycode(key_part);
+			if (kc > 0)
+				use_kc = true;
+		}
+	} else {
+		char *key_part = buf;
+		while (*key_part == ' ')
+			key_part++;
+		char *kp_end = key_part + strlen(key_part);
+		while (kp_end > key_part && kp_end[-1] == ' ')
+			*--kp_end = '\0';
+		if (strcasecmp(key_part, "catchall") == 0)
+			is_catchall = true;
+		else {
+			sym = parse_keysym(key_part);
+			kc = parse_keycode(key_part);
+			if (kc > 0)
+				use_kc = true;
+		}
+	}
+
+	if (is_catchall) {
+		if (flags)
+			*flags |= BINDF_CATCH_ALL;
+		if (mods != 0)
+			wlr_log(WLR_ERROR, "Mods on a catchall bind are ignored");
+		mods = 0;
+		sym = XKB_KEY_NoSymbol;
+		kc = 0;
+		use_kc = false;
+	} else if (sym == XKB_KEY_NoSymbol && kc == 0) {
+		return "Unknown keysym";
+	}
+
+	if (modifiers)
+		*modifiers = mods;
+	if (keysym)
+		*keysym = sym;
+	if (keycode)
+		*keycode = kc;
+	if (use_keycode)
+		*use_keycode = use_kc;
+
+	return NULL;
 }
 
 typedef struct {
@@ -462,8 +653,35 @@ static char *expand_sequence(const char *input, char *output, size_t out_size) {
 	return output;
 }
 
+static bool bind_flags_valid(const keybind_t *kb, bind_action_t action) {
+	if ((kb->flags & BINDF_REPEAT) && (kb->flags & BINDF_RELEASE)) {
+		wlr_log(WLR_ERROR, "A bind cannot be both repeat and release");
+		return false;
+	}
+
+	if (bind_keycode_is_mouse(kb->keycode)) {
+		if (kb->flags & BINDF_REPEAT) {
+			wlr_log(WLR_ERROR, "Mouse binds cannot repeat");
+			return false;
+		}
+		if (kb->flags & BINDF_NON_CONSUMING) {
+			wlr_log(WLR_ERROR, "Mouse binds cannot be non_consuming");
+			return false;
+		}
+	}
+
+	if ((kb->flags & BINDF_RELEASE) && (action == BIND_INTERACTIVE_MOVE ||
+			action == BIND_INTERACTIVE_RESIZE || action == BIND_TILING_DRAG)) {
+		wlr_log(WLR_ERROR, "Interactive binds are driven by the press, not release");
+		return false;
+	}
+
+	return true;
+}
+
 void add_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode, bool use_keycode,
-		bind_action_t action, int desktop_index, const char *external_cmd, const char *submap_name) {
+		uint32_t flags, bind_action_t action, int desktop_index, const char *external_cmd,
+		const char *submap_name) {
 	size_t *num_ptr;
 	keybind_t *kb_array;
 
@@ -484,6 +702,16 @@ void add_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode, bool
 		kb_array = keybinds;
 	}
 
+	keybind_t preview = {
+		.modifiers = modifiers,
+		.keysym = keysym,
+		.keycode = keycode,
+		.use_keycode = use_keycode,
+		.flags = flags,
+	};
+	if (!bind_flags_valid(&preview, action))
+		return;
+
 	keybind_t *kb = &kb_array[(*num_ptr)++];
 	kb->modifiers = modifiers;
 	kb->keysym = keysym;
@@ -491,6 +719,7 @@ void add_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode, bool
 	kb->use_keycode = use_keycode;
 	kb->action = action;
 	kb->desktop_index = desktop_index;
+	kb->flags = flags;
 	if (submap_name)
 		snprintf(kb->submap_name, sizeof(kb->submap_name), "%s", submap_name);
 	else
@@ -500,8 +729,11 @@ void add_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode, bool
 	else
 		kb->external_cmd[0] = '\0';
 
-	wlr_log(WLR_DEBUG, "Added keybind: mod=%u keysym=%u keycode=%u action=%d index=%d submap=%s",
-		modifiers, keysym, keycode, action, desktop_index, submap_name ? submap_name : "global");
+	char flag_text[128];
+	bind_flags_text(flags, flag_text, sizeof(flag_text));
+	wlr_log(WLR_DEBUG,
+		"Added keybind: mod=%u keysym=%u keycode=%u action=%d index=%d flags=%s submap=%s", modifiers,
+		keysym, keycode, action, desktop_index, flag_text, submap_name ? submap_name : "global");
 }
 
 static void add_gesturebind(enum gesture_type type, uint8_t fingers, uint32_t directions,
@@ -690,44 +922,32 @@ static void parse_hotkey_line(const char *hotkey_str, const char *command_str) {
 		xkb_keysym_t keysym = XKB_KEY_NoSymbol;
 		uint32_t keycode = 0;
 		bool use_keycode = false;
+		uint32_t flags = 0;
 
-		char hotkey_copy[MAXLEN];
-		snprintf(hotkey_copy, sizeof(hotkey_copy), "%s", single_hotkey);
-
-		char *plus = strrchr(hotkey_copy, '+');
-		if (plus) {
-			*plus = '\0';
-			modifiers = parse_modifiers(hotkey_copy);
-			char *key_part = plus + 1;
-			while (*key_part == ' ')
-				key_part++;
-			keysym = parse_keysym(key_part);
-			keycode = parse_keycode(key_part);
-			if (keycode > 0)
-				use_keycode = true;
-		} else {
-			keysym = parse_keysym(single_hotkey);
-			keycode = parse_keycode(single_hotkey);
-			if (keycode > 0)
-				use_keycode = true;
+		const char *error = parse_hotkey_spec(single_hotkey, &modifiers, &keysym, &keycode, &use_keycode,
+			&flags);
+		if (error) {
+			wlr_log(WLR_ERROR, "Invalid hotkey '%s': %s", single_hotkey, error);
+			continue;
 		}
 
-		if (keysym == XKB_KEY_NoSymbol && keycode == 0) {
-			wlr_log(WLR_ERROR, "Unknown keysym: %s", single_hotkey);
-		} else {
-			int desktop_index = 0;
-			char submap_name[MAXLEN];
-			submap_name[0] = '\0';
-			bind_action_t action = parse_action(single_cmd, &desktop_index, submap_name);
-			wlr_log(WLR_DEBUG, "Parsed action: %d for cmd: '%s' submap: '%s'", action, single_cmd,
-				submap_name);
-			if (action != BIND_EXTERNAL)
-				add_keybind(modifiers, keysym, keycode, use_keycode, action, desktop_index, NULL,
-					submap_name[0] ? submap_name : NULL);
-			else
-				add_keybind(modifiers, keysym, keycode, use_keycode, action, desktop_index, single_cmd,
-					submap_name[0] ? submap_name : NULL);
+		if (flags & BINDF_CATCH_ALL && current_parsing_submap == NULL) {
+			wlr_log(WLR_ERROR, "Catch-all binds are only allowed inside a submap");
+			continue;
 		}
+
+		int desktop_index = 0;
+		char submap_name[MAXLEN];
+		submap_name[0] = '\0';
+		bind_action_t action = parse_action(single_cmd, &desktop_index, submap_name);
+		wlr_log(WLR_DEBUG, "Parsed action: %d for cmd: '%s' submap: '%s'", action, single_cmd,
+			submap_name);
+		if (action != BIND_EXTERNAL)
+			add_keybind(modifiers, keysym, keycode, use_keycode, flags, action, desktop_index, NULL,
+				submap_name[0] ? submap_name : NULL);
+		else
+			add_keybind(modifiers, keysym, keycode, use_keycode, flags, action, desktop_index, single_cmd,
+				submap_name[0] ? submap_name : NULL);
 	}
 }
 
@@ -809,6 +1029,7 @@ void load_hotkeys(const char *config_path) {
 		return;
 	}
 
+	bind_state_reset();
 	num_keybinds = 0;
 	num_submaps = 0;
 	num_hotcornerbinds = 0;
@@ -1059,18 +1280,35 @@ bool keybind_matches(const keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysy
 	if (!kb)
 		return false;
 
-	if (kb->use_keycode)
-		return (kb->modifiers == modifiers) && (kb->keycode == keycode);
-	else {
-		if (kb->modifiers == modifiers && kb->keysym == keysym)
-			return true;
-		if (kb->modifiers == modifiers) {
-			xkb_keysym_t lower = xkb_keysym_to_lower(keysym);
-			if (kb->keysym == lower)
-				return true;
-		}
-		return false;
+	bool mods_ok;
+	if (kb->flags & BINDF_IGNORE_MODS) {
+		mods_ok = (modifiers & kb->modifiers) == kb->modifiers;
+	} else {
+		mods_ok = kb->modifiers == modifiers;
 	}
+
+	if (kb->use_keycode)
+		return mods_ok && (kb->keycode == keycode);
+
+	if (!mods_ok)
+		return false;
+
+	if (kb->keysym == keysym)
+		return true;
+	xkb_keysym_t lower = xkb_keysym_to_lower(keysym);
+	return kb->keysym == lower;
+}
+
+static bool keybind_matches_now(const keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysym,
+		uint32_t keycode, bool prefer_keycode) {
+	if (kb->use_keycode != prefer_keycode)
+		return false;
+	return keybind_matches(kb, modifiers, keysym, keycode);
+}
+
+// true for binds that only participate in release-triggered (or catchall) matching
+static bool keybind_is_deferred(const keybind_t *kb) {
+	return (kb->flags & (BINDF_RELEASE | BINDF_CATCH_ALL)) != 0;
 }
 
 keybind_t *find_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode,
@@ -1078,16 +1316,66 @@ keybind_t *find_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycod
 	if (active_submap) {
 		for (size_t i = 0; i < active_submap->num_keybinds; i++) {
 			keybind_t *kb = &active_submap->keybinds[i];
-			if (kb->use_keycode == prefer_keycode && keybind_matches(kb, modifiers, keysym, keycode))
+			if (keybind_is_deferred(kb))
+				continue;
+			if (keybind_matches_now(kb, modifiers, keysym, keycode, prefer_keycode))
 				return kb;
 		}
+
+		// universal binds
+		for (size_t i = 0; i < num_keybinds; i++) {
+			keybind_t *kb = &keybinds[i];
+			if (keybind_is_deferred(kb) || !(kb->flags & BINDF_SUBMAP_UNIVERSAL))
+				continue;
+			if (keybind_matches_now(kb, modifiers, keysym, keycode, prefer_keycode))
+				return kb;
+		}
+
 		if (!fallback_to_global)
 			return NULL;
 	}
 
 	for (size_t i = 0; i < num_keybinds; i++) {
 		keybind_t *kb = &keybinds[i];
-		if (kb->use_keycode == prefer_keycode && keybind_matches(kb, modifiers, keysym, keycode))
+		if (keybind_is_deferred(kb))
+			continue;
+		if (keybind_matches_now(kb, modifiers, keysym, keycode, prefer_keycode))
+			return kb;
+	}
+
+	return NULL;
+}
+
+submap_t *find_submap_by_name(const char *name) {
+	if (!name || name[0] == '\0')
+		return NULL;
+
+	for (size_t i = 0; i < num_submaps; i++)
+		if (strcmp(submaps[i].name, name) == 0)
+			return &submaps[i];
+
+	return NULL;
+}
+
+keybind_t *find_release_bind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode,
+		const char *submap_at_press) {
+	submap_t *sm = submap_at_press ? find_submap_by_name(submap_at_press) : NULL;
+	if (sm) {
+		for (size_t i = 0; i < sm->num_keybinds; i++) {
+			keybind_t *kb = &sm->keybinds[i];
+			if (!(kb->flags & BINDF_RELEASE))
+				continue;
+			if (keybind_matches(kb, modifiers, keysym, keycode))
+				return kb;
+		}
+		return NULL;
+	}
+
+	for (size_t i = 0; i < num_keybinds; i++) {
+		keybind_t *kb = &keybinds[i];
+		if (!(kb->flags & BINDF_RELEASE))
+			continue;
+		if (keybind_matches(kb, modifiers, keysym, keycode))
 			return kb;
 	}
 

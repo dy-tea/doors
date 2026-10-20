@@ -43,6 +43,12 @@ static void hotkey_list(ipc_args_t *a) {
 		else
 			snprintf(action_buf, sizeof(action_buf), "%s", action_label);
 
+		char flags_buf[64];
+		bind_flags_text(kb->flags, flags_buf, sizeof(flags_buf));
+		if (flags_buf[0])
+			snprintf(action_buf + strlen(action_buf), sizeof(action_buf) - strlen(action_buf), " [flags: %s]",
+				flags_buf);
+
 		ipc_buff(&b, "%zu\t%s\t%s\t%s\n", i, mods[0] ? mods : "(none)", key_name, action_buf);
 	}
 	ipc_buff(&b, "Total: %zu keybinds\n", num_keybinds);
@@ -54,34 +60,20 @@ static void hotkey_add(ipc_args_t *a) {
 	if (!ipc_need(a, "<modifiers+key>", &spec))
 		return;
 
-	char hotkey_str[MAXLEN];
-	snprintf(hotkey_str, sizeof(hotkey_str), "%s", spec);
-
 	uint32_t modifiers = 0;
 	xkb_keysym_t keysym = XKB_KEY_NoSymbol;
 	uint32_t keycode = 0;
 	bool use_keycode = false;
+	uint32_t flags = 0;
 
-	char *plus = strrchr(hotkey_str, '+');
-	if (plus) {
-		*plus = '\0';
-		modifiers = parse_modifiers(hotkey_str);
-		char *key_part = plus + 1;
-		while (*key_part == ' ')
-			key_part++;
-		keysym = parse_keysym(key_part);
-		keycode = parse_keycode(key_part);
-		if (keycode > 0)
-			use_keycode = true;
-	} else {
-		keysym = parse_keysym(hotkey_str);
-		keycode = parse_keycode(hotkey_str);
-		if (keycode > 0)
-			use_keycode = true;
+	const char *error = parse_hotkey_spec(spec, &modifiers, &keysym, &keycode, &use_keycode, &flags);
+	if (error) {
+		ipc_fail(a, "Invalid hotkey '%s': %s\n", spec, error);
+		return;
 	}
 
-	if (keysym == XKB_KEY_NoSymbol && keycode == 0) {
-		ipc_fail(a, "Unknown keysym\n");
+	if (flags & BINDF_CATCH_ALL) {
+		ipc_fail(a, "Catch-all binds are only allowed inside a submap\n");
 		return;
 	}
 
@@ -103,7 +95,7 @@ static void hotkey_add(ipc_args_t *a) {
 	submap_name[0] = '\0';
 	bind_action_t action = parse_action(cmd, &desktop_index, submap_name);
 
-	add_keybind(modifiers, keysym, keycode, use_keycode, action, desktop_index,
+	add_keybind(modifiers, keysym, keycode, use_keycode, flags, action, desktop_index,
 		(action == BIND_EXTERNAL) ? cmd : NULL, submap_name[0] ? submap_name : NULL);
 
 	ipc_ok(a, "Hotkey added\n");
@@ -111,7 +103,7 @@ static void hotkey_add(ipc_args_t *a) {
 
 static const ipc_sub_t hotkey_subs[] = {
 	IPC_SUB("list", NULL, "hotkey list", hotkey_list),
-	IPC_SUB("add", NULL, "hotkey add <modifiers+key> <command>", hotkey_add),
+	IPC_SUB("add", NULL, "hotkey add <modifiers+key>[flags] <command>", hotkey_add),
 	IPC_SUB_END,
 };
 

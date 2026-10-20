@@ -706,11 +706,16 @@ void cursor_button(struct wl_listener *listener, void *data) {
 		return;
 	}
 
-	wlr_seat_pointer_notify_button(server.seat, event->time_msec, event->button, event->state);
-	wlr_idle_notifier_v1_notify_activity(server.idle_notifier, server.seat);
-	idle_power_notify_activity();
-
+	bind_event_result_t bind_result = {0};
+	bool claimed = false;
 	if (event->state == WL_POINTER_BUTTON_STATE_RELEASED) {
+		int button_index = (int)event->button - MOUSE_BUTTON_KEYCODE_OFFSET;
+		if (button_index >= 0 && button_index < 5) {
+			bind_result = handle_keybind_raw(modifiers, mouse_button_to_keycode(button_index), false,
+				XKB_KEY_NoSymbol);
+			claimed = bind_result.consumed;
+		}
+
 		if (server.cursor_mode == CURSOR_TILING_DRAG) {
 			tiling_drag_finish();
 			server.cursor_buttons &= ~(1 << (event->button - MOUSE_BUTTON_KEYCODE_OFFSET));
@@ -718,6 +723,9 @@ void cursor_button(struct wl_listener *listener, void *data) {
 		}
 		reset_cursor_mode();
 		server.cursor_buttons &= ~(1 << (event->button - MOUSE_BUTTON_KEYCODE_OFFSET));
+
+		if (claimed)
+			return;
 	} else {
 		// tab bar click
 		if (event->button == BTN_LEFT) {
@@ -783,59 +791,62 @@ void cursor_button(struct wl_listener *listener, void *data) {
 		}
 
 		// add to cursor buttons
-		server.cursor_buttons |= 1 << (event->button - MOUSE_BUTTON_KEYCODE_OFFSET);
+		int button_index = (int)event->button - MOUSE_BUTTON_KEYCODE_OFFSET;
+		server.cursor_buttons |= 1 << button_index;
 
-		// perform binds
-		struct wlr_keyboard *wlr_keyboard = wlr_seat_get_keyboard(server.seat);
-		uint32_t modifiers = wlr_keyboard_get_modifiers(wlr_keyboard);
-		for (uint32_t i = 0; i != 5; ++i) {
-			if (server.cursor_buttons & (1 << i)) {
-				uint32_t keycode = mouse_button_to_keycode(i);
-				keybind_t *matched_kb = handle_keybind_raw(modifiers, keycode, true);
+		if (button_index >= 0 && button_index < 5) {
+			bind_result = handle_keybind_raw(modifiers, mouse_button_to_keycode(button_index), true,
+				XKB_KEY_NoSymbol);
+			claimed = bind_result.consumed;
 
-				if (matched_kb) {
-					view_t *view = NULL;
-					if (type && ((view_t *)type)->node)
-						view = type;
+			if (bind_result.bind) {
+				view_t *view = NULL;
+				if (type && ((view_t *)type)->node)
+					view = type;
 
-					if (view && view->node && view->node->client) {
-						if (matched_kb->action == BIND_TILING_DRAG) {
-							if (IS_TILED(view->node->client))
-								tiling_drag_begin(view->node);
-						} else if (matched_kb->action == BIND_INTERACTIVE_MOVE) {
-							if (view->node->client->state == STATE_FLOATING)
-								view_begin_interactive(view, CURSOR_MOVE, 0);
-							else if (IS_TILED(view->node->client))
-								tiling_drag_begin(view->node);
-						} else if (matched_kb->action == BIND_INTERACTIVE_RESIZE) {
-							client_t *c = view->node->client;
-							desktop_t *d = view->node->desktop;
-							uint32_t edges = 0;
+				if (view && view->node && view->node->client) {
+					if (bind_result.bind->action == BIND_TILING_DRAG) {
+						if (IS_TILED(view->node->client))
+							tiling_drag_begin(view->node);
+					} else if (bind_result.bind->action == BIND_INTERACTIVE_MOVE) {
+						if (view->node->client->state == STATE_FLOATING)
+							view_begin_interactive(view, CURSOR_MOVE, 0);
+						else if (IS_TILED(view->node->client))
+							tiling_drag_begin(view->node);
+					} else if (bind_result.bind->action == BIND_INTERACTIVE_RESIZE) {
+						client_t *c = view->node->client;
+						desktop_t *d = view->node->desktop;
+						uint32_t edges = 0;
 
-							if (c->state == STATE_FLOATING) {
-								// floating resize
-								struct wlr_box rect = c->floating_rectangle;
-								edges = edges_from_cursor(&rect,
-									WLR_EDGE_LEFT | WLR_EDGE_RIGHT | WLR_EDGE_TOP | WLR_EDGE_BOTTOM);
-							} else if (IS_TILED(c)) {
-								// for scroller layouts, only allow horizontal edges (column width resize)
-								if (d && d->layout == LAYOUT_SCROLLER) {
-									struct wlr_box rect = c->tiled_rectangle;
-									edges = edges_from_cursor(&rect, WLR_EDGE_LEFT | WLR_EDGE_RIGHT);
-								} else {
-									struct wlr_box rect = c->tiled_rectangle;
-									edges = edges_from_cursor(&rect, get_tiled_resizable_edges(view->node));
-								}
+						if (c->state == STATE_FLOATING) {
+							// floating resize
+							struct wlr_box rect = c->floating_rectangle;
+							edges = edges_from_cursor(&rect,
+								WLR_EDGE_LEFT | WLR_EDGE_RIGHT | WLR_EDGE_TOP | WLR_EDGE_BOTTOM);
+						} else if (IS_TILED(c)) {
+							// for scroller layouts, only allow horizontal edges (column width resize)
+							struct wlr_box rect = c->tiled_rectangle;
+							if (d && d->layout == LAYOUT_SCROLLER) {
+								edges = edges_from_cursor(&rect, WLR_EDGE_LEFT | WLR_EDGE_RIGHT);
+							} else {
+								edges = edges_from_cursor(&rect, get_tiled_resizable_edges(view->node));
 							}
-
-							if (edges != 0)
-								view_begin_interactive(view, CURSOR_RESIZE, edges);
 						}
+
+						if (edges != 0)
+							view_begin_interactive(view, CURSOR_RESIZE, edges);
 					}
 				}
 			}
+
+			if (claimed)
+				return;
 		}
 	}
+
+	wlr_seat_pointer_notify_button(server.seat, event->time_msec, event->button, event->state);
+	wlr_idle_notifier_v1_notify_activity(server.idle_notifier, server.seat);
+	idle_power_notify_activity();
 }
 
 void cursor_axis(struct wl_listener *listener, void *data) {

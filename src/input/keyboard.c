@@ -101,6 +101,10 @@ keyboard_t *keyboard_create(struct wlr_input_device *device) {
 	return keyboard;
 }
 
+static void schedule_bind_repeat(const keybind_t *kb, keyboard_t *keyboard);
+static bool bind_may_execute(const keybind_t *kb);
+static keybind_t *find_catchall_bind(submap_t *sm);
+
 void keyboard_modifiers(struct wl_listener *listener, void *data) {
 	(void)data;
 	keyboard_t *keyboard = wl_container_of(listener, keyboard, modifiers);
@@ -126,6 +130,7 @@ void keyboard_key(struct wl_listener *listener, void *data) {
 
 	wlr_idle_notifier_v1_notify_activity(server.idle_notifier, wlr_seat);
 	idle_power_notify_activity();
+	cancel_bind_repeat();
 
 	// get keysym
 	uint32_t keycode = event->keycode + 8;
@@ -133,6 +138,7 @@ void keyboard_key(struct wl_listener *listener, void *data) {
 	int nsyms = xkb_state_key_get_syms(keyboard->wlr_keyboard->xkb_state, keycode, &syms);
 
 	bool handled = false;
+	bool forward = false;
 	uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->wlr_keyboard);
 
 	// check keyboard shortcuts inhibitor
@@ -149,15 +155,40 @@ void keyboard_key(struct wl_listener *listener, void *data) {
 	}
 
 	if (!shortcuts_inhibited && event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
-		// first try raw keycode for number keys
-		if (handle_keybind_raw(modifiers, event->keycode, true)) {
-			handled = true;
-		} else {
-			// fallback to keysym
-			for (int i = 0; i < nsyms; i++)
-				if ((handled = handle_keybind(modifiers, syms[i])))
-					break;
+		// raw keycode for number keys
+		bind_event_result_t r = handle_keybind_raw(modifiers, event->keycode, true,
+			nsyms > 0 ? syms[0] : XKB_KEY_NoSymbol);
+		handled = r.consumed;
+		forward = r.forward;
+		if (r.bind && (r.bind->flags & BINDF_REPEAT))
+			schedule_bind_repeat(r.bind, keyboard);
+
+		if (!handled) {
+			// fallback to keysym binds
+			for (int i = 0; i < nsyms && !handled; i++) {
+				bind_event_result_t sym_result = handle_keybind(modifiers, syms[i]);
+				handled = sym_result.consumed;
+				forward = sym_result.forward;
+				if (sym_result.bind && (sym_result.bind->flags & BINDF_REPEAT))
+					schedule_bind_repeat(sym_result.bind, keyboard);
+			}
 		}
+
+		if (!handled && active_submap) {
+			// catch-all bind owns key
+			keybind_t *catchall = find_catchall_bind(active_submap);
+			if (catchall) {
+				handled = true;
+				forward = (catchall->flags & BINDF_NON_CONSUMING) != 0;
+				if (bind_may_execute(catchall))
+					execute_keybind(catchall);
+			}
+		}
+	} else if (!shortcuts_inhibited) {
+		// release events may trigger release-flagged binds
+		bind_event_result_t r = handle_keybind_raw(modifiers, event->keycode, false, XKB_KEY_NoSymbol);
+		handled = r.consumed;
+		forward = r.forward;
 	}
 
 	// xx-hotkey-v1 global shortcuts (client-driven; consumed unless a tap)
@@ -165,7 +196,7 @@ void keyboard_key(struct wl_listener *listener, void *data) {
 		event->state, event->time_msec))
 		handled = true;
 
-	if (!handled) {
+	if (!handled || forward) {
 		// forward key to input method if grabbed
 		if (!input_method_keyboard_grab_forward_key(keyboard->wlr_keyboard, event,
 				seat->input_method_relay)) {
@@ -218,57 +249,231 @@ void keyboard_detach_seat(struct seat_t *seat) {
 			keyboard->seat = NULL;
 }
 
-// keybind handling using raw keycode (for number keys 1-0)
-keybind_t *handle_keybind_raw(uint32_t modifiers, uint32_t keycode, bool pressed) {
-	if (!pressed)
-		return NULL;
+// keybind processing
+#define MAX_BIND_PRESSES 32
 
-	keybind_t *matched_kb = find_keybind(modifiers, 0, keycode, true, true);
-	if (!matched_kb)
-		return NULL;
+typedef struct bind_press_record {
+	bool used;
+	uint32_t keycode;
+	xkb_keysym_t keysym;
+	uint32_t modifiers_at_press;
+	char submap_at_press[MAXLEN];
+} bind_press_record_t;
 
-	if (is_interactive_bind(matched_kb))
-		return matched_kb;
+static bind_press_record_t bind_press_records[MAX_BIND_PRESSES];
 
-	execute_keybind(matched_kb);
-	return matched_kb;
+typedef struct bind_repeat_state {
+	keybind_t kb; // copy, the arrays may be reloaded while repeating
+	int rate;
+	bool active;
+} bind_repeat_state_t;
+
+static bind_repeat_state_t bind_repeat = {0};
+static struct wl_event_source *bind_repeat_source = NULL;
+
+static bind_press_record_t *find_bind_press_record(uint32_t keycode) {
+	for (int i = 0; i < MAX_BIND_PRESSES; i++)
+		if (bind_press_records[i].used && bind_press_records[i].keycode == keycode)
+			return &bind_press_records[i];
+	return NULL;
 }
 
-// keybind handling
-bool handle_keybind(uint32_t modifiers, xkb_keysym_t sym) {
+static void arm_bind_press(uint32_t keycode, xkb_keysym_t keysym, uint32_t modifiers,
+		const char *submap_at_press) {
+	bind_press_record_t *slot = find_bind_press_record(keycode);
+	if (!slot) {
+		for (int i = 0; i < MAX_BIND_PRESSES; i++) {
+			if (!bind_press_records[i].used) {
+				slot = &bind_press_records[i];
+				break;
+			}
+		}
+		if (!slot)
+			slot = &bind_press_records[0];
+	}
+
+	slot->used = true;
+	slot->keycode = keycode;
+	slot->keysym = keysym;
+	slot->modifiers_at_press = modifiers;
+	if (submap_at_press)
+		snprintf(slot->submap_at_press, sizeof(slot->submap_at_press), "%s", submap_at_press);
+	else
+		slot->submap_at_press[0] = '\0';
+}
+
+static bool bind_may_execute(const keybind_t *kb) {
+	return !server.locked || (kb->flags & BINDF_LOCKED);
+}
+
+static const char *current_submap_name(void) {
+	return active_submap ? active_submap->name : NULL;
+}
+
+static keybind_t *find_catchall_bind(submap_t *sm) {
+	for (size_t i = 0; i < sm->num_keybinds; i++)
+		if (sm->keybinds[i].flags & BINDF_CATCH_ALL)
+			return &sm->keybinds[i];
+
+	return NULL;
+}
+
+static int bind_repeat_timer(void *data) {
+	(void)data;
+	if (!bind_repeat.active)
+		return 0;
+
+	if (bind_repeat.rate > 0) {
+		execute_keybind(&bind_repeat.kb);
+		if (bind_repeat_source && bind_repeat.active)
+			wl_event_source_timer_update(bind_repeat_source, 1000 / bind_repeat.rate);
+	}
+	return 0;
+}
+
+void cancel_bind_repeat(void) {
+	if (bind_repeat_source) {
+		wl_event_source_remove(bind_repeat_source);
+		bind_repeat_source = NULL;
+	}
+	bind_repeat.active = false;
+}
+
+static void schedule_bind_repeat(const keybind_t *kb, keyboard_t *keyboard) {
+	if (!(kb->flags & BINDF_REPEAT))
+		return;
+
+	int rate = keyboard->wlr_keyboard->repeat_info.rate;
+	int delay = keyboard->wlr_keyboard->repeat_info.delay;
+	if (rate <= 0)
+		return;
+
+	bind_repeat.kb = *kb;
+	bind_repeat.rate = rate;
+	bind_repeat.active = true;
+
+	if (!bind_repeat_source) {
+		struct wl_event_loop *loop = wl_display_get_event_loop(server.wl_display);
+		bind_repeat_source = wl_event_loop_add_timer(loop, bind_repeat_timer, NULL);
+		if (!bind_repeat_source) {
+			wlr_log(WLR_ERROR, "Failed to create bind repeat timer");
+			bind_repeat.active = false;
+			return;
+		}
+	}
+
+	wl_event_source_timer_update(bind_repeat_source, delay);
+}
+
+void bind_state_reset(void) {
+	cancel_bind_repeat();
+	memset(bind_press_records, 0, sizeof(bind_press_records));
+}
+
+static bind_event_result_t dispatch_bind_press(uint32_t modifiers, xkb_keysym_t keysym,
+		uint32_t keycode, bool prefer_keycode) {
+	bind_event_result_t result = {0};
+
+	keybind_t *kb = find_keybind(modifiers, keysym, keycode, prefer_keycode, true);
+	if (!kb)
+		return result;
+
+	if (is_interactive_bind(kb)) {
+		// executed by the pointer machinery which has the view under the cursor
+		result.consumed = true;
+		result.bind = kb;
+		return result;
+	}
+
+	if (!bind_may_execute(kb)) {
+		result.consumed = true;
+		return result;
+	}
+
+	execute_keybind(kb);
+	result.consumed = true;
+	result.forward = (kb->flags & BINDF_NON_CONSUMING) != 0;
+	result.bind = kb;
+	return result;
+}
+
+bind_event_result_t handle_keybind_raw(uint32_t modifiers, uint32_t keycode, bool pressed,
+		xkb_keysym_t keysym_for_arming) {
+	bind_event_result_t result = {0};
+
+	if (pressed) {
+		const char *submap_at_press = current_submap_name();
+
+		arm_bind_press(keycode, keysym_for_arming, modifiers, submap_at_press);
+
+		result = dispatch_bind_press(modifiers, XKB_KEY_NoSymbol, keycode, true);
+		if (result.consumed)
+			return result;
+
+		keybind_t *rb = find_release_bind(modifiers, keysym_for_arming, keycode, submap_at_press);
+		if (!rb)
+			return result;
+
+		result.consumed = true;
+		result.bind = rb;
+		return result;
+	}
+
+	// release path
+	uint32_t mods_at_press = 0;
+	xkb_keysym_t keysym_at_press = XKB_KEY_NoSymbol;
+	char submap_at_press[MAXLEN];
+	submap_at_press[0] = '\0';
+
+	bind_press_record_t *r = find_bind_press_record(keycode);
+	if (!r)
+		return result;
+
+	mods_at_press = r->modifiers_at_press;
+	keysym_at_press = r->keysym;
+	snprintf(submap_at_press, sizeof(submap_at_press), "%s", r->submap_at_press);
+	r->used = false;
+
+	keybind_t *kb = find_release_bind(mods_at_press, keysym_at_press, keycode, submap_at_press);
+	if (!kb)
+		return result;
+
+	if (!bind_may_execute(kb)) {
+		result.consumed = true;
+		return result;
+	}
+
+	execute_keybind(kb);
+	result.consumed = true;
+	result.forward = (kb->flags & BINDF_NON_CONSUMING) != 0;
+	result.bind = kb;
+	return result;
+}
+
+bind_event_result_t handle_keybind(uint32_t modifiers, xkb_keysym_t sym) {
+	bind_event_result_t result = {0};
+
 	// handle vt switch
 	if (sym >= XKB_KEY_XF86Switch_VT_1 && sym <= XKB_KEY_XF86Switch_VT_12) {
 		if (server.session) {
 			wlr_session_change_vt(server.session, (unsigned int)(sym + 1 - XKB_KEY_XF86Switch_VT_1));
-			return true;
+			result.consumed = true;
 		}
+		return result;
 	}
 
 	if (active_submap && sym == XKB_KEY_Escape) {
 		exit_submap();
-		return true;
+		result.consumed = true;
+		return result;
 	}
 
-	// check if in submap
 	if (active_submap) {
 		wlr_log(WLR_DEBUG, "In submap '%s' with %zu keybinds, looking for keysym=%u mod=%u",
 			active_submap->name, active_submap->num_keybinds, sym, modifiers);
-		keybind_t *kb = find_keybind(modifiers, sym, 0, false, false);
-		if (kb) {
-			wlr_log(WLR_DEBUG, "  Matched submap keybind: action=%d", kb->action);
-			execute_keybind(kb);
-			return true;
-		}
-		return false;
 	}
 
-	// check global user-defined keybinds
-	keybind_t *kb = find_keybind(modifiers, sym, 0, false, true);
-	if (!kb)
-		return false;
-
-	execute_keybind(kb);
-	return true;
+	return dispatch_bind_press(modifiers, sym, 0, false);
 }
 
 void focus_dir(direction_t dir) {
