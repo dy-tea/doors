@@ -780,13 +780,8 @@ static void build_blur_mask_params(view_t *tl, output_t *output, int w, int h,
 	params->pre_blit = false;
 }
 
-static bool rebuild_live_blur(output_t *output, be_effect_resource_t shared_blurred,
-		pixman_region32_t *damage, bool only_missing) {
-	effects_output_t *ctx = output->effects;
-	int w = output->width, h = output->height;
-	bool any = false;
-
-	struct be_blur_params bp = {
+static void fill_blur_params(struct be_blur_params *bp) {
+	*bp = (struct be_blur_params){
 		.algorithm = blur_algorithm,
 		.passes = blur_passes,
 		.radius = blur_radius,
@@ -798,14 +793,24 @@ static bool rebuild_live_blur(output_t *output, be_effect_resource_t shared_blur
 		.noise_strength = blur_noise_strength,
 		.brightness = blur_brightness,
 		.contrast = blur_contrast,
-		.refraction_strength = refraction_strength,
-		.refraction_edge_size_px = refraction_edge_size_px,
-		.refraction_corner_radius_px = refraction_corner_radius_px,
-		.refraction_normal_pow = refraction_normal_pow,
-		.refraction_rgb_fringing = refraction_rgb_fringing,
-		.refraction_texture_repeat_mode = refraction_texture_repeat_mode,
-		.refraction_offset = refraction_offset,
 	};
+}
+
+static bool rebuild_live_blur(output_t *output, be_effect_resource_t shared_blurred,
+		pixman_region32_t *damage, bool only_missing) {
+	effects_output_t *ctx = output->effects;
+	int w = output->width, h = output->height;
+	bool any = false;
+
+	struct be_blur_params bp;
+	fill_blur_params(&bp);
+	bp.refraction_strength = refraction_strength;
+	bp.refraction_edge_size_px = refraction_edge_size_px;
+	bp.refraction_corner_radius_px = refraction_corner_radius_px;
+	bp.refraction_normal_pow = refraction_normal_pow;
+	bp.refraction_rgb_fringing = refraction_rgb_fringing;
+	bp.refraction_texture_repeat_mode = refraction_texture_repeat_mode;
+	bp.refraction_offset = refraction_offset;
 
 	bool keep_blur = ctx->blur_buf && ctx->blur_native[0] && ctx->blur_gen == ctx->backdrop_gen;
 
@@ -1127,19 +1132,8 @@ static bool rebuild_live_blur_layers(output_t *output, be_effect_resource_t bg_t
 	(void)damage;
 	effects_output_t *ctx = output->effects;
 
-	struct be_blur_params bp = {
-		.algorithm = blur_algorithm,
-		.passes = blur_passes,
-		.radius = blur_radius,
-		.full_res = blur_full_res && blur_algorithm == BLUR_ALGORITHM_KAWASE,
-		.offset = blur_offset,
-		.saturation = blur_saturation,
-		.vibrancy = blur_vibrancy,
-		.vibrancy_darkness = blur_vibrancy_darkness,
-		.noise_strength = blur_noise_strength,
-		.brightness = blur_brightness,
-		.contrast = blur_contrast,
-	};
+	struct be_blur_params bp;
+	fill_blur_params(&bp);
 
 	// capture the background with blur toplevels visible
 	if (!bg_tex.valid)
@@ -1428,19 +1422,8 @@ static bool rebuild_mica(output_t *output, be_effect_resource_t pre_captured_bg)
 		}
 	}
 
-	struct be_blur_params bp = {
-		.algorithm = blur_algorithm,
-		.passes = blur_passes,
-		.radius = blur_radius,
-		.full_res = blur_full_res && blur_algorithm == BLUR_ALGORITHM_KAWASE,
-		.offset = blur_offset,
-		.saturation = blur_saturation,
-		.vibrancy = blur_vibrancy,
-		.vibrancy_darkness = blur_vibrancy_darkness,
-		.noise_strength = blur_noise_strength,
-		.brightness = blur_brightness,
-		.contrast = blur_contrast,
-	};
+	struct be_blur_params bp;
+	fill_blur_params(&bp);
 	be_effect_resource_t mica_blur = {0};
 	be_effect_resource_t no_dst = {0};
 	effects_backend->blur(&ctx->be_state, src, ctx->blur_w, ctx->blur_h, &bp, no_dst, NULL, 0,

@@ -348,9 +348,7 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
 		node_t *n;
 		struct wlr_scene_tree *tree;
 		while (desktop_window_iter_advance(&it, &n, &tree)) {
-			if (!tree || !tree->node.enabled)
-				continue;
-			if (node_is_minimized(n))
+			if (!tree || !tree->node.enabled || node_is_minimized(n))
 				continue;
 			struct wlr_box target = window_target_rect(n);
 			struct wlr_box from = {
@@ -383,9 +381,7 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
 		node_t *n;
 		struct wlr_scene_tree *tree;
 		while (desktop_window_iter_advance(&it, &n, &tree)) {
-			if (!tree)
-				continue;
-			if (node_is_minimized(n))
+			if (!tree || node_is_minimized(n))
 				continue;
 			n->client->flags.shown = true;
 			wlr_scene_node_set_enabled(&tree->node, true);
@@ -405,9 +401,7 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
 		node_t *n;
 		struct wlr_scene_tree *tree;
 		while (desktop_window_iter_advance(&it, &n, &tree)) {
-			if (!tree)
-				continue;
-			if (node_is_minimized(n))
+			if (!tree || node_is_minimized(n))
 				continue;
 			n->client->flags.shown = true;
 			wlr_scene_node_set_enabled(&tree->node, true);
@@ -440,9 +434,7 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
 		node_t *n;
 		struct wlr_scene_tree *tree;
 		while (desktop_window_iter_advance(&it, &n, &tree)) {
-			if (!tree)
-				continue;
-			if (node_is_minimized(n))
+			if (!tree || node_is_minimized(n))
 				continue;
 			wlr_scene_node_set_enabled(&tree->node, true);
 			wlr_scene_node_set_position(&tree->node, tree->node.x - num_steps * dx,
@@ -468,9 +460,7 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
 		node_t *n;
 		struct wlr_scene_tree *tree;
 		while (desktop_window_iter_advance(&it, &n, &tree)) {
-			if (!tree)
-				continue;
-			if (node_is_minimized(n))
+			if (!tree || node_is_minimized(n))
 				continue;
 			struct wlr_box target = window_target_rect(n);
 			struct wlr_box from = {

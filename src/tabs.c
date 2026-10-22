@@ -114,7 +114,7 @@ node_t *tab_focus_leaf(node_t *tabbed_node, node_t *focus) {
 	return first;
 }
 
-node_t *tab_next_leaf(node_t *tabbed_node, node_t *focus) {
+static node_t *tab_step_leaf(node_t *tabbed_node, node_t *focus, int step) {
 	if (tabbed_node == NULL)
 		return NULL;
 	size_t n = tabbed_leaf_count(tabbed_node);
@@ -131,31 +131,18 @@ node_t *tab_next_leaf(node_t *tabbed_node, node_t *focus) {
 			idx = i;
 		break;
 	}
-	node_t *res = arr[(idx + 1) % n];
+	size_t next = step > 0 ? (idx + 1) % n : (idx + n - 1) % n;
+	node_t *res = arr[next];
 	free(arr);
 	return res;
 }
 
+node_t *tab_next_leaf(node_t *tabbed_node, node_t *focus) {
+	return tab_step_leaf(tabbed_node, focus, 1);
+}
+
 node_t *tab_prev_leaf(node_t *tabbed_node, node_t *focus) {
-	if (tabbed_node == NULL)
-		return NULL;
-	size_t n = tabbed_leaf_count(tabbed_node);
-	if (n == 0)
-		return NULL;
-	node_t **arr = calloc(n, sizeof(node_t *));
-	if (!arr)
-		return NULL;
-	collect_leaves(tabbed_node, arr, n);
-	node_t *cur = tab_focus_leaf(tabbed_node, focus);
-	size_t idx = 0;
-	for (size_t i = 0; i < n; i++)
-		if (arr[i] == cur) {
-			idx = i;
-		break;
-	}
-	node_t *res = arr[(idx + n - 1) % n];
-	free(arr);
-	return res;
+	return tab_step_leaf(tabbed_node, focus, -1);
 }
 
 static const char *leaf_label(node_t *leaf) {
