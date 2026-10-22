@@ -91,6 +91,20 @@
             buildPhase = "$CC ${./doorsctl}/doorsctl.c -o doors";
             installPhase = "install -Dm755 doors $out/bin/doorsctl";
           };
+
+          checks = {
+            config-parity = import ./checks/config-parity.nix {
+              inherit pkgs;
+              src = ./.;
+              moduleData = ./modules/upstream-settings.nix;
+            };
+            emit-smoke = import ./checks/emit-smoke.nix {
+              inherit pkgs;
+              moduleData = ./modules/upstream-settings.nix;
+              settingsModule = ./modules/settings.nix;
+            };
+          };
+
         };
     };
 }
