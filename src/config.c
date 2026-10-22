@@ -84,6 +84,7 @@ static const str_pair_t mod_map[] = {
 	{"mod2", WLR_MODIFIER_MOD2},
 	{"mod3", WLR_MODIFIER_MOD3},
 	{"mod5", WLR_MODIFIER_MOD5},
+	{NULL, 0},
 };
 
 uint32_t parse_modifiers(const char *mod_str) {
@@ -98,7 +99,8 @@ uint32_t parse_modifiers(const char *mod_str) {
 	}
 
 	char *out[32];
-	for (int i = 0; i < str_split(tmp, "+", out, 32); i++) {
+	int nmods = str_split(tmp, "+", out, 32);
+	for (int i = 0; i < nmods; i++) {
 		const str_pair_t *e = str_table_find(mod_map, str_trim(out[i]));
 		if (e)
 			mods |= (uint32_t)e->value;
@@ -150,6 +152,7 @@ static const str_pair_t bind_flag_names[] = {
 	{"submap_universal", BINDF_SUBMAP_UNIVERSAL},
 	{"catch_all", BINDF_CATCH_ALL},
 	{"catchall", BINDF_CATCH_ALL},
+	{NULL, 0},
 };
 
 bool parse_bind_flags(const char *str, uint32_t *out_flags) {
@@ -164,7 +167,8 @@ bool parse_bind_flags(const char *str, uint32_t *out_flags) {
 	bool ok = true;
 	uint32_t flags = 0;
 	char *tokens[32];
-	for (int i = 0; i < str_split(buf, ", \t", tokens, 32); i++) {
+	int nflags = str_split(buf, ", \t", tokens, 32);
+	for (int i = 0; i < nflags; i++) {
 		const str_pair_t *e = str_table_find(bind_flag_names, tokens[i]);
 		if (e)
 			flags |= (uint32_t)e->value;
