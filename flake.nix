@@ -19,7 +19,7 @@
       flake.homeModules.doors = import ./modules/homeModule.nix self;
 
       perSystem =
-        { pkgs, system, ... }:
+        { pkgs, system, lib, self', ... }:
         let
           commonPackages = with pkgs; [
             (
@@ -80,6 +80,41 @@
               ];
             };
           };
+
+					fovva = pkgs.stdenv.mkDerivation (finalAttrs: {
+						pname = "fovva";
+						version = "1.1";
+
+						src = pkgs.fetchFromGitHub {
+							owner = "dy-tea";
+							repo = "fovva";
+							tag = "v${finalAttrs.version}";
+							hash = "sha256-SV7Y6/sb+hK8WQgwpqvSdeVa0QceAaL9zPyluOTasGc=";
+						};
+
+						nativeBuildInputs = [ pkgs.vlang ];
+
+						preBuild = ''
+							export HOME=$TMPDIR
+						'';
+
+						buildPhase = ''
+							runHook preBuild
+							v -prod -o fovva .
+							runHook postBuild
+						'';
+
+						installPhase = ''
+							runHook preInstall
+							install -Dm755 fovva $out/bin/fovva
+							runHook postInstall
+						'';
+
+						meta = {
+							description = "C formatter following the wlroots style";
+							license = lib.licenses.gpl3Only;
+						};
+					});
         in
         {
           packages.default = doors;
@@ -91,6 +126,7 @@
             buildPhase = "$CC ${./doorsctl}/doorsctl.c -o doors";
             installPhase = "install -Dm755 doors $out/bin/doorsctl";
           };
+					packages.fovva = fovva;
 
           checks = {
             config-parity = import ./checks/config-parity.nix {
@@ -105,6 +141,9 @@
             };
           };
 
+					devShells.default = pkgs.mkShell {
+						buildInputs = with pkgs; [ nixfmt-tree fovva ];
+					};
         };
     };
 }
