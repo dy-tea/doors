@@ -64,6 +64,7 @@ protocols = [
 ]
 
 wl_protos_src = []
+wl_protos_h = []
 
 foreach xml : protocols
 	wl_protos_src += custom_target(
@@ -72,19 +73,27 @@ foreach xml : protocols
 		output: '@BASENAME@-protocol.c',
 		command: [wayland_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
 	)
-	wl_protos_src += custom_target(
+
+	h = custom_target(
 		xml.underscorify() + '_server_h',
 		input: xml,
 		output: '@BASENAME@-protocol.h',
 		command: [wayland_scanner, 'server-header', '@INPUT@', '@OUTPUT@'],
 	)
-	wl_protos_src += custom_target(
+	wl_protos_src += h
+	wl_protos_h += h
+
+	h = custom_target(
 		xml.underscorify() + '_client_h',
 		input: xml,
 		output: '@BASENAME@-client-protocol.h',
 		command: [wayland_scanner, 'client-header', '@INPUT@', '@OUTPUT@'],
 	)
+	wl_protos_src += h
+	wl_protos_h += h
 endforeach
+
+wl_protos_dep = declare_dependency(sources: wl_protos_h)
 
 shader_headers = []
 subdir('src' / 'shaders')

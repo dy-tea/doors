@@ -18,7 +18,7 @@ foreach name, source : test_programs
 		source,
 		include_directories: test_includes,
 		link_with: doors_core,
-		dependencies: libs,
+		dependencies: libs + [wl_protos_dep],
 	)
 	test(name, prog)
 endforeach
