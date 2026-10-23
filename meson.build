@@ -35,14 +35,9 @@ libs = [
 	dependency('vulkan'),
 	dependency('shaderc'),
 	dependency('libpcre2-8'),
+	dependency('threads'),
 	wayland_protos,
 ]
-
-libsystemd = dependency('libsystemd', required: false)
-if libsystemd.found()
-  libs += libsystemd
-  add_project_arguments('-DHAVE_SYSTEMD=1', language: 'c')
-endif
 
 if host_machine.system() == 'freebsd'
   libs += declare_dependency(link_args: ['/usr/local/lib/libinotify.so', '-lpthread'])
@@ -94,7 +89,21 @@ endforeach
 shader_headers = []
 subdir('src' / 'shaders')
 
-inc = include_directories(['include'])
+inc = include_directories(['include', '.'])
+
+version_h = vcs_tag(
+	input: 'include' / 'version.h.in',
+	output: 'version.h',
+	fallback: 'unknown',
+	command: ['git', 'describe', '--tags', '--always', '--dirty'],
+)
+
+commit_h = vcs_tag(
+	input: 'include' / 'commit.h.in',
+	output: 'commit.h',
+	fallback: 'unknown',
+	command: ['git', 'rev-parse', '--short=12', 'HEAD'],
+)
 
 doors_sources = [
 	'src' / 'animation.c',
@@ -103,6 +112,10 @@ doors_sources = [
 		'src' / 'borders.c',
 		'src' / 'client.c',
 		'src' / 'config.c',
+		'src' / 'diagnostics' / 'crash.c',
+		'src' / 'diagnostics' / 'diagnostics.c',
+		'src' / 'diagnostics' / 'status.c',
+		'src' / 'diagnostics' / 'watchdog.c',
 		'src' / 'dim.c',
 		'src' / 'effects' / 'effects.c',
 		'src' / 'effects' / 'gles2.c',
@@ -199,6 +212,8 @@ doors_sources = [
 		'src' / 'view.c',
 	wl_protos_src,
 	shader_headers,
+	version_h,
+	commit_h,
 ]
 
 doors_core = static_library(

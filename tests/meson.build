@@ -1,4 +1,4 @@
-test_includes = include_directories('../include', '../src/ipc/cmd')
+test_includes = include_directories('..', '../include', '../src/ipc/cmd')
 
 test_programs = {
 	'str': 'test_str.c',
@@ -9,6 +9,7 @@ test_programs = {
 	'ipc-dry-run': 'test_ipc_dry_run.c',
 	'subscribe': 'test_subscribe.c',
 	'config-reset': 'test_config_reset.c',
+	'diagnostics': 'test_diagnostics.c',
 }
 
 foreach name, source : test_programs

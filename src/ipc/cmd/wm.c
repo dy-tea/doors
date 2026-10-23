@@ -1,3 +1,4 @@
+#include "diagnostics.h"
 #include "ipc/args.h"
 #include "ipc/ipc.h"
 #include "ipc/json.h"
@@ -454,6 +455,30 @@ static void wm_adopt_orphans(ipc_args_t *a) {
 }
 
 static void wm_get_status(ipc_args_t *a) {
+	bool json = false;
+
+	const char *arg;
+	while ((arg = ipc_peek(a)) != NULL) {
+		if (streq(arg, "--json")) {
+			json = true;
+			ipc_take(a);
+			continue;
+		}
+
+		ipc_fail(a, "Expected --json, got \"%s\"\n", arg);
+		return;
+	}
+
+	if (!diag_status_refresh()) {
+		ipc_fail(a, "Status document did not fit in the reply buffer\n");
+		return;
+	}
+
+	if (json) {
+		send_success(a->fd, diag_status_snapshot(NULL));
+		return;
+	}
+
 	IPC_REPLY(b);
 
 	int output_count = 0;
@@ -491,7 +516,7 @@ const ipc_sub_t wm_subs[] = {
 	IPC_SUB("-a", "--add-monitor", "wm -a | --add-monitor <name>", wm_add_monitor),
 	IPC_SUB("-O", "--reorder-monitors", "wm -O | --reorder-monitors <names...>", wm_reorder_monitors),
 	IPC_SUB("-o", "--adopt-orphans", "wm -o | --adopt-orphans", wm_adopt_orphans),
-	IPC_SUB("-g", "--get-status", "wm -g | --get-status", wm_get_status),
+	IPC_SUB("-g", "--get-status", "wm -g | --get-status [--json]", wm_get_status),
 	IPC_SUB("-h", "--record-history", "wm -h | --record-history [true|false]", wm_record_history),
 	IPC_SUB("-r", "--restart", "wm -r | --restart", wm_restart),
 	IPC_SUB_END,

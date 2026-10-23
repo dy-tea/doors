@@ -1,0 +1,4 @@
+#pragma once
+
+// replaced at build time with the short commit of the tree being built
+#define DOORS_COMMIT "@VCS_TAG@"

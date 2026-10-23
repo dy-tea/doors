@@ -1,0 +1,4 @@
+#pragma once
+
+// replaced at build time with `git describe --tags --always --dirty`
+#define DOORS_VERSION "@VCS_TAG@"

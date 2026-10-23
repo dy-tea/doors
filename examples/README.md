@@ -1491,10 +1491,23 @@ doorsctl wm --dump-state                    # Dump current WM state as JSON
 doorsctl wm --load-state <file>             # Load WM state from a JSON file
 doorsctl wm --add-monitor <name>            # Add a new monitor
 doorsctl wm --reorder-monitors <names...>   # Reorder monitors
-doorsctl wm -g --get-status                 # Return compositor status (monitor/desktop/node counts)
+doorsctl wm -g --get-status [--json]        # Return compositor status
 doorsctl wm -h [true|false]                 # Get or set focus record history
 doorsctl wm -o --adopt-orphans              # Adopt orphaned toplevels into tree
 doorsctl wm -r --restart                    # Restart the compositor
+```
+
+Dump the status of the running doors session.
+
+```
+$ doorsctl wm --get-status --json
+{
+  "status": "running",
+  "version": "weekly-2026-10-19-9-ge716023",
+  "commit": "e716023cef5f",
+  "renderer": {"api": "gles2", "gpu": {"driver": "i915", "pci": "8086:A7A1"}},
+  ...
+}
 ```
 
 Dump the current state, edit it and load it back to restore a monitor arrangement

@@ -1,10 +1,10 @@
-#include "log.h"
+#include "diagnostics.h"
 #include "fs.h"
-#include "str.h"
+#include "log.h"
 #include "once.h"
+#include "str.h"
 #include <dirent.h>
 #include <errno.h>
-#include <signal.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -13,10 +13,6 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
-
-#if defined(__linux__) && (defined(__GLIBC__) || defined(__GNU_LIBRARY__))
-#include <execinfo.h>
-#endif
 
 static FILE *log_file = NULL;
 static char log_path[2048] = {0};
@@ -114,130 +110,39 @@ static void log_callback(enum wlr_log_importance importance, const char *fmt, va
 	const char *level_str = verbosity_headers[importance];
 	const char *color = verbosity_colors[importance];
 
-	// print to stdout (colored)
-	fprintf(stdout, "[%s] %s%s ", time_str, color, level_str);
+	char message[1900];
 	va_list args_copy;
 	va_copy(args_copy, args);
-	vfprintf(stdout, fmt, args_copy);
+	int n = vsnprintf(message, sizeof(message), fmt, args_copy);
 	va_end(args_copy);
-	fprintf(stdout, "\033[0m\n");
+
+	if (n < 0)
+		return;
+	if ((size_t)n >= sizeof(message))
+		n = (int)sizeof(message) - 1;
+	message[n] = '\0';
+
+	// print to stdout (colored)
+	fprintf(stdout, "[%s] %s%s %s\033[0m\n", time_str, color, level_str, message);
 	fflush(stdout);
 
-	// print to file (uncolored)
+	char line[2048];
+	snprintf(line, sizeof(line), "[%s] %s %s\n", time_str, level_str, message);
+
+	diag_log_line(line);
+
 	if (log_file) {
-		fprintf(log_file, "[%s] %s ", time_str, level_str);
-		va_copy(args_copy, args);
-		vfprintf(log_file, fmt, args_copy);
-		va_end(args_copy);
-		fprintf(log_file, "\n");
+		fputs(line, log_file);
 		fflush(log_file);
 	}
 }
 
-static void sig_write_all(int fd, const char *buf, size_t len) {
-	while (len > 0) {
-		ssize_t n = write(fd, buf, len);
-		if (n > 0) {
-			buf += n;
-			len -= (size_t)n;
-		} else if (n < 0 && errno == EINTR) {
-			continue;
-		} else {
-			return;
-		}
-	}
-}
-
-static void sig_write_str(int fd, const char *s) {
-	sig_write_all(fd, s, strlen(s));
-}
-
-static void sig_write_int(int fd, int v) {
-	char buf[12];
-	size_t i = sizeof(buf);
-	if (v < 0) {
-		sig_write_str(fd, "-");
-		v = -v;
-	}
-	do {
-		buf[--i] = (char)('0' + (v % 10));
-		v /= 10;
-	} while (v > 0);
-	sig_write_all(fd, buf + i, sizeof(buf) - i);
-}
-
-static void signal_handler(int sig) {
-#if defined(__linux__) && (defined(__GLIBC__) || defined(__GNU_LIBRARY__))
-	const char *sig_name = "UNKNOWN";
-	switch (sig) {
-	case SIGSEGV:
-		sig_name = "SIGSEGV (Segmentation Fault)";
-		break;
-	case SIGBUS:
-		sig_name = "SIGBUS (Bus Error)";
-		break;
-	case SIGABRT:
-		sig_name = "SIGABRT (Abort)";
-		break;
-	case SIGFPE:
-		sig_name = "SIGFPE (Floating Point Error)";
-		break;
-	case SIGILL:
-		sig_name = "SIGILL (Illegal Instruction)";
-		break;
-	}
-
-	// get backtrace
-	void *addrlist[32];
-	int addrlen = (int)backtrace(addrlist, 32);
-	int log_fd = log_file ? fileno(log_file) : -1;
-
-	for (int pass = 0; pass < 2; pass++) {
-		int fd = pass == 0 ? STDOUT_FILENO : log_fd;
-		if (fd < 0)
-			continue;
-		sig_write_str(fd, "\n########## CRASH REPORT ##########\n");
-		sig_write_str(fd, "Signal: ");
-		sig_write_str(fd, sig_name);
-		sig_write_str(fd, " (");
-		sig_write_int(fd, sig);
-		sig_write_str(fd, ")\nBacktrace:\n");
-		backtrace_symbols_fd(addrlist, addrlen, fd);
-		sig_write_str(fd, "##################################\n\n");
-	}
-#else
-	write(STDOUT_FILENO, "Backtrace not available on musl.", 32);
-#endif
-
-	// exit with error code
-	_exit(128 + sig);
-}
-
-int log_setup_signals(void) {
-	struct sigaction sa;
-	memset(&sa, 0, sizeof(sa));
-	sa.sa_handler = signal_handler;
-	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = SA_RESETHAND;
-
-#if defined(__linux__) && (defined(__GLIBC__) || defined(__GNU_LIBRARY__))
-	void *prime[4];
-	int primelen = (int)backtrace(prime, 4);
-	backtrace_symbols_fd(prime, primelen, -1);
-#endif
-
-	sigaction(SIGSEGV, &sa, NULL);
-	sigaction(SIGBUS, &sa, NULL);
-	sigaction(SIGABRT, &sa, NULL);
-	sigaction(SIGFPE, &sa, NULL);
-	sigaction(SIGILL, &sa, NULL);
-	signal(SIGPIPE, SIG_IGN); // TO PREVENT LOG CRASHES
-
-	return 0;
-}
-
 const char *log_get_path(void) {
 	return log_path[0] != '\0' ? log_path : NULL;
+}
+
+int log_get_fd(void) {
+	return log_file ? fileno(log_file) : -1;
 }
 
 int log_init(const char *log_file_path) {

@@ -42,6 +42,18 @@ typedef struct transaction_t {
 	struct timespec commit_time;
 } transaction_t;
 
+typedef struct {
+	size_t commits; // transactions committed since startup
+	size_t timeouts; // transactions that timed out waiting for clients
+	size_t pending; // instructions in the transaction in flight
+	size_t waiting; // of those, still waiting for a configure
+} transaction_stats_t;
+
+/**
+ * Counters for the status document.
+ */
+void transaction_stats(transaction_stats_t *out);
+
 /**
  * Find all dirty nodes, create and commit a transaction containing them,
  * and unmark them as dirty.

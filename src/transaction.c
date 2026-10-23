@@ -1,4 +1,5 @@
 #include "animation.h"
+#include "diagnostics.h"
 #include "effects/effects.h"
 #include "input/cursor.h"
 #include "once.h"
@@ -22,7 +23,23 @@ static struct {
 	node_t **dirty_nodes;
 	size_t dirty_count;
 	size_t dirty_capacity;
+	size_t commits;
+	size_t timeouts;
 } txn_state = {0};
+
+void transaction_stats(transaction_stats_t *out) {
+	*out = (transaction_stats_t){
+		.commits = txn_state.commits,
+		.timeouts = txn_state.timeouts,
+	};
+
+	transaction_t *txn = txn_state.queued_transaction ? txn_state.queued_transaction :
+		txn_state.pending_transaction;
+	if (txn != NULL) {
+		out->pending = wl_list_length(&txn->instructions);
+		out->waiting = txn->num_waiting;
+	}
+}
 
 static void transaction_commit(struct transaction_t *txn);
 static void transaction_commit_pending(void);
@@ -474,6 +491,8 @@ static int handle_timeout(void *data) {
 	if (!txn)
 		return 0;
 
+	txn_state.timeouts++;
+
 	wlr_log(WLR_DEBUG, "Transaction timed out (%zu/%zu ready) - retrying unresponsive",
 		wl_list_length(&txn->instructions) - txn->num_waiting,
 		(size_t)wl_list_length(&txn->instructions));
@@ -521,6 +540,8 @@ static void transaction_progress(void) {
 static void transaction_commit(transaction_t *txn) {
 	if (!txn)
 		return;
+
+	txn_state.commits++;
 
 	wlr_log(WLR_DEBUG, "Txn=%p with %zu instructions", (void *)txn,
 		(size_t)wl_list_length(&txn->instructions));
@@ -629,6 +650,8 @@ static void _transaction_commit_dirty(bool server_request) {
 	if (txn_state.dirty_count == 0)
 		return;
 
+	diag_stage_enter(DIAG_STAGE_COMMIT);
+
 	// always accumulate dirty nodes into pending_transaction
 	if (!txn_state.pending_transaction) {
 		txn_state.pending_transaction = transaction_create();
@@ -644,6 +667,7 @@ static void _transaction_commit_dirty(bool server_request) {
 	txn_state.dirty_count = 0;
 
 	transaction_commit_pending();
+	diag_stage_leave();
 }
 
 void transaction_commit_dirty(void) {

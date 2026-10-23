@@ -1,3 +1,4 @@
+#include "diagnostics.h"
 #include "ipc/args.h"
 #include "ipc/ipc.h"
 #include "ipc/registry.h"
@@ -127,6 +128,7 @@ bool process_ipc_message(char *msg, int msg_len, int client_fd) {
 	a.dry_run = dry_run;
 
 	bool owns_client_fd = false;
+	diag_stage_enter(DIAG_STAGE_IPC);
 
 	if (streq("subscribe", name)) {
 		owns_client_fd = ipc_cmd_subscribe(&a);
@@ -145,6 +147,7 @@ bool process_ipc_message(char *msg, int msg_len, int client_fd) {
 			ipc_fail(&a, "Unknown command \"%s\"\n", name);
 	}
 
+	diag_stage_leave();
 	free(args);
 	return owns_client_fd;
 }

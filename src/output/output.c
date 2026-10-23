@@ -1,5 +1,6 @@
 #include "animation.h"
 #include "client.h"
+#include "diagnostics.h"
 #include "dim.h"
 #include "effects/effects.h"
 #include "ipc/ipc.h"
@@ -258,7 +259,7 @@ static bool output_try_direct_scanout(output_t *output) {
 const long NSEC_PER_MSEC = 1000000;
 const long NSEC_PER_SEC = 1000000000;
 
-static void output_repaint(output_t *output) {
+static void output_repaint_frame(output_t *output) {
 	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(server.scene,
 		output->wlr_output);
 	if (!scene_output)
@@ -326,6 +327,12 @@ static void output_repaint(output_t *output) {
 
 	if (animating)
 		output_schedule_frame(output);
+}
+
+static void output_repaint(output_t *output) {
+	diag_stage_enter(DIAG_STAGE_RENDER);
+	output_repaint_frame(output);
+	diag_stage_leave();
 }
 
 void output_schedule_frame(output_t *output) {
