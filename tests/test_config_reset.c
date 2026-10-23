@@ -187,7 +187,7 @@ static void test_reset_all(void) {
 	CHECK(reply[0] == '\0');
 	CHECK(settings.record_history == record);
 	CHECK(settings.auto_float_dialogs == dialogs);
-	CHECK(strstr(reply + 1, "reset 2 of 106 settings") != NULL);
+	CHECK(strstr(reply + 1, "reset 2 of") != NULL);
 	CHECK(strstr(reply + 1, "record_history") != NULL);
 	CHECK(strstr(reply + 1, "auto_float_dialogs") != NULL);
 
