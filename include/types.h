@@ -346,6 +346,8 @@ typedef struct {
 	scroller_center_mode_t scroller_center_focused_column;
 	bool scroller_always_center_single_column;
 	padding_t scroller_struts;
+	int scroller_pan_fingers;
+	int scroller_snap_percent;
 
 	bool smart_gaps;
 	bool smart_borders;

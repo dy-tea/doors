@@ -251,6 +251,9 @@ const cfg_setting_t settings_table[] = {
 	I("scroller_top_strut", NULL, settings.scroller_struts.top, 0, INT_MAX, "%d\n", CFG_COMMIT, NULL),
 	I("scroller_bottom_strut", NULL, settings.scroller_struts.bottom, 0, INT_MAX, "%d\n", CFG_COMMIT,
 		NULL),
+	I("scroller_pan_fingers", NULL, settings.scroller_pan_fingers, 2, 5, "%d\n", 0, NULL),
+	I("scroller_snap_percent", NULL, settings.scroller_snap_percent, 2, 5, "%d\n", 0,
+		NULL),
 
 	/* blur */
 	B("blur_enabled", NULL, blur_enabled, 0, NULL),

@@ -440,6 +440,8 @@ in
       (mkIntBetween 0 2147483647 "scroller_right_strut" [ "scroller" "struts" "right" ] "Right strut in the scroller layout, in pixels." 0)
       (mkIntBetween 0 2147483647 "scroller_top_strut" [ "scroller" "struts" "top" ] "Top strut in the scroller layout, in pixels." 0)
       (mkIntBetween 0 2147483647 "scroller_bottom_strut" [ "scroller" "struts" "bottom" ] "Bottom strut in the scroller layout, in pixels." 0)
+			(mkIntBetween 2 5 "scroller_pan_fingers" [ "scroller" "pan-fingers" ] "Number of fingers that pan the scroller view." 3)
+			(mkIntBetween 0 100 "scroller_snap_percent" [ "scroller" "snap-percent" ] "Sets the minimum percent needed to pan before the scroller prefers the next neighbor." 30)
       (mk {
         key = "scroller_default_column_width";
         path = [

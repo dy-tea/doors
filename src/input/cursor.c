@@ -882,8 +882,7 @@ void cursor_axis(struct wl_listener *listener, void *data) {
 
 	m = server.focused_output;
 	desktop_t *d = m ? m->desk : NULL;
-	bool is_touchpad = (event->source == WL_POINTER_AXIS_SOURCE_FINGER ||
-		event->source == WL_POINTER_AXIS_SOURCE_CONTINUOUS);
+	bool is_touchpad = (event->source == WL_POINTER_AXIS_SOURCE_FINGER);
 
 	// cancel any ongoing touchpad scroll gesture if the layout is not scroller
 	if (server.touchpad_scroll.ongoing && (!d || d->layout != LAYOUT_SCROLLER))
@@ -891,6 +890,7 @@ void cursor_axis(struct wl_listener *listener, void *data) {
 
 	// handle touchpad horizontal scrolling in the scroller layout
 	if (d && d->layout == LAYOUT_SCROLLER && is_touchpad &&
+			settings.scroller_pan_fingers == 2 &&
 			event->orientation == WL_POINTER_AXIS_HORIZONTAL_SCROLL) {
 		if (!server.touchpad_scroll.ongoing) {
 			server.touchpad_scroll.ongoing = true;
@@ -1059,8 +1059,9 @@ void handle_pointer_swipe_begin(struct wl_listener *listener, void *data) {
 	(void)listener;
 	struct wlr_pointer_swipe_begin_event *event = data;
 
-	if (gesture_binding_check(GESTURE_TYPE_SWIPE, event->fingers)) {
-		gesture_tracker_begin(&server.gesture_tracker, GESTURE_TYPE_SWIPE, event->fingers);
+	if (gesture_binding_check(GESTURE_TYPE_SWIPE, event->fingers) ||
+		event->fingers == settings.scroller_pan_fingers) {
+			gesture_tracker_begin(&server.gesture_tracker, GESTURE_TYPE_SWIPE, event->fingers);
 	} else {
 		wlr_pointer_gestures_v1_send_swipe_begin(server.pointer_gestures, server.seat, event->time_msec,
 			event->fingers);
@@ -1073,10 +1074,20 @@ void handle_pointer_swipe_update(struct wl_listener *listener, void *data) {
 
 	if (gesture_tracker_check(&server.gesture_tracker, GESTURE_TYPE_SWIPE)) {
 		gesture_tracker_update(&server.gesture_tracker, event->dx, event->dy, NAN, NAN);
+		if (server.gesture_tracker.fingers == settings.scroller_pan_fingers) {
+			output_t *m = server.focused_output;
+			desktop_t *d = m ? m->desk : NULL;
+			if (d && d->layout == LAYOUT_SCROLLER) {
+				scroller_view_offset_gesture_update(d, event->dx * 5.0);
+				arrange(m, d, true);
+			}
+		}
 	} else {
 		wlr_pointer_gestures_v1_send_swipe_update(server.pointer_gestures, server.seat, event->time_msec,
 			event->dx, event->dy);
 	}
+
+
 }
 
 void handle_pointer_swipe_end(struct wl_listener *listener, void *data) {
@@ -1094,6 +1105,16 @@ void handle_pointer_swipe_end(struct wl_listener *listener, void *data) {
 		return;
 	}
 
+	output_t *m = server.focused_output;
+	desktop_t *d = m ? m->desk : NULL;
+	bool panned = server.gesture_tracker.fingers == settings.scroller_pan_fingers &&
+		d && d->layout == LAYOUT_SCROLLER;
+
+	if (panned) {
+		scroller_view_offset_gesture_end(d);
+		arrange(m, d, true);
+	}
+
 	uint32_t directions = GESTURE_DIRECTION_NONE;
 	double threshold = 30.0;
 
@@ -1107,8 +1128,8 @@ void handle_pointer_swipe_end(struct wl_listener *listener, void *data) {
 	else if (server.gesture_tracker.dy > threshold)
 		directions |= GESTURE_DIRECTION_DOWN;
 
-	gesturebind_t *binding = gesture_bind_match(GESTURE_TYPE_SWIPE, server.gesture_tracker.fingers,
-		directions);
+	gesturebind_t *binding = panned ? NULL : gesture_bind_match(GESTURE_TYPE_SWIPE,
+		server.gesture_tracker.fingers, directions);
 	if (binding)
 		execute_gesturebind(binding);
 	gesture_tracker_end(&server.gesture_tracker);
