@@ -81,6 +81,8 @@ doors_settings_t settings = {
 	.scroller_center_focused_column = SCROLLER_CENTER_NEVER,
 	.scroller_always_center_single_column = false,
 	.scroller_struts = {0},
+	.scroller_pan_fingers = 3,
+	.scroller_snap_percent = 30,
 
 	.smart_gaps = false,
 	.smart_borders = false,

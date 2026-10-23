@@ -172,6 +172,18 @@ doorsctl config scroller_bottom_strut <px>
 Reserves space at the screen edges so the scroller viewport never extends underneath a panel or dock.
 
 ```
+doorsctl config scroller_pan_fingers
+```
+
+Sets the amount of fingers required for scroller panning. Defaults to 3.
+
+```
+doorsctl config scroller_snap_percent
+```
+
+Sets the minimum percent needed to pan before the scroller prefers the next neighbor. Defaults to 30.
+
+```
 doorsctl config tab_color_bar_bg "R G B A"
 ```
 

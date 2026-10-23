@@ -46,7 +46,7 @@ typedef struct cfg_setting {
 #define CFG_VALUE_MAX 512
 
 // every setting reachable through `doorsctl config <name>`
-#define CFG_SETTINGS_COUNT 83
+#define CFG_SETTINGS_COUNT 85
 
 extern const cfg_setting_t settings_table[CFG_SETTINGS_COUNT];
 

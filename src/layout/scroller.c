@@ -802,13 +802,25 @@ bool scroller_view_offset_gesture_end(desktop_t *d) {
 			continue;
 
 		double snap = centering ? v.xs[i] + scroller_view_offset_centered(&v, view_pos, v.xs[i],
-			v.widths[i]) : v.xs[i] + scroller_view_offset_fit(&v, view_pos, v.xs[i], v.widths[i]);
+			v.widths[i]) : v.xs[i] + scroller_view_offset_edge(&v, view_pos, v.xs[i], v.widths[i]);
 
 		double dist = fabs(view_pos - snap);
 		if (dist < nearest_dist) {
 			nearest_dist = dist;
 			nearest = i;
 			best_snap = snap;
+		}
+	}
+
+	if (nearest != cam) {
+		double cam_snap = centering ? v.xs[cam] + scroller_view_offset_centered(&v, view_pos,
+			v.xs[cam], v.widths[cam]) : v.xs[cam] + scroller_view_offset_edge(&v, view_pos,
+			v.xs[cam], v.widths[cam]);
+		double span = fabs(best_snap - cam_snap);
+		double travelled = fabs(view_pos - cam_snap);
+		if (span > 1.0 && travelled < span * ((double)settings.scroller_snap_percent / 100.0)) {
+			nearest = cam;
+			best_snap = cam_snap;
 		}
 	}
 
@@ -820,6 +832,8 @@ bool scroller_view_offset_gesture_end(desktop_t *d) {
 	}
 
 	s->view_offset = best_snap - v.xs[nearest];
+
+	scroller_view_offset_clamp(&v, v.xs[nearest], &s->view_offset);
 
 	scroller_view_release(&v);
 	return true;
