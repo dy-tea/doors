@@ -1,8 +1,10 @@
 #include "config.h"
 #include "effects/effects.h"
+#include "input/input.h"
 #include "input/cursor.h"
 #include "input/input_method.h"
 #include "input/keyboard.h"
+#include "input/pointer.h"
 #include "input/tablet.h"
 #include "layout/layout.h"
 #include "layout/scroller.h"
@@ -19,6 +21,7 @@
 #include "transaction.h"
 #include "tree.h"
 #include "types.h"
+#include <libinput.h>
 #include <linux/input-event-codes.h>
 #include <math.h>
 #include <stdlib.h>
@@ -26,6 +29,7 @@
 #include <wayland-server-core.h>
 #include <wayland-util.h>
 #include <wlr/backend.h>
+#include <wlr/backend/libinput.h>
 #include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_data_device.h>
 #include <wlr/types/wlr_idle_notify_v1.h>
@@ -889,8 +893,7 @@ void cursor_axis(struct wl_listener *listener, void *data) {
 		server.touchpad_scroll.ongoing = false;
 
 	// handle touchpad horizontal scrolling in the scroller layout
-	if (d && d->layout == LAYOUT_SCROLLER && is_touchpad &&
-			settings.scroller_pan_fingers == 2 &&
+	if (d && d->layout == LAYOUT_SCROLLER && is_touchpad && settings.scroller_pan_fingers == 2 &&
 			event->orientation == WL_POINTER_AXIS_HORIZONTAL_SCROLL) {
 		if (!server.touchpad_scroll.ongoing) {
 			server.touchpad_scroll.ongoing = true;
@@ -1055,13 +1058,25 @@ void handle_pointer_pinch_end(struct wl_listener *listener, void *data) {
 	gesture_tracker_end(&server.gesture_tracker);
 }
 
+static bool cursor_touchpad_natural_scroll_enabled(void) {
+	pointer_t *pointer;
+	wl_list_for_each(pointer, &server.pointers, link) {
+		struct wlr_input_device *device = &pointer->wlr_pointer->base;
+		if (!device_is_touchpad(device))
+			continue;
+		struct libinput_device *libinput_dev = wlr_libinput_get_device_handle(device);
+		return libinput_device_config_scroll_get_natural_scroll_enabled(libinput_dev);
+	}
+	return false;
+}
+
 void handle_pointer_swipe_begin(struct wl_listener *listener, void *data) {
 	(void)listener;
 	struct wlr_pointer_swipe_begin_event *event = data;
 
-	if (gesture_binding_check(GESTURE_TYPE_SWIPE, event->fingers) ||
-		event->fingers == settings.scroller_pan_fingers) {
-			gesture_tracker_begin(&server.gesture_tracker, GESTURE_TYPE_SWIPE, event->fingers);
+	if (gesture_binding_check(GESTURE_TYPE_SWIPE,
+			event->fingers) || event->fingers == settings.scroller_pan_fingers) {
+		gesture_tracker_begin(&server.gesture_tracker, GESTURE_TYPE_SWIPE, event->fingers);
 	} else {
 		wlr_pointer_gestures_v1_send_swipe_begin(server.pointer_gestures, server.seat, event->time_msec,
 			event->fingers);
@@ -1078,7 +1093,10 @@ void handle_pointer_swipe_update(struct wl_listener *listener, void *data) {
 			output_t *m = server.focused_output;
 			desktop_t *d = m ? m->desk : NULL;
 			if (d && d->layout == LAYOUT_SCROLLER) {
-				scroller_view_offset_gesture_update(d, event->dx * 5.0);
+				double pan = event->dx * 5.0;
+				if (cursor_touchpad_natural_scroll_enabled())
+					pan = -pan;
+				scroller_view_offset_gesture_update(d, pan);
 				arrange(m, d, true);
 			}
 		}
@@ -1086,8 +1104,6 @@ void handle_pointer_swipe_update(struct wl_listener *listener, void *data) {
 		wlr_pointer_gestures_v1_send_swipe_update(server.pointer_gestures, server.seat, event->time_msec,
 			event->dx, event->dy);
 	}
-
-
 }
 
 void handle_pointer_swipe_end(struct wl_listener *listener, void *data) {
@@ -1107,8 +1123,8 @@ void handle_pointer_swipe_end(struct wl_listener *listener, void *data) {
 
 	output_t *m = server.focused_output;
 	desktop_t *d = m ? m->desk : NULL;
-	bool panned = server.gesture_tracker.fingers == settings.scroller_pan_fingers &&
-		d && d->layout == LAYOUT_SCROLLER;
+	bool panned = server.gesture_tracker.fingers == settings.scroller_pan_fingers && d &&
+		d->layout == LAYOUT_SCROLLER;
 
 	if (panned) {
 		scroller_view_offset_gesture_end(d);

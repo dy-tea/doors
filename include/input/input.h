@@ -94,5 +94,7 @@ void input_apply_config(struct wlr_input_device *device);
 void input_apply_config_all_keyboards(void);
 void input_apply_config_all_pointers(void);
 
+bool device_is_touchpad(struct wlr_input_device *device);
+
 extern input_config_t *input_configs[MAX_INPUT_CONFIGS];
 extern size_t num_input_configs;

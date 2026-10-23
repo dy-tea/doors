@@ -43,7 +43,7 @@ static enum input_config_type device_type_to_input_type(struct wlr_input_device 
 	}
 }
 
-static bool device_is_touchpad(struct wlr_input_device *device) {
+bool device_is_touchpad(struct wlr_input_device *device) {
 	if (device->type != WLR_INPUT_DEVICE_POINTER)
 		return false;
 
