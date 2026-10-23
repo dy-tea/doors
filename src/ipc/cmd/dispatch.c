@@ -1,6 +1,8 @@
 #include "ipc/args.h"
 #include "ipc/ipc.h"
 #include "ipc/registry.h"
+#include "str.h"
+#include <stdint.h>
 #include <stdlib.h>
 #include <wlr/util/log.h>
 
@@ -91,9 +93,45 @@ bool process_ipc_message(char *msg, int msg_len, int client_fd) {
 		return false;
 	}
 
-	const char *name = args[0];
+	bool dry_run = false;
+	uint32_t origin = 0;
+	int first = 0;
+	for (; first < num; first++) {
+		const char *arg = args[first];
+
+		if (streq(arg, "--dry-run")) {
+			dry_run = true;
+			continue;
+		}
+
+		if (str_starts(arg, "--origin=config:")) {
+			origin = (uint32_t)strtoul(arg + strlen("--origin=config:"), NULL, 10);
+			continue;
+		}
+
+		break;
+	}
+
+	if (first >= num) {
+		free(args);
+		send_failure(client_fd, "No command after flags\n");
+		return false;
+	}
+
+	const char *name = args[first];
+
+	if (dry_run && !streq(name, "config")) {
+		free(args);
+		char msg[128];
+		snprintf(msg, sizeof(msg), "--dry-run is not supported by \"%s\"\n", name);
+		send_failure(client_fd, msg);
+		return false;
+	}
+
 	ipc_args_t a;
-	ipc_args_init(&a, args + 1, num - 1, client_fd, name);
+	ipc_args_init(&a, args + first + 1, num - first - 1, client_fd, name);
+	a.dry_run = dry_run;
+	a.origin = origin;
 
 	bool owns_client_fd = false;
 

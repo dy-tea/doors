@@ -96,10 +96,8 @@ subdir('src' / 'shaders')
 
 inc = include_directories(['include'])
 
-executable(
-	'doors',
-	[
-		'src' / 'animation.c',
+doors_sources = [
+	'src' / 'animation.c',
 		'src' / 'backend.c',
 		'src' / 'bezier.c',
 		'src' / 'borders.c',
@@ -152,7 +150,6 @@ executable(
 		'src' / 'layout' / 'scroller_view.c',
 		'src' / 'layout' / 'tree.c',
 		'src' / 'log.c',
-		'src' / 'main.c',
 		'src' / 'output' / 'config.c',
 		'src' / 'output' / 'output.c',
 		'src' / 'protocol' / 'bell.c',
@@ -200,9 +197,21 @@ executable(
 		'src' / 'tree.c',
 		'src' / 'tree_focus.c',
 		'src' / 'view.c',
-		wl_protos_src,
-		shader_headers,
-	],
+	wl_protos_src,
+	shader_headers,
+]
+
+doors_core = static_library(
+	'doors_core',
+	doors_sources,
+	include_directories: inc,
+	dependencies: libs,
+)
+
+executable(
+	'doors',
+	'src' / 'main.c',
+	link_with: doors_core,
 	include_directories: inc,
 	dependencies: libs,
 	install: true,
@@ -212,8 +221,11 @@ executable(
 executable(
 	'doorsctl',
 	'doorsctl' / 'doorsctl.c',
+	include_directories: include_directories('doorsctl'),
 	install: true,
 	install_dir: get_option('bindir'),
 )
 
 install_data('doors.desktop', install_dir: '/usr/share/wayland-sessions')
+
+subdir('tests')

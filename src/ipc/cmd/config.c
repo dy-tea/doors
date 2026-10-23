@@ -332,14 +332,16 @@ void cfg_errf(char *err, size_t errsz, const char *fmt, ...) {
 	va_end(ap);
 }
 
-static bool cfg_set_bool(const cfg_setting_t *s, const char *arg, char *err, size_t errsz) {
+static bool cfg_set_bool(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
+		bool dry_run) {
 	bool v;
 	if (!ipc_parse_bool(arg, &v)) {
 		cfg_errf(err, errsz, "%s: expected true or false, got \"%s\"\n", s->name, arg);
 		return false;
 	}
 
-	*(bool *)s->ptr = v;
+	if (!dry_run)
+		*(bool *)s->ptr = v;
 	return true;
 }
 
@@ -349,10 +351,12 @@ static void cfg_store_enum(const cfg_setting_t *s, long value) {
 	memcpy(s->ptr, &v, sizeof(v));
 }
 
-static bool cfg_set_enum(const cfg_setting_t *s, const char *arg, char *err, size_t errsz) {
+static bool cfg_set_enum(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
+		bool dry_run) {
 	const str_pair_t *e = str_table_find(s->values, arg);
 	if (e) {
-		cfg_store_enum(s, e->value);
+		if (!dry_run)
+			cfg_store_enum(s, e->value);
 		return true;
 	}
 
@@ -398,7 +402,8 @@ static bool cfg_range(const cfg_setting_t *s, double val, double step, char *err
 	return true;
 }
 
-static bool cfg_set_int(const cfg_setting_t *s, const char *arg, char *err, size_t errsz) {
+static bool cfg_set_int(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
+		bool dry_run) {
 	char *end;
 	errno = 0;
 	long val = strtol(arg, &end, 10);
@@ -411,11 +416,13 @@ static bool cfg_set_int(const cfg_setting_t *s, const char *arg, char *err, size
 	if (!cfg_range(s, (double)val, 1.0, err, errsz, &out))
 		return false;
 
-	*((int *)s->ptr) = (int)out;
+	if (!dry_run)
+		*((int *)s->ptr) = (int)out;
 	return true;
 }
 
-static bool cfg_set_float(const cfg_setting_t *s, const char *arg, char *err, size_t errsz) {
+static bool cfg_set_float(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
+		bool dry_run) {
 	char *end;
 	double val = strtod(arg, &end);
 	if (end == arg || *end != '\0') {
@@ -427,11 +434,13 @@ static bool cfg_set_float(const cfg_setting_t *s, const char *arg, char *err, si
 	if (!cfg_range(s, val, 0.0, err, errsz, &out))
 		return false;
 
-	*((float *)s->ptr) = (float)out;
+	if (!dry_run)
+		*((float *)s->ptr) = (float)out;
 	return true;
 }
 
-static bool cfg_set_double(const cfg_setting_t *s, const char *arg, char *err, size_t errsz) {
+static bool cfg_set_double(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
+		bool dry_run) {
 	char *end;
 	double val = strtod(arg, &end);
 	if (end == arg || *end != '\0') {
@@ -443,29 +452,33 @@ static bool cfg_set_double(const cfg_setting_t *s, const char *arg, char *err, s
 	if (!cfg_range(s, val, 0.0, err, errsz, &out))
 		return false;
 
-	*((double *)s->ptr) = out;
+	if (!dry_run)
+		*((double *)s->ptr) = out;
 	return true;
 }
 
-static bool cfg_set_str(const cfg_setting_t *s, const char *arg, char *err, size_t errsz) {
+static bool cfg_set_str(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
+		bool dry_run) {
 	if (strlen(arg) >= s->size) {
 		cfg_errf(err, errsz, "%s: value is too long\n", s->name);
 		return false;
 	}
 
-	snprintf(s->ptr, s->size, "%s", arg);
+	if (!dry_run)
+		snprintf(s->ptr, s->size, "%s", arg);
 	return true;
 }
 
-static bool cfg_set_rgba(const cfg_setting_t *s, const char *arg, char *err, size_t errsz) {
+static bool cfg_set_rgba(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
+		bool dry_run) {
 	float parsed[4];
 	if (!ipc_parse_color_float(arg, parsed)) {
 		cfg_errf(err, errsz, "%s: expected \"R G B [A]\"\n", s->name);
 		return false;
 	}
 
-	float *rgba = s->ptr;
-	memcpy(rgba, parsed, sizeof(parsed));
+	if (!dry_run)
+		memcpy(s->ptr, parsed, sizeof(parsed));
 	return true;
 }
 
@@ -512,36 +525,43 @@ static void cfg_get(ipc_args_t *a, const cfg_setting_t *s) {
 	ipc_ok(a, buf);
 }
 
-// writes a setting, running its side effects and committing when it asks for it
-static bool cfg_apply(const cfg_setting_t *s, const char *arg, char *err, size_t errsz) {
+// writes a setting, running its side effects and committing when it asks for it.
+// with dry_run the value is parsed and range-checked but nothing is stored and no
+// side effects run, which is what `doorsctl config <name> <value> --dry-run`
+// reports to a config author.
+static bool cfg_apply(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
+		bool dry_run) {
 	bool ok = true;
 
 	switch (s->type) {
 	case CFG_BOOL:
-		ok = cfg_set_bool(s, arg, err, errsz);
+		ok = cfg_set_bool(s, arg, err, errsz, dry_run);
 		break;
 	case CFG_INT:
-		ok = cfg_set_int(s, arg, err, errsz);
+		ok = cfg_set_int(s, arg, err, errsz, dry_run);
 		break;
 	case CFG_FLOAT:
-		ok = cfg_set_float(s, arg, err, errsz);
+		ok = cfg_set_float(s, arg, err, errsz, dry_run);
 		break;
 	case CFG_DOUBLE:
-		ok = cfg_set_double(s, arg, err, errsz);
+		ok = cfg_set_double(s, arg, err, errsz, dry_run);
 		break;
 	case CFG_ENUM:
-		ok = cfg_set_enum(s, arg, err, errsz);
+		ok = cfg_set_enum(s, arg, err, errsz, dry_run);
 		break;
 	case CFG_STR:
-		ok = cfg_set_str(s, arg, err, errsz);
+		ok = cfg_set_str(s, arg, err, errsz, dry_run);
 		break;
 	case CFG_RGBA:
-		ok = cfg_set_rgba(s, arg, err, errsz);
+		ok = cfg_set_rgba(s, arg, err, errsz, dry_run);
 		break;
 	}
 
 	if (!ok)
 		return false;
+
+	if (dry_run)
+		return true;
 
 	if (s->on_set)
 		s->on_set();
@@ -558,7 +578,24 @@ bool config_apply_value(const char *name, const char *value, char *err, size_t e
 		return false;
 	}
 
-	return cfg_apply(s, value, err, errsz);
+	return cfg_apply(s, value, err, errsz, false);
+}
+
+bool config_validate_value(const char *name, const char *value, char *err, size_t errsz) {
+	// the settings with their own syntax parse live arguments and have no dry-run
+	// path, so they are reported as unsupported rather than as unknown
+	if (cfg_special_name(name)) {
+		cfg_errf(err, errsz, "%s: no dry-run validation available\n", name);
+		return false;
+	}
+
+	const cfg_setting_t *s = find_setting(name);
+	if (s == NULL) {
+		cfg_errf(err, errsz, "unknown setting \"%s\"\n", name);
+		return false;
+	}
+
+	return cfg_apply(s, value, err, errsz, true);
 }
 
 const ipc_sub_t config_subs[] = {
@@ -581,6 +618,14 @@ void ipc_cmd_config(ipc_args_t *a) {
 
 	ipc_take(a);
 
+	// settings with their own syntax (animation, gradients, tab colours, scroller
+	// presets) have no parse-without-mutate path yet, so say so instead of
+	// reporting a validation that did not happen
+	if (a->dry_run && cfg_special_name(name)) {
+		ipc_fail(a, "--dry-run is not supported by \"%s\"\n", name);
+		return;
+	}
+
 	if (cfg_special_dispatch(a, name))
 		return;
 
@@ -598,10 +643,10 @@ void ipc_cmd_config(ipc_args_t *a) {
 	const char *arg = ipc_take(a);
 
 	char err[256];
-	if (!cfg_apply(s, arg, err, sizeof(err))) {
+	if (!cfg_apply(s, arg, err, sizeof(err), a->dry_run)) {
 		ipc_fail(a, "%s", err);
 		return;
 	}
 
-	ipc_okf(a, "%s set\n", s->name);
+	ipc_okf(a, "%s %s\n", s->name, a->dry_run ? "would be set" : "set");
 }

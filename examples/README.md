@@ -1057,6 +1057,21 @@ window_gap    int    12    10    any
 blur_radius   float  7.00  5.00  >0
 ```
 
+#### Checking a value before applying it
+
+```
+doorsctl config <name> <value> --dry-run
+```
+
+`--dry-run` parses and range-checks the value but does not set it. It works for any config subcommand.
+
+```
+$ doorsctl config window_gap two --dry-run
+config: window_gap: invalid value "two"
+$ echo $?
+1
+```
+
 ### Animation Settings
 
 Doors supports per-type animation configuration with custom bezier curves.

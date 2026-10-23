@@ -520,6 +520,24 @@ static const cfg_named_handler_t special_settings[] = {
 };
 
 // settings that need their own syntax rather than the plain table entry
+bool cfg_special_name(const char *name) {
+	if (!name || name[0] == '\0')
+		return false;
+
+	if (str_skip_prefix(name, "tab_color_"))
+		return true;
+
+	if (cfg_find_gradient(name))
+		return true;
+
+	for (const cfg_named_handler_t *sp = special_settings; sp->name; sp++) {
+		if (streq(name, sp->name))
+			return true;
+	}
+
+	return false;
+}
+
 bool cfg_special_dispatch(ipc_args_t *a, const char *name) {
 	const char *tab_color = str_skip_prefix(name, "tab_color_");
 	if (tab_color) {

@@ -13,6 +13,8 @@ void settings_set_scroller_preset_window_heights(scroller_size_t *list, int coun
 
 bool config_apply_value(const char *name, const char *value, char *err, size_t errsz);
 
+bool config_validate_value(const char *name, const char *value, char *err, size_t errsz);
+
 void config_snapshot_defaults(void);
 
 extern struct output_t *mon;

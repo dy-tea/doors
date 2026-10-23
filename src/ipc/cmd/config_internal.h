@@ -45,7 +45,7 @@ typedef struct cfg_setting {
 // every setting reachable through `doorsctl config <name>`
 #define CFG_SETTINGS_COUNT 83
 
-extern const cfg_setting_t settings_table[];
+extern const cfg_setting_t settings_table[CFG_SETTINGS_COUNT];
 
 const char *cfg_type_name(cfg_type_t type);
 
@@ -78,6 +78,9 @@ void cfg_format_scroller_size(scroller_size_t size, ipc_buf_t *b, bool last);
 // handles the settings that need their own syntax, returns false when the name
 // is not one of them
 bool cfg_special_dispatch(ipc_args_t *a, const char *name);
+
+// whether the name is handled by cfg_special_dispatch
+bool cfg_special_name(const char *name);
 
 void cfg_list(ipc_args_t *a);
 
