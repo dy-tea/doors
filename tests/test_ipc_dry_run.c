@@ -73,7 +73,7 @@ static void test_dry_run_special_setting(void) {
 
 static void test_apply_still_works(void) {
 	int before = settings.border_width;
-	const char msg[] = "--origin=config:3\0config\0border_width\0"
+	const char msg[] = "config\0border_width\0"
 		"31\0";
 	char reply[512];
 

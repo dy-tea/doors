@@ -172,6 +172,7 @@ static int run_command(int sock_fd, char **argv, int argc) {
 
 	return ret;
 }
+
 static void hoist_dry_run(char **argv, int *argc) {
 	int flags = 0, kept = 0;
 

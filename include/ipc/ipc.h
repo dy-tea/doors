@@ -50,7 +50,8 @@ typedef enum {
 	SUB_MASK_NODE_CHANGE = 1 << 13,
 	SUB_MASK_NODE_STATE = 1 << 14,
 	SUB_MASK_NODE_FLAG = 1 << 15,
-	SUB_MASK_ALL = (1 << 16) - 1
+	SUB_MASK_CONFIG = 1 << 16,
+	SUB_MASK_ALL = (1 << 17) - 1
 } subscriber_mask_t;
 
 typedef struct subscriber_t {
@@ -74,6 +75,10 @@ bool ipc_print_report(int fd);
 
 void send_success(int client_fd, const char *msg);
 void send_failure(int client_fd, const char *msg);
+
+// maps a `subscribe` event word, or one of its aliases, to its mask. returns
+// false when the word is not an event
+bool subscribe_mask_for(const char *word, subscriber_mask_t *mask);
 
 // returns true when the command takes ownership of client_fd
 bool process_ipc_message(char *msg, int msg_len, int client_fd);

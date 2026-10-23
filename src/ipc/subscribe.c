@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <wlr/util/log.h>
 
 static subscriber_t *make_subscriber(int client_fd, char *fifo_path, subscriber_mask_t mask,
 		int count) {
@@ -68,36 +69,40 @@ void add_subscriber(subscriber_t *sb) {
 	(SUB_MASK_NODE_ADD | SUB_MASK_NODE_REMOVE | SUB_MASK_NODE_FOCUS | \
 		SUB_MASK_NODE_CHANGE | SUB_MASK_NODE_STATE | SUB_MASK_NODE_FLAG)
 
+#define NAMES1(a) a "\0"
+#define NAMES2(a, b) a "\0" b "\0"
+
 static const struct {
-	const char *names; // NULL separated aliases
+	const char *names; // NAMES1 or NAMES2
 	subscriber_mask_t mask;
 } event_words[] = {
-	{"report\0R", SUB_MASK_REPORT},
-	{"monitor\0M", MONITOR_EVENTS},
-	{"monitor_add", SUB_MASK_MONITOR_ADD},
-	{"monitor_remove", SUB_MASK_MONITOR_REMOVE},
-	{"monitor_focus", SUB_MASK_MONITOR_FOCUS},
-	{"monitor_change", SUB_MASK_MONITOR_CHANGE},
-	{"desktop\0D", DESKTOP_EVENTS},
-	{"desktop_add", SUB_MASK_DESKTOP_ADD},
-	{"desktop_remove", SUB_MASK_DESKTOP_REMOVE},
-	{"desktop_focus", SUB_MASK_DESKTOP_FOCUS},
-	{"desktop_change", SUB_MASK_DESKTOP_CHANGE},
-	{"desktop_layout", SUB_MASK_DESKTOP_LAYOUT},
-	{"node\0N", NODE_EVENTS},
-	{"node_add", SUB_MASK_NODE_ADD},
-	{"node_remove", SUB_MASK_NODE_REMOVE},
-	{"node_focus", SUB_MASK_NODE_FOCUS},
-	{"node_change", SUB_MASK_NODE_CHANGE},
-	{"node_state", SUB_MASK_NODE_STATE},
-	{"node_flag", SUB_MASK_NODE_FLAG},
-	{"all\0A", SUB_MASK_ALL},
+	{NAMES2("report", "R"), SUB_MASK_REPORT},
+	{NAMES2("monitor", "M"), MONITOR_EVENTS},
+	{NAMES1("monitor_add"), SUB_MASK_MONITOR_ADD},
+	{NAMES1("monitor_remove"), SUB_MASK_MONITOR_REMOVE},
+	{NAMES1("monitor_focus"), SUB_MASK_MONITOR_FOCUS},
+	{NAMES1("monitor_change"), SUB_MASK_MONITOR_CHANGE},
+	{NAMES2("desktop", "D"), DESKTOP_EVENTS},
+	{NAMES1("desktop_add"), SUB_MASK_DESKTOP_ADD},
+	{NAMES1("desktop_remove"), SUB_MASK_DESKTOP_REMOVE},
+	{NAMES1("desktop_focus"), SUB_MASK_DESKTOP_FOCUS},
+	{NAMES1("desktop_change"), SUB_MASK_DESKTOP_CHANGE},
+	{NAMES1("desktop_layout"), SUB_MASK_DESKTOP_LAYOUT},
+	{NAMES2("node", "N"), NODE_EVENTS},
+	{NAMES1("node_add"), SUB_MASK_NODE_ADD},
+	{NAMES1("node_remove"), SUB_MASK_NODE_REMOVE},
+	{NAMES1("node_focus"), SUB_MASK_NODE_FOCUS},
+	{NAMES1("node_change"), SUB_MASK_NODE_CHANGE},
+	{NAMES1("node_state"), SUB_MASK_NODE_STATE},
+	{NAMES1("node_flag"), SUB_MASK_NODE_FLAG},
+	{NAMES2("config", "config_changed"), SUB_MASK_CONFIG},
+	{NAMES2("all", "A"), SUB_MASK_ALL},
 };
 
-static bool event_word_matches(const char *arg, subscriber_mask_t *mask) {
+bool subscribe_mask_for(const char *word, subscriber_mask_t *mask) {
 	for (size_t i = 0; i < IPC_ARRAY_LEN(event_words); i++) {
 		for (const char *name = event_words[i].names; *name; name += strlen(name) + 1) {
-			if (streq(arg, name)) {
+			if (streq(word, name)) {
 				*mask |= event_words[i].mask;
 				return true;
 			}
@@ -120,7 +125,7 @@ bool ipc_cmd_subscribe(ipc_args_t *a) {
 				return false;
 		} else if (streq(opt, "-f") || streq(opt, "--fifo")) {
 			explicit_fifo = true;
-		} else if (event_word_matches(opt, &mask)) {
+		} else if (subscribe_mask_for(opt, &mask)) {
 			// handled by the table
 		} else {
 			ipc_fail(a, "Unknown argument \"%s\"\n", opt);

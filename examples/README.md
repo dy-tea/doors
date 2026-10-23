@@ -1032,6 +1032,7 @@ doorsctl config animation <type> [bezier|duration|spring|enabled] [<value>]
 doorsctl config idle_timeout [<s>]         # Get or set idle timeout in seconds (0=disable, default 0)
 doorsctl config idle_dpms [true|false]     # Get or set automatic DPMS on idle (default true)
 doorsctl config realtime_scheduling [true|false]  # Get or set real-time scheduling (default false)
+doorsctl config reset [<name>...]     # Put settings back to their built-in defaults
 ```
 
 #### Listing settings
@@ -1070,6 +1071,31 @@ $ doorsctl config window_gap two --dry-run
 config: window_gap: invalid value "two"
 $ echo $?
 1
+```
+
+#### Resetting to defaults
+
+```sh
+doorsctl config reset                      # every setting that differs
+doorsctl config reset window_gap border_width
+```
+
+`config reset` puts settings back to the values captured at startup, before `doorsrc` ran.
+
+```
+$ doorsctl config reset window_gap
+reset 1 of 1 setting to its default
+  window_gap 15 -> 10
+```
+
+`doorsctl config --reset` is the same command in flag form, and `--dry-run`
+reports what would change without writing:
+
+```
+$ doorsctl config reset --dry-run
+would reset 2 of 83 settings to their defaults
+  window_gap 15 -> 10
+  blur_radius 7.00 -> 5.00
 ```
 
 ### Animation Settings
@@ -1486,6 +1512,15 @@ Reorder the monitors, ones left out keep their relative order behind them.
 doorsctl wm --reorder-monitors DP-1 eDP-1 HDMI-A-1
 ```
 
+`doorsrc` runs once, at startup. It is a shell script, so it can start
+applications and run arbitrary commands; re-running it on demand would launch
+those again, which is why changing state mid-session goes through `doorsctl`
+itself instead. Settings can be changed with `config <name> <value>` and put back
+with [`config reset`](#resetting-to-defaults), rules with `rule`, and keybinds
+by editing `doorshkrc` (which is reloaded when saved). Editing `doorsrc` after
+startup announces itself through `subscribe config` as `config_changed`, but
+nothing in the file is applied by that.
+
 ### Subscribe Commands
 
 ```
@@ -1514,6 +1549,8 @@ node_focus            # Node focus change
 node_change           # Node property change
 node_state            # Node state change
 node_flag             # Node flag change
+config|config_changed # Config events
+config_changed        # doorsrc changed on disk; nothing is applied automatically
 all|A                 # All event types
 ```
 

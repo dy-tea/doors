@@ -1,5 +1,6 @@
 #include "config.h"
 #include "input/keyboard.h"
+#include "ipc/ipc.h"
 #include "launcher.h"
 #include "layout/layout.h"
 #include "layout/master_stack.h"
@@ -52,8 +53,20 @@ static int hotkey_watch_fd = -1;
 static char hotkey_config_path[CONFIG_PATH_MAX];
 static struct wl_event_loop *hotkey_event_loop = NULL;
 static struct wl_event_source *hotkey_event_source = NULL;
+static struct wl_event_source *doorsrc_debounce_timer = NULL;
 static void setup_inotify_watch(const char *config_path);
 static void add_hotkey_listener_to_event_loop(void);
+
+// whether an inotify event name is the file at `path`
+static bool file_event_matches(const char *path, const char *name) {
+	if (path[0] == '\0' || name == NULL || name[0] == '\0')
+		return false;
+
+	const char *base = strrchr(path, '/');
+	base = base ? base + 1 : path;
+
+	return streq(base, name);
+}
 
 static const char *get_config_home(void) {
 	if (custom_config_dir)
@@ -1161,6 +1174,10 @@ void config_fini(void) {
 		wl_event_source_remove(hotkey_event_source);
 		hotkey_event_source = NULL;
 	}
+	if (doorsrc_debounce_timer) {
+		wl_event_source_remove(doorsrc_debounce_timer);
+		doorsrc_debounce_timer = NULL;
+	}
 	if (hotkey_watch_fd >= 0) {
 		close(hotkey_watch_fd);
 		hotkey_watch_fd = -1;
@@ -1185,6 +1202,14 @@ static int hotkey_debounce_handler(void *data) {
 	return 0;
 }
 
+static int doorsrc_debounce_handler(void *data) {
+	(void)data;
+	doorsrc_debounce_timer = NULL;
+
+	ipc_put_status(SUB_MASK_CONFIG, "config_changed %s\n", config_path);
+	return 0;
+}
+
 static int hotkey_reload_handler(int fd, uint32_t mask, void *data) {
 	(void)data;
 	if (!(mask & WL_EVENT_READABLE))
@@ -1195,18 +1220,33 @@ static int hotkey_reload_handler(int fd, uint32_t mask, void *data) {
 	if (len <= 0)
 		return 0;
 
-	struct inotify_event *event = (struct inotify_event *)buf;
+	bool doorsrc = false, hotkeys = false;
+	for (ssize_t offset = 0; offset + (ssize_t)sizeof(struct inotify_event) <= len; ) {
+		struct inotify_event *event = (struct inotify_event *)(buf + offset);
 
-	bool match = false;
-	if (event->len > 0 && event->name[0] != '\0') {
-		const char *config_file_name = strrchr(hotkey_config_path, '/');
-		config_file_name = config_file_name ? config_file_name + 1 : hotkey_config_path;
-		match = (streq(event->name, config_file_name));
-	} else {
-		match = true;
+		if (event->len > 0 && event->name[0] != '\0') {
+			doorsrc |= file_event_matches(config_path, event->name);
+			hotkeys |= file_event_matches(hotkey_config_path, event->name);
+		} else {
+			// an event on the directory itself
+			hotkeys = true;
+		}
+
+		offset += (ssize_t)(sizeof(struct inotify_event) + event->len);
 	}
 
-	if (!match)
+	if (doorsrc) {
+		if (doorsrc_debounce_timer) {
+			wl_event_source_timer_update(doorsrc_debounce_timer, 100);
+		} else if (hotkey_event_loop) {
+			doorsrc_debounce_timer = wl_event_loop_add_timer(hotkey_event_loop, doorsrc_debounce_handler,
+				NULL);
+			if (doorsrc_debounce_timer)
+				wl_event_source_timer_update(doorsrc_debounce_timer, 100);
+		}
+	}
+
+	if (!hotkeys)
 		return 0;
 
 	if (hotkey_debounce_timer) {

@@ -14,7 +14,7 @@ static const ipc_cmd_t commands[] = {
 	CMD("balance", "even out the focused desktop", ipc_cmd_actions),
 	CMD("bezier", "register a bezier easing curve", ipc_cmd_actions),
 	CMD("commands", "list every command and its subcommands", ipc_cmd_commands),
-	{"config", "get or set a setting", ipc_cmd_config, config_subs},
+	{"config", "get, set or reset a setting", ipc_cmd_config, config_subs},
 	{"desktop", "focus, create, rename or reorder desktops", ipc_cmd_desktop, desktop_subs},
 	{"env", "set or unset environment variables for launched clients", ipc_cmd_env, env_subs},
 	CMD("equalize", "split the tree evenly", ipc_cmd_actions),
@@ -94,18 +94,12 @@ bool process_ipc_message(char *msg, int msg_len, int client_fd) {
 	}
 
 	bool dry_run = false;
-	uint32_t origin = 0;
 	int first = 0;
 	for (; first < num; first++) {
 		const char *arg = args[first];
 
 		if (streq(arg, "--dry-run")) {
 			dry_run = true;
-			continue;
-		}
-
-		if (str_starts(arg, "--origin=config:")) {
-			origin = (uint32_t)strtoul(arg + strlen("--origin=config:"), NULL, 10);
 			continue;
 		}
 
@@ -131,7 +125,6 @@ bool process_ipc_message(char *msg, int msg_len, int client_fd) {
 	ipc_args_t a;
 	ipc_args_init(&a, args + first + 1, num - first - 1, client_fd, name);
 	a.dry_run = dry_run;
-	a.origin = origin;
 
 	bool owns_client_fd = false;
 

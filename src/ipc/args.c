@@ -13,7 +13,6 @@ void ipc_args_init(ipc_args_t *a, char **v, int n, int fd, const char *cmd) {
 	a->cmd = cmd;
 	a->ctx = NULL;
 	a->dry_run = false;
-	a->origin = 0;
 }
 
 int ipc_left(const ipc_args_t *a) {

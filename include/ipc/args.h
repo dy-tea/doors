@@ -14,7 +14,6 @@ typedef struct {
 	const char *cmd; // command name, used as the error prefix
 	void *ctx; // command-scoped state, for handlers that resolve arguments up front
 	bool dry_run; // parse and report
-	uint32_t origin; // config run that issued this request, 0 for runtime callers
 } ipc_args_t;
 
 void ipc_args_init(ipc_args_t *a, char **v, int n, int fd, const char *cmd);

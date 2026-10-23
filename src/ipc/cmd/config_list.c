@@ -10,7 +10,6 @@
 #include <string.h>
 
 #define CFG_INTRO_MAX 256
-#define CFG_VALUE_MAX 512
 #define CFG_DEFAULTS_ARENA (32 * 1024)
 
 // setting the introspection commands can report on
@@ -309,6 +308,45 @@ static const char *cfg_intro_default(size_t i) {
 	if (!cfg_defaults_ready || i >= CFG_INTRO_MAX || cfg_defaults_at[i] == SIZE_MAX)
 		return "-";
 	return cfg_defaults_arena + cfg_defaults_at[i];
+}
+
+bool cfg_default_value(const char *name, char *buf, size_t bufsz) {
+	if (!cfg_defaults_ready)
+		return false;
+
+	for (size_t i = 0; i < CFG_SETTINGS_COUNT; i++) {
+		const cfg_setting_t *s = &settings_table[i];
+		if (!streq(name, s->name) && !(s->alias && streq(name, s->alias)))
+			continue;
+
+		if (cfg_defaults_at[i] == SIZE_MAX)
+			return false;
+
+		snprintf(buf, bufsz, "%s", cfg_defaults_arena + cfg_defaults_at[i]);
+		return true;
+	}
+
+	return false;
+}
+
+// how many of the settings with their own syntax (animation, gradients, tab
+// colours, scroller presets) differ from the value recorded at startup, since
+// `config reset` cannot restore those and should not claim otherwise
+size_t cfg_unresettable_changed(void) {
+	size_t changed = 0;
+
+	for (size_t i = CFG_SETTINGS_COUNT; i < cfg_intro_count(); i++) {
+		cfg_intro_t in;
+		cfg_intro_get(i, &in);
+
+		char value[CFG_VALUE_MAX];
+		in.format(in.self, value, sizeof(value));
+
+		if (!streq(value, cfg_intro_default(i)))
+			changed++;
+	}
+
+	return changed;
 }
 
 

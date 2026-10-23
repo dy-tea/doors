@@ -50,6 +50,12 @@ jobs:
       - name: Test
         run: meson test -C build --print-errorlogs
 
+      - name: Test under sanitizers
+        run: |
+          meson setup build-asan -Db_sanitize=address,undefined -Db_lundef=false
+          ninja -C build-asan
+          meson test -C build-asan --print-errorlogs
+
   alpine:
     runs-on: ubuntu-latest
     container:

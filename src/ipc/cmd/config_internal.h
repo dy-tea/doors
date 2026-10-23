@@ -42,6 +42,9 @@ typedef struct cfg_setting {
 	void (*on_set)(void); // side effects of a successful write
 } cfg_setting_t;
 
+// room for the longest value a setting can print, or a default is "-"
+#define CFG_VALUE_MAX 512
+
 // every setting reachable through `doorsctl config <name>`
 #define CFG_SETTINGS_COUNT 83
 
@@ -83,6 +86,13 @@ bool cfg_special_dispatch(ipc_args_t *a, const char *name);
 bool cfg_special_name(const char *name);
 
 void cfg_list(ipc_args_t *a);
+
+// the compiled default of a table setting, as `config <name>` prints it; false
+// when the name is not a single-value setting with a recorded default
+bool cfg_default_value(const char *name, char *buf, size_t bufsz);
+
+// how many settings with their own syntax differ from their recorded default
+size_t cfg_unresettable_changed(void);
 
 // rebuilds every tab bar, used by the handlers that change tab appearance
 void tabs_rebuild_all(void);

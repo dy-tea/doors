@@ -598,8 +598,116 @@ bool config_validate_value(const char *name, const char *value, char *err, size_
 	return cfg_apply(s, value, err, errsz, true);
 }
 
+
+#define CFG_RESET_LISTED 16
+
+static void cfg_reset(ipc_args_t *a) {
+	const cfg_setting_t *targets[CFG_SETTINGS_COUNT];
+	size_t total = 0;
+	bool named = ipc_left(a) > 0;
+
+	if (named) {
+		ipc_foreach(a, arg) {
+			if (cfg_special_name(arg)) {
+				ipc_fail(a, "%s: set through its own syntax, so there is no default to restore\n", arg);
+				return;
+			}
+
+			const cfg_setting_t *s = find_setting(arg);
+			if (s == NULL) {
+				ipc_fail(a, "Unknown setting \"%s\"\n", arg);
+				return;
+			}
+
+			if (total == CFG_SETTINGS_COUNT) {
+				ipc_fail(a, "Too many settings to reset\n");
+				return;
+			}
+
+			targets[total++] = s;
+		}
+	} else {
+		for (size_t i = 0; i < CFG_SETTINGS_COUNT; i++)
+			targets[total++] = &settings_table[i];
+	}
+
+	IPC_REPLY(b);
+	char detail_storage[2048] = {0};
+	ipc_buf_t detail;
+	ipc_buf_init(&detail, detail_storage, sizeof(detail_storage));
+
+	size_t changed = 0, listed = 0, hidden = 0, missing = 0;
+
+	for (size_t i = 0; i < total; i++) {
+		const cfg_setting_t *s = targets[i];
+
+		char dflt[CFG_VALUE_MAX];
+		if (!cfg_default_value(s->name, dflt, sizeof(dflt))) {
+			missing++;
+			continue;
+		}
+
+		char before[CFG_VALUE_MAX];
+		cfg_format_value(s, before, sizeof(before));
+		str_rtrim(before);
+
+		bool same = streq(before, dflt);
+
+		// writing a value that is already there would run its side effects and
+		// commit a transaction for nothing
+		if (!same) {
+			char err[256];
+			if (!cfg_apply(s, dflt, err, sizeof(err), a->dry_run)) {
+				ipc_fail(a, "%s", err);
+				return;
+			}
+
+			changed++;
+		}
+
+		// listing every setting when nothing is named would bury the few that moved
+		if (!named && same)
+			continue;
+
+		if (listed == CFG_RESET_LISTED || detail.truncated) {
+			hidden++;
+			continue;
+		}
+
+		listed++;
+
+		if (same)
+			ipc_buff(&detail, "  %s %s (unchanged)\n", s->name, dflt);
+		else
+			ipc_buff(&detail, "  %s %s -> %s\n", s->name, before, dflt);
+	}
+
+	if (changed == 0) {
+		ipc_buff(&b, "no change: %zu %s already at %s default\n", total,
+			total == 1 ? "setting" : "settings", total == 1 ? "its" : "their");
+	} else {
+		ipc_buff(&b, "%s %zu of %zu %s to %s\n", a->dry_run ? "would reset" : "reset", changed, total,
+			total == 1 ? "setting" : "settings", total == 1 ? "its default" : "their defaults");
+	}
+
+	ipc_buff(&b, "%s", detail.buf);
+	if (hidden)
+		ipc_buff(&b, "  (+%zu more)\n", hidden);
+
+	size_t special = cfg_unresettable_changed();
+	if (!named && special)
+		ipc_buff(&b, "%zu %s with their own syntax: %s\n", special, special == 1 ? "setting" : "settings",
+			"animation, gradients, tab colours, scroller presets");
+
+	if (missing)
+		ipc_buff(&b, "%zu %s had no recorded default\n", missing, missing == 1 ? "setting" : "settings");
+
+	ipc_buf_send(a, &b);
+}
+
 const ipc_sub_t config_subs[] = {
 	IPC_SUB("-l", "--list", "config --list [--json] [--changed] [--no-header]", cfg_list),
+	IPC_SUBA("-r", "--reset", "reset\0", "config reset [<name>...]", cfg_reset),
 	IPC_SUB_END,
 };
 
@@ -616,11 +724,14 @@ void ipc_cmd_config(ipc_args_t *a) {
 		return;
 	}
 
+	if (streq(name, "reset")) {
+		ipc_take(a);
+		cfg_reset(a);
+		return;
+	}
+
 	ipc_take(a);
 
-	// settings with their own syntax (animation, gradients, tab colours, scroller
-	// presets) have no parse-without-mutate path yet, so say so instead of
-	// reporting a validation that did not happen
 	if (a->dry_run && cfg_special_name(name)) {
 		ipc_fail(a, "--dry-run is not supported by \"%s\"\n", name);
 		return;
