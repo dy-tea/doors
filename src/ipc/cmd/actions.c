@@ -131,6 +131,14 @@ static void act_bezier(ipc_args_t *a) {
 		&p2y))
 		return;
 
+	if (a->dry_run) {
+		if (name[0] == '\0')
+			ipc_fail(a, "Failed to add bezier curve\n");
+		else
+			ipc_ok(a, "Bezier curve would be added\n");
+		return;
+	}
+
 	if (bezier_add(name, p1x, p1y, p2x, p2y))
 		ipc_ok(a, "Bezier curve added\n");
 	else
@@ -153,6 +161,14 @@ static void act_spring(ipc_args_t *a) {
 		return;
 	if (ipc_peek(a) && !ipc_double(a, "velocity_eps", 0, 1e9, &velocity_eps))
 		return;
+
+	if (a->dry_run) {
+		if (name[0] == '\0')
+			ipc_fail(a, "Failed to add spring curve\n");
+		else
+			ipc_ok(a, "Spring curve would be added\n");
+		return;
+	}
 
 	if (spring_add(name, stiffness, damping, mass, value_eps, velocity_eps))
 		ipc_ok(a, "Spring curve added\n");

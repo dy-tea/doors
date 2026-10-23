@@ -11,6 +11,25 @@
 
 static void ipc_cmd_commands(ipc_args_t *a);
 
+// commands with a parse-without-mutate path
+static const char *const dry_run_commands[] = {
+	"bezier",
+	"config",
+	"env",
+	"hotkey",
+	"input",
+	"rule",
+	"spring",
+};
+
+static bool dry_run_supported(const char *name) {
+	for (size_t i = 0; i < IPC_ARRAY_LEN(dry_run_commands); i++) {
+		if (streq(name, dry_run_commands[i]))
+			return true;
+	}
+	return false;
+}
+
 static const ipc_cmd_t commands[] = {
 	CMD("balance", "even out the focused desktop", ipc_cmd_actions),
 	CMD("bezier", "register a bezier easing curve", ipc_cmd_actions),
@@ -115,7 +134,7 @@ bool process_ipc_message(char *msg, int msg_len, int client_fd) {
 
 	const char *name = args[first];
 
-	if (dry_run && !streq(name, "config")) {
+	if (dry_run && !dry_run_supported(name)) {
 		free(args);
 		char msg[128];
 		snprintf(msg, sizeof(msg), "--dry-run is not supported by \"%s\"\n", name);

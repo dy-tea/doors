@@ -124,6 +124,7 @@ void effects_evict_buffers(void);
 enum blur_algorithm blur_algorithm_from_str(const char *str);
 const char *effects_algorithm_to_str(enum blur_algorithm algo);
 
+bool screen_shader_valid(const char *name);
 bool screen_shader_set(const char *name);
 bool screen_shader_load_file(const char *path);
 void screen_shader_clear(void);

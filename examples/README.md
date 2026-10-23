@@ -727,7 +727,8 @@ doorsctl rule -r <index>                # Remove rule by index
 doorsctl rule -l                        # List all rules
 ```
 
-At most 128 rules can be defined at once.
+At most 128 rules can be defined at once. Add `--dry-run` to check a rule without
+adding it.
 
 **Adding Rules (`-a` / `--add`):**
 Specify an app_id (or title) followed by consequence options:
@@ -1061,16 +1062,21 @@ blur_radius   float  7.00  5.00  >0
 #### Checking a value before applying it
 
 ```
-doorsctl config <name> <value> --dry-run
+doorsctl <command> ... --dry-run
 ```
 
-`--dry-run` parses and range-checks the value but does not set it. It works for any config subcommand.
+`--dry-run` parses and checks the request but does not apply it. `doorsctl` moves the flag to the front, so it can be written anywhere on the line.
 
 ```
 $ doorsctl config window_gap two --dry-run
 config: window_gap: invalid value "two"
 $ echo $?
 1
+```
+
+```
+$ doorsctl rule -a firefox state=floating --dry-run
+rule would be added
 ```
 
 #### Resetting to defaults
@@ -1093,7 +1099,7 @@ reports what would change without writing:
 
 ```
 $ doorsctl config reset --dry-run
-would reset 2 of 83 settings to their defaults
+would reset 2 of 106 settings to their defaults
   window_gap 15 -> 10
   blur_radius 7.00 -> 5.00
 ```
@@ -1635,6 +1641,8 @@ The master area is sized according to the configured ratio (default 0.5). The or
 ### Hotkey Commands
 
 Add or list keybinds on the fly without editing `doorshkrc`. Keybinds added this way are active immediately and use the same parsing as the config file.
+
+Add `--dry-run` to `hotkey` to check a keybind without registering it.
 
 ```
 doorsctl hotkey list

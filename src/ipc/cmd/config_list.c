@@ -9,7 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define CFG_INTRO_MAX 256
 #define CFG_DEFAULTS_ARENA (32 * 1024)
 
 // setting the introspection commands can report on
@@ -247,6 +246,26 @@ static void cfg_intro_format_extra(const void *self, char *buf, size_t bufsz) {
 	str_rtrim(buf);
 }
 
+size_t cfg_extra_count(void) {
+	return IPC_ARRAY_LEN(cfg_extras);
+}
+
+const char *cfg_extra_name(size_t i) {
+	return i < IPC_ARRAY_LEN(cfg_extras) ? cfg_extras[i].name : NULL;
+}
+
+bool cfg_special_format_value(const char *name, char *buf, size_t bufsz) {
+	for (size_t i = 0; i < IPC_ARRAY_LEN(cfg_extras); i++) {
+		if (!streq(name, cfg_extras[i].name))
+			continue;
+
+		cfg_extra_format(&cfg_extras[i], buf, bufsz);
+		return true;
+	}
+
+	return false;
+}
+
 _Static_assert(CFG_SETTINGS_COUNT + IPC_ARRAY_LEN(cfg_extras) <= CFG_INTRO_MAX,
 	"CFG_INTRO_MAX is too small for the config surface");
 
@@ -310,13 +329,28 @@ static const char *cfg_intro_default(size_t i) {
 	return cfg_defaults_arena + cfg_defaults_at[i];
 }
 
+static const char *cfg_canonical_name(const char *name) {
+	for (size_t i = 0; i < CFG_SETTINGS_COUNT; i++) {
+		const cfg_setting_t *s = &settings_table[i];
+		if (streq(name, s->name) || (s->alias && streq(name, s->alias)))
+			return s->name;
+	}
+
+	return name;
+}
+
 bool cfg_default_value(const char *name, char *buf, size_t bufsz) {
 	if (!cfg_defaults_ready)
 		return false;
 
-	for (size_t i = 0; i < CFG_SETTINGS_COUNT; i++) {
-		const cfg_setting_t *s = &settings_table[i];
-		if (!streq(name, s->name) && !(s->alias && streq(name, s->alias)))
+	const char *canonical = cfg_canonical_name(name);
+	size_t count = cfg_intro_count();
+
+	for (size_t i = 0; i < count; i++) {
+		cfg_intro_t in;
+		cfg_intro_get(i, &in);
+
+		if (!streq(canonical, in.name))
 			continue;
 
 		if (cfg_defaults_at[i] == SIZE_MAX)
@@ -327,26 +361,6 @@ bool cfg_default_value(const char *name, char *buf, size_t bufsz) {
 	}
 
 	return false;
-}
-
-// how many of the settings with their own syntax (animation, gradients, tab
-// colours, scroller presets) differ from the value recorded at startup, since
-// `config reset` cannot restore those and should not claim otherwise
-size_t cfg_unresettable_changed(void) {
-	size_t changed = 0;
-
-	for (size_t i = CFG_SETTINGS_COUNT; i < cfg_intro_count(); i++) {
-		cfg_intro_t in;
-		cfg_intro_get(i, &in);
-
-		char value[CFG_VALUE_MAX];
-		in.format(in.self, value, sizeof(value));
-
-		if (!streq(value, cfg_intro_default(i)))
-			changed++;
-	}
-
-	return changed;
 }
 
 

@@ -216,6 +216,12 @@ static void rule_add(ipc_args_t *a) {
 		return;
 	}
 
+	if (a->dry_run) {
+		free_rule(r);
+		ipc_ok(a, "rule would be added\n");
+		return;
+	}
+
 	add_rule(r);
 	ipc_ok(a, "rule added\n");
 }

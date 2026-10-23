@@ -582,11 +582,13 @@ bool config_apply_value(const char *name, const char *value, char *err, size_t e
 }
 
 bool config_validate_value(const char *name, const char *value, char *err, size_t errsz) {
-	// the settings with their own syntax parse live arguments and have no dry-run
-	// path, so they are reported as unsupported rather than as unknown
 	if (cfg_special_name(name)) {
-		cfg_errf(err, errsz, "%s: no dry-run validation available\n", name);
-		return false;
+		if (!cfg_special_settable(name)) {
+			cfg_errf(err, errsz, "%s: no dry-run validation available\n", name);
+			return false;
+		}
+
+		return cfg_special_apply(name, value, err, errsz, true);
 	}
 
 	const cfg_setting_t *s = find_setting(name);
@@ -601,34 +603,58 @@ bool config_validate_value(const char *name, const char *value, char *err, size_
 
 #define CFG_RESET_LISTED 16
 
+typedef struct {
+	const cfg_setting_t *setting;
+	const char *name;
+} cfg_reset_target_t;
+
+static const char *cfg_reset_value(const char *name, const char *dflt, char *buf, size_t bufsz) {
+	if (cfg_find_gradient(name) && strchr(dflt, ' ') == NULL) {
+		str_copy(buf, bufsz, "clear");
+		return buf;
+	}
+
+	return dflt;
+}
+
 static void cfg_reset(ipc_args_t *a) {
-	const cfg_setting_t *targets[CFG_SETTINGS_COUNT];
+	cfg_reset_target_t targets[CFG_INTRO_MAX];
 	size_t total = 0;
 	bool named = ipc_left(a) > 0;
 
 	if (named) {
 		ipc_foreach(a, arg) {
-			if (cfg_special_name(arg)) {
-				ipc_fail(a, "%s: set through its own syntax, so there is no default to restore\n", arg);
-				return;
-			}
-
 			const cfg_setting_t *s = find_setting(arg);
-			if (s == NULL) {
-				ipc_fail(a, "Unknown setting \"%s\"\n", arg);
+
+			if (s == NULL && !cfg_special_settable(arg)) {
+				if (cfg_special_name(arg))
+					ipc_fail(a, "%s: set through its own syntax, so there is no default to restore\n", arg);
+				else
+					ipc_fail(a, "Unknown setting \"%s\"\n", arg);
 				return;
 			}
 
-			if (total == CFG_SETTINGS_COUNT) {
+			if (total == CFG_INTRO_MAX) {
 				ipc_fail(a, "Too many settings to reset\n");
 				return;
 			}
 
-			targets[total++] = s;
+			targets[total].setting = s;
+			targets[total].name = s ? s->name : cfg_special_canonical(arg);
+			total++;
 		}
 	} else {
-		for (size_t i = 0; i < CFG_SETTINGS_COUNT; i++)
-			targets[total++] = &settings_table[i];
+		for (size_t i = 0; i < CFG_SETTINGS_COUNT; i++) {
+			targets[total].setting = &settings_table[i];
+			targets[total].name = settings_table[i].name;
+			total++;
+		}
+
+		for (size_t i = 0; i < cfg_extra_count(); i++) {
+			targets[total].setting = NULL;
+			targets[total].name = cfg_extra_name(i);
+			total++;
+		}
 	}
 
 	IPC_REPLY(b);
@@ -639,16 +665,20 @@ static void cfg_reset(ipc_args_t *a) {
 	size_t changed = 0, listed = 0, hidden = 0, missing = 0;
 
 	for (size_t i = 0; i < total; i++) {
-		const cfg_setting_t *s = targets[i];
+		const cfg_setting_t *s = targets[i].setting;
+		const char *name = targets[i].name;
 
 		char dflt[CFG_VALUE_MAX];
-		if (!cfg_default_value(s->name, dflt, sizeof(dflt))) {
+		if (!cfg_default_value(name, dflt, sizeof(dflt))) {
 			missing++;
 			continue;
 		}
 
 		char before[CFG_VALUE_MAX];
-		cfg_format_value(s, before, sizeof(before));
+		if (s)
+			cfg_format_value(s, before, sizeof(before));
+		else if (!cfg_special_format_value(name, before, sizeof(before)))
+			snprintf(before, sizeof(before), "?");
 		str_rtrim(before);
 
 		bool same = streq(before, dflt);
@@ -656,8 +686,13 @@ static void cfg_reset(ipc_args_t *a) {
 		// writing a value that is already there would run its side effects and
 		// commit a transaction for nothing
 		if (!same) {
+			char arg_storage[CFG_VALUE_MAX];
+			const char *value = cfg_reset_value(name, dflt, arg_storage, sizeof(arg_storage));
+
 			char err[256];
-			if (!cfg_apply(s, dflt, err, sizeof(err), a->dry_run)) {
+			bool ok = s ? cfg_apply(s, value, err, sizeof(err), a->dry_run) : cfg_special_apply(name, value,
+				err, sizeof(err), a->dry_run);
+			if (!ok) {
 				ipc_fail(a, "%s", err);
 				return;
 			}
@@ -677,9 +712,9 @@ static void cfg_reset(ipc_args_t *a) {
 		listed++;
 
 		if (same)
-			ipc_buff(&detail, "  %s %s (unchanged)\n", s->name, dflt);
+			ipc_buff(&detail, "  %s %s (unchanged)\n", name, dflt);
 		else
-			ipc_buff(&detail, "  %s %s -> %s\n", s->name, before, dflt);
+			ipc_buff(&detail, "  %s %s -> %s\n", name, before, dflt);
 	}
 
 	if (changed == 0) {
@@ -693,11 +728,6 @@ static void cfg_reset(ipc_args_t *a) {
 	ipc_buff(&b, "%s", detail.buf);
 	if (hidden)
 		ipc_buff(&b, "  (+%zu more)\n", hidden);
-
-	size_t special = cfg_unresettable_changed();
-	if (!named && special)
-		ipc_buff(&b, "%zu %s with their own syntax: %s\n", special, special == 1 ? "setting" : "settings",
-			"animation, gradients, tab colours, scroller presets");
 
 	if (missing)
 		ipc_buff(&b, "%zu %s had no recorded default\n", missing, missing == 1 ? "setting" : "settings");
@@ -732,7 +762,7 @@ void ipc_cmd_config(ipc_args_t *a) {
 
 	ipc_take(a);
 
-	if (a->dry_run && cfg_special_name(name)) {
+	if (a->dry_run && cfg_special_name(name) && !cfg_special_settable(name)) {
 		ipc_fail(a, "--dry-run is not supported by \"%s\"\n", name);
 		return;
 	}

@@ -2763,8 +2763,17 @@ const char *effects_algorithm_to_str(enum blur_algorithm algo) {
 	}
 }
 
-bool screen_shader_set(const char *name) {
+bool screen_shader_valid(const char *name) {
 	if (!effects_state.available)
+		return false;
+	if (!name || streq(name, "none"))
+		return true;
+
+	return effects_backend->get_screen_shader_source(name) != NULL;
+}
+
+bool screen_shader_set(const char *name) {
+	if (!screen_shader_valid(name))
 		return false;
 	if (!name || streq(name, "none")) {
 		screen_shader_clear();
@@ -2772,9 +2781,6 @@ bool screen_shader_set(const char *name) {
 	}
 
 	const char *frag_src = effects_backend->get_screen_shader_source(name);
-
-	if (!frag_src)
-		return false;
 
 	effects_backend->frame_begin();
 	bool ok = effects_backend->compile_screen_shader(frag_src);

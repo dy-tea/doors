@@ -45,6 +45,9 @@ typedef struct cfg_setting {
 // room for the longest value a setting can print, or a default is "-"
 #define CFG_VALUE_MAX 512
 
+// settings_table plus the settings with their own syntax, and most targets a reset can name
+#define CFG_INTRO_MAX 256
+
 // every setting reachable through `doorsctl config <name>`
 #define CFG_SETTINGS_COUNT 83
 
@@ -87,12 +90,21 @@ bool cfg_special_name(const char *name);
 
 void cfg_list(ipc_args_t *a);
 
-// the compiled default of a table setting, as `config <name>` prints it; false
-// when the name is not a single-value setting with a recorded default
+// compiled default of a setting
 bool cfg_default_value(const char *name, char *buf, size_t bufsz);
 
-// how many settings with their own syntax differ from their recorded default
-size_t cfg_unresettable_changed(void);
+// settings with their own syntax
+size_t cfg_extra_count(void);
+const char *cfg_extra_name(size_t i);
+
+// current value of a setting with its own syntax
+bool cfg_special_format_value(const char *name, char *buf, size_t bufsz);
+
+// name a setting with its own syntax is listed and stored under
+const char *cfg_special_canonical(const char *name);
+
+bool cfg_special_settable(const char *name);
+bool cfg_special_apply(const char *name, const char *value, char *err, size_t errsz, bool dry_run);
 
 // rebuilds every tab bar, used by the handlers that change tab appearance
 void tabs_rebuild_all(void);

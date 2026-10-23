@@ -18,6 +18,12 @@ static void env_set(ipc_args_t *a) {
 		ipc_fail(a, "Invalid variable name \"%s\"\n", name);
 		return;
 	}
+
+	if (a->dry_run) {
+		ipc_ok(a, "Environment variable would be set\n");
+		return;
+	}
+
 	if (setenv(name, value, 1) != 0) {
 		ipc_fail(a, "Failed to set variable\n");
 		return;
@@ -35,6 +41,12 @@ static void env_unset(ipc_args_t *a) {
 		ipc_fail(a, "Invalid variable name \"%s\"\n", name);
 		return;
 	}
+
+	if (a->dry_run) {
+		ipc_ok(a, "Environment variable would be unset\n");
+		return;
+	}
+
 	if (unsetenv(name) != 0) {
 		ipc_fail(a, "Failed to unset variable\n");
 		return;

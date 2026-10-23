@@ -54,11 +54,37 @@ void ipc_cmd_input(ipc_args_t *a) {
 			ipc_fail(a, "input xcursor_size: expected 1-512\n");
 			return;
 		}
+
+		if (a->dry_run) {
+			ipc_ok(a, "ok\n");
+			return;
+		}
+
 		if (!cursor_set_size((uint32_t)size)) {
 			ipc_fail(a, "input xcursor_size: failed to load cursor theme\n");
 			return;
 		}
 		setenv("XCURSOR_SIZE", value, true);
+		ipc_ok(a, "ok\n");
+		return;
+	}
+
+	// the setter is the only place that knows the property names, so a dry run
+	// runs it on a throwaway config instead of touching the live ones
+	if (a->dry_run) {
+		input_config_t *probe = input_config_create(identifier);
+		if (!probe) {
+			ipc_fail(a, "Failed to create config\n");
+			return;
+		}
+
+		bool known = input_config_set_value(probe, property, value);
+		input_config_destroy(probe);
+
+		if (!known) {
+			ipc_fail(a, "Unknown property \"%s\"\n", property);
+			return;
+		}
 		ipc_ok(a, "ok\n");
 		return;
 	}

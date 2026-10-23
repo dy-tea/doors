@@ -93,6 +93,11 @@ static void hotkey_add(ipc_args_t *a) {
 	submap_name[0] = '\0';
 	bind_action_t action = parse_action(cmd, &desktop_index, submap_name);
 
+	if (a->dry_run) {
+		ipc_ok(a, "hotkey would be added\n");
+		return;
+	}
+
 	add_keybind(modifiers, keysym, keycode, use_keycode, flags, action, desktop_index,
 		(action == BIND_EXTERNAL) ? cmd : NULL, submap_name[0] ? submap_name : NULL);
 
