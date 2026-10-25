@@ -71,7 +71,8 @@ typedef struct {
 	int middle_emulation;
 
 	enum input_config_scroll_method scroll_method;
-	int scroll_button, scroll_button_lock, scroll_factor;
+	int scroll_button, scroll_button_lock;
+	double scroll_factor;
 
 	float rotation_angle;
 

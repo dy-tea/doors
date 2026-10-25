@@ -7,6 +7,7 @@
 #include "str.h"
 #include <float.h>
 #include <libinput.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wlr/backend/libinput.h>
@@ -62,12 +63,14 @@ input_config_t *input_config_create(const char *identifier) {
 	if (identifier)
 		config->identifier = strdup(identifier);
 
-	config->repeat_rate = 25;
-	config->repeat_delay = 600;
+	config->repeat_rate = -1;
+	config->repeat_delay = -1;
+	config->xkb_numlock = -1;
+	config->xkb_capslock = -1;
 	config->pointer_accel = FLT_MIN;
 	config->accel_profile = -1;
-	config->tap_button_map = INPUT_CONFIG_TAP_BUTTON_MAP_LRM;
-	config->drag_lock = INPUT_CONFIG_DRAG_LOCK_DISABLED;
+	config->tap_button_map = -1;
+	config->drag_lock = -1;
 	config->scroll_factor = FLT_MIN;
 	config->scroll_button = -1;
 	config->scroll_button_lock = -1;
@@ -79,7 +82,7 @@ input_config_t *input_config_create(const char *identifier) {
 	config->left_handed = -1;
 	config->dwt = -1;
 	config->dwtp = -1;
-	config->click_method = INPUT_CONFIG_CLICK_METHOD_BUTTON_AREAS;
+	config->click_method = -1;
 	config->middle_emulation = -1;
 	config->scroll_method = -1;
 
@@ -201,7 +204,7 @@ void input_config_merge(input_config_t *base, const input_config_t *overlay) {
 		base->tap_button_map = overlay->tap_button_map;
 	if (overlay->drag != -1)
 		base->drag = overlay->drag;
-	if (overlay->drag_lock != INPUT_CONFIG_DRAG_LOCK_DISABLED)
+	if ((int)overlay->drag_lock != -1)
 		base->drag_lock = overlay->drag_lock;
 	if (overlay->dwt != -1)
 		base->dwt = overlay->dwt;
@@ -305,8 +308,9 @@ bool input_config_set_value(input_config_t *config, const char *name, const char
 	} else if (streq(name, "drag")) {
 		config->drag = parse_bool(value, -1);
 	} else if (streq(name, "drag_lock")) {
-		config->drag_lock = parse_bool(value,
-			0) ? INPUT_CONFIG_DRAG_LOCK_ENABLED : INPUT_CONFIG_DRAG_LOCK_DISABLED;
+		int lock = parse_bool(value, -1);
+		if (lock != -1)
+			config->drag_lock = lock ? INPUT_CONFIG_DRAG_LOCK_ENABLED : INPUT_CONFIG_DRAG_LOCK_DISABLED;
 	} else if (streq(name, "dwt")) {
 		config->dwt = parse_bool(value, -1);
 	} else if (streq(name, "dwtp")) {
@@ -383,8 +387,9 @@ void input_config_apply(const input_config_t *config, struct wlr_input_device *d
 
 		xkb_context_unref(context);
 
-		if (config->repeat_rate > 0 && config->repeat_delay > 0)
-			wlr_keyboard_set_repeat_info(keyboard, config->repeat_rate, config->repeat_delay);
+		int rate = config->repeat_rate > 0 ? config->repeat_rate : 25;
+		int delay = config->repeat_delay > 0 ? config->repeat_delay : 600;
+		wlr_keyboard_set_repeat_info(keyboard, rate, delay);
 
 		if (config->xkb_numlock == 1 || config->xkb_capslock == 1) {
 			uint32_t leds = 0;
@@ -403,11 +408,23 @@ void input_config_apply(const input_config_t *config, struct wlr_input_device *d
 	case WLR_INPUT_DEVICE_TABLET:
 	case WLR_INPUT_DEVICE_TABLET_PAD:
 	case WLR_INPUT_DEVICE_SWITCH: {
+		if (device->type == WLR_INPUT_DEVICE_POINTER && device->data) {
+			pointer_t *pointer = device->data;
+			pointer->scroll_factor = config->scroll_factor != FLT_MIN ? config->scroll_factor : 1.0;
+		}
+
 		if (!wlr_input_device_is_libinput(device))
 			return;
 		struct libinput_device *libinput_dev = wlr_libinput_get_device_handle(device);
 		if (!libinput_dev)
 			return;
+
+		if (config->rotation_angle != FLT_MIN && libinput_device_config_rotation_is_available(libinput_dev)) {
+			double angle = fmod(config->rotation_angle, 360.0);
+			if (angle < 0)
+				angle += 360.0;
+			libinput_device_config_rotation_set_angle(libinput_dev, (unsigned int)angle);
+		}
 
 		if (device_is_touchpad(device)) {
 			if (config->tap != -1) {
@@ -422,12 +439,12 @@ void input_config_apply(const input_config_t *config, struct wlr_input_device *d
 				libinput_device_config_tap_set_drag_enabled(libinput_dev, drag);
 			}
 
-			if (config->drag_lock == INPUT_CONFIG_DRAG_LOCK_ENABLED)
-				libinput_device_config_tap_set_drag_lock_enabled(libinput_dev,
-					LIBINPUT_CONFIG_DRAG_LOCK_ENABLED);
-			else if (config->drag != -1)
-				libinput_device_config_tap_set_drag_lock_enabled(libinput_dev,
-					LIBINPUT_CONFIG_DRAG_LOCK_DISABLED);
+			if ((int)config->drag_lock != -1) {
+				enum libinput_config_drag_lock_state lock = config->drag_lock ==
+					INPUT_CONFIG_DRAG_LOCK_ENABLED ? LIBINPUT_CONFIG_DRAG_LOCK_ENABLED :
+					LIBINPUT_CONFIG_DRAG_LOCK_DISABLED;
+				libinput_device_config_tap_set_drag_lock_enabled(libinput_dev, lock);
+			}
 
 			if ((int)config->tap_button_map != -1) {
 				enum libinput_config_tap_button_map map = (config->tap_button_map ==

@@ -25,6 +25,7 @@ void pointer_create(struct wlr_input_device *device) {
 	}
 	ptr->wlr_pointer = pointer;
 	ptr->seat = seat_default();
+	ptr->scroll_factor = 1.0;
 	device->data = ptr;
 
 	ptr->destroy.notify = pointer_destroy;
