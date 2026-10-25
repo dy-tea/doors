@@ -75,7 +75,7 @@ void ipc_fail(ipc_args_t * a, const char *fmt, ...) {
 	va_end(ap);
 
 	char buf[320];
-	snprintf(buf, sizeof(buf), "%s: %s", a->cmd ? a->cmd : "ipc", msg);
+	snprintf(buf, sizeof(buf), "%s: %s\n", a->cmd ? a->cmd : "ipc", msg);
 	send_failure(a->fd, buf);
 }
 
@@ -390,7 +390,7 @@ void ipc_fail_unknown(ipc_args_t *a, const ipc_sub_t *subs) {
 	else
 		ipc_buff(&b, "%s: missing command, expected one of:", a->cmd ? a->cmd : "ipc");
 	ipc_sub_usage(&b, subs);
-
+	ipc_buff(&b,"\n");
 	send_failure(a->fd, b.buf);
 }
 
