@@ -75,7 +75,7 @@ void ipc_fail(ipc_args_t * a, const char *fmt, ...) {
 	va_end(ap);
 
 	char buf[320];
-	snprintf(buf, sizeof(buf), "%s: %s\n", a->cmd ? a->cmd : "ipc", msg);
+	snprintf(buf, sizeof(buf), "%s: %s", a->cmd ? a->cmd : "ipc", msg);
 	send_failure(a->fd, buf);
 }
 
