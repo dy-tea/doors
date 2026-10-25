@@ -18,6 +18,7 @@ static const char *const dry_run_commands[] = {
 	"env",
 	"hotkey",
 	"input",
+	"permission",
 	"rule",
 	"spring",
 };
@@ -47,6 +48,8 @@ static const ipc_cmd_t commands[] = {
 	{"master_stack", "drive the master_stack layout", ipc_cmd_master_stack, master_stack_subs},
 	{"node", "act on the focused window", ipc_cmd_node, node_subs},
 	{"output", "configure outputs and desktops", ipc_cmd_output, output_subs},
+	{"permission", "manage capture, output and input permissions", ipc_cmd_permission,
+		permission_subs},
 	CMD("presel", "set the preselection direction", ipc_cmd_actions),
 	{"query", "query monitors, desktops and nodes", ipc_cmd_query, query_subs},
 	CMD("quit", "shut the compositor down", ipc_cmd_quit),

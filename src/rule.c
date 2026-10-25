@@ -86,7 +86,7 @@ bool remove_rule_by_index(int idx) {
 }
 
 // format the pattern back as a spec that rule -a accepts, so -l round-trips
-static void rule_pattern_spec(const rule_pattern_t *p, char *out, size_t outsz) {
+void rule_pattern_spec(const rule_pattern_t *p, char *out, size_t outsz) {
 	const char *mode = "";
 	if (p->mode == RULE_MATCH_GLOB)
 		mode = "glob:";

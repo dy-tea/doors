@@ -10,6 +10,7 @@
 #include "ipc/ipc.h"
 #include "launcher.h"
 #include "output/config.h"
+#include "permission.h"
 #include "protocol/bell.h"
 #include "protocol/copy_capture.h"
 #include "protocol/cursor_shape.h"
@@ -382,6 +383,7 @@ void server_init(void) {
 	workspace_init();
 	render_unfocused_init();
 	idle_power_init();
+	permission_init();
 	ipc_init();
 	rule_init();
 	output_config_init();
@@ -452,6 +454,7 @@ void server_fini(void) {
 	spring_fini();
 	workspace_fini();
 	ipc_fini();
+	permission_fini();
 	rule_fini();
 	output_config_fini();
 	settings_fini();

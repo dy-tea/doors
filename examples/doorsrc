@@ -27,3 +27,8 @@ doorsctl config enable_animations true
 # Idle power management (DPMS timeout in seconds, 0 to disable)
 doorsctl config idle_timeout 300
 doorsctl config idle_dpms true
+
+# Permission policy for unsandboxed clients (see README: Permission Commands).
+# Rules are appended and the last matching rule wins.
+# doorsctl permission 'exe:*grim' capture=allow
+# doorsctl permission 'exe:*' capture=ask

@@ -831,6 +831,58 @@ doorsctl rule -l
 doorsctl rule -r 0
 ```
 
+### Permission Commands
+
+```sh
+doorsctl permission '<subject>' <capability>=<allow|deny|ask> ...
+doorsctl permission default <capability>=<allow|deny|ask> ...
+doorsctl permission -l | --list
+doorsctl permission -r | --remove <index>
+doorsctl permission --forget [<subject>]
+```
+
+The three capabilities are `capture` (screencopy and image-copy-capture), `output` (output-management apply/test and gamma) and `inject` (virtual keyboard and pointer). A rule matches the executable behind the client, resolved from `/proc/<pid>/exe`.
+
+Subjects take the window-rule pattern syntax: `exact:`, `glob:` or `regex:` before the pattern, `i:` after the mode to ignore case, and a bare `*` or `?` makes the pattern a glob. The `exe:` prefix is optional. Patterns match the whole path, so use `glob:/usr/lib/firefox/firefox*` rather than `firefox*`.
+
+Rules are appended, and the last matching rule wins, as with window rules. Each `capability=mode` argument creates one rule, so one line can set several:
+
+```sh
+# Allow grim to capture, ask about everything else
+doorsctl permission 'exe:*grim' capture=allow
+doorsctl permission 'exe:*' capture=ask
+
+# Refuse input injection from one tool
+doorsctl permission 'exe:/usr/bin/ydotool' inject=deny
+
+# Change what a client no rule names gets
+doorsctl permission default capture=ask
+```
+
+`permission -l` prints the defaults, the numbered rules and the remembered answers; an answer that a rule outranks is marked `shadowed by rule N`. Take the index from that list for `--remove`. `--forget` removes remembered answers whose executable matches the given pattern, or all of them when no pattern is given.
+
+```text
+default   capture=allow  output=allow  inject=allow
+0         exe:glob:*grim  capture=allow
+1         exe:/usr/bin/ydotool  inject=deny
+remember  exe:/usr/bin/spectacle  capture=allow  expires=never  shadowed by rule 0
+2 rules, 1 remembered
+```
+
+Defaults start at `allow` for all three capabilities, which is the current behaviour. Answers recorded with `--remember=always` are stored in `$XDG_STATE_HOME/doors/permissions` (`~/.local/state/doors/permissions`), and `--remember=session` keeps them in memory until Doors exits. Until `permission answer` lands, entries can be placed in that file by hand, one per line: `exe<TAB>capability<TAB>allow|deny<TAB>expiry`, where expiry is epoch seconds or `0` for never.
+
+`--dry-run` validates the subject, capability and mode, and reports what would be
+added, removed or forgotten:
+
+```sh
+$ doorsctl permission 'exe:*' capture=maybe --dry-run
+permission: Unknown mode "maybe", expected allow, deny or ask
+$ doorsctl permission 'exe:*' capture=deny --dry-run
+1 permission rule would be added
+```
+
+The policy is stored, listed and resolved today; the capture, output and inject checks, the `permission_request` event and `permission answer` are the next change. Until those land, these rules do not refuse anything.
+
 ### Gesture Bindings
 
 Touchpad gesture bindings are defined with the `gesture` keyword, followed by the gesture specification and command.

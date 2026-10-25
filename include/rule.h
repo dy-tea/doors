@@ -82,6 +82,8 @@ static inline bool rule_flag(const rule_consequence_t *rule, rule_type_t flag) {
 bool rule_pattern_set(rule_pattern_t *p, const char *spec, char *errbuf, size_t errsz);
 bool rule_pattern_match(const rule_pattern_t *p, const char *value);
 void rule_pattern_clear(rule_pattern_t *p);
+// format a stored pattern back as a spec that rule_pattern_set accepts
+void rule_pattern_spec(const rule_pattern_t *p, char *out, size_t outsz);
 size_t rule_count(void);
 
 typedef struct rule_t {
