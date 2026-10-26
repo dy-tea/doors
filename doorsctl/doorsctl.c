@@ -108,8 +108,7 @@ static bool send_args(int sock_fd, char **argv, int argc) {
 			argv++) {
 		n = snprintf(msg + offset, rem, "%s%c", *argv, 0);
 
-		if (n < 0 || (size_t)n + msg_len == sizeof(msg))
-		{
+		if (n < 0 || (size_t)n + msg_len == sizeof(msg)) {
 			fprintf(stderr, "Error: Message too long.\n");
 			return false;
 		}

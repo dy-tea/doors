@@ -12,7 +12,8 @@ typedef struct {
 } scroller_view_t;
 
 double scroller_view_offset_fit(const scroller_view_t *v, double cur_x, double col_x, double col_w);
-double scroller_view_offset_edge(const scroller_view_t *v, double cur_x, double col_x, double col_w);
+double scroller_view_offset_edge(const scroller_view_t *v, double cur_x, double col_x,
+	double col_w);
 double scroller_view_offset_centered(const scroller_view_t *v, double cur_x, double col_x,
 	double col_w);
 bool scroller_view_offset_bounds(const scroller_view_t *v, double anchor_x, double *out_min,

@@ -1,5 +1,6 @@
 #include "ext-image-capture-source-v1-protocol.h"
 #include "once.h"
+#include "permission.h"
 #include "protocol/capture.h"
 #include "protocol/copy_capture.h"
 #include "server.h"
@@ -30,6 +31,7 @@ typedef struct output_capture_source_t {
 	size_t num_started;
 	bool software_cursors_locked;
 
+	struct wl_list parked; // parked_frame_t.link
 	struct wl_listener output_commit;
 } output_capture_source_t;
 
@@ -38,6 +40,14 @@ typedef struct output_source_frame_event_t {
 	struct wlr_buffer *buffer;
 	struct timespec when;
 } output_source_frame_event_t;
+
+typedef struct {
+	output_capture_source_t *source;
+	struct wlr_ext_image_copy_capture_frame_v1 *frame;
+	perm_waiter_t *waiter;
+	struct wl_listener frame_destroy;
+	struct wl_list link; // source->parked
+} parked_frame_t;
 
 static output_capture_source_t *source_from_base(struct wlr_ext_image_capture_source_v1 *base) {
 	return (output_capture_source_t *)((char *)base - offsetof(output_capture_source_t, base));
@@ -139,6 +149,48 @@ static bool copy_buffer_to_frame(struct wlr_ext_image_copy_capture_frame_v1 *fra
 	return ok;
 }
 
+static parked_frame_t *parked_frame_find(output_capture_source_t *source,
+		struct wlr_ext_image_copy_capture_frame_v1 *frame) {
+	parked_frame_t *ctx;
+	wl_list_for_each(ctx, &source->parked, link) {
+		if (ctx->frame == frame)
+			return ctx;
+	}
+	return NULL;
+}
+
+static void parked_frame_destroyed(struct wl_listener *listener, void *data) {
+	(void)data;
+	parked_frame_t *ctx = wl_container_of(listener, ctx, frame_destroy);
+
+	permission_unpark(ctx->waiter);
+	ctx->waiter = NULL;
+
+	wl_list_remove(&ctx->frame_destroy.link);
+	wl_list_remove(&ctx->link);
+	free(ctx);
+}
+
+static void parked_frame_resolve(void *data, bool allow) {
+	parked_frame_t *ctx = data;
+	ctx->waiter = NULL;
+
+	struct wlr_ext_image_copy_capture_frame_v1 *frame = ctx->frame;
+	output_capture_source_t *source = ctx->source;
+
+	wl_list_remove(&ctx->frame_destroy.link);
+	wl_list_remove(&ctx->link);
+	free(ctx);
+
+	if (!allow) {
+		wlr_ext_image_copy_capture_frame_v1_fail(frame,
+			EXT_IMAGE_COPY_CAPTURE_FRAME_V1_FAILURE_REASON_STOPPED);
+		return;
+	}
+
+	wlr_output_update_needs_frame(source->output);
+}
+
 static void output_source_start(struct wlr_ext_image_capture_source_v1 *base, bool with_cursors) {
 	output_capture_source_t *source = source_from_base(base);
 
@@ -191,12 +243,54 @@ static void output_source_copy_frame(struct wlr_ext_image_capture_source_v1 *bas
 		return;
 	}
 
-	struct wlr_box rects[CAPTURE_MAX_BLOCKED_RECTS];
-	size_t nrects = capture_block_out_rects(source->output, rects, CAPTURE_MAX_BLOCKED_RECTS);
+	struct wl_client *client = frame->resource ? wl_resource_get_client(frame->resource) : NULL;
+	perm_result_t permission = {
+		.decision = PERM_ALLOW,
+		.source = "default",
+		.rule_index = -1
+	};
+	if (client)
+		permission = permission_check(client, PERM_CAPTURE);
 
-	if (copy_buffer_to_frame(frame, event->buffer, source->output->renderer, rects, nrects,
-			source->base.dmabuf_formats.len > 0, source->base.shm_formats_len > 0)) {
-		wlr_ext_image_copy_capture_frame_v1_ready(frame, source->output->transform, &event->when);
+	if (permission.decision == PERM_DENY) {
+		permission_log_denial(client, PERM_CAPTURE, &permission);
+		wlr_ext_image_copy_capture_frame_v1_fail(frame,
+			EXT_IMAGE_COPY_CAPTURE_FRAME_V1_FAILURE_REASON_STOPPED);
+		return;
+	}
+
+	if (permission.decision == PERM_ALLOW) {
+		struct wlr_box rects[CAPTURE_MAX_BLOCKED_RECTS];
+		size_t nrects = capture_block_out_rects(source->output, rects, CAPTURE_MAX_BLOCKED_RECTS);
+
+		if (copy_buffer_to_frame(frame, event->buffer, source->output->renderer, rects, nrects,
+				source->base.dmabuf_formats.len > 0, source->base.shm_formats_len > 0)) {
+			wlr_ext_image_copy_capture_frame_v1_ready(frame, source->output->transform, &event->when);
+		}
+		return;
+	}
+
+	if (parked_frame_find(source, frame))
+		return;
+
+	parked_frame_t *ctx = calloc(1, sizeof(*ctx));
+	if (!ctx) {
+		wlr_ext_image_copy_capture_frame_v1_fail(frame,
+			EXT_IMAGE_COPY_CAPTURE_FRAME_V1_FAILURE_REASON_STOPPED);
+		return;
+	}
+
+	ctx->source = source;
+	ctx->frame = frame;
+
+	ctx->frame_destroy.notify = parked_frame_destroyed;
+	wl_signal_add(&frame->events.destroy, &ctx->frame_destroy);
+	wl_list_insert(&source->parked, &ctx->link);
+
+	ctx->waiter = permission_park(client, PERM_CAPTURE, parked_frame_resolve, ctx);
+	if (!ctx->waiter) {
+		wlr_ext_image_copy_capture_frame_v1_fail(frame,
+			EXT_IMAGE_COPY_CAPTURE_FRAME_V1_FAILURE_REASON_STOPPED);
 	}
 }
 
@@ -254,6 +348,15 @@ static void source_handle_output_commit(struct wl_listener *listener, void *data
 static void source_addon_destroy(struct wlr_addon *addon) {
 	output_capture_source_t *source = wl_container_of(addon, source, addon);
 	wlr_ext_image_capture_source_v1_finish(&source->base);
+
+	parked_frame_t *ctx, *tmp;
+	wl_list_for_each_safe(ctx, tmp, &source->parked, link) {
+		permission_unpark(ctx->waiter);
+		wl_list_remove(&ctx->frame_destroy.link);
+		wl_list_remove(&ctx->link);
+		free(ctx);
+	}
+
 	wl_list_remove(&source->output_commit.link);
 	wlr_addon_finish(&source->addon);
 	free(source);
@@ -277,6 +380,7 @@ static output_capture_source_t *output_source_get_or_create(struct wlr_output *o
 
 	source->output = output;
 	wlr_ext_image_capture_source_v1_init(&source->base, &output_source_impl);
+	wl_list_init(&source->parked);
 	wlr_addon_init(&source->addon, &output->addons, NULL, &output_addon_impl);
 
 	source->output_commit.notify = source_handle_output_commit;

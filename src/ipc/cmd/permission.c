@@ -3,7 +3,6 @@
 #include "ipc/registry.h"
 #include "permission.h"
 #include "str.h"
-
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -103,8 +102,22 @@ static void permission_list(ipc_args_t *a) {
 		ipc_buff(&b, "\n");
 	}
 
-	ipc_buff(&b, "%zu rule%s, %zu remembered\n", rule_count, rule_count == 1 ? "" : "s",
-		remember_count);
+	size_t pending_count = permission_pending_count();
+	for (size_t i = 0; i < pending_count; i++) {
+		perm_pending_info_t info;
+		if (!permission_pending_at(i, &info))
+			continue;
+
+		const perm_subject_t *s = info.subject;
+		ipc_buff(&b, "pending\t%s\t%s\texe:%s", info.token, permission_cap_name(info.cap),
+			s->known && s->exe[0] ? s->exe : "?");
+		if (s->app_id[0])
+			ipc_buff(&b, "\tapp_id=%s", s->app_id);
+		ipc_buff(&b, "\t%ds left\n", info.seconds_left);
+	}
+
+	ipc_buff(&b, "%zu rule%s, %zu remembered, %zu pending\n", rule_count, rule_count == 1 ? "" : "s",
+		remember_count, pending_count);
 	ipc_buf_send(a, &b);
 }
 
@@ -191,10 +204,9 @@ static void permission_forget(ipc_args_t *a) {
 	}
 
 	if (a->dry_run) {
-		size_t n = subject ? permission_remember_matching(subject, err, sizeof(err))
-			: permission_remember_count();
-		ipc_okf(a, "%zu remembered permission%s would be forgotten\n", n,
-			n == 1 ? "" : "s");
+		size_t n = subject ? permission_remember_matching(subject, err,
+			sizeof(err)) : permission_remember_count();
+		ipc_okf(a, "%zu remembered permission%s would be forgotten\n", n, n == 1 ? "" : "s");
 		return;
 	}
 
@@ -210,8 +222,89 @@ static void permission_forget(ipc_args_t *a) {
 		ipc_okf(a, "%d remembered permission%s forgotten\n", n, n == 1 ? "" : "s");
 }
 
+static bool pending_token_valid(const char *token) {
+	if (strlen(token) != PERM_TOKEN_LEN)
+		return false;
+
+	for (const char *c = token; *c; c++) {
+		if (str_hex_digit(*c) < 0)
+			return false;
+	}
+	return true;
+}
+
+static bool pending_token_known(const char *token) {
+	size_t n = permission_pending_count();
+	for (size_t i = 0; i < n; i++) {
+		perm_pending_info_t info;
+		if (permission_pending_at(i, &info) && streq(info.token, token))
+			return true;
+	}
+	return false;
+}
+
+static void permission_answer_prompt(ipc_args_t *a) {
+	const char *token = ipc_peek(a);
+	if (!token) {
+		ipc_fail(a, "Missing <token>\n");
+		return;
+	}
+	if (!pending_token_valid(token)) {
+		ipc_fail(a, "Expected a %d digit hex token, got \"%s\"\n", PERM_TOKEN_LEN, token);
+		return;
+	}
+	if (!pending_token_known(token)) {
+		ipc_fail(a, "No pending permission request with token \"%s\"\n", token);
+		return;
+	}
+	ipc_take(a);
+
+	const char *mode = ipc_peek(a);
+	if (!mode) {
+		ipc_fail(a, "Missing <allow|deny>\n");
+		return;
+	}
+
+	perm_decision_t decision;
+	if (!permission_mode_parse(mode, &decision) || decision == PERM_ASK) {
+		ipc_fail(a, "Expected allow or deny, got \"%s\"\n", mode);
+		return;
+	}
+	ipc_take(a);
+
+	perm_remember_t remember = PERM_REMEMBER_NONE;
+	const char *opt;
+	while ((opt = ipc_peek(a))) {
+		ipc_take(a);
+
+		const char *value = str_skip_prefix(opt, "--remember=");
+		if (!value) {
+			ipc_fail(a, "Unknown argument \"%s\"\n", opt);
+			return;
+		}
+		if (streq(value, "session")) {
+			remember = PERM_REMEMBER_SESSION;
+		} else if (streq(value, "always")) {
+			remember = PERM_REMEMBER_ALWAYS;
+		} else {
+			ipc_fail(a, "Expected --remember=session or --remember=always, got \"%s\"\n", opt);
+			return;
+		}
+	}
+
+	if (a->dry_run) {
+		ipc_okf(a, "Permission request %s would be answered %s\n", token, permission_mode_name(decision));
+		return;
+	}
+
+	permission_answer_token(token, decision, remember);
+	ipc_okf(a, "Permission request %s %s\n", token, permission_mode_name(decision));
+}
+
 const ipc_sub_t permission_subs[] = {
 	IPC_SUB("default", NULL, "permission default <capability>=<mode> ...", permission_set_defaults),
+	IPC_SUB("answer", NULL, "permission answer <token> <allow|deny> [--remember=session|always]",
+		permission_answer_prompt),
 	IPC_SUB("-l", "--list", "permission -l | --list", permission_list),
 	IPC_SUB("-r", "--remove", "permission -r | --remove <index>", permission_remove),
 	IPC_SUB("--forget", NULL, "permission --forget [<subject>]", permission_forget),
@@ -221,6 +314,7 @@ const ipc_sub_t permission_subs[] = {
 static void permission_usage(ipc_args_t *a) {
 	IPC_REPLY(b);
 	ipc_buff(&b, "Usage:\n  permission <subject> <capability>=<mode> ...\n");
+	ipc_buff(&b, "  permission answer <token> <allow|deny> [--remember=session|always]\n");
 	ipc_sub_usage(&b, permission_subs);
 	ipc_buff(&b, "\n");
 	send_failure(a->fd, b.buf);
@@ -233,7 +327,7 @@ void ipc_cmd_permission(ipc_args_t *a) {
 		return;
 	}
 
-	if (first[0] == '-' || streq(first, "default")) {
+	if (first[0] == '-' || streq(first, "default") || streq(first, "answer")) {
 		if (!ipc_sub_dispatch(a, permission_subs))
 			ipc_fail_unknown(a, permission_subs);
 		return;

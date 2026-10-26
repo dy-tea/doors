@@ -51,7 +51,8 @@ typedef enum {
 	SUB_MASK_NODE_STATE = 1 << 14,
 	SUB_MASK_NODE_FLAG = 1 << 15,
 	SUB_MASK_CONFIG = 1 << 16,
-	SUB_MASK_ALL = (1 << 17) - 1
+	SUB_MASK_PERMISSION = 1 << 17,
+	SUB_MASK_ALL = (1 << 18) - 1
 } subscriber_mask_t;
 
 typedef struct subscriber_t {

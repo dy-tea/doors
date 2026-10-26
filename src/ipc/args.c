@@ -390,7 +390,7 @@ void ipc_fail_unknown(ipc_args_t *a, const ipc_sub_t *subs) {
 	else
 		ipc_buff(&b, "%s: missing command, expected one of:", a->cmd ? a->cmd : "ipc");
 	ipc_sub_usage(&b, subs);
-	ipc_buff(&b,"\n");
+	ipc_buff(&b, "\n");
 	send_failure(a->fd, b.buf);
 }
 

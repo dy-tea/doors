@@ -1,7 +1,7 @@
 #include "config.h"
 #include "effects/effects.h"
-#include "input/input.h"
 #include "input/cursor.h"
+#include "input/input.h"
 #include "input/input_method.h"
 #include "input/keyboard.h"
 #include "input/pointer.h"
@@ -917,8 +917,9 @@ void cursor_axis(struct wl_listener *listener, void *data) {
 
 	pointer_t *pointer = event->pointer ? event->pointer->base.data : NULL;
 	double factor = pointer ? pointer->scroll_factor : 1.0;
-	wlr_seat_pointer_notify_axis(server.seat, event->time_msec, event->orientation, event->delta * factor,
-		(int32_t)round(event->delta_discrete * factor), event->source, event->relative_direction);
+	wlr_seat_pointer_notify_axis(server.seat, event->time_msec, event->orientation,
+		event->delta * factor, (int32_t)round(event->delta_discrete * factor), event->source,
+		event->relative_direction);
 	wlr_idle_notifier_v1_notify_activity(server.idle_notifier, server.seat);
 	idle_power_notify_activity();
 }

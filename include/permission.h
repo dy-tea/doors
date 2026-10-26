@@ -12,6 +12,8 @@
 
 #define MAX_PERMISSION_RULES 64
 #define MAX_PERMISSION_REMEMBER 64
+#define PERM_TOKEN_LEN 8
+#define PERM_ASK_TIMEOUT_MS 15000
 
 typedef enum {
 	PERM_CAPTURE = 0,
@@ -28,8 +30,8 @@ typedef enum {
 
 typedef enum {
 	PERM_REMEMBER_NONE = 0,
-	PERM_REMEMBER_SESSION, // until doors exits
-	PERM_REMEMBER_ALWAYS, // written to the state file
+	PERM_REMEMBER_SESSION,
+	PERM_REMEMBER_ALWAYS,
 } perm_remember_t;
 
 typedef struct {
@@ -61,6 +63,19 @@ typedef struct {
 	int shadow_rule; // index of a policy rule that outranks it, -1 otherwise
 } perm_remember_info_t;
 
+typedef struct perm_waiter perm_waiter_t;
+
+// called exactly once when a parked request is answered, times out, the client
+// disconnects or the compositor shuts down. data is the caller's.
+typedef void (*perm_resolve_fn)(void *data, bool allow);
+
+typedef struct {
+	const char *token;
+	const perm_subject_t *subject;
+	perm_cap_t cap;
+	int seconds_left;
+} perm_pending_info_t;
+
 void permission_init(void);
 void permission_fini(void);
 
@@ -81,6 +96,28 @@ perm_result_t permission_check(struct wl_client *client, perm_cap_t cap);
 // record answer to parked prompt and optionally remember it
 void permission_answer(struct wl_client *client, const perm_subject_t *subject, perm_cap_t cap,
 	perm_decision_t decision, perm_remember_t remember);
+
+// hold an operation until the user answers
+perm_waiter_t *permission_park(struct wl_client *client, perm_cap_t cap, perm_resolve_fn resolve,
+	void *data);
+
+// cancel a parked operation, safe from inside the resolve callback
+void permission_unpark(perm_waiter_t *waiter);
+
+// show prompt
+bool permission_prompt(struct wl_client *client, perm_cap_t cap);
+
+// answer by token, returns false when no request has that token
+bool permission_answer_token(const char *token, perm_decision_t decision, perm_remember_t remember);
+
+size_t permission_pending_count(void);
+bool permission_pending_at(size_t index, perm_pending_info_t *out);
+
+// log denial at INFO with the subject and the rule that matched
+void permission_log_denial(struct wl_client *client, perm_cap_t cap, const perm_result_t *result);
+
+// timeout for unanswered asks, in milliseconds. 0 disables the timer.
+void permission_set_ask_timeout(uint32_t ms);
 
 bool permission_subject_valid(const char *spec, char *err, size_t errsz);
 

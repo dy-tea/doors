@@ -33,15 +33,15 @@ double scroller_view_offset_fit(const scroller_view_t *v, double cur_x, double c
 }
 
 double scroller_view_offset_edge(const scroller_view_t *v, double cur_x, double col_x,
-	double col_w) {
-		if (v->view_width <= col_w)
+		double col_w) {
+	if (v->view_width <= col_w)
 		return scroller_view_offset_fit(v, cur_x, col_x, col_w);
 
-		double padding = clamp_d((v->view_width - col_w) / 2.0, 0.0, v->gap);
-		double left = -padding;
-		double right = -(v->view_width - padding - col_w);
+	double padding = clamp_d((v->view_width - col_w) / 2.0, 0.0, v->gap);
+	double left = -padding;
+	double right = -(v->view_width - padding - col_w);
 
-		return fabs(cur_x - (col_x + left)) <= fabs(cur_x - (col_x + right)) ? left : right;
+	return fabs(cur_x - (col_x + left)) <= fabs(cur_x - (col_x + right)) ? left : right;
 }
 
 double scroller_view_offset_centered(const scroller_view_t *v, double cur_x, double col_x,

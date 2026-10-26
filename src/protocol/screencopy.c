@@ -1,5 +1,6 @@
 #include "once.h"
 #include "output/output.h"
+#include "permission.h"
 #include "protocol/capture.h"
 #include "protocol/screencopy.h"
 #include "server.h"
@@ -42,6 +43,9 @@ typedef struct screencopy_frame_t {
 
 	struct wl_listener output_commit;
 	struct wl_listener output_destroy;
+
+	bool whole_output;
+	perm_waiter_t *waiter;
 
 	struct screencopy_client_t *client;
 	struct screencopy_mgr_t *manager;
@@ -88,6 +92,9 @@ static void frame_destroy(screencopy_frame_t *frame) {
 		if (frame->cursor_locked)
 			wlr_output_lock_software_cursors(frame->output, false);
 	}
+
+	permission_unpark(frame->waiter);
+	frame->waiter = NULL;
 
 	wl_list_remove(&frame->link);
 	wl_list_remove(&frame->output_commit.link);
@@ -407,6 +414,109 @@ static void frame_handle_resource_destroy(struct wl_resource *frame_resource) {
 	frame_destroy(frame);
 }
 
+static void capture_output_start(screencopy_frame_t *frame) {
+	struct wlr_output *output = frame->output;
+
+	if (!output->enabled || !output->renderer)
+		goto error;
+
+	struct wlr_renderer *renderer = output->renderer;
+
+	if (!wlr_output_configure_primary_swapchain(output, NULL, &output->swapchain))
+		goto error;
+
+	struct wlr_buffer *buf = wlr_swapchain_acquire(output->swapchain);
+	if (buf == NULL)
+		goto error;
+
+	struct wlr_texture *tex = wlr_texture_from_buffer(renderer, buf);
+	wlr_buffer_unlock(buf);
+	if (!tex)
+		goto error;
+
+	frame->shm_format = wlr_texture_preferred_read_format(tex);
+	wlr_texture_destroy(tex);
+
+	if (frame->shm_format == DRM_FORMAT_INVALID) {
+		wlr_log(WLR_ERROR, "Failed to capture output %s: no read format supported by renderer",
+			output->name);
+		goto error;
+	}
+
+	if (output->allocator && (output->allocator->buffer_caps & WLR_BUFFER_CAP_DMABUF))
+		frame->dmabuf_format = output->render_format;
+	else
+		frame->dmabuf_format = DRM_FORMAT_INVALID;
+
+	struct wlr_box buffer_box = {0};
+	if (frame->whole_output) {
+		buffer_box.width = output->width;
+		buffer_box.height = output->height;
+	} else {
+		int ow, oh;
+		wlr_output_effective_resolution(output, &ow, &oh);
+		buffer_box = frame->box;
+		wlr_box_transform(&buffer_box, &buffer_box, wlr_output_transform_invert(output->transform), ow,
+			oh);
+		buffer_box.x *= output->scale;
+		buffer_box.y *= output->scale;
+		buffer_box.width *= output->scale;
+		buffer_box.height *= output->scale;
+	}
+
+	frame->box = buffer_box;
+	frame->shm_stride = buffer_box.width * 4;
+
+	uint32_t shm_format;
+	switch (frame->shm_format) {
+	case DRM_FORMAT_ARGB8888:
+		shm_format = WL_SHM_FORMAT_ARGB8888;
+		break;
+	case DRM_FORMAT_XRGB8888:
+		shm_format = WL_SHM_FORMAT_XRGB8888;
+		break;
+	case DRM_FORMAT_ABGR8888:
+		shm_format = WL_SHM_FORMAT_ABGR8888;
+		break;
+	case DRM_FORMAT_XBGR8888:
+		shm_format = WL_SHM_FORMAT_XBGR8888;
+		break;
+	default:
+		shm_format = WL_SHM_FORMAT_XRGB8888;
+		break;
+	}
+
+	zwlr_screencopy_frame_v1_send_buffer(frame->resource, shm_format, buffer_box.width,
+		buffer_box.height, frame->shm_stride);
+
+	if (wl_resource_get_version(frame->resource) >= 3) {
+		if (frame->dmabuf_format != DRM_FORMAT_INVALID) {
+			zwlr_screencopy_frame_v1_send_linux_dmabuf(frame->resource, frame->dmabuf_format,
+				buffer_box.width, buffer_box.height);
+		}
+		zwlr_screencopy_frame_v1_send_buffer_done(frame->resource);
+	}
+
+	return;
+
+error:
+	zwlr_screencopy_frame_v1_send_failed(frame->resource);
+	frame_destroy(frame);
+}
+
+static void capture_output_resolved(void *data, bool allow) {
+	screencopy_frame_t *frame = data;
+	frame->waiter = NULL;
+
+	if (!allow) {
+		zwlr_screencopy_frame_v1_send_failed(frame->resource);
+		frame_destroy(frame);
+		return;
+	}
+
+	capture_output_start(frame);
+}
+
 static void capture_output(struct wl_client *wl_client, screencopy_client_t *client,
 		uint32_t version, uint32_t id, int32_t overlay_cursor, struct wlr_output *output,
 		const struct wlr_box *box) {
@@ -417,6 +527,9 @@ static void capture_output(struct wl_client *wl_client, screencopy_client_t *cli
 	}
 	frame->output = output;
 	frame->overlay_cursor = !!overlay_cursor;
+	frame->whole_output = box == NULL;
+	if (box)
+		frame->box = *box;
 
 	frame->resource = wl_resource_create(wl_client, &zwlr_screencopy_frame_v1_interface, version, id);
 	if (frame->resource == NULL) {
@@ -453,89 +566,25 @@ static void capture_output(struct wl_client *wl_client, screencopy_client_t *cli
 	wl_signal_add(&output->events.destroy, &frame->output_destroy);
 	frame->output_destroy.notify = frame_handle_output_destroy;
 
-	struct wlr_renderer *renderer = output->renderer;
-	assert(renderer);
-
-	if (!wlr_output_configure_primary_swapchain(output, NULL, &output->swapchain))
-		goto error;
-
-	struct wlr_buffer *buf = wlr_swapchain_acquire(output->swapchain);
-	if (buf == NULL)
-		goto error;
-
-	struct wlr_texture *tex = wlr_texture_from_buffer(renderer, buf);
-	wlr_buffer_unlock(buf);
-	if (!tex)
-		goto error;
-
-	frame->shm_format = wlr_texture_preferred_read_format(tex);
-	wlr_texture_destroy(tex);
-
-	if (frame->shm_format == DRM_FORMAT_INVALID) {
-		wlr_log(WLR_ERROR, "Failed to capture output %s: no read format supported by renderer",
-			output->name);
-		goto error;
+	perm_result_t permission = permission_check(wl_client, PERM_CAPTURE);
+	if (permission.decision == PERM_DENY) {
+		permission_log_denial(wl_client, PERM_CAPTURE, &permission);
+		zwlr_screencopy_frame_v1_send_failed(frame->resource);
+		frame_destroy(frame);
+		return;
 	}
 
-	if (output->allocator && (output->allocator->buffer_caps & WLR_BUFFER_CAP_DMABUF))
-		frame->dmabuf_format = output->render_format;
-	else
-		frame->dmabuf_format = DRM_FORMAT_INVALID;
-
-	struct wlr_box buffer_box = {0};
-	if (box == NULL) {
-		buffer_box.width = output->width;
-		buffer_box.height = output->height;
-	} else {
-		int ow, oh;
-		wlr_output_effective_resolution(output, &ow, &oh);
-		buffer_box = *box;
-		wlr_box_transform(&buffer_box, &buffer_box, wlr_output_transform_invert(output->transform), ow,
-			oh);
-		buffer_box.x *= output->scale;
-		buffer_box.y *= output->scale;
-		buffer_box.width *= output->scale;
-		buffer_box.height *= output->scale;
+	if (permission.decision == PERM_ALLOW) {
+		capture_output_start(frame);
+		return;
 	}
 
-	frame->box = buffer_box;
-	frame->shm_stride = buffer_box.width * 4;
-
-	uint32_t shm_format;
-	switch (frame->shm_format) {
-	case DRM_FORMAT_ARGB8888:
-		shm_format = WL_SHM_FORMAT_ARGB8888;
-		break;
-	case DRM_FORMAT_XRGB8888:
-		shm_format = WL_SHM_FORMAT_XRGB8888;
-		break;
-	case DRM_FORMAT_ABGR8888:
-		shm_format = WL_SHM_FORMAT_ABGR8888;
-		break;
-	case DRM_FORMAT_XBGR8888:
-		shm_format = WL_SHM_FORMAT_XBGR8888;
-		break;
-	default:
-		shm_format = WL_SHM_FORMAT_XRGB8888;
-		break;
+	// ask: hold the frame before the buffer event, so the client simply waits
+	frame->waiter = permission_park(wl_client, PERM_CAPTURE, capture_output_resolved, frame);
+	if (!frame->waiter) {
+		zwlr_screencopy_frame_v1_send_failed(frame->resource);
+		frame_destroy(frame);
 	}
-
-	zwlr_screencopy_frame_v1_send_buffer(frame->resource, shm_format, buffer_box.width,
-		buffer_box.height, frame->shm_stride);
-
-	if (version >= 3) {
-		if (frame->dmabuf_format != DRM_FORMAT_INVALID) {
-			zwlr_screencopy_frame_v1_send_linux_dmabuf(frame->resource, frame->dmabuf_format,
-				buffer_box.width, buffer_box.height);
-		}
-		zwlr_screencopy_frame_v1_send_buffer_done(frame->resource);
-	}
-
-	return;
-
-error:
-	zwlr_screencopy_frame_v1_send_failed(frame->resource);
-	frame_destroy(frame);
 }
 
 static void manager_handle_capture_output(struct wl_client *wl_client,

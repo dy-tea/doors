@@ -44,6 +44,10 @@ static void test_words(void) {
 	CHECK(mask_for("node_flag") == SUB_MASK_NODE_FLAG);
 	CHECK(mask_for("config") == SUB_MASK_CONFIG);
 	CHECK(mask_for("config_changed") == SUB_MASK_CONFIG);
+	CHECK(mask_for("permission") == SUB_MASK_PERMISSION);
+	CHECK(mask_for("P") == SUB_MASK_PERMISSION);
+	CHECK(mask_for("permission_request") == SUB_MASK_PERMISSION);
+	CHECK(mask_for("permission_resolved") == SUB_MASK_PERMISSION);
 	CHECK(mask_for("all") == SUB_MASK_ALL);
 	CHECK(mask_for("A") == SUB_MASK_ALL);
 }
@@ -55,6 +59,7 @@ static void test_no_bleed(void) {
 	CHECK(mask_for("M") == MONITOR_EVENTS);
 	CHECK(mask_for("D") == DESKTOP_EVENTS);
 	CHECK(mask_for("N") == NODE_EVENTS);
+	CHECK(mask_for("P") == SUB_MASK_PERMISSION);
 	CHECK(mask_for("A") == SUB_MASK_ALL);
 }
 

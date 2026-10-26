@@ -1,7 +1,7 @@
 #include "permission.h"
+#include "server.h"
 #include "str.h"
 #include "test.h"
-
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -96,6 +96,207 @@ static void test_subject_and_cache(void) {
 
 	close(fds[1]);
 	wl_display_destroy(display);
+}
+
+typedef struct {
+	int calls;
+	int allows;
+	int denies;
+} resolve_counter_t;
+
+static void count_resolve(void *data, bool allow) {
+	resolve_counter_t *c = data;
+	c->calls++;
+	if (allow)
+		c->allows++;
+	else
+		c->denies++;
+}
+
+static struct wl_client *new_client(struct wl_display *display, int fds[2]) {
+	if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) != 0)
+		return NULL;
+
+	struct wl_client *client = wl_client_create(display, fds[0]);
+	if (!client)
+		close(fds[0]);
+	return client;
+}
+
+static perm_waiter_t *cancel_target;
+
+static void cancel_waiter(void *data, bool allow) {
+	(void)allow;
+	resolve_counter_t *c = data;
+	c->calls++;
+	permission_unpark(cancel_target);
+	cancel_target = NULL;
+}
+
+static bool pending_token(char token[PERM_TOKEN_LEN + 1], perm_cap_t cap) {
+	size_t n = permission_pending_count();
+	for (size_t i = 0; i < n; i++) {
+		perm_pending_info_t info;
+		if (!permission_pending_at(i, &info) || info.cap != cap)
+			continue;
+		str_copy(token, PERM_TOKEN_LEN + 1, info.token);
+		return true;
+	}
+	return false;
+}
+
+static void test_pending(void) {
+	struct wl_display *display = wl_display_create();
+	CHECK(display != NULL);
+	if (!display)
+		return;
+
+	server.wl_display = display;
+	clean_state();
+	permission_set_default(PERM_CAPTURE, PERM_ASK);
+
+	int fds[2];
+	struct wl_client *client = new_client(display, fds);
+	CHECK(client != NULL);
+	if (!client) {
+		server.wl_display = NULL;
+		wl_display_destroy(display);
+		return;
+	}
+
+	CHECK(permission_check(client, PERM_CAPTURE).decision == PERM_ASK);
+
+	resolve_counter_t first = {0}, second = {0};
+	CHECK(permission_park(client, PERM_CAPTURE, count_resolve, &first) != NULL);
+	CHECK(permission_pending_count() == 1);
+
+	perm_pending_info_t info;
+	CHECK(permission_pending_at(0, &info));
+	CHECK(strlen(info.token) == PERM_TOKEN_LEN);
+	CHECK(info.cap == PERM_CAPTURE);
+	CHECK(info.subject != NULL && info.subject->known);
+	CHECK(info.seconds_left >= 0);
+
+	char token[PERM_TOKEN_LEN + 1];
+	str_copy(token, sizeof(token), info.token);
+
+	char self_exe[PATH_MAX];
+	str_copy(self_exe, sizeof(self_exe), info.subject->exe);
+
+	// a second capture for the same client joins the open prompt
+	CHECK(permission_park(client, PERM_CAPTURE, count_resolve, &second) != NULL);
+	CHECK(permission_pending_count() == 1);
+
+	CHECK(!permission_answer_token("zzzzzzzz", PERM_ALLOW, PERM_REMEMBER_NONE));
+	CHECK(!permission_answer_token(token, PERM_ASK, PERM_REMEMBER_NONE));
+
+	CHECK(permission_answer_token(token, PERM_ALLOW, PERM_REMEMBER_NONE));
+	CHECK(first.calls == 1 && first.allows == 1);
+	CHECK(second.calls == 1 && second.allows == 1);
+	CHECK(permission_pending_count() == 0);
+
+	perm_result_t r = permission_check(client, PERM_CAPTURE);
+	CHECK(r.decision == PERM_ALLOW);
+	CHECK_STREQ(r.source, "answer");
+
+	// deny once, then remember the denial for the session
+	permission_cache_clear();
+	resolve_counter_t denied = {0};
+	CHECK(permission_park(client, PERM_CAPTURE, count_resolve, &denied) != NULL);
+	CHECK(pending_token(token, PERM_CAPTURE));
+	CHECK(permission_answer_token(token, PERM_DENY, PERM_REMEMBER_SESSION));
+	CHECK(denied.calls == 1 && denied.denies == 1);
+
+	perm_subject_t self = subject_of(self_exe);
+	r = permission_decide(&self, PERM_CAPTURE);
+	CHECK(r.decision == PERM_DENY);
+	CHECK_STREQ(r.source, "remember");
+
+	CHECK(permission_remember_forget(NULL, NULL, 0) == 1);
+	CHECK(permission_decide(&self, PERM_CAPTURE).decision == PERM_ASK);
+
+	// an unanswered prompt expires and denies
+	permission_set_ask_timeout(10);
+	resolve_counter_t timed_out = {0};
+	CHECK(permission_park(client, PERM_CAPTURE, count_resolve, &timed_out) != NULL);
+	wl_event_loop_dispatch(wl_display_get_event_loop(display), 100);
+	CHECK(timed_out.calls == 1 && timed_out.denies == 1);
+	CHECK(permission_pending_count() == 0);
+	permission_set_ask_timeout(PERM_ASK_TIMEOUT_MS);
+
+	// client disconnect resolves parked operations instead of leaking them
+	int gone_fds[2];
+	struct wl_client *gone = new_client(display, gone_fds);
+	CHECK(gone != NULL);
+	if (gone) {
+		resolve_counter_t gone_result = {0};
+		CHECK(permission_park(gone, PERM_CAPTURE, count_resolve, &gone_result) != NULL);
+		CHECK(permission_pending_count() == 1);
+		wl_client_destroy(gone);
+		close(gone_fds[1]);
+		CHECK(gone_result.calls == 1 && gone_result.denies == 1);
+		CHECK(permission_pending_count() == 0);
+	}
+
+	// a locked session refuses to park or prompt
+	server.locked = true;
+	CHECK(permission_park(client, PERM_CAPTURE, count_resolve, &first) == NULL);
+	CHECK(!permission_prompt(client, PERM_CAPTURE));
+	CHECK(permission_pending_count() == 0);
+	server.locked = false;
+
+	// prompt-only capabilities: no operation is held, the answer applies to the
+	// next request
+	permission_set_default(PERM_OUTPUT, PERM_ASK);
+	CHECK(permission_prompt(client, PERM_OUTPUT));
+	CHECK(permission_prompt(client, PERM_OUTPUT));
+	CHECK(permission_pending_count() == 1);
+	CHECK(pending_token(token, PERM_OUTPUT));
+	CHECK(permission_answer_token(token, PERM_ALLOW, PERM_REMEMBER_SESSION));
+	CHECK(permission_pending_count() == 0);
+
+	r = permission_check(client, PERM_OUTPUT);
+	CHECK(r.decision == PERM_ALLOW);
+	CHECK_STREQ(r.source, "answer");
+	CHECK(permission_remember_count() == 1);
+	CHECK(permission_remember_forget(NULL, NULL, 0) == 1);
+
+	// a waiter cancelled while the answers are being delivered must not run
+	permission_set_default(PERM_CAPTURE, PERM_ASK);
+	permission_cache_clear();
+	resolve_counter_t cancel_count = {0}, victim_count = {0};
+	CHECK(permission_park(client, PERM_CAPTURE, cancel_waiter, &cancel_count) != NULL);
+	cancel_target = permission_park(client, PERM_CAPTURE, count_resolve, &victim_count);
+	CHECK(cancel_target != NULL);
+	CHECK(pending_token(token, PERM_CAPTURE));
+	CHECK(permission_answer_token(token, PERM_ALLOW, PERM_REMEMBER_NONE));
+	CHECK(cancel_count.calls == 1);
+	CHECK(victim_count.calls == 0);
+	CHECK(permission_pending_count() == 0);
+
+	// clearing the answer cache must not orphan a prompt: the client still owns
+	// the destroy listener that resolves it
+	int cache_fds[2];
+	struct wl_client *cache_client = new_client(display, cache_fds);
+	CHECK(cache_client != NULL);
+	if (cache_client) {
+		resolve_counter_t cache_gone = {0};
+		CHECK(permission_park(cache_client, PERM_CAPTURE, count_resolve, &cache_gone) != NULL);
+		permission_cache_clear();
+		CHECK(permission_cache_count() == 0);
+		wl_client_destroy(cache_client);
+		close(cache_fds[1]);
+		CHECK(cache_gone.calls == 1 && cache_gone.denies == 1);
+		CHECK(permission_pending_count() == 0);
+	}
+
+	wl_client_destroy(client);
+	close(fds[1]);
+	CHECK(permission_cache_count() == 0);
+
+	server.wl_display = NULL;
+	wl_display_destroy(display);
+	clean_state();
 }
 
 static void test_policy_precedence(void) {
@@ -263,6 +464,7 @@ static void run_tests(void) {
 
 	test_names();
 	test_subject_and_cache();
+	test_pending();
 	test_policy_precedence();
 	test_patterns();
 	test_unknown_subject();

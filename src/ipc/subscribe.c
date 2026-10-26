@@ -96,6 +96,9 @@ static const struct {
 	{NAMES1("node_state"), SUB_MASK_NODE_STATE},
 	{NAMES1("node_flag"), SUB_MASK_NODE_FLAG},
 	{NAMES2("config", "config_changed"), SUB_MASK_CONFIG},
+	{NAMES2("permission", "P"), SUB_MASK_PERMISSION},
+	{NAMES1("permission_request"), SUB_MASK_PERMISSION},
+	{NAMES1("permission_resolved"), SUB_MASK_PERMISSION},
 	{NAMES2("all", "A"), SUB_MASK_ALL},
 };
 

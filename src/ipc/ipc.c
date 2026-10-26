@@ -14,7 +14,10 @@
 static int ipc_socket_fd = -1;
 static char socket_path[256];
 
-struct wl_list subscriber_list;
+struct wl_list subscriber_list = {
+	&subscriber_list,
+	&subscriber_list
+};
 
 void remove_subscriber(subscriber_t *sb);
 

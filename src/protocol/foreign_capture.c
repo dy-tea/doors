@@ -1,4 +1,5 @@
 #include "once.h"
+#include "permission.h"
 #include "server.h"
 #include <wlr/types/wlr_ext_image_capture_source_v1.h>
 #include <wlr/types/wlr_scene.h>
@@ -6,6 +7,17 @@
 static void handle_new_toplevel_capture_request(struct wl_listener *listener, void *data) {
 	(void)listener;
 	struct wlr_ext_foreign_toplevel_image_capture_source_manager_v1_request_event *request = data;
+
+	perm_result_t permission = permission_check(request->client, PERM_CAPTURE);
+	if (permission.decision != PERM_ALLOW) {
+		if (permission.decision == PERM_ASK)
+			permission_prompt(request->client, PERM_CAPTURE);
+		else
+			permission_log_denial(request->client, PERM_CAPTURE, &permission);
+		wlr_ext_foreign_toplevel_image_capture_source_manager_v1_request_accept(request, NULL);
+		return;
+	}
+
 	void *handle_data = request->toplevel_handle->data;
 
 	struct wlr_ext_image_capture_source_v1 **image_capture_source_ptr = NULL;

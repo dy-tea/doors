@@ -813,9 +813,8 @@ bool scroller_view_offset_gesture_end(desktop_t *d) {
 	}
 
 	if (nearest != cam) {
-		double cam_snap = centering ? v.xs[cam] + scroller_view_offset_centered(&v, view_pos,
-			v.xs[cam], v.widths[cam]) : v.xs[cam] + scroller_view_offset_edge(&v, view_pos,
-			v.xs[cam], v.widths[cam]);
+		double cam_snap = centering ? v.xs[cam] + scroller_view_offset_centered(&v, view_pos, v.xs[cam],
+			v.widths[cam]) : v.xs[cam] + scroller_view_offset_edge(&v, view_pos, v.xs[cam], v.widths[cam]);
 		double span = fabs(best_snap - cam_snap);
 		double travelled = fabs(view_pos - cam_snap);
 		if (span > 1.0 && travelled < span * ((double)settings.scroller_snap_percent / 100.0)) {

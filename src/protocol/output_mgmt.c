@@ -1,6 +1,7 @@
 #include "once.h"
 #include "output/config.h"
 #include "output/output.h"
+#include "permission.h"
 #include "protocol/output_mgmt.h"
 #include "server.h"
 #include <wlr/types/wlr_output.h>
@@ -49,9 +50,31 @@ static void apply_output_head_config(struct wlr_output_configuration_head_v1 *co
 		output_update_scale(out, config_head->state.scale);
 }
 
+static bool output_permitted(struct wl_client *client) {
+	if (!client)
+		return true;
+
+	perm_result_t permission = permission_check(client, PERM_OUTPUT);
+	if (permission.decision == PERM_ALLOW)
+		return true;
+
+	if (permission.decision == PERM_ASK)
+		permission_prompt(client, PERM_OUTPUT);
+	else
+		permission_log_denial(client, PERM_OUTPUT, &permission);
+
+	return false;
+}
+
 static void handle_output_manager_apply(struct wl_listener *listener, void *data) {
 	(void)listener;
 	struct wlr_output_configuration_v1 *config = data;
+
+	struct wl_client *client = config->resource ? wl_resource_get_client(config->resource) : NULL;
+	if (!output_permitted(client)) {
+		wlr_output_configuration_v1_send_failed(config);
+		return;
+	}
 
 	struct wlr_output_configuration_head_v1 *head;
 	wl_list_for_each(head, &config->heads, link) {
@@ -65,6 +88,12 @@ static void handle_output_manager_apply(struct wl_listener *listener, void *data
 static void handle_output_manager_test(struct wl_listener *listener, void *data) {
 	(void)listener;
 	struct wlr_output_configuration_v1 *config = data;
+
+	struct wl_client *client = config->resource ? wl_resource_get_client(config->resource) : NULL;
+	if (!output_permitted(client)) {
+		wlr_output_configuration_v1_send_failed(config);
+		return;
+	}
 
 	struct wlr_output_configuration_head_v1 *head;
 	wl_list_for_each(head, &config->heads, link) {

@@ -419,7 +419,8 @@ void input_config_apply(const input_config_t *config, struct wlr_input_device *d
 		if (!libinput_dev)
 			return;
 
-		if (config->rotation_angle != FLT_MIN && libinput_device_config_rotation_is_available(libinput_dev)) {
+		if (config->rotation_angle != FLT_MIN &&
+				libinput_device_config_rotation_is_available(libinput_dev)) {
 			double angle = fmod(config->rotation_angle, 360.0);
 			if (angle < 0)
 				angle += 360.0;
@@ -440,9 +441,8 @@ void input_config_apply(const input_config_t *config, struct wlr_input_device *d
 			}
 
 			if ((int)config->drag_lock != -1) {
-				enum libinput_config_drag_lock_state lock = config->drag_lock ==
-					INPUT_CONFIG_DRAG_LOCK_ENABLED ? LIBINPUT_CONFIG_DRAG_LOCK_ENABLED :
-					LIBINPUT_CONFIG_DRAG_LOCK_DISABLED;
+				enum libinput_config_drag_lock_state lock = config->drag_lock == INPUT_CONFIG_DRAG_LOCK_ENABLED
+					? LIBINPUT_CONFIG_DRAG_LOCK_ENABLED : LIBINPUT_CONFIG_DRAG_LOCK_DISABLED;
 				libinput_device_config_tap_set_drag_lock_enabled(libinput_dev, lock);
 			}
 
