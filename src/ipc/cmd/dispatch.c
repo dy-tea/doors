@@ -4,6 +4,7 @@
 #include "ipc/registry.h"
 #include "str.h"
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <wlr/util/log.h>
 
@@ -68,17 +69,34 @@ static const ipc_cmd_t commands[] = {
 };
 
 static void ipc_cmd_commands(ipc_args_t *a) {
-	IPC_REPLY(b);
+	char *msg = NULL;
+	size_t msg_sz = 0;
+	FILE *f = open_memstream(&msg, &msg_sz);
+	if (!f) {
+		ipc_fail(a, "Failed to allocate reply buffer\n");
+		return;
+	}
 
 	for (size_t i = 0; i < IPC_ARRAY_LEN(commands); i++) {
 		const ipc_cmd_t *c = &commands[i];
-		ipc_buff(&b, "%-18s %s", c->name, c->summary);
-		if (c->subs)
-			ipc_sub_usage(&b, c->subs);
-		ipc_buff(&b, "\n");
+		fprintf(f, "%-18s %s", c->name, c->summary);
+		if (c->subs) {
+			for (const ipc_sub_t *s = c->subs; s->flag; s++) {
+				if (s->usage)
+					fprintf(f, "\n  %s", s->usage);
+			}
+		}
+		fputc('\n', f);
 	}
 
-	ipc_buf_send(a, &b);
+	if (fclose(f) != 0) {
+		free(msg);
+		ipc_fail(a, "Failed to build reply\n");
+		return;
+	}
+
+	send_success(a->fd, msg ? msg : "");
+	free(msg);
 }
 
 bool process_ipc_message(char *msg, int msg_len, int client_fd) {
