@@ -27,6 +27,7 @@ void ipc_cmd_rule(ipc_args_t *a);
 void ipc_cmd_scratchpad(ipc_args_t *a);
 void ipc_cmd_scroller(ipc_args_t *a);
 void ipc_cmd_seat(ipc_args_t *a);
+void ipc_cmd_tree(ipc_args_t *a);
 void ipc_cmd_sessions(ipc_args_t *a);
 bool ipc_cmd_subscribe(ipc_args_t *a); // true when the handler keeps the socket
 void ipc_cmd_wm(ipc_args_t *a);
@@ -42,4 +43,5 @@ extern const ipc_sub_t query_subs[];
 extern const ipc_sub_t rule_subs[];
 extern const ipc_sub_t scroller_subs[];
 extern const ipc_sub_t seat_subs[];
+extern const ipc_sub_t tree_subs[];
 extern const ipc_sub_t wm_subs[];

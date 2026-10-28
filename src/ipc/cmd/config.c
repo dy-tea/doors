@@ -179,6 +179,7 @@ const cfg_setting_t settings_table[] = {
 	I("window_gap", NULL, settings.window_gap, INT_MIN, INT_MAX, "%d\n", CFG_COMMIT, on_window_gap),
 
 	/* layout behaviour */
+	E("automatic_scheme", NULL, settings.automatic_scheme, automatic_scheme_values, CFG_COMMIT, NULL),
 	B("borderless_monocle", NULL, settings.borderless_monocle, CFG_COMMIT, NULL),
 	B("borderless_singleton", NULL, settings.borderless_singleton, CFG_COMMIT, NULL),
 	B("smart_gaps", NULL, settings.smart_gaps, CFG_COMMIT, NULL),
@@ -195,27 +196,24 @@ const cfg_setting_t settings_table[] = {
 	I("monocle_left_padding", NULL, settings.monocle_padding.left, 0, INT_MAX, "%d\n", CFG_COMMIT,
 		NULL),
 	B("pointer_follows_focus", NULL, settings.pointer_follows_focus, CFG_COMMIT, NULL),
-	B("record_history", NULL, settings.record_history, 0, NULL),
-	B("allow_tearing", NULL, settings.allow_tearing, CFG_COMMIT, NULL),
 	B("auto_float_dialogs", NULL, settings.auto_float_dialogs, 0, NULL),
 	B("enable_minimize", NULL, settings.enable_minimize, 0, on_enable_minimize),
 	B("enable_maximize", NULL, settings.enable_maximize, 0, on_enable_maximize),
 	B("minimize_to_scratchpad", NULL, settings.minimize_to_scratchpad, 0, NULL),
 	B("scratchpad_restore_to_origin", NULL, settings.scratchpad_restore_to_origin, 0, NULL),
+	I("ignore_ewmh_fullscreen", NULL, settings.ignore_ewmh_fullscreen, 0, 2, "%d\n", 0, NULL),
 	D("split_ratio", NULL, settings.split_ratio, 0, 1, "%f\n", CFG_COMMIT | CFG_EXCLUSIVE, NULL),
 	E("focus_on_activate", NULL, settings.focus_on_activate, focus_on_activate_values, CFG_COMMIT,
 		NULL),
-	E("decoration_mode", NULL, settings.decoration_mode, decoration_mode_values, CFG_COMMIT,
-		on_decoration_mode),
-	E("automatic_scheme", NULL, settings.automatic_scheme, automatic_scheme_values, CFG_COMMIT, NULL),
-	E("initial_polarity", NULL, settings.initial_polarity, initial_polarity_values, 0, NULL),
 	E("focus_follows_pointer", "focus_follows_mouse", settings.focus_follows_mouse,
 		focus_follows_pointer_values, CFG_COMMIT, NULL),
-	E("workspace_anim_direction", NULL, settings.workspace_anim_direction,
-		workspace_anim_direction_values, 0, NULL),
+	E("initial_polarity", NULL, settings.initial_polarity, initial_polarity_values, 0, NULL),
+
+	/* animations */
 	B("enable_animations", NULL, settings.enable_animations, 0, NULL),
 	B("workspace_anim_slide_up", NULL, settings.workspace_anim_slide_up, 0, NULL),
-	I("ignore_ewmh_fullscreen", NULL, settings.ignore_ewmh_fullscreen, 0, 2, "%d\n", 0, NULL),
+	E("workspace_anim_direction", NULL, settings.workspace_anim_direction,
+		workspace_anim_direction_values, 0, NULL),
 
 	/* dimming */
 	B("dim_inactive", NULL, settings.dim_inactive, 0, on_dim),
@@ -299,6 +297,12 @@ const cfg_setting_t settings_table[] = {
 	I("idle_timeout", NULL, settings.idle_timeout, 0, 86400, "%d\n", 0, on_idle),
 	B("idle_dpms", NULL, settings.idle_dpms, 0, on_idle),
 	B("realtime_scheduling", NULL, settings.realtime_scheduling, 0, on_realtime_scheduling),
+
+	/* misc */
+	B("record_history", NULL, settings.record_history, 0, NULL),
+	B("allow_tearing", NULL, settings.allow_tearing, CFG_COMMIT, NULL),
+	E("decoration_mode", NULL, settings.decoration_mode, decoration_mode_values, CFG_COMMIT,
+		on_decoration_mode),
 };
 
 // the introspection sizes its buffers from CFG_SETTINGS_COUNT

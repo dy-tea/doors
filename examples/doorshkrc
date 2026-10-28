@@ -72,17 +72,17 @@ alt + shift + {h,j,k,l}
 
 # cancel preselection
 alt + ctrl + space
-	doorsctl presel cancel
+	doorsctl tree presel cancel
 
 # rotate
 alt + r
-	doorsctl rotate clockwise
+	doorsctl tree rotate clockwise
 alt + shift + r
-	doorsctl rotate counterclockwise
+	doorsctl tree rotate counterclockwise
 
 # flip
 alt + {comma,period}
-	doorsctl flip {horizontal,vertical}
+	doorsctl tree flip {horizontal,vertical}
 
 # resizing tiled windows (using brace expansion)
 alt + ctrl + {h,j,k,l}

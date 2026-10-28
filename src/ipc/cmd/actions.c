@@ -2,11 +2,7 @@
 #include "input/keyboard.h"
 #include "ipc/args.h"
 #include "ipc/registry.h"
-#include "output/output.h"
-#include "server.h"
 #include "spring.h"
-#include "transaction.h"
-#include "tree.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -23,33 +19,6 @@ static void action_direction(ipc_args_t *a, const char *success, bool (*filter)(
 
 	execute_bind_action(action);
 	ipc_okf(a, "%s\n", success);
-}
-
-static bool is_rotate_action(bind_action_t a) {
-	return a == BIND_ROTATE_CW || a == BIND_ROTATE_CCW;
-}
-
-static bool is_flip_action(bind_action_t a) {
-	return a == BIND_FLIP_HORIZONTAL || a == BIND_FLIP_VERTICAL;
-}
-
-static bool is_presel_action(bind_action_t a) {
-	return a >= BIND_PRESEL_NORTH && a <= BIND_PRESEL_CANCEL;
-}
-
-static void act_presel(ipc_args_t *a) {
-	const char *dir;
-	if (!ipc_need(a, "direction", &dir))
-		return;
-
-	bind_action_t action = bind_action_from_name(dir);
-	if (action == BIND_NONE || !is_presel_action(action)) {
-		ipc_fail(a, "Unknown direction \"%s\"\n", dir);
-		return;
-	}
-
-	execute_bind_action(action);
-	ipc_okf(a, "Presel %s\n", action == BIND_PRESEL_CANCEL ? "cancelled" : "set");
 }
 
 static void act_toggle(ipc_args_t *a) {
@@ -105,22 +74,6 @@ static void act_send(ipc_args_t *a) {
 	else
 		send_to_prev_desktop();
 	ipc_ok(a, "sent\n");
-}
-
-static void act_tree(ipc_args_t *a, void (*fn)(node_t * )) {
-	output_t *m = server.focused_output;
-	if (!m || !m->desk) {
-		ipc_fail(a, "No focused desktop\n");
-		return;
-	}
-	if (!m->desk->root) {
-		ipc_fail(a, "No tree\n");
-		return;
-	}
-
-	fn(m->desk->root);
-	transaction_commit_dirty();
-	ipc_okf(a, "%sed\n", a->cmd);
 }
 
 static void act_bezier(ipc_args_t *a) {
@@ -185,20 +138,10 @@ void ipc_cmd_actions(ipc_args_t *a) {
 		action_direction(a, "swapped", NULL);
 	} else if (streq(cmd, "resize")) {
 		action_direction(a, "resized", NULL);
-	} else if (streq(cmd, "rotate")) {
-		action_direction(a, "rotated", is_rotate_action);
-	} else if (streq(cmd, "flip")) {
-		action_direction(a, "flipped", is_flip_action);
-	} else if (streq(cmd, "presel")) {
-		act_presel(a);
 	} else if (streq(cmd, "toggle")) {
 		act_toggle(a);
 	} else if (streq(cmd, "send")) {
 		act_send(a);
-	} else if (streq(cmd, "balance")) {
-		act_tree(a, balance_tree);
-	} else if (streq(cmd, "equalize")) {
-		act_tree(a, equalize_tree);
 	} else if (streq(cmd, "bezier")) {
 		act_bezier(a);
 	} else {

@@ -626,11 +626,12 @@ doorsctl swap south|s                   # Swap with window below
 #### Preselection Commands
 
 ```
-doorsctl presel west|w                  # Preselect left direction for next window
-doorsctl presel east|e                   # Preselect right direction for next window
-doorsctl presel north|n                  # Preselect above direction for next window
-doorsctl presel south|s                  # Preselect below direction for next window
-doorsctl presel cancel                   # Cancel current preselection
+doorsctl tree presel west|w             # Preselect left direction for next window
+doorsctl tree presel east|e             # Preselect right direction for next window
+doorsctl tree presel north|n            # Preselect above direction for next window
+doorsctl tree presel south|s            # Preselect below direction for next window
+doorsctl tree presel cancel             # Cancel current preselection
+doorsctl node --presel-dir <dir>        # Same, focused-node form
 ```
 
 #### Toggle Commands
@@ -669,11 +670,28 @@ doorsctl node --scratchpad              # Send focused window to scratchpad
 
 #### Rotate/Flip Commands
 
+These are now tree operations:
+
 ```
-doorsctl rotate clockwise|cw           # Rotate window layout clockwise
-doorsctl rotate counterclockwise|ccw   # Rotate window layout counter-clockwise
-doorsctl flip horizontal|h             # Flip window layout horizontally
-doorsctl flip vertical|v               # Flip window layout vertically
+doorsctl tree rotate clockwise|cw      # Rotate window layout clockwise
+doorsctl tree rotate counterclockwise|ccw  # Rotate window layout counter-clockwise
+doorsctl tree flip horizontal|h       # Flip window layout horizontally
+doorsctl tree flip vertical|v         # Flip window layout vertically
+```
+
+#### Tree Commands (tiled/BSP layout)
+
+```
+doorsctl tree balance                 # Even out window sizes in the tree
+doorsctl tree equalize               # Split the tree evenly
+doorsctl tree rotate clockwise|cw    # Rotate tree clockwise
+doorsctl tree rotate counterclockwise|ccw  # Rotate tree counter-clockwise
+doorsctl tree flip horizontal|h      # Flip tree horizontally
+doorsctl tree flip vertical|v        # Flip tree vertically
+doorsctl tree presel <dir>           # Preselect direction for next window
+doorsctl tree presel cancel          # Cancel preselection
+doorsctl tree presel_ratio <ratio>    # Set preselection ratio
+doorsctl tree circulate <forward|backward>  # Circulate focus in tree
 ```
 
 #### Send Commands
@@ -1724,8 +1742,8 @@ doorsctl hotkey "alt+m [release, non_consuming]" doorsctl toggle monocle
 ### Equalize/Balance Commands
 
 ```
-doorsctl equalize # Equalize window sizes in tree
-doorsctl balance  # Balance window sizes in tree
+doorsctl tree equalize # Equalize window sizes in tree
+doorsctl tree balance  # Balance window sizes in tree
 ```
 
 ### Primary selection

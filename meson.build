@@ -163,6 +163,7 @@ doors_sources = [
 		'src' / 'ipc' / 'cmd' / 'scratchpad.c',
 		'src' / 'ipc' / 'cmd' / 'scroller.c',
 		'src' / 'ipc' / 'cmd' / 'seat.c',
+		'src' / 'ipc' / 'cmd' / 'tree.c',
 		'src' / 'ipc' / 'cmd' / 'sessions.c',
 		'src' / 'ipc' / 'cmd' / 'wm.c',
 		'src' / 'launcher.c',

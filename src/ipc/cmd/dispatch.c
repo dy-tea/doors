@@ -33,14 +33,11 @@ static bool dry_run_supported(const char *name) {
 }
 
 static const ipc_cmd_t commands[] = {
-	CMD("balance", "even out the focused desktop", ipc_cmd_actions),
 	CMD("bezier", "register a bezier easing curve", ipc_cmd_actions),
 	CMD("commands", "list every command and its subcommands", ipc_cmd_commands),
 	{"config", "get, set or reset a setting", ipc_cmd_config, config_subs},
 	{"desktop", "focus, create, rename or reorder desktops", ipc_cmd_desktop, desktop_subs},
 	{"env", "set or unset environment variables for launched clients", ipc_cmd_env, env_subs},
-	CMD("equalize", "split the tree evenly", ipc_cmd_actions),
-	CMD("flip", "flip the layout axis", ipc_cmd_actions),
 	CMD("focus", "move focus in a direction", ipc_cmd_actions),
 	CMD("globalshortcuts", "list bound global shortcuts", ipc_cmd_globalshortcuts),
 	CMD("hotkey", "list or add keybinds", ipc_cmd_hotkey),
@@ -51,11 +48,9 @@ static const ipc_cmd_t commands[] = {
 	{"output", "configure outputs and desktops", ipc_cmd_output, output_subs},
 	{"permission", "manage capture, output and input permissions", ipc_cmd_permission,
 		permission_subs},
-	CMD("presel", "set the preselection direction", ipc_cmd_actions),
 	{"query", "query monitors, desktops and nodes", ipc_cmd_query, query_subs},
 	CMD("quit", "shut the compositor down", ipc_cmd_quit),
 	CMD("resize", "resize in a direction", ipc_cmd_actions),
-	CMD("rotate", "rotate the layout", ipc_cmd_actions),
 	{"rule", "manage window rules", ipc_cmd_rule, rule_subs},
 	CMD("scratchpad", "show, hide and list scratchpad entries", ipc_cmd_scratchpad),
 	{"scroller", "drive the scroller layout", ipc_cmd_scroller, scroller_subs},
@@ -65,6 +60,7 @@ static const ipc_cmd_t commands[] = {
 	CMD("spring", "register a spring animation curve", ipc_cmd_actions),
 	CMD("swap", "swap with the neighbour in a direction", ipc_cmd_actions),
 	CMD("toggle", "toggle a window state", ipc_cmd_actions),
+	{"tree", "drive the tiled (BSP) tree layout", ipc_cmd_tree, tree_subs},
 	{"wm", "compositor level commands", ipc_cmd_wm, wm_subs},
 };
 
