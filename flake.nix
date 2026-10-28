@@ -15,8 +15,8 @@
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = [ "x86_64-linux" ];
 
-      flake.nixosModules.doors = import ./modules/nixosModule.nix self;
-      flake.homeModules.doors = import ./modules/homeModule.nix self;
+      flake.nixosModules.doors = import ./nix/modules/nixosModule.nix self;
+      flake.homeModules.doors = import ./nix/modules/homeModule.nix self;
 
       perSystem =
         { pkgs, system, lib, self', ... }:
@@ -129,15 +129,15 @@
 					packages.fovva = fovva;
 
           checks = {
-            config-parity = import ./checks/config-parity.nix {
+            config-parity = import ./nix/checks/config-parity.nix {
               inherit pkgs;
               src = ./.;
-              moduleData = ./modules/upstream-settings.nix;
+              moduleData = ./nix/modules/upstream-settings.nix;
             };
-            emit-smoke = import ./checks/emit-smoke.nix {
+            emit-smoke = import ./nix/checks/emit-smoke.nix {
               inherit pkgs;
-              moduleData = ./modules/upstream-settings.nix;
-              settingsModule = ./modules/settings.nix;
+              moduleData = ./nix/modules/upstream-settings.nix;
+              settingsModule = ./nix/modules/settings.nix;
             };
           };
 

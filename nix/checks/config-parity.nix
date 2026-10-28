@@ -52,7 +52,7 @@ pkgs.runCommand "doors-config-parity" {
 
   if ! diff -u "$work/upstream.txt" "$work/module.txt"; then
     echo "" >&2
-    echo "doors: modules/upstream-settings.nix does not match the upstream config keys." >&2
+    echo "doors: nix/modules/upstream-settings.nix does not match the upstream config keys." >&2
     echo "      Add or remove entries so every key is covered exactly once." >&2
     exit 1
   fi

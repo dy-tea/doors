@@ -549,7 +549,7 @@ in
               Settings applied via `doorsctl config`. Every key accepted by
               upstream `doorsctl config --list` has exactly one option here;
               unset (`null`) options are not emitted. See
-              `modules/upstream-settings.nix` for the key-to-option mapping.
+              `nix/modules/upstream-settings.nix` for the key-to-option mapping.
             '';
           };
 
