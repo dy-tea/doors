@@ -1,0 +1,1574 @@
+#   doorsctl.pod - doorsctl man page source
+#
+#   Copyright
+#
+#       Licensed under GPL-3.0.
+#
+#   Description
+#
+#	To learn what TOP LEVEL section to use in manual pages,
+#	see POSIX/Susv standard and "Utility Description Defaults" at
+#	http://www.opengroup.org/onlinepubs/009695399/utilities/xcu_chap01.html#tag_01_11
+#
+#	This is manual page in Perl POD format. Read more at
+#	http://perldoc.perl.org/perlpod.html or run command:
+#
+#	    perldoc perlpod | less
+#
+#	To check the syntax:
+#
+#	    podchecker *.pod
+#
+#	Create manual page with command:
+#
+#	    pod2man PAGE.N.pod > PAGE.N
+
+=pod
+
+=head1 NAME
+
+doorsctl - The IPC client for the doors Wayland compositor.
+
+=head1 SYNOPSIS
+
+doorsctl [I<L<command|"COMMANDS">>] [I<subcommands>]... [I<options>]...
+
+=head1 DESCRIPTION
+
+I<doorsctl> communicates with the running doors compositor over IPC.
+The IPC socket used is set by the I<$DOORS_SOCKET> environment variable.
+It is used to both configure the running compositor as well as perform
+actions such as moving toplevels, setting layouts, or changing focus.
+Events can also be subscribed to, and hotkeys can be changed (although
+this is simplified in the L<doorshkrc(5)> file).
+Note that a running doors compositor is required for commands to function.
+
+=head1 COMMANDS
+
+I<command> is one of the top-level commands, which include: L</"bezier">,
+L</"commands">, L</"config">, L</"desktop">, L</"env">, L</"focus">,
+L</"globalshortcuts">, L</"hotkey">, L</"input">, L</"keyboard_grouping">,
+L</"master_stack">, L</"node">, L</"output">, L</"permission">, L</"query">,
+L</"quit">, L</"resize">, L</"rule">, L</"scratchpad">, L</"scroller">,
+L</"seat">, L</"send">, L</"sessions">, L</"spring">, L</"subscribe">,
+L</"swap">, L</"toggle">, L</"tree"> and L</"wm">.
+
+=over 4
+
+=item bezier
+
+C<doorsctl bezier [I<name>] [I<p1x>] [I<p1y>] [I<p2x>] [I<p2y>]>
+
+Register named cubic bezier curves for use as animation easing functions.
+The curve is defined by two control points, with implicit I<P0>=(0,0) and
+I<P1>=(1,1).
+
+I<name> is the name of the bezier (e.g. "linear"),I<p1x> I<p1y> are the
+position of point 1, I<p2x> I<p2y> are similarly the position of point
+2 (these are floats).
+
+=item commands
+
+C<doorsctl commands>
+
+Print out a list of all top-level commands and their subcommands.
+
+=item config
+
+C<doorsctl config [I<name>] [I<value>]...>
+
+Get, set or reset a compositor setting. Run C<doorsctl config --list> to print
+every setting with its type, current value, default and accepted range.
+
+
+=over 4
+
+=item I<--list>
+
+C<doorsctl config --list [--json] [--changed] [--no-header]>
+
+List settings. C<--json> emits JSON, C<--changed> only shows settings
+differing from their defaults, C<--no-header> omits the header row.
+
+=item I<--reset>
+
+C<doorsctl config --reset [I<name>]...>
+
+C<doorsctl config reset [I<name>]...>
+
+Put settings back to their built-in defaults. With no names, resets every
+setting that differs from its default.
+
+=item I<animation>
+
+C<doorsctl config animation [I<type>] [bezier|duration|spring|enabled] [I<value>]>
+
+Configure per-type animation settings. Types include C<geometry>, C<resize>,
+C<fade_in>, C<fade_out>, C<fade_in_layer>, C<fade_out_layer> and
+C<workspace_slide>.
+
+=item I<animation_bezier>
+
+C<doorsctl config animation_bezier [I<name>]>
+
+Get or set the global default bezier curve for animations. Defaults to
+C<default>.
+
+=item I<animation_duration>
+
+C<doorsctl config animation_duration [I<ms>]>
+
+Get or set the global default animation duration in milliseconds. Defaults to
+C<180>.
+
+=back
+
+
+=over 4
+
+=item I<border_width>
+
+C<doorsctl config border_width [I<pixels>]>
+
+Set the border width. Defaults to C<2>.
+
+=item I<window_gap>
+
+C<doorsctl config window_gap [I<pixels>]>
+
+Set the gap between windows. Defaults to C<10>.
+
+=item I<automatic_scheme>
+
+C<doorsctl config automatic_scheme [I<scheme>]>
+
+Set the automatic scheme for the tiling layout. I<scheme> can take the values
+C<longest_side>, C<alternate> or C<spiral>. Defaults to C<spiral>.
+
+=item I<borderless_monocle>
+
+C<doorsctl config borderless_monocle [true|false]>
+
+When true, removes borders in monocle layout. Defaults to C<false>.
+
+=item I<borderless_singleton>
+
+C<doorsctl config borderless_singleton [true|false]>
+
+When true, removes borders for singleton windows. Defaults to C<false>.
+
+=item I<smart_gaps>
+
+C<doorsctl config smart_gaps [true|false]>
+
+When true, window gaps are disabled when there is only one tiled window on the
+desktop. Defaults to C<false>.
+
+=item I<smart_borders>
+
+C<doorsctl config smart_borders [true|false]>
+
+When true, window borders are hidden when there is only one tiled window on the
+desktop. Defaults to C<false>.
+
+=item I<respect_tiled_min_size>
+
+C<doorsctl config respect_tiled_min_size [true|false]>
+
+When true, tiled windows will not go below their configured minimum size. Defaults
+to C<false>.
+
+=item I<focus_wrapping>
+
+C<doorsctl config focus_wrapping [true|false]>
+
+When true, directional focus wraps around. Defaults to C<true>.
+
+=item I<hide_lone_tab>
+
+C<doorsctl config hide_lone_tab [true|false]>
+
+When true, the tab bar is hidden when a tabbed container has only one window.
+Defaults to C<false>.
+
+=item I<gapless_monocle>
+
+C<doorsctl config gapless_monocle [true|false]>
+
+When true, windows are rearranged to fill gaps when windows are closed.
+Defaults to C<false>.
+
+=item I<monocle_top_padding>
+
+C<doorsctl config monocle_top_padding [I<pixels>]>
+
+Set the top padding for monocle layout desktops. Defaults to C<0>.
+
+=item I<monocle_right_padding>
+
+C<doorsctl config monocle_right_padding [I<pixels>]>
+
+Set the right padding for monocle layout desktops. Defaults to C<0>.
+
+=item I<monocle_bottom_padding>
+
+C<doorsctl config monocle_bottom_padding [I<pixels>]>
+
+Set the bottom padding for monocle layout desktops. Defaults to C<0>.
+
+=item I<monocle_left_padding>
+
+C<doorsctl config monocle_left_padding [I<pixels>]>
+
+Set the left padding for monocle layout desktops. Defaults to C<0>.
+
+=item I<pointer_follows_focus>
+
+C<doorsctl config pointer_follows_focus [true|false]>
+
+When true, the pointer is warped to follow window focus changes.
+Defaults to C<false>.
+
+=item I<auto_float_dialogs>
+
+C<doorsctl config auto_float_dialogs [true|false]>
+
+When true, xdg-dialog-v1 windows are automatically floated.
+Defaults to C<false>.
+
+=item I<enable_minimize>
+
+C<doorsctl config enable_minimize [true|false]>
+
+When false, minimizing is disabled entirely. Defaults to C<true>.
+
+=item I<enable_maximize>
+
+C<doorsctl config enable_maximize [true|false]>
+
+When false, maximizing is disabled entirely. Defaults to C<true>.
+
+=item I<minimize_to_scratchpad>
+
+C<doorsctl config minimize_to_scratchpad [true|false]>
+
+When true, minimizing sends the window to the scratchpad. Defaults to C<false>.
+
+=item I<scratchpad_restore_to_origin>
+
+C<doorsctl config scratchpad_restore_to_origin [true|false]>
+
+When true, scratchpad windows are restored to their original position.
+Defaults to C<true>.
+
+=item I<ignore_ewmh_fullscreen>
+
+C<doorsctl config ignore_ewmh_fullscreen [0-2]>
+
+Controls how EWMH fullscreen requests are handled: 0=honor, 1=ignore, 2=auto.
+Defaults to C<0>.
+
+=item I<split_ratio>
+
+C<doorsctl config split_ratio [I<value>]>
+
+Sets the default split ratio for new containers (0.0-1.0). Defaults to C<0.5>.
+
+=item I<focus_on_activate>
+
+C<doorsctl config focus_on_activate [focus|none|smart|urgent]>
+
+Controls what happens when a window requests activation. Defaults to C<focus>.
+
+=item I<focus_follows_pointer>
+
+C<doorsctl config focus_follows_pointer [no|yes|always]>
+
+Controls whether keyboard focus follows the pointer cursor. Defaults to C<no>.
+
+=item I<initial_polarity>
+
+C<doorsctl config initial_polarity [first_child|second_child]>
+
+Sets the initial insertion side for new windows. Defaults to C<first_child>.
+
+=item I<enable_animations>
+
+C<doorsctl config enable_animations [true|false]>
+
+Globally enable or disable all animations. Defaults to C<false>.
+
+=item I<workspace_anim_slide_up>
+
+C<doorsctl config workspace_anim_slide_up [true|false]>
+
+On the workspace slide animation, slide in -y instead of +y. Defaults to
+C<false>.
+
+=item I<workspace_anim_direction>
+
+C<doorsctl config workspace_anim_direction [vertical|horizontal]>
+
+Sets the workspace animation direction. Defaults to C<vertical>.
+
+=item I<dim_inactive>
+
+C<doorsctl config dim_inactive [true|false]>
+
+Enable dimming of inactive windows. Defaults to C<false>.
+
+=item I<dim_below>
+
+C<doorsctl config dim_below [true|false]>
+
+Enable dimming of windows below the focused one. Defaults to C<false>.
+
+=item I<dim_strength>
+
+C<doorsctl config dim_strength [I<value>]>
+
+Sets the dim strength (0.0-1.0). Defaults to C<0.1>.
+
+=item I<dim_color>
+
+C<doorsctl config dim_color [I<color>]>
+
+Sets the dim color (0.0-1.0). Defaults to C<0.0 0.0 0.0 1.0>.
+
+=item I<normal_border_color>
+
+C<doorsctl config normal_border_color [I<color>]>
+
+Sets the border color for unfocused windows. Defaults to C<0x444444ff>.
+
+=item I<active_border_color>
+
+C<doorsctl config active_border_color [I<color>]>
+
+Sets the border color for the active window within a container.
+Defaults to C<0x555555ff>.
+
+=item I<focused_border_color>
+
+C<doorsctl config focused_border_color [I<color>]>
+
+Sets the border color for the focused window. Defaults to C<0x1793dfff>.
+
+=item I<presel_feedback_color>
+
+C<doorsctl config presel_feedback_color [I<color>]>
+
+Sets the color of the preselection feedback indicator. Defaults to
+C<0xff5555ff>.
+
+=item I<tiling_drag_indicator_color>
+
+C<doorsctl config tiling_drag_indicator_color [I<color>]>
+
+Sets the color of the tiling drag overlay indicator. Defaults to C<0x4d9eff4d>.
+
+=item I<text_font>
+
+C<doorsctl config text_font [I<font>]>
+
+Sets the default Pango font description. Defaults to C<Sans 10>.
+
+=item I<text_height>
+
+C<doorsctl config text_height [I<pixels>]>
+
+Sets the default text height in pixels. Defaults to C<18>.
+
+=item I<scroller_always_center_single_column>
+
+C<doorsctl config scroller_always_center_single_column [true|false]>
+
+When true, a desktop with a single column keeps that column centered.
+Defaults to C<false>.
+
+=item I<scroller_center_focused_column>
+
+C<doorsctl config scroller_center_focused_column [never|always|on_overflow]>
+
+Controls how the focused column is positioned in the viewport.
+C<never> disables automatic centeringm C<always> enables automatic
+centering, and C<on_overflow> only centers on overflowing columns.
+Defaults to C<never>.
+
+=item I<scroller_left_strut>
+
+C<doorsctl config scroller_left_strut [I<px>]>
+
+Reserves space at the left screen edge for the scroller.
+Defaults to C<0>.
+
+=item I<scroller_right_strut>
+
+C<doorsctl config scroller_right_strut [I<px>]>
+
+Reserves space at the right screen edge for the scroller.
+Defaults to C<0>.
+
+=item I<scroller_top_strut>
+
+C<doorsctl config scroller_top_strut [I<px>]>
+
+Reserves space at the top screen edge for the scroller.
+Defaults to C<0>.
+
+=item I<scroller_bottom_strut>
+
+C<doorsctl config scroller_bottom_strut [I<px>]>
+
+Reserves space at the bottom screen edge for the scroller.
+Defaults to C<0>.
+
+=item I<scroller_pan_fingers>
+
+C<doorsctl config scroller_pan_fingers [I<n>]>
+
+Sets the amount of fingers required for scroller panning.
+Defaults to C<3>.
+
+=item I<scroller_snap_percent>
+
+C<doorsctl config scroller_snap_percent [I<n>]>
+
+Sets the minimum percent needed to pan before preferring the next neighbor.
+Defaults to C<30>.
+
+=item I<blur_enabled>
+
+C<doorsctl config blur_enabled [true|false]>
+
+Enables or disables the blur effect. Defaults to C<false>.
+
+=item I<blur_radius>
+
+C<doorsctl config blur_radius [I<value>]>
+
+Sets the blur radius. Defaults to C<5.0>.
+
+=item I<blur_full_res>
+
+C<doorsctl config blur_full_res [true|false]>
+
+Use full resolution for blur. Defaults to C<true>.
+
+=item I<blur_passes>
+
+C<doorsctl config blur_passes [I<n>]>
+
+Sets the number of blur passes (1-10). Defaults to C<1>.
+
+=item I<blur_downsample>
+
+C<doorsctl config blur_downsample [I<n>]>
+
+Sets the blur downsample (1-8). Defaults to C<4>.
+
+=item I<blur_offset>
+
+C<doorsctl config blur_offset [I<value>]>
+
+Sets the blur offset. Defaults to C<3.0>.
+
+=item I<blur_saturation>
+
+C<doorsctl config blur_saturation [I<value>]>
+
+Sets the blur saturation. Defaults to C<1.5>.
+
+=item I<blur_vibrancy>
+
+C<doorsctl config blur_vibrancy [I<value>]>
+
+Enhances color saturation in blurred areas (0.0-1.0). Defaults to C<0.0>.
+
+=item I<blur_vibrancy_darkness>
+
+C<doorsctl config blur_vibrancy_darkness [I<value>]>
+
+Controls dark color boost by vibrancy. Defaults to C<0.5>.
+
+=item I<blur_noise_strength>
+
+C<doorsctl config blur_noise_strength [I<value>]>
+
+Adds noise dithering to reduce banding. Defaults to C<0.0>.
+
+=item I<blur_brightness>
+
+C<doorsctl config blur_brightness [I<value>]>
+
+Sets the blur brightness. Defaults to C<1.0>.
+
+=item I<blur_contrast>
+
+C<doorsctl config blur_contrast [I<value>]>
+
+Sets the blur contrast. Defaults to C<1.0>.
+
+=item I<refraction_strength>
+
+C<doorsctl config refraction_strength [I<value>]>
+
+Sets the refraction strength. Defaults to C<30.0>.
+
+=item I<refraction_edge_size_px>
+
+C<doorsctl config refraction_edge_size_px [I<value>]>
+
+Sets the refraction edge size in pixels. Defaults to C<18.0>.
+
+=item I<refraction_corner_radius_px>
+
+C<doorsctl config refraction_corner_radius_px [I<value>]>
+
+Sets the refraction corner radius in pixels. Defaults to C<8.0>.
+
+=item I<refraction_normal_pow>
+
+C<doorsctl config refraction_normal_pow [I<value>]>
+
+Sets the refraction normal power. Defaults to C<6.0>.
+
+=item I<refraction_rgb_fringing>
+
+C<doorsctl config refraction_rgb_fringing [I<value>]>
+
+Sets the refraction RGB fringing. Defaults to C<0.7333333333>.
+
+=item I<refraction_offset>
+
+C<doorsctl config refraction_offset [I<value>]>
+
+Sets the refraction offset. Defaults to C<1.0>.
+
+=item I<refraction_texture_repeat_mode>
+
+C<doorsctl config refraction_texture_repeat_mode [I<n>]>
+
+Sets the refraction texture repeat mode. Defaults to C<-1>.
+
+=item I<mica_enabled>
+
+C<doorsctl config mica_enabled [true|false]>
+
+Enables or disables the mica effect. Defaults to C<false>.
+
+=item I<mica_tint_strength>
+
+C<doorsctl config mica_tint_strength [I<value>]>
+
+Sets the mica tint strength. Defaults to C<0.35>.
+
+=item I<mica_tint>
+
+C<doorsctl config mica_tint [I<color>]>
+
+Sets the mica tint color. Defaults to C<0.12 0.12 0.14 1.0>.
+
+=item I<acrylic_tint>
+
+C<doorsctl config acrylic_tint [I<color>]>
+
+Sets the acrylic tint color. Defaults to C<1.0 1.0 1.0 1.0>.
+
+=item I<acrylic_tint_strength>
+
+C<doorsctl config acrylic_tint_strength [I<value>]>
+
+Sets the acrylic tint strength. Defaults to C<0.3>.
+
+=item I<acrylic_noise_strength>
+
+C<doorsctl config acrylic_noise_strength [I<value>]>
+
+Sets the acrylic noise strength. Defaults to C<0.02>.
+
+=item I<acrylic_blur_passes>
+
+C<doorsctl config acrylic_blur_passes [I<n>]>
+
+Sets the acrylic blur passes. Defaults to C<4>.
+
+=item I<shadow_size>
+
+C<doorsctl config shadow_size [I<value>]>
+
+Sets the shadow size. Defaults to C<8.0>.
+
+=item I<shadow_offset_x>
+
+C<doorsctl config shadow_offset_x [I<value>]>
+
+Sets the shadow X offset. Defaults to C<0.0>.
+
+=item I<shadow_offset_y>
+
+C<doorsctl config shadow_offset_y [I<value>]>
+
+Sets the shadow Y offset. Defaults to C<4.0>.
+
+=item I<shadow_color>
+
+C<doorsctl config shadow_color [I<color>]>
+
+Sets the shadow color. Defaults to C<0.0 0.0 0.0 0.5>.
+
+=item I<screen_shader_enabled>
+
+C<doorsctl config screen_shader_enabled [true|false]>
+
+Enables or disables the screen shader. Defaults to C<false>.
+
+=item I<idle_timeout>
+
+C<doorsctl config idle_timeout [I<seconds>]>
+
+Get or set idle timeout in seconds (0=disable). Defaults to C<0>.
+
+=item I<idle_dpms>
+
+C<doorsctl config idle_dpms [true|false]>
+
+Get or set automatic DPMS on idle. Defaults to C<true>.
+
+=item I<realtime_scheduling>
+
+C<doorsctl config realtime_scheduling [true|false]>
+
+Get or set real-time scheduling. Defaults to C<false>.
+
+=item I<record_history>
+
+C<doorsctl config record_history [true|false]>
+
+When true, focus history is recorded. Defaults to C<true>.
+
+=item I<allow_tearing>
+
+C<doorsctl config allow_tearing [true|false]>
+
+When true, windows may use tearing page flips. Defaults to C<false>.
+
+=item I<decoration_mode>
+
+C<doorsctl config decoration_mode [none|tabs|always|csd]>
+
+Controls how window decorations are displayed. Defaults to C<always>.
+
+=item I<normal_border_gradient>
+
+C<doorsctl config normal_border_gradient [I<colors...>] [I<angledeg>]>
+
+Sets a gradient border for unfocused windows.
+
+=item I<active_border_gradient>
+
+C<doorsctl config active_border_gradient [I<colors...>] [I<angledeg>]>
+
+Sets a gradient border for active windows.
+
+=item I<focused_border_gradient>
+
+C<doorsctl config focused_border_gradient [I<colors...>] [I<angledeg>]>
+
+Sets a gradient border for focused windows.
+
+=item I<normal_border_gradient2>
+
+C<doorsctl config normal_border_gradient2 [I<colors...>] [I<angledeg>]>
+
+Sets a secondary gradient for unfocused windows.
+
+=item I<active_border_gradient2>
+
+C<doorsctl config active_border_gradient2 [I<colors...>] [I<angledeg>]>
+
+Sets a secondary gradient for active windows.
+
+=item I<focused_border_gradient2>
+
+C<doorsctl config focused_border_gradient2 [I<colors...>] [I<angledeg>]>
+
+Sets a secondary gradient for focused windows.
+
+=item I<normal_border_gradient_lerp>
+
+C<doorsctl config normal_border_gradient_lerp [0.0-1.0]>
+
+Controls blend between primary and secondary gradient. Defaults to C<0>.
+
+=item I<active_border_gradient_lerp>
+
+C<doorsctl config active_border_gradient_lerp [0.0-1.0]>
+
+Controls blend between primary and secondary gradient. Defaults to C<0>.
+
+=item I<focused_border_gradient_lerp>
+
+C<doorsctl config focused_border_gradient_lerp [0.0-1.0]>
+
+Controls blend between primary and secondary gradient. Defaults to C<0>.
+
+=item I<tab_color_bar_bg>
+
+C<doorsctl config tab_color_bar_bg [I<R G B A>]>
+
+Sets tab bar background color. Defaults to C<0.1 0.1 0.12 1.0>.
+
+=item I<tab_color_bg>
+
+C<doorsctl config tab_color_bg [I<R G B A>]>
+
+Sets inactive tab background color. Defaults to C<0.18 0.18 0.2 1.0>.
+
+=item I<tab_color_bg_active>
+
+C<doorsctl config tab_color_bg_active [I<R G B A>]>
+
+Sets active tab background color. Defaults to C<0.09 0.58 0.87 1.0>.
+
+=item I<tab_color_text>
+
+C<doorsctl config tab_color_text [I<R G B A>]>
+
+Sets inactive tab text color. Defaults to C<0.85 0.85 0.88 1.0>.
+
+=item I<tab_color_text_active>
+
+C<doorsctl config tab_color_text_active [I<R G B A>]>
+
+Sets active tab text color. Defaults to C<1.0 1.0 1.0 1.0>.
+
+=item I<tab_color_sep>
+
+C<doorsctl config tab_color_sep [I<R G B A>]>
+
+Sets tab separator color. Defaults to C<0.0 0.0 0.0 1.0>.
+
+=item I<scroller_preset_column_widths>
+
+C<doorsctl config scroller_preset_column_widths [I<values>]>
+
+Sets preset widths cycled by scroller. Defaults to C<33.33% 50% 66.66%>.
+
+=item I<scroller_preset_window_heights>
+
+C<doorsctl config scroller_preset_window_heights [I<values>]>
+
+Sets preset heights cycled by scroller. Defaults to C<33.33% 50% 66.66%>.
+
+=item I<scroller_default_column_width>
+
+C<doorsctl config scroller_default_column_width [I<value>]>
+
+Sets width new scroller columns get. Defaults to C<0.5>.
+
+=item I<acrylic_light_anchor>
+
+C<doorsctl config acrylic_light_anchor [I<x y>]>
+
+Sets the acrylic light anchor. Defaults to C<0.5 0.5>.
+
+=item I<blur_algorithm>
+
+C<doorsctl config blur_algorithm [none|kawase|gaussian|box|refraction|lens_refraction]>
+
+Sets the blur algorithm. Defaults to C<kawase>.
+
+=item I<screen_shader>
+
+C<doorsctl config screen_shader [none|grayscale|invert|sepia|nightlight]>
+
+Sets the screen shader. Defaults to C<none>.
+
+=item I<screen_shader_file>
+
+C<doorsctl config screen_shader_file [I<path>]>
+
+Sets the screen shader file.
+
+=back
+
+=item desktop
+
+C<doorsctl desktop [I<name>|I<n>|next|prev] [options]>
+
+Focus, create, rename or reorder desktops.
+
+
+=over 4
+
+=item I<--focus>
+
+C<doorsctl desktop -f|--focus [next|last|prev]>
+
+Focus a desktop.
+
+=item I<--layout>
+
+C<doorsctl desktop -l|--layout <tiled|monocle|scroller|master_stack|floating>
+ [--all]>
+
+Set desktop layout.
+
+=item I<--rename>
+
+C<doorsctl desktop -n|--rename <name>>
+
+Rename desktop.
+
+=item I<--swap>
+
+C<doorsctl desktop -s|--swap <desktop>>
+
+Swap contents with another desktop.
+
+=item I<--remove>
+
+C<doorsctl desktop -r|--remove>
+
+Remove current empty desktop.
+
+=item I<--bubble>
+
+C<doorsctl desktop -b|--bubble <up|down>>
+
+Reorder desktop in list.
+
+=item I<--to-monitor>
+
+C<doorsctl desktop -m|--to-monitor <monitor>>
+
+Move desktop to monitor.
+
+=back
+
+=item env
+
+C<doorsctl env set <name> <value>>
+
+C<doorsctl env unset <name>>
+
+Set or unset environment variables for launched clients.
+
+=item focus
+
+C<doorsctl focus west|east|north|south>
+
+Move focus in a direction (aliases: w, e, n, s).
+
+=item globalshortcuts
+
+C<doorsctl globalshortcuts>
+
+List bound global shortcuts.
+
+=item hotkey
+
+C<doorsctl hotkey list>
+
+C<doorsctl hotkey add <modifiers+key>[flags] <command>>
+
+List or add keybinds.
+
+=item input
+
+C<doorsctl input [I<device>] [type:<type>] <property> <value>>
+
+Set an input device property. Use C<*> for all devices.
+
+=item keyboard_grouping
+
+C<doorsctl keyboard_grouping [none|smart|default]>
+
+Set the keyboard grouping mode.
+
+=item master_stack
+
+C<doorsctl master_stack <subcommand>>
+
+Drive the master_stack layout.
+
+
+=over 4
+
+=item I<cycle_orientation>
+
+C<doorsctl master_stack cycle_orientation>
+
+Cycle orientation.
+
+=item I<orientation>
+
+C<doorsctl master_stack orientation <left|right|top|bottom|center>>
+
+Set orientation.
+
+=item I<cycle_stack_layout>
+
+C<doorsctl master_stack cycle_stack_layout>
+
+Cycle stack layout.
+
+=item I<inc>
+
+C<doorsctl master_stack inc>
+
+Increase master count.
+
+=item I<dec>
+
+C<doorsctl master_stack dec>
+
+Decrease master count.
+
+=item I<flip>
+
+C<doorsctl master_stack flip>
+
+Flip master/stack.
+
+=item I<promote>
+
+C<doorsctl master_stack promote>
+
+Promote window to master.
+
+=item I<demote>
+
+C<doorsctl master_stack demote>
+
+Demote window from master.
+
+=item I<set_count>
+
+C<doorsctl master_stack set_count <count>>
+
+Set master count.
+
+=item I<set_ratio>
+
+C<doorsctl master_stack set_ratio <0.1-0.9>>
+
+Set master ratio.
+
+=back
+
+=item node
+
+C<doorsctl node [options]>
+
+Act on the focused window.
+
+
+=over 4
+
+=item I<--focus>
+
+C<doorsctl node -f|--focus>
+
+Focus most recently focused window.
+
+=item I<--close>
+
+C<doorsctl node -c|--close>
+
+Close focused window.
+
+=item I<--state>
+
+C<doorsctl node -t|--state <tiled|floating|fullscreen|maximized|minimized>>
+
+Set window state.
+
+=item I<--to-desktop>
+
+C<doorsctl node -d|--to-desktop <desktop>>
+
+Send window to desktop.
+
+=item I<--flag>
+
+C<doorsctl node -g|--flag <key>[=true|false]>
+
+Toggle window flags and effects.
+
+=item I<--scratchpad>
+
+C<doorsctl node -S|--scratchpad>
+
+Send focused window to scratchpad.
+
+=item I<--move>
+
+C<doorsctl node -v|--move <dx> <dy>>
+
+Move floating window.
+
+=item I<--resize>
+
+C<doorsctl node -z|--resize <handle> <dx> <dy>>
+
+Resize floating window.
+
+=item I<--activate>
+
+C<doorsctl node -a|--activate>
+
+Activate focused window.
+
+=item I<--kill>
+
+C<doorsctl node -k|--kill>
+
+Kill focused window.
+
+=item I<--to-monitor>
+
+C<doorsctl node -m|--to-monitor <monitor> [--follow]>
+
+Send window to monitor.
+
+=item I<--to-node>
+
+C<doorsctl node -n|--to-node <id>>
+
+Send window to node.
+
+=item I<--layer>
+
+C<doorsctl node -l|--layer <below|normal|above>>
+
+Set window layer.
+
+=item I<--type>
+
+C<doorsctl node -y|--type [tabbed|horizontal|vertical|next_tab|prev_tab]>
+
+Set split type.
+
+=item I<--ratio>
+
+C<doorsctl node -r|--ratio [+|-]<ratio|px>>
+
+Set split ratio.
+
+=item I<--circulate>
+
+C<doorsctl node -C|--circulate <forward|backward>>
+
+Circulate focus.
+
+=item I<--insert-receptacle>
+
+C<doorsctl node -i|--insert-receptacle>
+
+Insert receptacle.
+
+=item I<--presel-dir>
+
+C<doorsctl node -p|--presel-dir <direction|cancel>>
+
+Preselect direction.
+
+=item I<--presel-ratio>
+
+C<doorsctl node -o|--presel-ratio <ratio>>
+
+Set preselection ratio.
+
+=item I<--swap>
+
+C<doorsctl node -s|--swap <id>>
+
+Swap with node.
+
+=back
+
+=item output
+
+C<doorsctl output list>
+
+C<doorsctl output create>
+
+C<doorsctl output <name> <subcommand> [args]>
+
+Configure outputs and desktops.
+
+
+=over 4
+
+=item I<enable>
+
+C<doorsctl output <name> enable>
+
+Enable output.
+
+=item I<disable>
+
+C<doorsctl output <name> disable>
+
+Disable output.
+
+=item I<mode>
+
+C<doorsctl output <name> mode <WxH[@hz]>>
+
+Set display mode.
+
+=item I<modes>
+
+C<doorsctl output <name> modes>
+
+List modes.
+
+=item I<position>
+
+C<doorsctl output <name> position <x> <y>>
+
+Set output position.
+
+=item I<scale>
+
+C<doorsctl output <name> scale <factor>>
+
+Set output scale.
+
+=item I<transform>
+
+C<doorsctl output <name> transform <normal|90|180|270|flipped|...>>
+
+Set rotation.
+
+=item I<dpms>
+
+C<doorsctl output <name> dpms <on|off>>
+
+Set DPMS state.
+
+=item I<adaptive_sync>
+
+C<doorsctl output <name> adaptive_sync <on|off>>
+
+Set adaptive sync.
+
+=item I<render_bit_depth>
+
+C<doorsctl output <name> render_bit_depth <8|10>>
+
+Set render bit depth.
+
+=item I<color_profile>
+
+C<doorsctl output <name> color_profile <gamma22|srgb|icc <path>>>
+
+Set color profile.
+
+=item I<hdr>
+
+C<doorsctl output <name> hdr <on|off>>
+
+Enable HDR.
+
+=item I<tearing>
+
+C<doorsctl output <name> tearing <on|off>>
+
+Set tearing.
+
+=item I<max_render_time>
+
+C<doorsctl output <name> max_render_time <off|ms>>
+
+Set max render time.
+
+=item I<focus>
+
+C<doorsctl output <name> focus>
+
+Focus output.
+
+=item I<rename>
+
+C<doorsctl output <name> rename <newname>>
+
+Rename output.
+
+=item I<desktops>
+
+C<doorsctl output <name> desktops [names...]>
+
+List or set desktops.
+
+=item I<add-desktops>
+
+C<doorsctl output <name> add-desktops <names...>>
+
+Add desktops.
+
+=item I<reorder-desktops>
+
+C<doorsctl output <name> reorder-desktops <names...>>
+
+Reorder desktops.
+
+=item I<swap-desktops>
+
+C<doorsctl output <name> swap-desktops <target>>
+
+Swap desktops with another output.
+
+=item I<remove>
+
+C<doorsctl output <name> remove>
+
+Remove output.
+
+=item I<rectangle>
+
+C<doorsctl output <name> rectangle <WxH:X,Y>>
+
+Set output rectangle.
+
+=back
+
+=item permission
+
+C<doorsctl permission '<subject>' <capability>=<allow|deny|ask> ...>
+
+C<doorsctl permission default <capability>=<allow|deny|ask> ...>
+
+C<doorsctl permission -l|--list>
+
+C<doorsctl permission -r|--remove <index>>
+
+C<doorsctl permission --forget [<subject>]>
+
+C<doorsctl permission answer <token> <allow|deny> [--remember=session|always]>
+
+Manage capture, output and input permissions.
+
+=item query
+
+C<doorsctl query -T|--tree>
+
+C<doorsctl query -M|--monitors>
+
+C<doorsctl query -D|--desktops>
+
+C<doorsctl query -N|--nodes>
+
+C<doorsctl query -f|--focused>
+
+Query monitors, desktops and nodes. Supports C<-m>, C<-d>, C<-n>, C<--names>.
+
+=item quit
+
+C<doorsctl quit>
+
+Shut the compositor down.
+
+=item resize
+
+C<doorsctl resize left|right|up|down>
+
+Resize in a direction.
+
+=item rule
+
+C<doorsctl rule -a|--add <app_id> [options...]>
+
+C<doorsctl rule -r|--remove <index>>
+
+C<doorsctl rule -l|--list>
+
+Manage window rules.
+
+=item scratchpad
+
+C<doorsctl scratchpad show [app_id:<id>|title:<title>]>
+
+C<doorsctl scratchpad hide <app_id:<id>|title:<title>>>
+
+C<doorsctl scratchpad list>
+
+Show, hide and list scratchpad entries.
+
+=item scroller
+
+C<doorsctl scroller <subcommand>>
+
+Drive the scroller layout.
+
+
+=over 4
+
+=item I<proportion>
+
+C<doorsctl scroller proportion <0-1|px>>
+
+Set column width.
+
+=item I<resize>
+
+C<doorsctl scroller resize <delta>>
+
+Resize column.
+
+=item I<stack>
+
+C<doorsctl scroller stack>
+
+Stack windows.
+
+=item I<unstack>
+
+C<doorsctl scroller unstack>
+
+Unstack windows.
+
+=item I<cycle_preset>
+
+C<doorsctl scroller cycle_preset [forward|backward]>
+
+Cycle preset width.
+
+=item I<cycle_width>
+
+C<doorsctl scroller cycle_width [forward|backward]>
+
+Cycle width.
+
+=item I<cycle_height>
+
+C<doorsctl scroller cycle_height [forward|backward]>
+
+Cycle height.
+
+=item I<toggle_full_width>
+
+C<doorsctl scroller toggle_full_width>
+
+Toggle full width.
+
+=item I<expand_column>
+
+C<doorsctl scroller expand_column>
+
+Expand column.
+
+=item I<set_height>
+
+C<doorsctl scroller set_height <0-1|px>>
+
+Set height.
+
+=item I<reset_height>
+
+C<doorsctl scroller reset_height>
+
+Reset height.
+
+=item I<center>
+
+C<doorsctl scroller center>
+
+Center column.
+
+=item I<center_visible>
+
+C<doorsctl scroller center_visible>
+
+Center visible columns.
+
+=item I<action>
+
+C<doorsctl scroller action <name>>
+
+Perform action.
+
+=item I<focus>
+
+C<doorsctl scroller focus <name>>
+
+Focus.
+
+=item I<move>
+
+C<doorsctl scroller move <name>>
+
+Move.
+
+=item I<swap>
+
+C<doorsctl scroller swap <name>>
+
+Swap.
+
+=back
+
+=item seat
+
+C<doorsctl seat list>
+
+List seats.
+
+=item send
+
+C<doorsctl send next|prev|previous>
+
+Send focused window to another desktop.
+
+=item sessions
+
+C<doorsctl sessions>
+
+List application sessions.
+
+=item spring
+
+C<doorsctl spring [I<name>] [I<stiffness>] [I<damping>] [I<mass>] [I<value_eps>] [I<velocity_eps>]>
+
+Register a spring animation curve.
+
+=item subscribe
+
+C<doorsctl subscribe [report|monitor|desktop|node|config|permission|all] [-c|--count N] [-f|--fifo]>
+
+Subscribe to events.
+
+=item swap
+
+C<doorsctl swap west|east|north|south>
+
+Swap with neighbour in a direction.
+
+=item toggle
+
+C<doorsctl toggle floating|fullscreen|maximize|minimize|restore_minimized|pseudo_tiled|monocle|floating_layout|block_out_from_screenshare>
+
+Toggle a window state.
+
+=item tree
+
+C<doorsctl tree <subcommand>>
+
+Drive the tiled (BSP) tree layout.
+
+
+=over 4
+
+=item I<balance>
+
+C<doorsctl tree balance>
+
+Even out window sizes.
+
+=item I<equalize>
+
+C<doorsctl tree equalize>
+
+Split tree evenly.
+
+=item I<rotate>
+
+C<doorsctl tree rotate <clockwise|counterclockwise>>
+
+Rotate tree.
+
+=item I<flip>
+
+C<doorsctl tree flip <horizontal|vertical>>
+
+Flip tree.
+
+=item I<presel>
+
+C<doorsctl tree presel <west|east|north|south|cancel>>
+
+Preselect direction.
+
+=item I<presel_ratio>
+
+C<doorsctl tree presel_ratio <ratio>>
+
+Set preselection ratio.
+
+=item I<circulate>
+
+C<doorsctl tree circulate <forward|backward>>
+
+Circulate focus.
+
+=back
+
+=item wm
+
+C<doorsctl wm <subcommand>>
+
+Compositor level commands.
+
+
+=over 4
+
+=item I<--dump-state>
+
+C<doorsctl wm -d|--dump-state>
+
+Dump state.
+
+=item I<--load-state>
+
+C<doorsctl wm -l|--load-state <file>>
+
+Load state.
+
+=item I<--add-monitor>
+
+C<doorsctl wm -a|--add-monitor <name>>
+
+Add monitor.
+
+=item I<--reorder-monitors>
+
+C<doorsctl wm -O|--reorder-monitors <names...>>
+
+Reorder monitors.
+
+=item I<--adopt-orphans>
+
+C<doorsctl wm -o|--adopt-orphans>
+
+Adopt orphans.
+
+=item I<--get-status>
+
+C<doorsctl wm -g|--get-status [--json]>
+
+Get status.
+
+=item I<--record-history>
+
+C<doorsctl wm -h|--record-history [true|false]>
+
+Record history.
+
+=item I<--restart>
+
+C<doorsctl wm -r|--restart>
+
+Restart compositor.
+
+=back
+
+=back
+
+=head1 SEE ALSO
+
+L<doors(1)>, L<doorsrc(5)>, L<doorshkrc(5)>
+
+=cut

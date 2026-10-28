@@ -1,0 +1,252 @@
+#   doorshkrc.pod - doorshkrc file man page source
+#
+#   Copyright
+#
+#       Licensed under GPL-3.0.
+#
+#   Description
+#
+#	To learn what TOP LEVEL section to use in manual pages,
+#	see POSIX/Susv standard and "Utility Description Defaults" at
+#	http://www.opengroup.org/onlinepubs/009695399/utilities/xcu_chap01.html#tag_01_11
+#
+#	This is manual page in Perl POD format. Read more at
+#	http://perldoc.perl.org/perlpod.html or run command:
+#
+#	    perldoc perlpod | less
+#
+#	To check the syntax:
+#
+#	    podchecker *.pod
+#
+#	Create manual page with command:
+#
+#	    pod2man PAGE.N.pod > PAGE.N
+
+=pod
+
+=head1 NAME
+
+doorshkrc - hotkey configuration for the doors Wayland compositor
+
+=head1 SYNOPSIS
+
+B<$XDG_CONFIG_HOME/doors/doorshkrc>
+
+B<$HOME/.config/doors/doorshkrc>
+
+B<doors -c> I<DIR>
+
+=head1 DESCRIPTION
+
+I<doorshkrc> is the hotkey configuration file for doors. It uses a format
+similar to I<sxhkd>: a key combination on one line, followed by one or more
+indented commands. It is reloaded automatically every time the file is
+saved, so changes take effect without restarting doors.
+
+The file is looked up in the configuration directory, which defaults to
+I<$XDG_CONFIG_HOME/doors/> (or I<$HOME/.config/doors/>). A different
+directory can be passed to doors with the B<-c> option.
+
+Commands in the file are shell commands; compositor actions are usually
+invoked through I<doorsctl>. Keybinds can also be added at runtime with
+C<doorsctl hotkey>, which uses the same parsing.
+
+=head1 COMMENTS AND BLANK LINES
+
+Lines beginning with C<#> are comments. Blank lines separate bindings.
+Leading whitespace is significant: a command line must be indented (usually
+with a tab) so that it is associated with the preceding key combination.
+
+=head1 BASIC SYNTAX
+
+    <modifiers> + <key>
+        <command>
+
+Example:
+
+    alt + Return
+        foot
+
+    alt + shift + q
+        doorsctl node --close
+
+Multiple commands may follow a single key combination, each on its own
+indented line:
+
+    alt + r
+        doorsctl tree rotate clockwise
+
+=head1 MODIFIERS
+
+Modifier names are combined with C<+>. Common modifiers include:
+
+=over 4
+
+=item B<super>
+
+The Super/Windows key.
+
+=item B<alt>
+
+Alt.
+
+=item B<ctrl>
+
+Control.
+
+=item B<shift>
+
+Shift.
+
+=back
+
+Modifier combinations such as C<alt + shift> are written with C<+> between
+each modifier and the key.
+
+=head1 KEYS
+
+Keys are named by their XKB keysym name (for example C<Return>, C<space>,
+C<Escape>, C<h>, C<1>). Special mouse buttons are written as C<mouse_left>,
+C<mouse_right>, C<mouse_middle> and so on.
+
+=head1 BRACE EXPANSION
+
+A single binding can expand to several using brace expansion, mirroring
+sxhkd. The expansions on the key line and the command line are paired
+positionally:
+
+    alt + {h,j,k,l}
+        doorsctl focus {west,south,north,east}
+
+    alt + shift + {1-9}
+        doorsctl node --to-desktop {1-9}
+
+Ranges such as C<{1-9}> expand to C<1> through C<9>.
+
+=head1 BIND FLAGS
+
+Flags can be attached to a binding in square brackets after the key
+combination. They control how the binding is triggered:
+
+    alt + m [release, non_consuming]
+        doorsctl toggle monocle
+
+Common flags include C<release> (trigger on key release), C<repeat>
+(allow auto-repeat) and C<non_consuming> (do not consume the key event).
+
+=head1 SUBMAPS
+
+Submaps (modes) group bindings. Enter a submap with an arrow binding:
+
+    alt + shift + f -> @focus
+
+Then define the submap block, indented:
+
+    @focus
+      escape
+        @exit
+      {h,j,k,l}
+        doorsctl focus {west,south,north,east}
+
+An unindented line ends the submap context.
+
+=head1 MOUSE BINDINGS
+
+Mouse buttons can be bound directly, with or without modifiers:
+
+    alt + mouse_left
+        doorsctl node interactive_move
+
+    alt + mouse_right
+        doorsctl node interactive_resize
+
+Floating window interactions and tiling drag are available as commands:
+
+    doorsctl node interactive_move
+    doorsctl node interactive_resize
+    doorsctl node tiling_drag
+
+=head1 BELL
+
+A command can be run when the system bell rings:
+
+    bell
+        ffplay -nodisp -autoexit /usr/share/sounds/freedesktop/stereo/bell.oga
+
+=head1 GESTURE BINDINGS
+
+Touchpad gestures use the C<gesture> keyword:
+
+    gesture <type>[:<fingers>][:<directions>]
+        <command>
+
+Types are C<swipe>, C<pinch> and C<hold>. Fingers are C<1>-C<5> or C<*>
+for any. Directions for swipes are C<left>, C<right>, C<up>, C<down>;
+for pinches C<inward>, C<outward>, C<clockwise>, C<counterclockwise>.
+Combine directions with C<+>.
+
+Examples:
+
+    gesture swipe:3:left
+        doorsctl desktop --focus prev
+    gesture swipe:3:right
+        doorsctl desktop --focus next
+    gesture pinch:in
+        doorsctl node --state fullscreen
+    gesture pinch:out
+        doorsctl node --state fullscreen
+    gesture hold:*
+        doorsctl desktop --focus prev
+
+=head1 HOT CORNER BINDINGS
+
+Hot corners trigger when the cursor enters a corner of the focused output:
+
+    hotcorner topleft|topright|bottomleft|bottomright
+        <command>
+
+Example:
+
+    hotcorner topleft
+        doorsctl desktop --layout monocle
+
+=head1 EXAMPLE
+
+A minimal I<doorshkrc>:
+
+    # terminal
+    alt + Return
+        foot
+
+    # close window
+    alt + shift + q
+        doorsctl node --close
+
+    # toggle fullscreen
+    alt + f
+        doorsctl node --state fullscreen
+
+    # desktop switching
+    alt + {1-9}
+        doorsctl desktop {1-9}
+    alt + 0
+        doorsctl desktop 10
+
+=head1 FILES
+
+=over 4
+
+=item I<$XDG_CONFIG_HOME/doors/doorshkrc>
+
+=item I<$HOME/.config/doors/doorshkrc>
+
+Hotkey configuration. Reloaded on every save.
+
+=back
+
+=head1 SEE ALSO
+
+L<doors(1)>, L<doorsctl(1)>, L<doorsrc(5)>
+
+=cut

@@ -1,0 +1,19 @@
+name: Check Docs
+
+on:
+  push:
+    paths:
+      - "docs/*"
+  pull_request:
+    paths:
+      - "docs/*"
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Install perl
+        run: sudo apt install perl
+      - name:	Run podchecker
+        run: podchecker docs/*
