@@ -725,25 +725,10 @@ void focus_last_desktop(void) {
 	workspace_switch_to_last_desktop();
 }
 
-void send_to_desktop(int desktop_index) {
-	if (mon == NULL)
+static void send_focused_node_to_desktop(desktop_t *target, bool apply_initial_polarity,
+		bool clamp_float) {
+	if (mon == NULL || target == NULL)
 		return;
-
-	// get index of desktop
-	desktop_t *target = NULL, *d;
-	int idx = 0;
-	wl_list_for_each(d, &mon->desk_list, link) {
-		if (idx == desktop_index) {
-			target = d;
-			break;
-		}
-		++idx;
-	}
-
-	if (!target) {
-		wlr_log(WLR_ERROR, "Desktop not found at index: %d", desktop_index);
-		return;
-	}
 
 	if (mon->desk == target)
 		return;
@@ -755,6 +740,12 @@ void send_to_desktop(int desktop_index) {
 		return;
 
 	desktop_t *src_desk = mon->desk;
+
+	output_t *target_mon = find_monitor_for_desktop(target);
+	if (target_mon == NULL) {
+		wlr_log(WLR_ERROR, "Could not find monitor for desktop: %s", target->name);
+		return;
+	}
 
 	n->destroying = false;
 	n->ntxnrefs = 0;
@@ -782,12 +773,6 @@ void send_to_desktop(int desktop_index) {
 		}
 	}
 
-	output_t *target_mon = find_monitor_for_desktop(target);
-	if (target_mon == NULL) {
-		wlr_log(WLR_ERROR, "Could not find monitor for desktop: %s", target->name);
-		return;
-	}
-
 	// floating toplevels live outside the tree
 	if (IS_FLOATING(n->client)) {
 		n->desktop = target;
@@ -796,80 +781,8 @@ void send_to_desktop(int desktop_index) {
 	}
 	target->focus = n;
 
-	arrange(mon, src_desk, true);
-	arrange(target_mon, target, false);
-
-	n->output = target_mon;
-
-	// a floating toplevel may have been left behind on the monitor it came from
-	float_node_clamp(target_mon, target, n);
-
-	wlr_log(WLR_INFO, "Sent window to desktop: %s (n->output=%p target_mon=%p)", target->name,
-		(void *)n->output, (void *)target_mon);
-}
-
-void send_to_desktop_by_name(const char *name) {
-	if (mon == NULL)
-		return;
-
-	desktop_t *target = find_desktop_by_name(name);
-	if (!target) {
-		wlr_log(WLR_ERROR, "Desktop not found: %s", name);
-		return;
-	}
-
-	if (mon->desk == target)
-		return;
-	if (mon->desk == NULL || mon->desk->focus == NULL)
-		return;
-
-	node_t *n = mon->desk->focus;
-	if (n == NULL || n->client == NULL)
-		return;
-
-	desktop_t *src_desk = mon->desk;
-
-	output_t *target_mon = find_monitor_for_desktop(target);
-	if (target_mon == NULL) {
-		wlr_log(WLR_ERROR, "Could not find monitor for desktop: %s", target->name);
-		return;
-	}
-
-	n->destroying = false;
-	n->ntxnrefs = 0;
-
-	n->client->flags.shown = false;
-	struct wlr_scene_tree *scene_tree = client_get_scene_tree(n->client);
-	if (scene_tree)
-		wlr_scene_node_set_enabled(&scene_tree->node, false);
-
-	remove_node(src_desk, n);
-
-	if (src_desk->focus == n) {
-		if (src_desk->root != NULL) {
-			node_t *new_focus = first_extrema(src_desk->root);
-			if (new_focus != NULL) {
-				src_desk->focus = new_focus;
-				focus_node(mon, src_desk, new_focus);
-			} else {
-				src_desk->focus = NULL;
-			}
-		} else {
-			src_desk->focus = NULL;
-		}
-	}
-
-	// add to target desktop
-	if (IS_FLOATING(n->client)) {
-		n->desktop = target;
-	} else {
-		insert_node(target, n, find_public(target));
-	}
-	target->focus = n;
-
-	// ensure the moved node respects initial_polarity
-	// in spiral mode, insert_node may place it as second_child regardless
-	if (n->parent != NULL) {
+	// ensure the moved node respects initial_polarity (only where requested)
+	if (apply_initial_polarity && n->parent != NULL) {
 		if (settings.initial_polarity == FIRST_CHILD && n->parent->second_child == n) {
 			// node is second child but should be first, swap them
 			node_t *p = n->parent;
@@ -898,8 +811,47 @@ void send_to_desktop_by_name(const char *name) {
 
 	n->output = target_mon;
 
+	if (clamp_float)
+		float_node_clamp(target_mon, target, n);
+
 	wlr_log(WLR_INFO, "Sent window to desktop: %s (n->output=%p target_mon=%p)", target->name,
 		(void *)n->output, (void *)target_mon);
+}
+
+void send_to_desktop(int desktop_index) {
+	if (mon == NULL)
+		return;
+
+	// get index of desktop
+	desktop_t *target = NULL, *d;
+	int idx = 0;
+	wl_list_for_each(d, &mon->desk_list, link) {
+		if (idx == desktop_index) {
+			target = d;
+			break;
+		}
+		++idx;
+	}
+
+	if (!target) {
+		wlr_log(WLR_ERROR, "Desktop not found at index: %d", desktop_index);
+		return;
+	}
+
+	send_focused_node_to_desktop(target, false, true);
+}
+
+void send_to_desktop_by_name(const char *name) {
+	if (mon == NULL)
+		return;
+
+	desktop_t *target = find_desktop_by_name(name);
+	if (!target) {
+		wlr_log(WLR_ERROR, "Desktop not found: %s", name);
+		return;
+	}
+
+	send_focused_node_to_desktop(target, true, false);
 }
 
 void send_to_next_desktop(void) {

@@ -154,79 +154,51 @@ void input_config_merge(input_config_t *base, const input_config_t *overlay) {
 	if (!base || !overlay)
 		return;
 
-	if (overlay->xkb_layout) {
-		free(base->xkb_layout);
-		base->xkb_layout = strdup(overlay->xkb_layout);
+#define MERGE_STR(f) \
+	if (overlay->f) { \
+		free(base->f); \
+		base->f = strdup(overlay->f); \
 	}
-	if (overlay->xkb_model) {
-		free(base->xkb_model);
-		base->xkb_model = strdup(overlay->xkb_model);
-	}
-	if (overlay->xkb_options) {
-		free(base->xkb_options);
-		base->xkb_options = strdup(overlay->xkb_options);
-	}
-	if (overlay->xkb_rules) {
-		free(base->xkb_rules);
-		base->xkb_rules = strdup(overlay->xkb_rules);
-	}
-	if (overlay->xkb_variant) {
-		free(base->xkb_variant);
-		base->xkb_variant = strdup(overlay->xkb_variant);
-	}
-	if (overlay->xkb_file) {
-		free(base->xkb_file);
-		base->xkb_file = strdup(overlay->xkb_file);
-	}
+	MERGE_STR(xkb_layout);
+	MERGE_STR(xkb_model);
+	MERGE_STR(xkb_options);
+	MERGE_STR(xkb_rules);
+	MERGE_STR(xkb_variant);
+	MERGE_STR(xkb_file);
+#undef MERGE_STR
 
-	if (overlay->repeat_rate > 0)
-		base->repeat_rate = overlay->repeat_rate;
-	if (overlay->repeat_delay > 0)
-		base->repeat_delay = overlay->repeat_delay;
+#define MERGE_POS_INT(f) if (overlay->f > 0) base->f = overlay->f;
+	MERGE_POS_INT(repeat_rate);
+	MERGE_POS_INT(repeat_delay);
+#undef MERGE_POS_INT
 
-	if (overlay->xkb_numlock != -1)
-		base->xkb_numlock = overlay->xkb_numlock;
-	if (overlay->xkb_capslock != -1)
-		base->xkb_capslock = overlay->xkb_capslock;
+#define MERGE_SENT_INT(f, sent) if (overlay->f != (sent)) base->f = overlay->f;
+	MERGE_SENT_INT(xkb_numlock, -1);
+	MERGE_SENT_INT(xkb_capslock, -1);
+	MERGE_SENT_INT(natural_scroll, -1);
+	MERGE_SENT_INT(left_handed, -1);
+	MERGE_SENT_INT(tap, -1);
+	MERGE_SENT_INT(drag, -1);
+	MERGE_SENT_INT(dwt, -1);
+	MERGE_SENT_INT(dwtp, -1);
+	MERGE_SENT_INT(middle_emulation, -1);
+	MERGE_SENT_INT(scroll_button, -1);
+	MERGE_SENT_INT(scroll_button_lock, -1);
+#undef MERGE_SENT_INT
 
-	if (overlay->pointer_accel != FLT_MIN)
-		base->pointer_accel = overlay->pointer_accel;
-	if ((int)overlay->accel_profile != -1)
-		base->accel_profile = overlay->accel_profile;
+#define MERGE_SENT_ENUM(f, sent) if ((int)overlay->f != (sent)) base->f = overlay->f;
+	MERGE_SENT_ENUM(accel_profile, -1);
+	MERGE_SENT_ENUM(tap_button_map, -1);
+	MERGE_SENT_ENUM(click_method, -1);
+	MERGE_SENT_ENUM(scroll_method, -1);
+	MERGE_SENT_ENUM(drag_lock, -1);
+#undef MERGE_SENT_ENUM
 
-	if (overlay->natural_scroll != -1)
-		base->natural_scroll = overlay->natural_scroll;
-	if (overlay->left_handed != -1)
-		base->left_handed = overlay->left_handed;
-	if (overlay->tap != -1)
-		base->tap = overlay->tap;
-	if ((int)overlay->tap_button_map != -1)
-		base->tap_button_map = overlay->tap_button_map;
-	if (overlay->drag != -1)
-		base->drag = overlay->drag;
-	if ((int)overlay->drag_lock != -1)
-		base->drag_lock = overlay->drag_lock;
-	if (overlay->dwt != -1)
-		base->dwt = overlay->dwt;
-	if (overlay->dwtp != -1)
-		base->dwtp = overlay->dwtp;
-
-	if ((int)overlay->click_method != -1)
-		base->click_method = overlay->click_method;
-	if (overlay->middle_emulation != -1)
-		base->middle_emulation = overlay->middle_emulation;
-
-	if ((int)overlay->scroll_method != -1)
-		base->scroll_method = overlay->scroll_method;
-	if (overlay->scroll_button != -1)
-		base->scroll_button = overlay->scroll_button;
-	if (overlay->scroll_button_lock != -1)
-		base->scroll_button_lock = overlay->scroll_button_lock;
-	if (overlay->scroll_factor != FLT_MIN)
-		base->scroll_factor = overlay->scroll_factor;
-
-	if (overlay->rotation_angle != FLT_MIN)
-		base->rotation_angle = overlay->rotation_angle;
+#define MERGE_SENT_FLOAT(f, sent) if (overlay->f != (sent)) base->f = overlay->f;
+	MERGE_SENT_FLOAT(pointer_accel, FLT_MIN);
+	MERGE_SENT_FLOAT(scroll_factor, FLT_MIN);
+	MERGE_SENT_FLOAT(rotation_angle, FLT_MIN);
+#undef MERGE_SENT_FLOAT
 
 	if (overlay->calibration_matrix_set) {
 		base->calibration_matrix_set = true;
@@ -253,80 +225,129 @@ static int parse_scancode(const char *value) {
 	return -1;
 }
 
+static bool set_str_field(char **field, const char *value) {
+	free(*field);
+	*field = strdup(value);
+	return true;
+}
+
 bool input_config_set_value(input_config_t *config, const char *name, const char *value) {
 	if (!config || !name)
 		return false;
 
-	if (streq(name, "xkb_layout")) {
-		free(config->xkb_layout);
-		config->xkb_layout = strdup(value);
-	} else if (streq(name, "xkb_model")) {
-		free(config->xkb_model);
-		config->xkb_model = strdup(value);
-	} else if (streq(name, "xkb_options")) {
-		free(config->xkb_options);
-		config->xkb_options = strdup(value);
-	} else if (streq(name, "xkb_rules")) {
-		free(config->xkb_rules);
-		config->xkb_rules = strdup(value);
-	} else if (streq(name, "xkb_variant")) {
-		free(config->xkb_variant);
-		config->xkb_variant = strdup(value);
-	} else if (streq(name, "xkb_file")) {
-		free(config->xkb_file);
-		config->xkb_file = strdup(value);
-	} else if (streq(name, "repeat_rate")) {
+	// string fields
+	if (streq(name, "xkb_layout"))
+		return set_str_field(&config->xkb_layout, value);
+	if (streq(name, "xkb_model"))
+		return set_str_field(&config->xkb_model, value);
+	if (streq(name, "xkb_options"))
+		return set_str_field(&config->xkb_options, value);
+	if (streq(name, "xkb_rules"))
+		return set_str_field(&config->xkb_rules, value);
+	if (streq(name, "xkb_variant"))
+		return set_str_field(&config->xkb_variant, value);
+	if (streq(name, "xkb_file"))
+		return set_str_field(&config->xkb_file, value);
+
+	// integer fields
+	if (streq(name, "repeat_rate")) {
 		config->repeat_rate = atoi(value);
-	} else if (streq(name, "repeat_delay")) {
+		return true;
+	}
+	if (streq(name, "repeat_delay")) {
 		config->repeat_delay = atoi(value);
-	} else if (streq(name, "xkb_numlock")) {
+		return true;
+	}
+	if (streq(name, "xkb_numlock")) {
 		config->xkb_numlock = parse_bool(value, -1);
-	} else if (streq(name, "xkb_capslock")) {
+		return true;
+	}
+	if (streq(name, "xkb_capslock")) {
 		config->xkb_capslock = parse_bool(value, -1);
-	} else if (streq(name, "pointer_accel")) {
+		return true;
+	}
+	if (streq(name, "natural_scroll")) {
+		config->natural_scroll = parse_bool(value, -1);
+		return true;
+	}
+	if (streq(name, "left_handed")) {
+		config->left_handed = parse_bool(value, -1);
+		return true;
+	}
+	if (streq(name, "tap")) {
+		config->tap = parse_bool(value, -1);
+		return true;
+	}
+	if (streq(name, "drag")) {
+		config->drag = parse_bool(value, -1);
+		return true;
+	}
+	if (streq(name, "dwt")) {
+		config->dwt = parse_bool(value, -1);
+		return true;
+	}
+	if (streq(name, "dwtp")) {
+		config->dwtp = parse_bool(value, -1);
+		return true;
+	}
+	if (streq(name, "middle_emulation")) {
+		config->middle_emulation = parse_bool(value, -1);
+		return true;
+	}
+	if (streq(name, "scroll_button")) {
+		config->scroll_button = parse_scancode(value);
+		return true;
+	}
+	if (streq(name, "scroll_button_lock")) {
+		config->scroll_button_lock = parse_bool(value, -1);
+		return true;
+	}
+
+	// floating point fields
+	if (streq(name, "pointer_accel")) {
 		config->pointer_accel = atof(value);
-	} else if (streq(name, "accel_profile")) {
-		if (streq(value, "flat"))
-			config->accel_profile = INPUT_CONFIG_ACCEL_PROFILE_FLAT;
-		else if (streq(value, "adaptive"))
+		return true;
+	}
+	if (streq(name, "scroll_factor")) {
+		config->scroll_factor = atof(value);
+		return true;
+	}
+	if (streq(name, "rotation_angle")) {
+		config->rotation_angle = atof(value);
+		return true;
+	}
+
+	// enum fields
+	if (streq(name, "accel_profile")) {
+		if (streq(value, "adaptive"))
 			config->accel_profile = INPUT_CONFIG_ACCEL_PROFILE_ADAPTIVE;
 		else
 			config->accel_profile = INPUT_CONFIG_ACCEL_PROFILE_FLAT;
-	} else if (streq(name, "natural_scroll")) {
-		config->natural_scroll = parse_bool(value, -1);
-	} else if (streq(name, "left_handed")) {
-		config->left_handed = parse_bool(value, -1);
-	} else if (streq(name, "tap")) {
-		config->tap = parse_bool(value, -1);
-	} else if (streq(name, "tap_button_map")) {
-		if (streq(value, "lrm"))
-			config->tap_button_map = INPUT_CONFIG_TAP_BUTTON_MAP_LRM;
-		else if (streq(value, "lmr"))
+		return true;
+	}
+	if (streq(name, "tap_button_map")) {
+		if (streq(value, "lmr"))
 			config->tap_button_map = INPUT_CONFIG_TAP_BUTTON_MAP_LMR;
 		else
 			config->tap_button_map = INPUT_CONFIG_TAP_BUTTON_MAP_LRM;
-	} else if (streq(name, "drag")) {
-		config->drag = parse_bool(value, -1);
-	} else if (streq(name, "drag_lock")) {
+		return true;
+	}
+	if (streq(name, "drag_lock")) {
 		int lock = parse_bool(value, -1);
 		if (lock != -1)
 			config->drag_lock = lock ? INPUT_CONFIG_DRAG_LOCK_ENABLED : INPUT_CONFIG_DRAG_LOCK_DISABLED;
-	} else if (streq(name, "dwt")) {
-		config->dwt = parse_bool(value, -1);
-	} else if (streq(name, "dwtp")) {
-		config->dwtp = parse_bool(value, -1);
-	} else if (streq(name, "click_method")) {
-		if (streq(value, "button_areas"))
-			config->click_method = INPUT_CONFIG_CLICK_METHOD_BUTTON_AREAS;
-		else if (streq(value, "clickfinger"))
+		return true;
+	}
+	if (streq(name, "click_method")) {
+		if (streq(value, "clickfinger"))
 			config->click_method = INPUT_CONFIG_CLICK_METHOD_CLICKFINGER;
 		else if (streq(value, "none"))
 			config->click_method = INPUT_CONFIG_CLICK_METHOD_NONE;
 		else
 			config->click_method = INPUT_CONFIG_CLICK_METHOD_BUTTON_AREAS;
-	} else if (streq(name, "middle_emulation")) {
-		config->middle_emulation = parse_bool(value, -1);
-	} else if (streq(name, "scroll_method")) {
+		return true;
+	}
+	if (streq(name, "scroll_method")) {
 		if (streq(value, "edge"))
 			config->scroll_method = INPUT_CONFIG_SCROLL_METHOD_EDGE;
 		else if (streq(value, "button"))
@@ -337,19 +358,10 @@ bool input_config_set_value(input_config_t *config, const char *name, const char
 			config->scroll_method = INPUT_CONFIG_SCROLL_METHOD_NONE;
 		else
 			config->scroll_method = INPUT_CONFIG_SCROLL_METHOD_TWOFINGER;
-	} else if (streq(name, "scroll_button")) {
-		config->scroll_button = parse_scancode(value);
-	} else if (streq(name, "scroll_button_lock")) {
-		config->scroll_button_lock = parse_bool(value, -1);
-	} else if (streq(name, "scroll_factor")) {
-		config->scroll_factor = atof(value);
-	} else if (streq(name, "rotation_angle")) {
-		config->rotation_angle = atof(value);
-	} else {
-		return false;
+		return true;
 	}
 
-	return true;
+	return false;
 }
 
 void input_config_apply(const input_config_t *config, struct wlr_input_device *device) {
