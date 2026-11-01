@@ -29,13 +29,6 @@ typedef struct tab_bar_t {
 	struct wlr_box rect;
 } tab_bar_t;
 
-extern float color_bar_bg[4];
-extern float color_tab_bg[4];
-extern float color_tab_bg_active[4];
-extern float color_tab_text[4];
-extern float color_tab_text_active[4];
-extern float color_tab_sep[4];
-
 size_t tabbed_leaf_count(node_t *n);
 int tab_bar_height(node_t *n);
 

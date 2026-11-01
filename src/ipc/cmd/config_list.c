@@ -135,7 +135,7 @@ static void cfg_extra_vec2(const cfg_extra_t *e, char *buf, size_t bufsz) {
 static void cfg_extra_blur_algorithm(const cfg_extra_t *e, char *buf, size_t bufsz) {
 	(void)e;
 
-	snprintf(buf, bufsz, "%s", effects_algorithm_to_str(blur_algorithm));
+	snprintf(buf, bufsz, "%s", effects_algorithm_to_str(settings.blur_algorithm));
 }
 
 static void cfg_extra_screen_shader(const cfg_extra_t *e, char *buf, size_t bufsz) {
@@ -191,12 +191,12 @@ static void cfg_extra_animation_duration(const cfg_extra_t *e, char *buf, size_t
 
 static const cfg_extra_t cfg_extras[] = {
 	// tab bar colours
-	CFG_COLOR_ENTRY("tab_color_bar_bg", color_bar_bg),
-	CFG_COLOR_ENTRY("tab_color_bg", color_tab_bg),
-	CFG_COLOR_ENTRY("tab_color_bg_active", color_tab_bg_active),
-	CFG_COLOR_ENTRY("tab_color_text", color_tab_text),
-	CFG_COLOR_ENTRY("tab_color_text_active", color_tab_text_active),
-	CFG_COLOR_ENTRY("tab_color_sep", color_tab_sep),
+	CFG_COLOR_ENTRY("tab_color_bar_bg", settings.color_bar_bg),
+	CFG_COLOR_ENTRY("tab_color_bg", settings.color_tab_bg),
+	CFG_COLOR_ENTRY("tab_color_bg_active", settings.color_tab_bg_active),
+	CFG_COLOR_ENTRY("tab_color_text", settings.color_tab_text),
+	CFG_COLOR_ENTRY("tab_color_text_active", settings.color_tab_text_active),
+	CFG_COLOR_ENTRY("tab_color_sep", settings.color_tab_sep),
 
 	// border gradients
 	CFG_GRADIENT_ENTRY("normal_border_gradient"),
@@ -218,7 +218,7 @@ static const cfg_extra_t cfg_extras[] = {
 
 	// materials and effects
 	{
-		"acrylic_light_anchor", "vec2", "-1 .. 1", cfg_extra_vec2, acrylic_light_anchor
+		"acrylic_light_anchor", "vec2", "-1 .. 1", cfg_extra_vec2, settings.acrylic_light_anchor
 	},
 	{"blur_algorithm", "enum", "none|kawase|gaussian|box|refraction|lens_refraction",
 		cfg_extra_blur_algorithm, NULL},

@@ -24,12 +24,12 @@ typedef struct {
 } cfg_tab_color_t;
 
 static const cfg_tab_color_t tab_colors[] = {
-	{"bar_bg", color_bar_bg},
-	{"bg", color_tab_bg},
-	{"bg_active", color_tab_bg_active},
-	{"text", color_tab_text},
-	{"text_active", color_tab_text_active},
-	{"sep", color_tab_sep},
+	{"bar_bg", settings.color_bar_bg},
+	{"bg", settings.color_tab_bg},
+	{"bg_active", settings.color_tab_bg_active},
+	{"text", settings.color_tab_text},
+	{"text_active", settings.color_tab_text_active},
+	{"sep", settings.color_tab_sep},
 };
 
 static const cfg_tab_color_t *cfg_find_tab_color(const char *suffix) {
@@ -415,8 +415,8 @@ static bool cfg_anchor_apply(const char *value, bool dry_run, char *err, size_t 
 	}
 
 	if (!dry_run) {
-		acrylic_light_anchor[0] = v[0];
-		acrylic_light_anchor[1] = v[1];
+		settings.acrylic_light_anchor[0] = v[0];
+		settings.acrylic_light_anchor[1] = v[1];
 	}
 	return true;
 }
@@ -424,7 +424,8 @@ static bool cfg_anchor_apply(const char *value, bool dry_run, char *err, size_t 
 static void cfg_acrylic_light_anchor(ipc_args_t *a) {
 	if (!ipc_peek(a)) {
 		char buf[128];
-		snprintf(buf, sizeof(buf), "%.3f %.3f\n", acrylic_light_anchor[0], acrylic_light_anchor[1]);
+		snprintf(buf, sizeof(buf), "%.3f %.3f\n", settings.acrylic_light_anchor[0],
+			settings.acrylic_light_anchor[1]);
 		ipc_ok(a, buf);
 		return;
 	}
@@ -434,8 +435,8 @@ static void cfg_acrylic_light_anchor(ipc_args_t *a) {
 		return;
 
 	if (!a->dry_run) {
-		acrylic_light_anchor[0] = x;
-		acrylic_light_anchor[1] = y;
+		settings.acrylic_light_anchor[0] = x;
+		settings.acrylic_light_anchor[1] = y;
 	}
 	ipc_okf(a, "acrylic_light_anchor %s\n", a->dry_run ? "would be set" : "set");
 }
@@ -448,13 +449,13 @@ static bool cfg_blur_algorithm_apply(const char *value, bool dry_run, char *err,
 	}
 
 	if (!dry_run)
-		blur_algorithm = algo;
+		settings.blur_algorithm = algo;
 	return true;
 }
 
 static void cfg_blur_algorithm(ipc_args_t *a) {
 	if (!ipc_peek(a)) {
-		ipc_okf(a, "%s\n", effects_algorithm_to_str(blur_algorithm));
+		ipc_okf(a, "%s\n", effects_algorithm_to_str(settings.blur_algorithm));
 		return;
 	}
 

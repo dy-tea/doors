@@ -47,8 +47,6 @@ static submap_t submaps[MAX_SUBMAPS];
 static size_t num_submaps = 0;
 static submap_t *current_parsing_submap = NULL;
 
-static keyboard_grouping_t keyboard_grouping = KEYBOARD_GROUP_DEFAULT;
-
 static int hotkey_watch_fd = -1;
 static char hotkey_config_path[CONFIG_PATH_MAX];
 static struct wl_event_loop *hotkey_event_loop = NULL;
@@ -1670,12 +1668,12 @@ void exit_submap(void) {
 }
 
 keyboard_grouping_t get_keyboard_grouping(void) {
-	return keyboard_grouping;
+	return settings.keyboard_grouping;
 }
 
 void set_keyboard_grouping(keyboard_grouping_t grouping) {
-	if (keyboard_grouping != grouping) {
-		keyboard_grouping = grouping;
+	if (settings.keyboard_grouping != grouping) {
+		settings.keyboard_grouping = grouping;
 		wlr_log(WLR_INFO, "Keyboard grouping set to %d", (int)grouping);
 		keyboard_reapply_grouping();
 	}

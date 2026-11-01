@@ -98,8 +98,8 @@ static void test_reset_special_setting(void) {
 	CHECK(cfg_default_value("tab_color_bg", dflt, sizeof(dflt)));
 
 	float saved[4];
-	memcpy(saved, color_tab_bg, sizeof(saved));
-	color_tab_bg[0] = saved[0] > 0.5f ? 0.0f : 1.0f;
+	memcpy(saved, settings.color_tab_bg, sizeof(saved));
+	settings.color_tab_bg[0] = saved[0] > 0.5f ? 0.0f : 1.0f;
 
 	char reply[4096];
 	size_t n = SEND("config\0reset\0tab_color_bg\0", reply);
@@ -118,7 +118,7 @@ static void test_reset_special_setting(void) {
 	str_rtrim(got);
 	CHECK_STREQ(got, dflt);
 
-	memcpy(color_tab_bg, saved, sizeof(saved));
+	memcpy(settings.color_tab_bg, saved, sizeof(saved));
 }
 
 // a gradient whose default has no stops is restored as "clear"

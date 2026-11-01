@@ -52,11 +52,11 @@ static void test_invalid_values(void) {
 static void test_special_values(void) {
 	char err[256] = {0};
 	float before[4];
-	memcpy(before, color_tab_bg, sizeof(before));
+	memcpy(before, settings.color_tab_bg, sizeof(before));
 
 	CHECK(config_validate_value("tab_color_bg", "0.1 0.2 0.3 0.4", err, sizeof(err)));
 	CHECK(err[0] == '\0');
-	CHECK(memcmp(before, color_tab_bg, sizeof(before)) == 0);
+	CHECK(memcmp(before, settings.color_tab_bg, sizeof(before)) == 0);
 
 	err[0] = '\0';
 	CHECK(!config_validate_value("tab_color_bg", "not a colour", err, sizeof(err)));

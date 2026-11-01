@@ -1,5 +1,7 @@
 #pragma once
 
+#include "types.h"
+
 #include <pixman.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -44,15 +46,6 @@ typedef struct {
 	be_buffer_t screen_shader;
 	be_buffer_t blur_levels[BLUR_MAX_LEVELS];
 } be_output_state_t;
-
-enum blur_algorithm {
-	BLUR_ALGORITHM_NONE,
-	BLUR_ALGORITHM_KAWASE,
-	BLUR_ALGORITHM_GAUSSIAN,
-	BLUR_ALGORITHM_BOX,
-	BLUR_ALGORITHM_REFRACTION,
-	BLUR_ALGORITHM_LENS_REFRACTION,
-};
 
 struct be_blur_params {
 	enum blur_algorithm algorithm;

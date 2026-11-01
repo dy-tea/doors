@@ -81,7 +81,7 @@ static void test_dry_run_special_setting(void) {
 // a setting with its own syntax but a single value can be checked too
 static void test_dry_run_special_value(void) {
 	float before[4];
-	memcpy(before, color_tab_bg, sizeof(before));
+	memcpy(before, settings.color_tab_bg, sizeof(before));
 
 	const char msg[] = "--dry-run\0config\0tab_color_bg\0"
 		"0.25 0.5 0.75 1\0";
@@ -91,7 +91,7 @@ static void test_dry_run_special_value(void) {
 	CHECK(n > 1);
 	CHECK(reply[0] == '\0');
 	CHECK(strstr(reply + 1, "would be set") != NULL);
-	CHECK(memcmp(before, color_tab_bg, sizeof(before)) == 0);
+	CHECK(memcmp(before, settings.color_tab_bg, sizeof(before)) == 0);
 }
 
 static void test_dry_run_rule(void) {

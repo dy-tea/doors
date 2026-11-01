@@ -1,3 +1,4 @@
+#include "settings.h"
 #include "str.h"
 #include "text.h"
 #include <cairo.h>
@@ -15,9 +16,6 @@
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/util/log.h>
-
-char text_font[128] = "Sans 10";
-int text_height = 18;
 
 typedef struct {
 	struct wlr_buffer base;
@@ -65,7 +63,7 @@ typedef struct {
 } text_buffer_t;
 
 int text_node_default_height(void) {
-	return text_height;
+	return settings.text_height;
 }
 
 static int get_text_width(const text_node_t *props) {
@@ -81,7 +79,7 @@ static int get_text_width(const text_node_t *props) {
 
 static PangoLayout *make_pango_layout(cairo_t *cairo, const char *text, bool pango_markup) {
 	PangoLayout *layout = pango_cairo_create_layout(cairo);
-	PangoFontDescription *desc = pango_font_description_from_string(text_font);
+	PangoFontDescription *desc = pango_font_description_from_string(settings.text_font);
 	pango_layout_set_font_description(layout, desc);
 	pango_font_description_free(desc);
 
@@ -249,7 +247,7 @@ text_node_t *text_node_create(struct wlr_scene_tree *parent, const char *text, c
 		return NULL;
 	}
 
-	buffer->props.height = text_height;
+	buffer->props.height = settings.text_height;
 	buffer->props.pango_markup = pango_markup;
 	memcpy(buffer->props.color, color, sizeof(float) * 4);
 	buffer->props.background[0] = buffer->props.background[1] = buffer->props.background[2] =

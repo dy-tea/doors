@@ -14,40 +14,6 @@ struct wlr_backend;
 struct wlr_output;
 struct wlr_scene_buffer;
 
-extern bool blur_enabled;
-extern enum blur_algorithm blur_algorithm;
-extern int blur_passes;
-extern float blur_radius;
-extern int blur_downsample;
-extern bool blur_full_res;
-extern float blur_offset;
-extern float blur_saturation;
-
-extern float blur_vibrancy;
-extern float blur_vibrancy_darkness;
-extern float blur_noise_strength;
-extern float blur_brightness;
-extern float blur_contrast;
-
-extern bool mica_enabled;
-extern float mica_tint[4];
-extern float mica_tint_strength;
-extern float acrylic_tint[4];
-extern float acrylic_tint_strength;
-extern float acrylic_noise_strength;
-extern float acrylic_light_anchor[2];
-extern int acrylic_blur_passes;
-
-extern bool screen_shader_enabled;
-
-extern float refraction_strength;
-extern float refraction_edge_size_px;
-extern float refraction_corner_radius_px;
-extern float refraction_normal_pow;
-extern float refraction_rgb_fringing;
-extern int refraction_texture_repeat_mode;
-extern float refraction_offset;
-
 typedef struct effects_output_t {
 	int width, height;
 	int blur_w, blur_h;

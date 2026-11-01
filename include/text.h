@@ -3,9 +3,6 @@
 #include <stdbool.h>
 #include <wlr/types/wlr_scene.h>
 
-extern char text_font[128];
-extern int text_height;
-
 typedef struct text_node_t {
 	int width, max_width;
 	int height;

@@ -17,48 +17,6 @@
 
 extern struct server_t server;
 
-float color_bar_bg[4] = {
-	0.10f,
-	0.10f,
-	0.12f,
-	1.0f
-};
-
-float color_tab_bg[4] = {
-	0.18f,
-	0.18f,
-	0.20f,
-	1.0f
-};
-
-float color_tab_bg_active[4] = {
-	0.09f,
-	0.58f,
-	0.87f,
-	1.0f
-};
-
-float color_tab_text[4] = {
-	0.85f,
-	0.85f,
-	0.88f,
-	1.0f
-};
-
-float color_tab_text_active[4] = {
-	1.0f,
-	1.0f,
-	1.0f,
-	1.0f
-};
-
-float color_tab_sep[4] = {
-	0.0f,
-	0.0f,
-	0.0f,
-	1.0f
-};
-
 int tab_bar_height(node_t *n) {
 	if (settings.hide_lone_tab && n && tabbed_leaf_count(n) <= 1)
 		return 0;
@@ -190,11 +148,11 @@ static void build_entries(struct tab_bar_t *bar) {
 		if (!e->tree)
 			continue;
 
-		e->bg = wlr_scene_rect_create(e->tree, 1, 1, color_tab_bg);
-		e->border = wlr_scene_rect_create(e->tree, 1, TAB_BAR_BORDER, color_tab_sep);
+		e->bg = wlr_scene_rect_create(e->tree, 1, 1, settings.color_tab_bg);
+		e->border = wlr_scene_rect_create(e->tree, 1, TAB_BAR_BORDER, settings.color_tab_sep);
 
 		float text_color[4];
-		memcpy(text_color, color_tab_text, sizeof(text_color));
+		memcpy(text_color, settings.color_tab_text, sizeof(text_color));
 		e->label = text_node_create(e->tree, leaf_label(leaves[i]), text_color, false);
 	}
 
@@ -219,7 +177,7 @@ void tabs_create(node_t *n) {
 		free(bar);
 		return;
 	}
-	bar->bg = wlr_scene_rect_create(bar->tree, 1, 1, color_bar_bg);
+	bar->bg = wlr_scene_rect_create(bar->tree, 1, 1, settings.color_bar_bg);
 
 	n->tab_bar = bar;
 	build_entries(bar);
@@ -325,10 +283,11 @@ void tabs_update_focus(node_t *n, node_t *focus) {
 		bool is_active = (e->leaf == active);
 
 		if (e->bg)
-			wlr_scene_rect_set_color(e->bg, is_active ? color_tab_bg_active : color_tab_bg);
+			wlr_scene_rect_set_color(e->bg,
+				is_active ? settings.color_tab_bg_active : settings.color_tab_bg);
 		if (e->label) {
 			float c[4];
-			memcpy(c, is_active ? color_tab_text_active : color_tab_text, sizeof(c));
+			memcpy(c, is_active ? settings.color_tab_text_active : settings.color_tab_text, sizeof(c));
 			text_node_set_color(e->label, c);
 		}
 	}

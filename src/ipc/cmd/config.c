@@ -79,7 +79,7 @@ static void on_mica(void) {
 }
 
 static void on_screen_shader_enabled(void) {
-	if (!screen_shader_enabled)
+	if (!settings.screen_shader_enabled)
 		screen_shader_hide_nodes();
 }
 
@@ -234,8 +234,8 @@ const cfg_setting_t settings_table[] = {
 		sizeof(settings.tiling_drag_indicator_color), 0, NULL),
 
 	/* text */
-	S("text_font", NULL, text_font, sizeof(text_font), 0, on_text),
-	I("text_height", NULL, text_height, 0, 0, "%d\n", CFG_POSITIVE, on_text),
+	S("text_font", NULL, settings.text_font, sizeof(settings.text_font), 0, on_text),
+	I("text_height", NULL, settings.text_height, 0, 0, "%d\n", CFG_POSITIVE, on_text),
 
 	/* scroller */
 	B("scroller_always_center_single_column", NULL, settings.scroller_always_center_single_column, 0,
@@ -253,36 +253,39 @@ const cfg_setting_t settings_table[] = {
 	I("scroller_snap_percent", NULL, settings.scroller_snap_percent, 2, 5, "%d\n", 0, NULL),
 
 	/* blur */
-	B("blur_enabled", NULL, blur_enabled, 0, NULL),
-	F("blur_radius", NULL, blur_radius, 0, 0, "%.2f\n", CFG_POSITIVE, NULL),
-	B("blur_full_res", NULL, blur_full_res, 0, NULL),
-	I("blur_passes", NULL, blur_passes, 1, 10, "%d\n", 0, NULL),
-	I("blur_downsample", NULL, blur_downsample, 1, 8, "%d\n", 0, on_blur_downsample),
-	F("blur_offset", NULL, blur_offset, 0.0, 8.0, "%.3f\n", 0, NULL),
-	F("blur_saturation", NULL, blur_saturation, 0.0, 3.0, "%.3f\n", 0, NULL),
-	F("blur_vibrancy", NULL, blur_vibrancy, 0.0, 1.0, "%.3f\n", 0, NULL),
-	F("blur_vibrancy_darkness", NULL, blur_vibrancy_darkness, 0.0, 1.0, "%.3f\n", 0, NULL),
-	F("blur_noise_strength", NULL, blur_noise_strength, 0.0, 1.0, "%.3f\n", 0, NULL),
-	F("blur_brightness", NULL, blur_brightness, 0.5, 2.0, "%.3f\n", 0, NULL),
-	F("blur_contrast", NULL, blur_contrast, 0.5, 2.0, "%.3f\n", 0, NULL),
+	B("blur_enabled", NULL, settings.blur_enabled, 0, NULL),
+	F("blur_radius", NULL, settings.blur_radius, 0, 0, "%.2f\n", CFG_POSITIVE, NULL),
+	B("blur_full_res", NULL, settings.blur_full_res, 0, NULL),
+	I("blur_passes", NULL, settings.blur_passes, 1, 10, "%d\n", 0, NULL),
+	I("blur_downsample", NULL, settings.blur_downsample, 1, 8, "%d\n", 0, on_blur_downsample),
+	F("blur_offset", NULL, settings.blur_offset, 0.0, 8.0, "%.3f\n", 0, NULL),
+	F("blur_saturation", NULL, settings.blur_saturation, 0.0, 3.0, "%.3f\n", 0, NULL),
+	F("blur_vibrancy", NULL, settings.blur_vibrancy, 0.0, 1.0, "%.3f\n", 0, NULL),
+	F("blur_vibrancy_darkness", NULL, settings.blur_vibrancy_darkness, 0.0, 1.0, "%.3f\n", 0, NULL),
+	F("blur_noise_strength", NULL, settings.blur_noise_strength, 0.0, 1.0, "%.3f\n", 0, NULL),
+	F("blur_brightness", NULL, settings.blur_brightness, 0.5, 2.0, "%.3f\n", 0, NULL),
+	F("blur_contrast", NULL, settings.blur_contrast, 0.5, 2.0, "%.3f\n", 0, NULL),
 
 	/* refraction */
-	F("refraction_strength", NULL, refraction_strength, 0.0, 30.0, "%.3f\n", 0, NULL),
-	F("refraction_edge_size_px", NULL, refraction_edge_size_px, 0.0, 400.0, "%.3f\n", 0, NULL),
-	F("refraction_corner_radius_px", NULL, refraction_corner_radius_px, 0.0, 400.0, "%.3f\n", 0, NULL),
-	F("refraction_normal_pow", NULL, refraction_normal_pow, 0.0, 8.0, "%.3f\n", 0, NULL),
-	F("refraction_rgb_fringing", NULL, refraction_rgb_fringing, 0.0, 1.0, "%.6f\n", 0, NULL),
-	F("refraction_offset", NULL, refraction_offset, 0.0, 8.0, "%.3f\n", 0, NULL),
-	I("refraction_texture_repeat_mode", NULL, refraction_texture_repeat_mode, 0, 1, "%d\n", 0, NULL),
+	F("refraction_strength", NULL, settings.refraction_strength, 0.0, 30.0, "%.3f\n", 0, NULL),
+	F("refraction_edge_size_px", NULL, settings.refraction_edge_size_px, 0.0, 400.0, "%.3f\n", 0,
+		NULL),
+	F("refraction_corner_radius_px", NULL, settings.refraction_corner_radius_px, 0.0, 400.0, "%.3f\n",
+		0, NULL),
+	F("refraction_normal_pow", NULL, settings.refraction_normal_pow, 0.0, 8.0, "%.3f\n", 0, NULL),
+	F("refraction_rgb_fringing", NULL, settings.refraction_rgb_fringing, 0.0, 1.0, "%.6f\n", 0, NULL),
+	F("refraction_offset", NULL, settings.refraction_offset, 0.0, 8.0, "%.3f\n", 0, NULL),
+	I("refraction_texture_repeat_mode", NULL, settings.refraction_texture_repeat_mode, 0, 1, "%d\n", 0,
+		NULL),
 
 	/* mica and acrylic */
-	B("mica_enabled", NULL, mica_enabled, 0, on_mica),
-	F("mica_tint_strength", NULL, mica_tint_strength, 0.0, 1.0, "%.3f\n", 0, on_mica),
-	C("mica_tint", NULL, mica_tint, 0, on_mica),
-	C("acrylic_tint", NULL, acrylic_tint, 0, NULL),
-	F("acrylic_tint_strength", NULL, acrylic_tint_strength, 0.0, 1.0, "%.3f\n", 0, NULL),
-	F("acrylic_noise_strength", NULL, acrylic_noise_strength, 0.0, 1.0, "%.3f\n", 0, NULL),
-	I("acrylic_blur_passes", NULL, acrylic_blur_passes, 0, 10, "%d\n", 0, NULL),
+	B("mica_enabled", NULL, settings.mica_enabled, 0, on_mica),
+	F("mica_tint_strength", NULL, settings.mica_tint_strength, 0.0, 1.0, "%.3f\n", 0, on_mica),
+	C("mica_tint", NULL, settings.mica_tint, 0, on_mica),
+	C("acrylic_tint", NULL, settings.acrylic_tint, 0, NULL),
+	F("acrylic_tint_strength", NULL, settings.acrylic_tint_strength, 0.0, 1.0, "%.3f\n", 0, NULL),
+	F("acrylic_noise_strength", NULL, settings.acrylic_noise_strength, 0.0, 1.0, "%.3f\n", 0, NULL),
+	I("acrylic_blur_passes", NULL, settings.acrylic_blur_passes, 0, 10, "%d\n", 0, NULL),
 
 	/* shadow */
 	F("shadow_size", NULL, settings.shadow_size, 0.0, 100.0, "%.1f\n", 0, NULL),
@@ -291,7 +294,7 @@ const cfg_setting_t settings_table[] = {
 	C("shadow_color", NULL, settings.shadow_color, 0, NULL),
 
 	/* screen shader */
-	B("screen_shader_enabled", NULL, screen_shader_enabled, 0, on_screen_shader_enabled),
+	B("screen_shader_enabled", NULL, settings.screen_shader_enabled, 0, on_screen_shader_enabled),
 
 	/* idle power management */
 	I("idle_timeout", NULL, settings.idle_timeout, 0, 86400, "%d\n", 0, on_idle),

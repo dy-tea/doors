@@ -43,67 +43,13 @@ extern bool wlr_renderer_is_vk(const struct wlr_renderer *wlr_renderer);
 extern const effects_backend_t vk_backend;
 #endif
 
-enum blur_algorithm blur_algorithm = BLUR_ALGORITHM_KAWASE;
-
 static const struct wlr_drm_format *s_render_fmt = NULL;
 
 // input callbacks for effect overlay buffers
 static bool scene_buffer_no_input(struct wlr_scene_buffer *buffer, double *sx, double *sy);
 
-bool blur_enabled = true;
-int blur_passes = 1;
-float blur_radius = 5.0f;
-int blur_downsample = 4;
-bool blur_full_res = true;
-float blur_offset = 3.0f;
-float blur_saturation = 1.5f;
-
-float blur_vibrancy = 0.0f;
-float blur_vibrancy_darkness = 0.5f;
-float blur_noise_strength = 0.0f;
-float blur_brightness = 1.0f;
-float blur_contrast = 1.0f;
-
-bool mica_enabled = false;
-float mica_tint[4] = {
-	0.12f,
-	0.12f,
-	0.14f,
-	1.0f
-};
-
-float mica_tint_strength = 0.35f;
-
-float acrylic_tint[4] = {
-	1.0f,
-	1.0f,
-	1.0f,
-	1.0f
-};
-
-float acrylic_tint_strength = 0.3f;
-float acrylic_noise_strength = 0.02f;
-float acrylic_light_anchor[2] = {
-	0.5f,
-	0.5f
-};
-
-int acrylic_blur_passes = 4;
-
-bool screen_shader_enabled = false;
-
-float refraction_strength = 30.0f;
-float refraction_edge_size_px = 18.0f;
-float refraction_corner_radius_px = 8.0f;
-float refraction_normal_pow = 6.0f;
-float refraction_rgb_fringing = 22.0f / 30.0f;
-int refraction_texture_repeat_mode = 1;
-float refraction_offset = 1.0f;
-
 effects_state_t effects_state = {0};
 const effects_backend_t *effects_backend = NULL;
-
-static char screen_shader_name_str[256] = "none";
 
 static const struct wlr_backend_impl capture_backend_impl = {0};
 
@@ -300,13 +246,14 @@ void effects_fini(void) {
 	if (!effects_state.available)
 		return;
 	effects_state.backend->fini();
-	screen_shader_enabled = false;
+	settings.screen_shader_enabled = false;
 	effects_state = (effects_state_t){0};
 }
 
 static void blur_output_sizes(int width, int height, int *bw, int *bh) {
-	int ds = (blur_full_res &&
-		blur_algorithm == BLUR_ALGORITHM_KAWASE) ? 1 : (blur_downsample > 0 ? blur_downsample : 1);
+	int ds = (settings.blur_full_res &&
+		settings.blur_algorithm == BLUR_ALGORITHM_KAWASE) ? 1 : (settings.blur_downsample > 0 ?
+		settings.blur_downsample : 1);
 	*bw = (width / ds) > 0 ? (width / ds) : 1;
 	*bh = (height / ds) > 0 ? (height / ds) : 1;
 }
@@ -782,17 +729,17 @@ static void build_blur_mask_params(view_t *tl, output_t *output, int w, int h,
 
 static void fill_blur_params(struct be_blur_params *bp) {
 	*bp = (struct be_blur_params){
-		.algorithm = blur_algorithm,
-		.passes = blur_passes,
-		.radius = blur_radius,
-		.full_res = blur_full_res && blur_algorithm == BLUR_ALGORITHM_KAWASE,
-		.offset = blur_offset,
-		.saturation = blur_saturation,
-		.vibrancy = blur_vibrancy,
-		.vibrancy_darkness = blur_vibrancy_darkness,
-		.noise_strength = blur_noise_strength,
-		.brightness = blur_brightness,
-		.contrast = blur_contrast,
+		.algorithm = settings.blur_algorithm,
+		.passes = settings.blur_passes,
+		.radius = settings.blur_radius,
+		.full_res = settings.blur_full_res && settings.blur_algorithm == BLUR_ALGORITHM_KAWASE,
+		.offset = settings.blur_offset,
+		.saturation = settings.blur_saturation,
+		.vibrancy = settings.blur_vibrancy,
+		.vibrancy_darkness = settings.blur_vibrancy_darkness,
+		.noise_strength = settings.blur_noise_strength,
+		.brightness = settings.blur_brightness,
+		.contrast = settings.blur_contrast,
 	};
 }
 
@@ -804,13 +751,13 @@ static bool rebuild_live_blur(output_t *output, be_effect_resource_t shared_blur
 
 	struct be_blur_params bp;
 	fill_blur_params(&bp);
-	bp.refraction_strength = refraction_strength;
-	bp.refraction_edge_size_px = refraction_edge_size_px;
-	bp.refraction_corner_radius_px = refraction_corner_radius_px;
-	bp.refraction_normal_pow = refraction_normal_pow;
-	bp.refraction_rgb_fringing = refraction_rgb_fringing;
-	bp.refraction_texture_repeat_mode = refraction_texture_repeat_mode;
-	bp.refraction_offset = refraction_offset;
+	bp.refraction_strength = settings.refraction_strength;
+	bp.refraction_edge_size_px = settings.refraction_edge_size_px;
+	bp.refraction_corner_radius_px = settings.refraction_corner_radius_px;
+	bp.refraction_normal_pow = settings.refraction_normal_pow;
+	bp.refraction_rgb_fringing = settings.refraction_rgb_fringing;
+	bp.refraction_texture_repeat_mode = settings.refraction_texture_repeat_mode;
+	bp.refraction_offset = settings.refraction_offset;
 
 	bool keep_blur = ctx->blur_buf && ctx->blur_native[0] && ctx->blur_gen == ctx->backdrop_gen;
 
@@ -1318,15 +1265,16 @@ static bool rebuild_live_acrylic(output_t *output, pixman_region32_t *damage,
 			continue;
 
 		struct be_acrylic_params ap = {
-			.tint = {acrylic_tint[0], acrylic_tint[1], acrylic_tint[2], acrylic_tint[3]},
-			.tint_strength = acrylic_tint_strength,
-			.noise_strength = acrylic_noise_strength,
+			.tint = {settings.acrylic_tint[0], settings.acrylic_tint[1], settings.acrylic_tint[2],
+				settings.acrylic_tint[3]},
+			.tint_strength = settings.acrylic_tint_strength,
+			.noise_strength = settings.acrylic_noise_strength,
 			.res_w = (float)w,
 			.res_h = (float)h,
-			.light_anchor_x = acrylic_light_anchor[0],
-			.light_anchor_y = acrylic_light_anchor[1],
-			.blur_passes = acrylic_blur_passes,
-			.blur_radius = blur_radius,
+			.light_anchor_x = settings.acrylic_light_anchor[0],
+			.light_anchor_y = settings.acrylic_light_anchor[1],
+			.blur_passes = settings.acrylic_blur_passes,
+			.blur_radius = settings.blur_radius,
 		};
 		be_buffer_t acrylic_buf = {
 			.native_handle = {tl->blur->acrylic_native[0], tl->blur->acrylic_native[1]},
@@ -1442,8 +1390,8 @@ static bool rebuild_mica(output_t *output, be_effect_resource_t pre_captured_bg)
 		.state = BE_RESOURCE_COLOR_ATTACHMENT,
 		.owned = false,
 	};
-	effects_backend->apply_mica_tint(&ctx->be_state, mica_blur, mica_tint, mica_tint_strength,
-		be_buffer_target_from_buffer(&mica_buf, 0));
+	effects_backend->apply_mica_tint(&ctx->be_state, mica_blur, settings.mica_tint,
+		settings.mica_tint_strength, be_buffer_target_from_buffer(&mica_buf, 0));
 
 	ctx->mica_dirty = false;
 	return true;
@@ -2145,7 +2093,7 @@ static void handle_screen_shader_frame(output_t *output) {
 	if (!ctx || !ctx->screen_shader_node)
 		return;
 
-	if (!screen_shader_enabled) {
+	if (!settings.screen_shader_enabled) {
 		wlr_scene_node_set_enabled(&ctx->screen_shader_node->node, false);
 		return;
 	}
@@ -2214,11 +2162,11 @@ void effects_evict_buffers(void) {
 
 		if (tl->blur) {
 			// visual eviction
-			if (blur_count(tl->blur) > 0 && !blur_enabled)
+			if (blur_count(tl->blur) > 0 && !settings.blur_enabled)
 				blur_set_buffer_null(tl->blur);
-			if (tl->blur->acrylic_node && !blur_enabled)
+			if (tl->blur->acrylic_node && !settings.blur_enabled)
 				wlr_scene_buffer_set_buffer(tl->blur->acrylic_node, NULL);
-			if (tl->blur->mica_node && !mica_enabled)
+			if (tl->blur->mica_node && !settings.mica_enabled)
 				wlr_scene_buffer_set_buffer(tl->blur->mica_node, NULL);
 
 			// memory eviction
@@ -2386,7 +2334,7 @@ static bool workspace_effect_buffers_missing(output_t *output) {
 
 		client_t *c = tl->node->client;
 		bool masked = c && c->border_radius > 0.0f && c->state != STATE_FULLSCREEN;
-		if (blur_enabled && blur_count(tl->blur) > 0) {
+		if (settings.blur_enabled && blur_count(tl->blur) > 0) {
 			if ((masked && !tl->blur->blur_buf) || (!masked && !ctx->blur_buf))
 				return true;
 		}
@@ -2411,7 +2359,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 
 	// check if layer blur surfaces need rendering
 	bool has_layer_blur = false;
-	if (blur_enabled) {
+	if (settings.blur_enabled) {
 		for (int i = 0; i < 4 && !has_layer_blur; i++) {
 			layer_surface_t *ls;
 			wl_list_for_each(ls, &output->layers[i], link)
@@ -2424,7 +2372,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 
 	// check if any visible toplevel blur is on this output
 	bool has_window_blur = false;
-	if (blur_enabled) {
+	if (settings.blur_enabled) {
 		view_t *tl;
 		wl_list_for_each(tl, &server.views, link) {
 			if (tl->blur && blur_count(tl->blur) > 0 && tl->node && tl->node->client &&
@@ -2437,7 +2385,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 
 	// when both window and layer blur are active, one capture with blur toplevels
 	// visible feeds both backdrops
-	bool unified = blur_enabled && has_window_blur && has_layer_blur;
+	bool unified = settings.blur_enabled && has_window_blur && has_layer_blur;
 
 	// check if corner masks need rendering
 	bool any_cm = false;
@@ -2486,11 +2434,11 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 		if (!workspace_warmup && !effects_pending_update(output))
 			bg_damaged = false;
 	}
-	bool mica_dirty = mica_enabled && ctx->mica_dirty;
-	bool blur_stale = blur_enabled && has_window_blur && (!ctx->blur_buf || !ctx->blur_native[0] ||
-		ctx->blur_gen != ctx->backdrop_gen);
+	bool mica_dirty = settings.mica_enabled && ctx->mica_dirty;
+	bool blur_stale = settings.blur_enabled && has_window_blur && (!ctx->blur_buf ||
+		!ctx->blur_native[0] || ctx->blur_gen != ctx->backdrop_gen);
 	bool effects_work = bg_damaged || mica_dirty || blur_stale;
-	if (!effects_work && !effects_border_pending(output) && !screen_shader_enabled)
+	if (!effects_work && !effects_border_pending(output) && !settings.screen_shader_enabled)
 		return;
 
 	effects_backend->frame_begin();
@@ -2565,7 +2513,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 	}
 
 	// toplevel blur
-	if (blur_enabled && has_window_blur) {
+	if (settings.blur_enabled && has_window_blur) {
 		if (bg_damaged || blur_stale)
 			rebuild_live_blur(output, shared_bg, &scene_output->damage_ring.current, workspace_warmup);
 		push_blur_to_toplevels(output);
@@ -2591,7 +2539,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 	// apply mica before corner masks; rebuild whenever the backdrop changed
 	// (mica windows show the live desktop behind them, not a one-shot capture:
 	// they map after startup, when the one-shot capture was still empty/black)
-	if (mica_dirty || (mica_enabled && bg_damaged)) {
+	if (mica_dirty || (settings.mica_enabled && bg_damaged)) {
 		be_effect_resource_t mica_bg = shared_bg.valid ? shared_bg : capture_bg_to_tex1(output, ctx, true,
 			NULL, NULL);
 		if (mica_bg.valid)
@@ -2604,9 +2552,9 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 	if (has_layer_blur) {
 		if (unified) {
 			be_effect_resource_t layer_bg = capture_bg_combined(output, ctx);
-			if (layer_bg.valid && blur_enabled)
+			if (layer_bg.valid && settings.blur_enabled)
 				rebuild_live_blur_layers(output, layer_bg, &scene_output->damage_ring.current);
-			else if (blur_enabled)
+			else if (settings.blur_enabled)
 				rebuild_live_blur_layers(output, (be_effect_resource_t){0}, &scene_output->damage_ring.current);
 			push_blur_to_layers(output, ctx->layer_blur_buf);
 			if (any_cm_dirty)
@@ -2614,15 +2562,15 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 			push_corner_masks_to_toplevels(output, any_cm_dirty);
 			goto cm_done;
 		}
-		bool any_layer_needs_blur = blur_enabled && layer_blur_needs_rebuild(output,
+		bool any_layer_needs_blur = settings.blur_enabled && layer_blur_needs_rebuild(output,
 			&scene_output->damage_ring.current);
 
 		if (any_layer_needs_blur && any_cm) {
 			be_effect_resource_t bg_tex = capture_bg_combined(output, ctx);
-			if (bg_tex.valid && blur_enabled) {
+			if (bg_tex.valid && settings.blur_enabled) {
 				rebuild_live_blur_layers(output, bg_tex, &scene_output->damage_ring.current);
 				push_blur_to_layers(output, ctx->layer_blur_buf);
-			} else if (blur_enabled) {
+			} else if (settings.blur_enabled) {
 				rebuild_live_blur_layers(output, (be_effect_resource_t){0}, &scene_output->damage_ring.current);
 				push_blur_to_layers(output, ctx->layer_blur_buf);
 			}
@@ -2644,7 +2592,7 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 	}
 cm_done:
 
-	if (mica_enabled && ctx->mica_buf)
+	if (settings.mica_enabled && ctx->mica_buf)
 		push_mica_to_toplevels(output);
 
 after_capture:
@@ -2724,12 +2672,13 @@ after_capture:
 		}
 	}
 
-	if (screen_shader_enabled && ctx->screen_shader_node)
+	if (settings.screen_shader_enabled && ctx->screen_shader_node)
 		if (!ctx->screen_shader_node->node.enabled ||
 			!pixman_region32_empty(&scene_output->damage_ring.current))
 			handle_screen_shader_frame(output);
 
-	if (!screen_shader_enabled && ctx->screen_shader_node && ctx->screen_shader_node->node.enabled) {
+	if (!settings.screen_shader_enabled && ctx->screen_shader_node &&
+			ctx->screen_shader_node->node.enabled) {
 		wlr_scene_node_set_enabled(&ctx->screen_shader_node->node, false);
 	}
 
@@ -2749,15 +2698,15 @@ layer_only_frame:
 
 	// apply corner masks and layer blur if needed
 	if (has_layer_blur) {
-		bool any_layer_needs_blur = blur_enabled && layer_blur_needs_rebuild(output,
+		bool any_layer_needs_blur = settings.blur_enabled && layer_blur_needs_rebuild(output,
 			&scene_output->damage_ring.current);
 
 		if (any_layer_needs_blur && any_cm) {
 			be_effect_resource_t bg_tex = capture_bg_combined(output, ctx);
-			if (bg_tex.valid && blur_enabled) {
+			if (bg_tex.valid && settings.blur_enabled) {
 				rebuild_live_blur_layers(output, bg_tex, &scene_output->damage_ring.current);
 				push_blur_to_layers(output, ctx->layer_blur_buf);
-			} else if (blur_enabled) {
+			} else if (settings.blur_enabled) {
 				rebuild_live_blur_layers(output, (be_effect_resource_t){0}, &scene_output->damage_ring.current);
 				push_blur_to_layers(output, ctx->layer_blur_buf);
 			}
@@ -2835,8 +2784,8 @@ bool screen_shader_set(const char *name) {
 	effects_backend->frame_begin();
 	bool ok = effects_backend->compile_screen_shader(frag_src);
 	if (ok) {
-		screen_shader_enabled = true;
-		str_copy(screen_shader_name_str, sizeof(screen_shader_name_str), name);
+		settings.screen_shader_enabled = true;
+		str_copy(settings.screen_shader, sizeof(settings.screen_shader), name);
 	}
 	effects_backend->frame_end();
 	return ok;
@@ -2876,8 +2825,8 @@ bool screen_shader_load_file(const char *path) {
 	bool ok = effects_backend->compile_screen_shader(src);
 	free(src);
 	if (ok) {
-		screen_shader_enabled = true;
-		str_copy(screen_shader_name_str, sizeof(screen_shader_name_str), path);
+		settings.screen_shader_enabled = true;
+		str_copy(settings.screen_shader, sizeof(settings.screen_shader), path);
 	}
 	effects_backend->frame_end();
 	return ok;
@@ -2889,9 +2838,9 @@ void screen_shader_clear(void) {
 		effects_backend->destroy_screen_shader();
 		effects_backend->frame_end();
 	}
-	screen_shader_enabled = false;
+	settings.screen_shader_enabled = false;
 	screen_shader_hide_nodes();
-	snprintf(screen_shader_name_str, sizeof(screen_shader_name_str), "none");
+	snprintf(settings.screen_shader, sizeof(settings.screen_shader), "none");
 }
 
 void screen_shader_hide_nodes(void) {
@@ -2908,5 +2857,5 @@ void screen_shader_hide_nodes(void) {
 }
 
 const char *screen_shader_get_name(void) {
-	return screen_shader_name_str;
+	return settings.screen_shader;
 }

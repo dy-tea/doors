@@ -131,12 +131,6 @@ typedef enum {
 	BINDF_CATCH_ALL = 1 << 6,
 } bind_flag_t;
 
-typedef enum {
-	KEYBOARD_GROUP_DEFAULT,
-	KEYBOARD_GROUP_NONE,
-	KEYBOARD_GROUP_SMART,
-} keyboard_grouping_t;
-
 typedef struct {
 	bind_action_t action;
 	int desktop_index;
