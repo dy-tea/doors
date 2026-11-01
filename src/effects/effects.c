@@ -1705,6 +1705,11 @@ static bool blur_render_border(view_t *tl, struct wlr_box content) {
 		return false;
 	if (content.width <= 0 || content.height <= 0)
 		return false;
+	if (tl->node && tl->node->client && tl->node->client->state == STATE_FULLSCREEN) {
+		if (tl->rounded->border_shader_node)
+			wlr_scene_node_set_enabled(&tl->rounded->border_shader_node->node, false);
+		return false;
+	}
 
 	float scale = tl->node->output ? tl->node->output->wlr_output->scale : 1.0f;
 	client_t *c = tl->node->client;
@@ -2043,6 +2048,8 @@ static void push_corner_masks_to_toplevels(output_t *output, bool rebuilt) {
 		client_t *c = tl->node->client;
 		if (c->border_radius <= 0.0f || c->state == STATE_FULLSCREEN) {
 			wlr_scene_buffer_set_buffer(tl->rounded->corner_mask_node, NULL);
+			if (tl->rounded->corner_mask_node->node.enabled)
+				wlr_scene_node_set_enabled(&tl->rounded->corner_mask_node->node, false);
 			continue;
 		}
 		if (!tl->rounded->corner_mask_buf)
@@ -2657,6 +2664,15 @@ after_capture:
 			// use shader if rounded corners or a gradient is set
 			bool has_gradient = (tl->rounded->gradient_count >= 2);
 			if (c->border_radius <= 0.0f && !has_gradient) {
+				tl->rounded->border_dirty = false;
+				tl->rounded->corner_mask_dirty = false;
+				continue;
+			}
+
+			// fullscreen toplevels never show their rounded border
+			if (c->state == STATE_FULLSCREEN) {
+				if (tl->rounded->border_shader_node)
+					wlr_scene_node_set_enabled(&tl->rounded->border_shader_node->node, false);
 				tl->rounded->border_dirty = false;
 				tl->rounded->corner_mask_dirty = false;
 				continue;

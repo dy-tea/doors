@@ -172,6 +172,32 @@ void update_borders(struct wlr_scene_tree *border_tree, struct wlr_scene_rect *r
 
 void update_border_colors(client_t *client) {
 	struct wlr_scene_tree *border_tree = client_border_tree(client);
+
+	if (client && client->state == STATE_FULLSCREEN) {
+		surface_rounded_t *rounded = client_get_rounded(client);
+		if (rounded) {
+			if (rounded->border_shader_node)
+				wlr_scene_node_set_enabled(&rounded->border_shader_node->node, false);
+			if (rounded->corner_mask_node)
+				wlr_scene_node_set_enabled(&rounded->corner_mask_node->node, false);
+			// mark dirty so the border re-renders when leaving fullscreen
+			static const float transparent[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+			if (memcmp(rounded->border_color, transparent, sizeof(rounded->border_color)) != 0) {
+				memcpy(rounded->border_color, transparent, sizeof(rounded->border_color));
+				rounded->border_dirty = true;
+				rounded->corner_mask_dirty = true;
+			}
+		}
+		if (border_tree) {
+			static const float transparent[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+			struct wlr_scene_rect **rects = client_border_rects(client);
+			for (int i = 0; i < 4; i++)
+				if (rects[i])
+					wlr_scene_rect_set_color(rects[i], transparent);
+		}
+		return;
+	}
+
 	if (settings.border_width == 0 || !border_tree)
 		return;
 
