@@ -19,7 +19,6 @@
 #include "server.h"
 #include "tabs.h"
 #include "tiling_drag.h"
-#include "transaction.h"
 #include "tree.h"
 #include "types.h"
 #include <libinput.h>
@@ -865,12 +864,15 @@ void cursor_button(struct wl_listener *listener, void *data) {
 		struct wlr_surface *surface = NULL;
 		void *type = desktop_type_at(server.cursor->x, server.cursor->y, &surface, &sx, &sy);
 		view_t *hover = type ? view_from_wlr_surface(surface) : NULL;
-		if (type == NULL)
+
+		if (surface == NULL)
 			return;
 
 		struct wlr_xdg_surface *xdg_surface = wlr_xdg_surface_try_from_wlr_surface(surface);
 		if (xdg_surface != NULL && xdg_surface->role == WLR_XDG_SURFACE_ROLE_POPUP) {
 			// le skip
+		} else if (type == NULL) {
+			// goes to the surface below
 		} else if (wlr_layer_surface_v1_try_from_wlr_surface(surface)) {
 			layer_surface_t *layer = type;
 			if (layer)
