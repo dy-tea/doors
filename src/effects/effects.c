@@ -436,6 +436,7 @@ static void hide_workspace_slide_out_tree(output_t *output, node_t *node,
 
 static struct wlr_box get_client_rect(view_t *tl);
 static struct wlr_box get_animated_client_rect(view_t *tl);
+static struct wlr_box get_animated_visible_rect(view_t *tl);
 
 // union of rects hidden during shared backdrop capture
 static void collect_hidden_blur_rects(output_t *output, effects_output_t *ctx,
@@ -966,7 +967,10 @@ static void push_blur_to_toplevels(output_t *output) {
 				blur_set_buffer_null(tl->blur);
 				continue;
 			}
-			struct wlr_box r = get_animated_client_rect(tl);
+			struct wlr_box container_r = get_animated_client_rect(tl);
+			struct wlr_box r = get_animated_visible_rect(tl);
+			int lx = 0, ly = 0;
+			wlr_scene_node_coords(&tl->scene_tree->node, &lx, &ly);
 			int rx = r.x > output->lx ? r.x : output->lx;
 			int ry = r.y > output->ly ? r.y : output->ly;
 			int rxe = r.x + r.width < output->lx + output->width ? r.x + r.width : output->lx +
@@ -980,13 +984,13 @@ static void push_blur_to_toplevels(output_t *output) {
 			int off_x = rx - r.x;
 			int off_y = ry - r.y;
 			struct wlr_fbox src = {
-				.x = off_x,
-				.y = off_y,
+				.x = (r.x - container_r.x) + off_x,
+				.y = (r.y - container_r.y) + off_y,
 				.width = rxe - rx,
 				.height = rye - ry
 			};
 			blur_set_buffer(tl->blur, buf);
-			scene_set_pos_guarded(&node->node, off_x, off_y);
+			scene_set_pos_guarded(&node->node, (r.x - lx) + off_x, (r.y - ly) + off_y);
 			scene_set_source_box_guarded(node, &src);
 			scene_set_dest_size_guarded(node, rxe - rx, rye - ry);
 			continue;
@@ -1052,7 +1056,10 @@ static void push_blur_to_toplevels(output_t *output) {
 			blur_set_buffer_null(tl->blur);
 			continue;
 		}
-		struct wlr_box r = get_animated_client_rect(tl);
+		// clip to the same visible rect the border follows during a resize
+		struct wlr_box r = get_animated_visible_rect(tl);
+		int lx = 0, ly = 0;
+		wlr_scene_node_coords(&tl->scene_tree->node, &lx, &ly);
 
 		struct wlr_fbox src;
 		int dw, dh;
@@ -1064,7 +1071,7 @@ static void push_blur_to_toplevels(output_t *output) {
 		int node_ox = (r.x < output->lx) ? (output->lx - r.x) : 0;
 		int node_oy = (r.y < output->ly) ? (output->ly - r.y) : 0;
 		blur_set_buffer(tl->blur, buf);
-		scene_set_pos_guarded(&node->node, node_ox, node_oy);
+		scene_set_pos_guarded(&node->node, (r.x - lx) + node_ox, (r.y - ly) + node_oy);
 		src.x *= src_scale_x;
 		src.y *= src_scale_y;
 		src.width *= src_scale_x;
@@ -1450,6 +1457,20 @@ static struct wlr_box get_animated_client_rect(view_t *tl) {
 		r.y = anim.y;
 		r.width = anim.width;
 		r.height = anim.height;
+	}
+	return r;
+}
+
+static struct wlr_box get_animated_visible_rect(view_t *tl) {
+	struct wlr_box r = get_animated_client_rect(tl);
+	struct wlr_box off = {0};
+	struct wlr_box size = {0};
+
+	if (animation_get_resize_border(tl, &off, &size) && size.width > 0 && size.height > 0) {
+		r.x += off.x;
+		r.y += off.y;
+		r.width = size.width;
+		r.height = size.height;
 	}
 	return r;
 }
