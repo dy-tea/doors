@@ -44,7 +44,7 @@ static void tree_rotate(ipc_args_t *a) {
 	if (!ipc_need(a, "direction", &arg))
 		return;
 
-	bind_action_t action = bind_action_from_name(arg);
+	bind_action_t action = bind_action_from_alias(arg);
 	if (action != BIND_ROTATE_CW && action != BIND_ROTATE_CCW) {
 		ipc_fail(a, "Unknown direction \"%s\", expected clockwise|counterclockwise\n", arg);
 		return;
@@ -59,7 +59,7 @@ static void tree_flip(ipc_args_t *a) {
 	if (!ipc_need(a, "axis", &arg))
 		return;
 
-	bind_action_t action = bind_action_from_name(arg);
+	bind_action_t action = bind_action_from_alias(arg);
 	if (action != BIND_FLIP_HORIZONTAL && action != BIND_FLIP_VERTICAL) {
 		ipc_fail(a, "Unknown axis \"%s\", expected horizontal|vertical\n", arg);
 		return;
@@ -69,30 +69,30 @@ static void tree_flip(ipc_args_t *a) {
 	ipc_ok(a, "flipped\n");
 }
 
+static const str_pair_t presel_dirs[] = {
+	{"west", BIND_PRESEL_WEST},
+	{"east", BIND_PRESEL_EAST},
+	{"north", BIND_PRESEL_NORTH},
+	{"south", BIND_PRESEL_SOUTH},
+	{"cancel", BIND_PRESEL_CANCEL},
+	IPC_ENUM_END,
+};
+
 static void tree_presel(ipc_args_t *a) {
 	const char *arg;
 	if (!ipc_need(a, "direction", &arg))
 		return;
 
-	if (streq(arg, "cancel")) {
-		execute_bind_action(BIND_PRESEL_CANCEL);
-		ipc_ok(a, "Presel cancelled\n");
-		return;
-	}
-
-	bind_action_t action = bind_action_from_name(arg);
+	bind_action_t action = bind_action_from_alias(arg);
 	if (action < BIND_PRESEL_NORTH || action > BIND_PRESEL_CANCEL) {
-		char buf[64];
-		snprintf(buf, sizeof(buf), "presel_%s", arg);
-		action = bind_action_from_name(buf);
-	}
-	if (action < BIND_PRESEL_NORTH || action > BIND_PRESEL_CANCEL) {
-		ipc_fail(a, "Unknown direction \"%s\"\n", arg);
-		return;
+		long dir;
+		if (!ipc_enum_names(a, "direction", arg, presel_dirs, &dir))
+			return;
+		action = (bind_action_t)dir;
 	}
 
 	execute_bind_action(action);
-	ipc_ok(a, "Presel set\n");
+	ipc_okf(a, "%s\n", action == BIND_PRESEL_CANCEL ? "Presel cancelled" : "Presel set");
 }
 
 const ipc_sub_t tree_subs[] = {

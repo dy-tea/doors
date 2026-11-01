@@ -4,6 +4,7 @@ test_programs = {
 	'str': 'test_str.c',
 	'bezier': 'test_bezier.c',
 	'spring': 'test_spring.c',
+	'bind-action': 'test_bind_action.c',
 	'config-table': 'test_config_table.c',
 	'config-validate': 'test_config_validate.c',
 	'ipc-dry-run': 'test_ipc_dry_run.c',

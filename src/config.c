@@ -1722,114 +1722,116 @@ void execute_hotcornerbind(const hotcornerbind_t *hc) {
 	execute_bind(bind);
 }
 
+static const char *const bind_action_names[] = {
+	"none",
+	"quit",
+	"enter_submap",
+	"exit_submap",
+	"node_focus",
+	"node_close",
+	"node_state_tiled",
+	"node_state_floating",
+	"node_state_fullscreen",
+	"node_state_maximized",
+	"node_state_minimized",
+	"node_to_desktop",
+	"desktop_focus",
+	"desktop_layout_tiled",
+	"desktop_layout_monocle",
+	"focus_north",
+	"focus_west",
+	"focus_south",
+	"focus_east",
+	"swap_north",
+	"swap_west",
+	"swap_south",
+	"swap_east",
+	"presel_north",
+	"presel_west",
+	"presel_south",
+	"presel_east",
+	"presel_cancel",
+	"toggle_floating",
+	"toggle_fullscreen",
+	"toggle_maximize",
+	"toggle_minimize",
+	"toggle_pseudo_tiled",
+	"toggle_monocle",
+	"toggle_master_stack",
+	"toggle_floating_layout",
+	"desktop_layout_master_stack",
+	"desktop_layout_floating",
+	"master_stack_inc",
+	"master_stack_dec",
+	"master_stack_flip",
+	"master_stack_cycle_orientation",
+	"master_stack_cycle_stack_layout",
+	"rotate_cw",
+	"rotate_ccw",
+	"flip_horizontal",
+	"flip_vertical",
+	"desktop_next",
+	"desktop_prev",
+	"desktop_last",
+	"send_to_desktop_next",
+	"send_to_desktop_prev",
+	"send_to_desktop_1",
+	"send_to_desktop_2",
+	"send_to_desktop_3",
+	"send_to_desktop_4",
+	"send_to_desktop_5",
+	"send_to_desktop_6",
+	"send_to_desktop_7",
+	"send_to_desktop_8",
+	"send_to_desktop_9",
+	"send_to_desktop_10",
+	"desktop_1",
+	"desktop_2",
+	"desktop_3",
+	"desktop_4",
+	"desktop_5",
+	"desktop_6",
+	"desktop_7",
+	"desktop_8",
+	"desktop_9",
+	"desktop_10",
+	"resize_left",
+	"resize_right",
+	"resize_up",
+	"resize_down",
+	"interactive_move",
+	"interactive_resize",
+	"tiling_drag",
+	"external",
+	"restore_minimized",
+	"scroller_cycle_preset",
+	"scroller_cycle_preset_back",
+	"scroller_cycle_height",
+	"scroller_cycle_height_back",
+	"scroller_toggle_full_width",
+	"scroller_expand_column",
+	"scroller_center",
+	"scroller_center_visible",
+	"focus_column_first",
+	"focus_column_last",
+	"focus_down_or_left",
+	"focus_down_or_right",
+	"focus_up_or_left",
+	"focus_up_or_right",
+	"move_column_left",
+	"move_column_right",
+	"move_column_up",
+	"move_column_down",
+	"move_column_to_first",
+	"move_column_to_last",
+};
+
+_Static_assert(sizeof(bind_action_names) / sizeof(bind_action_names[0]) == BIND_ACTION_COUNT,
+	"bind_action_name() must have exactly one name per bind_action_t value");
+
 const char *bind_action_name(bind_action_t action) {
-	static const char *names[] = {
-		"none",
-		"quit",
-		"enter_submap",
-		"exit_submap",
-		"node_focus",
-		"node_close",
-		"node_state_tiled",
-		"node_state_floating",
-		"node_state_fullscreen",
-		"node_state_maximized",
-		"node_state_minimized",
-		"node_to_desktop",
-		"desktop_focus",
-		"desktop_layout_tiled",
-		"desktop_layout_monocle",
-		"focus_north",
-		"focus_west",
-		"focus_south",
-		"focus_east",
-		"swap_north",
-		"swap_west",
-		"swap_south",
-		"swap_east",
-		"presel_north",
-		"presel_west",
-		"presel_south",
-		"presel_east",
-		"presel_cancel",
-		"toggle_floating",
-		"toggle_fullscreen",
-		"toggle_maximize",
-		"toggle_minimize",
-		"toggle_pseudo_tiled",
-		"toggle_monocle",
-		"toggle_master_stack",
-		"toggle_floating_layout",
-		"desktop_layout_master_stack",
-		"desktop_layout_floating",
-		"master_stack_inc",
-		"master_stack_dec",
-		"master_stack_flip",
-		"master_stack_cycle_orientation",
-		"master_stack_cycle_stack_layout",
-		"rotate_cw",
-		"rotate_ccw",
-		"flip_horizontal",
-		"flip_vertical",
-		"desktop_next",
-		"desktop_prev",
-		"desktop_last",
-		"send_to_desktop_next",
-		"send_to_desktop_prev",
-		"send_to_desktop_1",
-		"send_to_desktop_2",
-		"send_to_desktop_3",
-		"send_to_desktop_4",
-		"send_to_desktop_5",
-		"send_to_desktop_6",
-		"send_to_desktop_7",
-		"send_to_desktop_8",
-		"send_to_desktop_9",
-		"send_to_desktop_10",
-		"desktop_1",
-		"desktop_2",
-		"desktop_3",
-		"desktop_4",
-		"desktop_5",
-		"desktop_6",
-		"desktop_7",
-		"desktop_8",
-		"desktop_9",
-		"desktop_10",
-		"resize_left",
-		"resize_right",
-		"resize_up",
-		"resize_down",
-		"interactive_move",
-		"interactive_resize",
-		"tiling_drag",
-		"external",
-		"restore_minimized",
-		"scroller_cycle_preset",
-		"scroller_cycle_preset_back",
-		"scroller_cycle_height",
-		"scroller_cycle_height_back",
-		"scroller_toggle_full_width",
-		"scroller_expand_column",
-		"scroller_center",
-		"scroller_center_visible",
-		"focus_column_first",
-		"focus_column_last",
-		"focus_down_or_left",
-		"focus_down_or_right",
-		"focus_up_or_left",
-		"focus_up_or_right",
-		"move_column_left",
-		"move_column_right",
-		"move_column_up",
-		"move_column_down",
-		"move_column_to_first",
-		"move_column_to_last",
-	};
-	_Static_assert(sizeof(names) / sizeof(names[0]) == BIND_ACTION_COUNT,
-		"bind_action_name() must have exactly one name per bind_action_t value");
-	if (action >= 0 && action < (int)(sizeof(names) / sizeof(names[0])))
-		return names[action];
+	if (action >= 0 && action < BIND_ACTION_COUNT)
+		return bind_action_names[action];
 
 	return "unknown";
 }
@@ -1842,110 +1844,41 @@ void execute_bind_action(bind_action_t action) {
 	execute_bind(b);
 }
 
-bind_action_t bind_action_from_name(const char *name) {
+typedef struct {
+	const char *name;
+	bind_action_t action;
+} bind_alias_t;
+
+static const bind_alias_t bind_aliases[] = {
+	{"floating_layout", BIND_TOGGLE_FLOATING_LAYOUT},
+	{"next", BIND_DESKTOP_NEXT},
+	{"send", BIND_SEND_TO_DESKTOP_NEXT},
+	{"send_next", BIND_SEND_TO_DESKTOP_NEXT},
+	{"send_prev", BIND_SEND_TO_DESKTOP_PREV},
+	{"clockwise", BIND_ROTATE_CW},
+	{"cw", BIND_ROTATE_CW},
+	{"counterclockwise", BIND_ROTATE_CCW},
+	{"ccw", BIND_ROTATE_CCW},
+	{"horizontal", BIND_FLIP_HORIZONTAL},
+	{"h", BIND_FLIP_HORIZONTAL},
+	{"vertical", BIND_FLIP_VERTICAL},
+	{"v", BIND_FLIP_VERTICAL},
+};
+
+// resolve a shorthand alias or a canonical action name (as returned by bind_action_name())
+bind_action_t bind_action_from_alias(const char *name) {
 	if (!name)
 		return BIND_NONE;
 
-#define ACTION_IF_MATCH(n, val)                                                                                        \
-	if (streq(name, n))                                                                                            \
-	return val
+	for (size_t i = 0; i < sizeof(bind_aliases) / sizeof(bind_aliases[0]); i++) {
+		if (streq(name, bind_aliases[i].name))
+			return bind_aliases[i].action;
+	}
 
-	ACTION_IF_MATCH("west", BIND_FOCUS_WEST);
-	ACTION_IF_MATCH("w", BIND_FOCUS_WEST);
-	ACTION_IF_MATCH("east", BIND_FOCUS_EAST);
-	ACTION_IF_MATCH("e", BIND_FOCUS_EAST);
-	ACTION_IF_MATCH("north", BIND_FOCUS_NORTH);
-	ACTION_IF_MATCH("n", BIND_FOCUS_NORTH);
-	ACTION_IF_MATCH("south", BIND_FOCUS_SOUTH);
-	ACTION_IF_MATCH("s", BIND_FOCUS_SOUTH);
-
-	ACTION_IF_MATCH("swap_west", BIND_SWAP_WEST);
-	ACTION_IF_MATCH("swap_east", BIND_SWAP_EAST);
-	ACTION_IF_MATCH("swap_north", BIND_SWAP_NORTH);
-	ACTION_IF_MATCH("swap_south", BIND_SWAP_SOUTH);
-
-	ACTION_IF_MATCH("presel_west", BIND_PRESEL_WEST);
-	ACTION_IF_MATCH("presel_east", BIND_PRESEL_EAST);
-	ACTION_IF_MATCH("presel_north", BIND_PRESEL_NORTH);
-	ACTION_IF_MATCH("presel_south", BIND_PRESEL_SOUTH);
-	ACTION_IF_MATCH("presel_cancel", BIND_PRESEL_CANCEL);
-
-	ACTION_IF_MATCH("resize_left", BIND_RESIZE_LEFT);
-	ACTION_IF_MATCH("left", BIND_RESIZE_LEFT);
-	ACTION_IF_MATCH("resize_right", BIND_RESIZE_RIGHT);
-	ACTION_IF_MATCH("right", BIND_RESIZE_RIGHT);
-	ACTION_IF_MATCH("resize_up", BIND_RESIZE_UP);
-	ACTION_IF_MATCH("up", BIND_RESIZE_UP);
-	ACTION_IF_MATCH("resize_down", BIND_RESIZE_DOWN);
-	ACTION_IF_MATCH("down", BIND_RESIZE_DOWN);
-
-	ACTION_IF_MATCH("toggle_floating", BIND_TOGGLE_FLOATING);
-	ACTION_IF_MATCH("toggle_fullscreen", BIND_TOGGLE_FULLSCREEN);
-	ACTION_IF_MATCH("toggle_maximize", BIND_TOGGLE_MAXIMIZE);
-	ACTION_IF_MATCH("toggle_minimize", BIND_TOGGLE_MINIMIZE);
-	ACTION_IF_MATCH("restore_minimized", BIND_RESTORE_MINIMIZED);
-	ACTION_IF_MATCH("toggle_pseudo_tiled", BIND_TOGGLE_PSEUDO_TILED);
-	ACTION_IF_MATCH("toggle_monocle", BIND_TOGGLE_MONOCLE);
-	ACTION_IF_MATCH("toggle_master_stack", BIND_TOGGLE_MASTER_STACK);
-	ACTION_IF_MATCH("toggle_floating_layout", BIND_TOGGLE_FLOATING_LAYOUT);
-	ACTION_IF_MATCH("floating_layout", BIND_TOGGLE_FLOATING_LAYOUT);
-	ACTION_IF_MATCH("master_stack_inc", BIND_MASTER_STACK_INC);
-	ACTION_IF_MATCH("master_stack_dec", BIND_MASTER_STACK_DEC);
-	ACTION_IF_MATCH("master_stack_flip", BIND_MASTER_STACK_FLIP);
-	ACTION_IF_MATCH("master_stack_cycle_orientation", BIND_MASTER_STACK_CYCLE_ORIENTATION);
-	ACTION_IF_MATCH("master_stack_cycle_stack_layout", BIND_MASTER_STACK_CYCLE_STACK_LAYOUT);
-
-	ACTION_IF_MATCH("rotate_cw", BIND_ROTATE_CW);
-	ACTION_IF_MATCH("rotate_ccw", BIND_ROTATE_CCW);
-
-	ACTION_IF_MATCH("flip_horizontal", BIND_FLIP_HORIZONTAL);
-	ACTION_IF_MATCH("flip_vertical", BIND_FLIP_VERTICAL);
-
-	ACTION_IF_MATCH("desktop_next", BIND_DESKTOP_NEXT);
-	ACTION_IF_MATCH("next", BIND_DESKTOP_NEXT);
-	ACTION_IF_MATCH("desktop_prev", BIND_DESKTOP_PREV);
-	ACTION_IF_MATCH("desktop_last", BIND_DESKTOP_LAST);
-
-	ACTION_IF_MATCH("quit", BIND_QUIT);
-
-	ACTION_IF_MATCH("send_to_desktop_next", BIND_SEND_TO_DESKTOP_NEXT);
-	ACTION_IF_MATCH("send_to_desktop_prev", BIND_SEND_TO_DESKTOP_PREV);
-
-	ACTION_IF_MATCH("send_next", BIND_SEND_TO_DESKTOP_NEXT);
-	ACTION_IF_MATCH("send_prev", BIND_SEND_TO_DESKTOP_PREV);
-	ACTION_IF_MATCH("send", BIND_SEND_TO_DESKTOP_NEXT);
-
-	ACTION_IF_MATCH("clockwise", BIND_ROTATE_CW);
-	ACTION_IF_MATCH("cw", BIND_ROTATE_CW);
-	ACTION_IF_MATCH("counterclockwise", BIND_ROTATE_CCW);
-	ACTION_IF_MATCH("ccw", BIND_ROTATE_CCW);
-	ACTION_IF_MATCH("horizontal", BIND_FLIP_HORIZONTAL);
-	ACTION_IF_MATCH("h", BIND_FLIP_HORIZONTAL);
-	ACTION_IF_MATCH("vertical", BIND_FLIP_VERTICAL);
-	ACTION_IF_MATCH("v", BIND_FLIP_VERTICAL);
-
-	ACTION_IF_MATCH("scroller_cycle_preset", BIND_SCROLLER_CYCLE_PRESET);
-	ACTION_IF_MATCH("scroller_cycle_preset_back", BIND_SCROLLER_CYCLE_PRESET_BACK);
-	ACTION_IF_MATCH("scroller_cycle_height", BIND_SCROLLER_CYCLE_HEIGHT);
-	ACTION_IF_MATCH("scroller_cycle_height_back", BIND_SCROLLER_CYCLE_HEIGHT_BACK);
-	ACTION_IF_MATCH("scroller_toggle_full_width", BIND_SCROLLER_TOGGLE_FULL_WIDTH);
-	ACTION_IF_MATCH("scroller_expand_column", BIND_SCROLLER_EXPAND_COLUMN);
-	ACTION_IF_MATCH("scroller_center", BIND_SCROLLER_CENTER);
-	ACTION_IF_MATCH("scroller_center_visible", BIND_SCROLLER_CENTER_VISIBLE);
-	ACTION_IF_MATCH("focus_column_first", BIND_FOCUS_COLUMN_FIRST);
-	ACTION_IF_MATCH("focus_column_last", BIND_FOCUS_COLUMN_LAST);
-	ACTION_IF_MATCH("focus_down_or_left", BIND_FOCUS_DOWN_OR_LEFT);
-	ACTION_IF_MATCH("focus_down_or_right", BIND_FOCUS_DOWN_OR_RIGHT);
-	ACTION_IF_MATCH("focus_up_or_left", BIND_FOCUS_UP_OR_LEFT);
-	ACTION_IF_MATCH("focus_up_or_right", BIND_FOCUS_UP_OR_RIGHT);
-	ACTION_IF_MATCH("move_column_left", BIND_MOVE_COLUMN_LEFT);
-	ACTION_IF_MATCH("move_column_right", BIND_MOVE_COLUMN_RIGHT);
-	ACTION_IF_MATCH("move_column_up", BIND_MOVE_COLUMN_UP);
-	ACTION_IF_MATCH("move_column_down", BIND_MOVE_COLUMN_DOWN);
-	ACTION_IF_MATCH("move_column_to_first", BIND_MOVE_COLUMN_FIRST);
-	ACTION_IF_MATCH("move_column_to_last", BIND_MOVE_COLUMN_LAST);
-
-#undef ACTION_IF_MATCH
+	for (size_t i = 0; i < sizeof(bind_action_names) / sizeof(bind_action_names[0]); i++) {
+		if (streq(name, bind_action_names[i]))
+			return (bind_action_t)i;
+	}
 
 	return BIND_NONE;
 }

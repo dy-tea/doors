@@ -228,7 +228,7 @@ void execute_hotcornerbind(const hotcornerbind_t *hc);
 void execute_bind(bind_t b);
 void execute_bind_action(bind_action_t action);
 
-bind_action_t bind_action_from_name(const char *name);
+bind_action_t bind_action_from_alias(const char *name);
 const char *bind_action_name(bind_action_t action);
 
 bool parse_bind_flags(const char *str, uint32_t *out_flags);

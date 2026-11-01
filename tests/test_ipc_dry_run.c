@@ -187,7 +187,7 @@ static const char *reply_body(const char *reply) {
 }
 
 static void check_parity(const char *node_msg, size_t node_len, const char *tree_msg,
-	size_t tree_len) {
+		size_t tree_len) {
 	char node_reply[512];
 	char tree_reply[512];
 
@@ -223,8 +223,7 @@ static void test_shared_subcommand_parity(void) {
 		"sideways\0";
 	const char tree_circ_bad[] = "tree\0circulate\0"
 		"sideways\0";
-	check_parity(node_circ_bad, sizeof(node_circ_bad) - 1, tree_circ_bad,
-		sizeof(tree_circ_bad) - 1);
+	check_parity(node_circ_bad, sizeof(node_circ_bad) - 1, tree_circ_bad, sizeof(tree_circ_bad) - 1);
 }
 
 static void test_apply_still_works(void) {

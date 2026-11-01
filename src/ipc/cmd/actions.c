@@ -3,17 +3,77 @@
 #include "ipc/args.h"
 #include "ipc/registry.h"
 #include "spring.h"
+#include "str.h"
 #include <stdlib.h>
 #include <string.h>
 
-static void action_direction(ipc_args_t *a, const char *success, bool (*filter)(bind_action_t)) {
+static const str_pair_t focus_dirs[] = {
+	{"west", BIND_FOCUS_WEST},
+	{"w", BIND_FOCUS_WEST},
+	{"east", BIND_FOCUS_EAST},
+	{"e", BIND_FOCUS_EAST},
+	{"north", BIND_FOCUS_NORTH},
+	{"n", BIND_FOCUS_NORTH},
+	{"south", BIND_FOCUS_SOUTH},
+	{"s", BIND_FOCUS_SOUTH},
+	IPC_ENUM_END,
+};
+
+static const str_pair_t swap_dirs[] = {
+	{"west", BIND_SWAP_WEST},
+	{"w", BIND_SWAP_WEST},
+	{"east", BIND_SWAP_EAST},
+	{"e", BIND_SWAP_EAST},
+	{"north", BIND_SWAP_NORTH},
+	{"n", BIND_SWAP_NORTH},
+	{"south", BIND_SWAP_SOUTH},
+	{"s", BIND_SWAP_SOUTH},
+	IPC_ENUM_END,
+};
+
+static const str_pair_t resize_dirs[] = {
+	{"left", BIND_RESIZE_LEFT},
+	{"right", BIND_RESIZE_RIGHT},
+	{"up", BIND_RESIZE_UP},
+	{"down", BIND_RESIZE_DOWN},
+	IPC_ENUM_END,
+};
+
+// names resolve across all bind actions, so each command only accepts its own range
+static bool is_focus_action(bind_action_t a) {
+	return a >= BIND_FOCUS_NORTH && a <= BIND_FOCUS_EAST;
+}
+
+static bool is_swap_action(bind_action_t a) {
+	return a >= BIND_SWAP_NORTH && a <= BIND_SWAP_EAST;
+}
+
+static bool is_resize_action(bind_action_t a) {
+	return a >= BIND_RESIZE_LEFT && a <= BIND_RESIZE_DOWN;
+}
+
+static void action_direction(ipc_args_t *a, const char *success, const str_pair_t *dirs,
+		size_t dir_count, bool (*in_range)(bind_action_t)) {
 	const char *dir;
 	if (!ipc_need(a, "direction", &dir))
 		return;
 
-	bind_action_t action = bind_action_from_name(dir);
-	if (action == BIND_NONE || (filter && !filter(action))) {
-		ipc_fail(a, "Unknown direction \"%s\"\n", dir);
+	bind_action_t action = BIND_NONE;
+	const str_pair_t *match = str_table_find(dirs, dir);
+	if (match) {
+		action = (bind_action_t)match->value;
+	} else {
+		bind_action_t full = bind_action_from_alias(dir);
+		if (full != BIND_NONE && in_range(full))
+			action = full;
+	}
+
+	if (action == BIND_NONE) {
+		ipc_buf_t b;
+		char list[128];
+		ipc_buf_init(&b, list, sizeof(list));
+		IPC_FORMAT_NAMES(&b, dirs, dir_count);
+		ipc_fail(a, "Unknown direction \"%s\", expected one of: %s\n", dir, list);
 		return;
 	}
 
@@ -133,11 +193,11 @@ void ipc_cmd_actions(ipc_args_t *a) {
 	const char *cmd = a->cmd;
 
 	if (streq(cmd, "focus")) {
-		action_direction(a, "focused", NULL);
+		action_direction(a, "focused", focus_dirs, IPC_ARRAY_LEN(focus_dirs) - 1, is_focus_action);
 	} else if (streq(cmd, "swap")) {
-		action_direction(a, "swapped", NULL);
+		action_direction(a, "swapped", swap_dirs, IPC_ARRAY_LEN(swap_dirs) - 1, is_swap_action);
 	} else if (streq(cmd, "resize")) {
-		action_direction(a, "resized", NULL);
+		action_direction(a, "resized", resize_dirs, IPC_ARRAY_LEN(resize_dirs) - 1, is_resize_action);
 	} else if (streq(cmd, "toggle")) {
 		act_toggle(a);
 	} else if (streq(cmd, "send")) {

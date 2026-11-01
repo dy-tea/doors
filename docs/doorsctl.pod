@@ -1445,7 +1445,7 @@ Subscribe to events.
 
 C<doorsctl swap west|east|north|south>
 
-Swap with neighbour in a direction.
+Swap with neighbour in a direction (aliases: w, e, n, s).
 
 =item toggle
 
