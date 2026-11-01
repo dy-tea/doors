@@ -67,15 +67,15 @@ static uint32_t get_time_ms(void) {
 static void clear_resize_anchors(desktop_t *d);
 
 static void reset_cursor_mode(void) {
-	if (server.tiled_resize_node) {
-		node_t *node = server.tiled_resize_node;
+	if (server.tiled_resize.node) {
+		node_t *node = server.tiled_resize.node;
 		output_t *m = node->output;
 		desktop_t *d = node->desktop;
 
 		clear_resize_anchors(d);
-		server.tiled_resize_node = NULL;
-		server.tiled_resize_parent_vertical = NULL;
-		server.tiled_resize_parent_horizontal = NULL;
+		server.tiled_resize.node = NULL;
+		server.tiled_resize.parent_vertical = NULL;
+		server.tiled_resize.parent_horizontal = NULL;
 
 		if (m && d)
 			arrange(m, d, true);
@@ -91,11 +91,11 @@ static void reset_cursor_mode(void) {
 
 	server.cursor_mode = CURSOR_PASSTHROUGH;
 	server.grabbed_view = NULL;
-	server.tiled_resize_node = NULL;
-	server.tiled_resize_parent_vertical = NULL;
-	server.tiled_resize_parent_horizontal = NULL;
-	server.tiled_resize_initial_width = 0;
-	server.tiled_resize_initial_height = 0;
+	server.tiled_resize.node = NULL;
+	server.tiled_resize.parent_vertical = NULL;
+	server.tiled_resize.parent_horizontal = NULL;
+	server.tiled_resize.initial_width = 0;
+	server.tiled_resize.initial_height = 0;
 }
 
 void *desktop_type_at(double lx, double ly, struct wlr_surface **surface, double *sx, double *sy) {
@@ -290,7 +290,7 @@ static double max_d(double a, double b) {
 
 // process cursor motion for tiled window resizing
 static void process_cursor_tiled_resize(void) {
-	node_t *node = server.tiled_resize_node;
+	node_t *node = server.tiled_resize.node;
 	if (!node || !node->client)
 		return;
 
@@ -315,7 +315,7 @@ static void process_cursor_tiled_resize(void) {
 
 			// resolve against the width the drag started from instead of
 			// adding every motion delta again
-			double initial_width = server.tiled_resize_initial_width;
+			double initial_width = server.tiled_resize.initial_width;
 			if (!(initial_width > 0.0))
 				initial_width = s->columns[col].width.value;
 			s->columns[col].width.value = initial_width + delta_x / area_w;
@@ -332,11 +332,11 @@ static void process_cursor_tiled_resize(void) {
 	}
 
 	// handle horizontal resizing
-	if (server.tiled_resize_parent_vertical &&
+	if (server.tiled_resize.parent_vertical &&
 			(server.resize_edges & (WLR_EDGE_LEFT | WLR_EDGE_RIGHT))) {
-		node_t *parent = server.tiled_resize_parent_vertical;
+		node_t *parent = server.tiled_resize.parent_vertical;
 
-		double total_width = server.tiled_resize_initial_width;
+		double total_width = server.tiled_resize.initial_width;
 		if (total_width <= 0)
 			total_width = 1.0;
 
@@ -345,7 +345,7 @@ static void process_cursor_tiled_resize(void) {
 
 		// convert to ratio change
 		double ratio_delta = delta_x / total_width;
-		double new_ratio = server.tiled_resize_initial_ratio_v + ratio_delta;
+		double new_ratio = server.tiled_resize.initial_ratio_v + ratio_delta;
 
 		// clamp to valid range
 		if (new_ratio < RESIZE_RATIO_MIN)
@@ -357,10 +357,10 @@ static void process_cursor_tiled_resize(void) {
 	}
 
 	// handle vertical resizing
-	if (server.tiled_resize_parent_horizontal &&
+	if (server.tiled_resize.parent_horizontal &&
 			(server.resize_edges & (WLR_EDGE_TOP | WLR_EDGE_BOTTOM))) {
-		node_t *parent = server.tiled_resize_parent_horizontal;
-		double total_height = server.tiled_resize_initial_height;
+		node_t *parent = server.tiled_resize.parent_horizontal;
+		double total_height = server.tiled_resize.initial_height;
 		if (total_height <= 0)
 			total_height = 1.0;
 
@@ -369,7 +369,7 @@ static void process_cursor_tiled_resize(void) {
 
 		// convert to ratio change
 		double ratio_delta = delta_y / total_height;
-		double new_ratio = server.tiled_resize_initial_ratio_h + ratio_delta;
+		double new_ratio = server.tiled_resize.initial_ratio_h + ratio_delta;
 
 		// clamp to valid range
 		if (new_ratio < RESIZE_RATIO_MIN)
@@ -421,7 +421,7 @@ static void process_cursor_move(void) {
 
 static void process_cursor_resize(void) {
 	// handle tiled mode resize
-	if (server.tiled_resize_node) {
+	if (server.tiled_resize.node) {
 		process_cursor_tiled_resize();
 		return;
 	}
@@ -643,11 +643,11 @@ void view_begin_interactive(view_t *view, enum cursor_mode mode, uint32_t edges)
 	server.cursor_mode = mode;
 
 	// clear tiled resize state
-	server.tiled_resize_node = NULL;
-	server.tiled_resize_parent_vertical = NULL;
-	server.tiled_resize_parent_horizontal = NULL;
-	server.tiled_resize_initial_width = 0;
-	server.tiled_resize_initial_height = 0;
+	server.tiled_resize.node = NULL;
+	server.tiled_resize.parent_vertical = NULL;
+	server.tiled_resize.parent_horizontal = NULL;
+	server.tiled_resize.initial_width = 0;
+	server.tiled_resize.initial_height = 0;
 
 	if (mode == CURSOR_MOVE) {
 		if (view->node && view->node->client) {
@@ -657,32 +657,32 @@ void view_begin_interactive(view_t *view, enum cursor_mode mode, uint32_t edges)
 	} else if (mode == CURSOR_RESIZE) {
 		if (view->node && view->node->client && IS_TILED(view->node->client)) {
 			// init tiled resize state
-			server.tiled_resize_node = view->node;
-			server.tiled_resize_parent_vertical = find_vertical_ancestor(view->node);
-			server.tiled_resize_parent_horizontal = find_horizontal_ancestor(view->node);
+			server.tiled_resize.node = view->node;
+			server.tiled_resize.parent_vertical = find_vertical_ancestor(view->node);
+			server.tiled_resize.parent_horizontal = find_horizontal_ancestor(view->node);
 
 			// store initial ratios and split sizes
-			if (server.tiled_resize_parent_vertical) {
-				server.tiled_resize_initial_ratio_v = server.tiled_resize_parent_vertical->split_ratio;
-				server.tiled_resize_initial_width =
-					(double)server.tiled_resize_parent_vertical->rectangle.width;
+			if (server.tiled_resize.parent_vertical) {
+				server.tiled_resize.initial_ratio_v = server.tiled_resize.parent_vertical->split_ratio;
+				server.tiled_resize.initial_width =
+					(double)server.tiled_resize.parent_vertical->rectangle.width;
 			}
 
-			if (server.tiled_resize_parent_horizontal) {
-				server.tiled_resize_initial_ratio_h = server.tiled_resize_parent_horizontal->split_ratio;
-				server.tiled_resize_initial_height =
-					(double)server.tiled_resize_parent_horizontal->rectangle.height;
+			if (server.tiled_resize.parent_horizontal) {
+				server.tiled_resize.initial_ratio_h = server.tiled_resize.parent_horizontal->split_ratio;
+				server.tiled_resize.initial_height =
+					(double)server.tiled_resize.parent_horizontal->rectangle.height;
 			}
 
 			// remember which edge of every slot stays put for this drag
-			set_resize_anchors(view->node->desktop, server.tiled_resize_parent_vertical,
-				server.tiled_resize_parent_horizontal);
+			set_resize_anchors(view->node->desktop, server.tiled_resize.parent_vertical,
+				server.tiled_resize.parent_horizontal);
 
 			desktop_t *d = view->node->desktop;
 			if (d && d->layout == LAYOUT_SCROLLER && d->scroller_state) {
 				int col = find_scroller_column(d->scroller_state, view->node->client);
 				if (col >= 0)
-					server.tiled_resize_initial_width = d->scroller_state->columns[col].width.value;
+					server.tiled_resize.initial_width = d->scroller_state->columns[col].width.value;
 			}
 
 			// store grab position

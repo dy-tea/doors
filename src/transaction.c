@@ -153,9 +153,9 @@ static void transaction_add_node(transaction_t *txn, node_t *node, bool server_r
 }
 
 static bool node_in_manual_resize(node_t *node) {
-	if (server.tiled_resize_node == NULL || node == NULL || node->desktop == NULL)
+	if (server.tiled_resize.node == NULL || node == NULL || node->desktop == NULL)
 		return false;
-	if (node->desktop != server.tiled_resize_node->desktop)
+	if (node->desktop != server.tiled_resize.node->desktop)
 		return false;
 	if (node->client == NULL || !IS_TILED(node->client))
 		return false;

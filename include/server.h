@@ -211,13 +211,13 @@ typedef struct server_t {
 	bool focus_from_click;
 
 	// tiled resize state
-	struct node_t *tiled_resize_node;
-	struct node_t *tiled_resize_parent_vertical;
-	struct node_t *tiled_resize_parent_horizontal;
-	double tiled_resize_initial_ratio_v;
-	double tiled_resize_initial_ratio_h;
-	double tiled_resize_initial_width;
-	double tiled_resize_initial_height;
+	struct {
+		node_t *node;
+		node_t *parent_vertical;
+		node_t *parent_horizontal;
+		double initial_ratio_v, initial_ratio_h;
+		double initial_width, initial_height;
+	} tiled_resize;
 
 	// tiling drag state
 	struct node_t *tiling_drag_node;

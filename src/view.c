@@ -538,7 +538,7 @@ void view_center_and_clip_surface(view_t *view) {
 	if (tiled && container_rect) {
 		view_resolve_tiled_layout(view, *container_rect, &content_offset, &border_size, &border_offset);
 
-		if (!server.tiled_resize_node) {
+		if (!server.tiled_resize.node) {
 			if (view->geometry.width == container_rect->width)
 				view->content_anchor_x = 0;
 			if (view->geometry.height == container_rect->height)
