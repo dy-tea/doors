@@ -467,6 +467,50 @@ void view_resolve_content_layout(view_t *view, struct wlr_box container,
 		};
 }
 
+void view_resolve_tiled_layout(view_t *view, struct wlr_box container,
+		struct wlr_box *content_offset, struct wlr_box *border_size, struct wlr_box *border_offset) {
+	int cw = container.width > 0 ? container.width : 0;
+	int ch = container.height > 0 ? container.height : 0;
+	int gw = view->geometry.width > 0 ? view->geometry.width : 0;
+	int gh = view->geometry.height > 0 ? view->geometry.height : 0;
+	int ox = 0, oy = 0;
+
+	if (gw > 0 && cw > 0) {
+		if (view->content_anchor_x < 0)
+			ox = 0;
+		else if (view->content_anchor_x > 0)
+			ox = cw - gw;
+		else if (gw < cw)
+			ox = (cw - gw) / 2;
+	}
+	if (gh > 0 && ch > 0) {
+		if (view->content_anchor_y < 0)
+			oy = 0;
+		else if (view->content_anchor_y > 0)
+			oy = ch - gh;
+		else if (gh < ch)
+			oy = (ch - gh) / 2;
+	}
+
+	if (content_offset)
+		*content_offset = (struct wlr_box){
+			.x = ox,
+			.y = oy
+		};
+	if (border_size)
+		*border_size = (struct wlr_box){
+			.x = 0,
+			.y = 0,
+			.width = (gw > 0 && gw < cw) ? gw : cw,
+			.height = (gh > 0 && gh < ch) ? gh : ch,
+		};
+	if (border_offset)
+		*border_offset = (struct wlr_box){
+			.x = ox < 0 ? 0 : ox,
+			.y = oy < 0 ? 0 : oy
+		};
+}
+
 void view_center_and_clip_surface(view_t *view) {
 	if (!view || !view->content_tree || !view->client)
 		return;
@@ -489,8 +533,25 @@ void view_center_and_clip_surface(view_t *view) {
 	int bw = effective_border_width(view->node->desktop);
 	struct wlr_box content_offset = {0};
 	struct wlr_box border_size = {0};
-	if (container_rect)
-		view_resolve_content_layout(view, *container_rect, &content_offset, &border_size);
+	struct wlr_box border_offset = {0};
+
+	if (tiled && container_rect) {
+		view_resolve_tiled_layout(view, *container_rect, &content_offset, &border_size, &border_offset);
+
+		if (!server.tiled_resize_node) {
+			if (view->geometry.width == container_rect->width)
+				view->content_anchor_x = 0;
+			if (view->geometry.height == container_rect->height)
+				view->content_anchor_y = 0;
+		}
+	} else {
+		view->content_anchor_x = 0;
+		view->content_anchor_y = 0;
+		if (container_rect) {
+			view_resolve_content_layout(view, *container_rect, &content_offset, &border_size);
+			border_offset = content_offset;
+		}
+	}
 
 	int x = content_offset.x;
 	int y = content_offset.y;
@@ -508,7 +569,8 @@ void view_center_and_clip_surface(view_t *view) {
 	// border wraps the actual surface instead of the full allocated space
 	if ((tiled || floating) && view->border_tree) {
 		if (bw > 0) {
-			update_borders(view->border_tree, view->border_rects, border_size, (unsigned int)bw, x, y);
+			update_borders(view->border_tree, view->border_rects, border_size, (unsigned int)bw,
+				border_offset.x, border_offset.y);
 			update_border_colors(c);
 			if (view->rounded && (view->rounded->border_shader_node || c->border_radius > 0.0f ||
 					view->rounded->gradient_count >= 2)) {
@@ -524,22 +586,30 @@ void view_center_and_clip_surface(view_t *view) {
 	}
 
 	if (!wl_list_empty(&view->content_tree->children) && container_rect) {
+		int clip_x = view->geometry.x;
+		int clip_y = view->geometry.y;
 		int clip_w = container_rect->width;
 		int clip_h = container_rect->height;
 		if (tiled && view->geometry.width > 0 && view->geometry.height > 0) {
-			if ((int)view->geometry.width < container_rect->width)
-				clip_w = view->geometry.width;
-			else if ((int)view->geometry.width > container_rect->width)
+			if (x < 0) {
+				clip_x -= x;
 				clip_w = container_rect->width;
-			if ((int)view->geometry.height < container_rect->height)
-				clip_h = view->geometry.height;
-			else if ((int)view->geometry.height > container_rect->height)
+			} else {
+				clip_w = (int)view->geometry.width < container_rect->width ? view->geometry.width :
+					container_rect->width;
+			}
+			if (y < 0) {
+				clip_y -= y;
 				clip_h = container_rect->height;
+			} else {
+				clip_h = (int)view->geometry.height < container_rect->height ? view->geometry.height :
+					container_rect->height;
+			}
 		}
 
 		struct wlr_box clip = {
-			.x = view->geometry.x,
-			.y = view->geometry.y,
+			.x = clip_x,
+			.y = clip_y,
 			.width = clip_w,
 			.height = clip_h
 		};

@@ -1921,22 +1921,42 @@ static be_effect_resource_t capture_corner_mask_bg(output_t *output, effects_out
 	return result;
 }
 
-// window rect in layout coords including the content offset and clamped to the
-// surface size when it is smaller than its container
 static struct wlr_box corner_mask_content_rect(view_t *tl) {
 	struct wlr_box container_r = get_animated_client_rect(tl);
-	int cx = tl->content_tree->node.x;
-	int cy = tl->content_tree->node.y;
-	int surf_w = (tl->geometry.width > 0 &&
-		tl->geometry.width < container_r.width) ? (int)tl->geometry.width : container_r.width;
-	int surf_h = (tl->geometry.height > 0 &&
-		tl->geometry.height < container_r.height) ? (int)tl->geometry.height : container_r.height;
+	struct wlr_box content_offset = {0};
+	struct wlr_box border_size = {0};
+	struct wlr_box border_offset = {0};
+
+	if (IS_TILED(tl->node->client))
+		view_resolve_tiled_layout(tl, container_r, NULL, &border_size, &border_offset);
+	else {
+		view_resolve_content_layout(tl, container_r, &content_offset, &border_size);
+		border_offset = content_offset;
+	}
+
+	// a resize animation owns the border geometry while it runs
+	struct wlr_box anim_offset = {0};
+	struct wlr_box anim_size = {0};
+	if (animation_get_resize_border(tl, &anim_offset, &anim_size)) {
+		border_offset = anim_offset;
+		border_size = anim_size;
+	}
+
 	return (struct wlr_box){
-		.x = container_r.x + cx,
-		.y = container_r.y + cy,
-		.width = surf_w,
-		.height = surf_h,
+		.x = container_r.x + border_offset.x,
+		.y = container_r.y + border_offset.y,
+		.width = border_size.width,
+		.height = border_size.height,
 	};
+}
+
+static void corner_mask_node_offset(view_t *tl, output_t *output, struct wlr_box content_r,
+		int *node_ox, int *node_oy) {
+	struct wlr_box container_r = get_animated_client_rect(tl);
+	int visible_x = content_r.x < output->lx ? output->lx : content_r.x;
+	int visible_y = content_r.y < output->ly ? output->ly : content_r.y;
+	*node_ox = visible_x - container_r.x;
+	*node_oy = visible_y - container_r.y;
 }
 
 static bool rebuild_corner_masks(output_t *output) {
@@ -2004,6 +2024,7 @@ static bool rebuild_corner_masks(output_t *output) {
 		effects_backend->blit(src, cm_target, w, h, NULL, 0);
 		effects_backend->apply_corner_mask(&ctx->be_state, cm_target, src, &params);
 
+		tl->rounded->corner_mask_rect = content_r;
 		tl->rounded->corner_mask_dirty = false;
 		any = true;
 	}
@@ -2029,10 +2050,8 @@ static void push_corner_masks_to_toplevels(output_t *output, bool rebuilt) {
 
 		if (!rebuilt) {
 			struct wlr_box content_r = corner_mask_content_rect(tl);
-			int node_ox = (content_r.x < output->lx) ? (output->lx - content_r.x) : 0;
-			int node_oy = (content_r.y < output->ly) ? (output->ly - content_r.y) : 0;
-			node_ox += (int)tl->content_tree->node.x;
-			node_oy += (int)tl->content_tree->node.y;
+			int node_ox, node_oy;
+			corner_mask_node_offset(tl, output, content_r, &node_ox, &node_oy);
 			if (tl->rounded->corner_mask_node->node.x != node_ox ||
 					tl->rounded->corner_mask_node->node.y != node_oy) {
 				tl->rounded->corner_mask_dirty = true;
@@ -2056,10 +2075,8 @@ static void push_corner_masks_to_toplevels(output_t *output, bool rebuilt) {
 			continue;
 		}
 
-		int node_ox = (content_r.x < output->lx) ? (output->lx - content_r.x) : 0;
-		int node_oy = (content_r.y < output->ly) ? (output->ly - content_r.y) : 0;
-		node_ox += (int)tl->content_tree->node.x;
-		node_oy += (int)tl->content_tree->node.y;
+		int node_ox, node_oy;
+		corner_mask_node_offset(tl, output, content_r, &node_ox, &node_oy);
 
 		if (!tl->rounded->corner_mask_node->node.enabled)
 			wlr_scene_node_set_enabled(&tl->rounded->corner_mask_node->node, true);
@@ -2427,6 +2444,17 @@ void effects_output_frame(output_t *output, struct wlr_scene_output *scene_outpu
 				any_cm = true;
 				if (tl->rounded->corner_mask_dirty)
 					any_cm_dirty = true;
+
+				if (!any_cm_dirty && tl->node->client->flags.shown) {
+					struct wlr_box mask_r = corner_mask_content_rect(tl);
+					if (mask_r.width > 0 && mask_r.height > 0 && (mask_r.x != tl->rounded->corner_mask_rect.x ||
+							mask_r.y != tl->rounded->corner_mask_rect.y ||
+							mask_r.width != tl->rounded->corner_mask_rect.width ||
+							mask_r.height != tl->rounded->corner_mask_rect.height)) {
+						tl->rounded->corner_mask_dirty = true;
+						any_cm_dirty = true;
+					}
+				}
 			}
 		}
 	}
@@ -2640,18 +2668,24 @@ after_capture:
 			struct wlr_box container = get_animated_client_rect(tl);
 			struct wlr_box content_offset = {0};
 			struct wlr_box border_size = {0};
-			view_resolve_content_layout(tl, container, &content_offset, &border_size);
+			struct wlr_box border_offset = {0};
+			if (IS_TILED(c))
+				view_resolve_tiled_layout(tl, container, NULL, &border_size, &border_offset);
+			else {
+				view_resolve_content_layout(tl, container, &content_offset, &border_size);
+				border_offset = content_offset;
+			}
 
 			struct wlr_box anim_offset = {0};
 			struct wlr_box anim_size = {0};
 			if (animation_get_resize_border(tl, &anim_offset, &anim_size)) {
-				content_offset = anim_offset;
+				border_offset = anim_offset;
 				border_size = anim_size;
 			}
 
 			struct wlr_box content = {
-				.x = container.x + content_offset.x,
-				.y = container.y + content_offset.y,
+				.x = container.x + border_offset.x,
+				.y = container.y + border_offset.y,
 				.width = border_size.width,
 				.height = border_size.height,
 			};

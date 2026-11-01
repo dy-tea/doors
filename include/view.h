@@ -49,6 +49,9 @@ struct view_t {
 	struct wlr_box geometry;
 	struct wlr_box last_requested;
 
+	// -1 = start, 0 = center, 1 = end
+	int content_anchor_x, content_anchor_y;
+
 	bool mapped, configured, wants_fade;
 	int max_render_time;
 
@@ -74,6 +77,9 @@ view_t *view_from_wlr_surface(struct wlr_surface *surface);
 
 void view_resolve_content_layout(view_t *view, struct wlr_box container,
 	struct wlr_box *content_offset, struct wlr_box *border_size);
+
+void view_resolve_tiled_layout(view_t *view, struct wlr_box container,
+	struct wlr_box *content_offset, struct wlr_box *border_size, struct wlr_box *border_offset);
 
 void view_center_and_clip_surface(view_t *view);
 bool view_get_surface_offset(view_t *view, int *ox, int *oy);

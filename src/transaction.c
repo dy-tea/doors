@@ -152,17 +152,30 @@ static void transaction_add_node(transaction_t *txn, node_t *node, bool server_r
 	wl_list_insert(&txn->instructions, &instruction->link);
 }
 
+static bool node_in_manual_resize(node_t *node) {
+	if (server.tiled_resize_node == NULL || node == NULL || node->desktop == NULL)
+		return false;
+	if (node->desktop != server.tiled_resize_node->desktop)
+		return false;
+	if (node->client == NULL || !IS_TILED(node->client))
+		return false;
+	return node->pending.rectangle.width > 0 && node->pending.rectangle.height > 0;
+}
+
 static void copy_node_current_state(node_t *node, transaction_inst_t *instruction) {
 	if (!node || !instruction)
 		return;
 
-	node->current.rectangle = instruction->rectangle;
-	node->current.split_ratio = instruction->split_ratio;
-	node->current.split_type = instruction->split_type;
-	node->current.hidden = instruction->hidden;
-	node->rectangle = instruction->rectangle;
-	node->split_ratio = instruction->split_ratio;
-	node->split_type = instruction->split_type;
+	bool manual_resize = node_in_manual_resize(node);
+
+	node->current.rectangle = manual_resize ? node->pending.rectangle : instruction->rectangle;
+	node->current.split_ratio = manual_resize ? node->pending.split_ratio : instruction->split_ratio;
+	node->current.split_type = manual_resize ? node->pending.split_type :
+		(split_type_t)instruction->split_type;
+	node->current.hidden = manual_resize ? node->pending.hidden : instruction->hidden;
+	node->rectangle = node->current.rectangle;
+	node->split_ratio = node->current.split_ratio;
+	node->split_type = node->current.split_type;
 
 	if (!node->client) {
 		wlr_log(WLR_DEBUG, "Skipping state copy for node %u - client is NULL", node->id);
@@ -175,9 +188,10 @@ static void copy_node_current_state(node_t *node, transaction_inst_t *instructio
 	}
 
 	node->client->state = instruction->state;
-	node->client->tiled_rectangle = instruction->tiled_rectangle;
+	node->client->tiled_rectangle = manual_resize ? node->client->arranged_rectangle :
+		instruction->tiled_rectangle;
 	node->client->floating_rectangle = instruction->floating_rectangle;
-	node->client->committed_tiled_rectangle = instruction->tiled_rectangle;
+	node->client->committed_tiled_rectangle = node->client->tiled_rectangle;
 	instruction->applied = true;
 }
 
@@ -204,6 +218,8 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 	if (!ready)
 		return;
 
+	bool manual_resize = node_in_manual_resize(node);
+
 	struct wlr_box *rect;
 	if (instruction->state == STATE_FULLSCREEN) {
 		output_t *m = node->output;
@@ -214,6 +230,8 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 			return;
 	} else if (instruction->state == STATE_FLOATING)
 		rect = &instruction->floating_rectangle;
+	else if (manual_resize)
+		rect = &node->client->arranged_rectangle;
 	else
 		rect = &instruction->tiled_rectangle;
 
@@ -274,9 +292,8 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 		instruction->previous_tiled_rectangle.height != rect->height))))
 		effects_dirty_corner_masks(node->output);
 
-	// attempt resize animation for size changes
 	bool snapshot_resize = false;
-	if (node->client->view && instruction->previous_tiled_rectangle.width > 0 &&
+	if (!manual_resize && node->client->view && instruction->previous_tiled_rectangle.width > 0 &&
 			instruction->previous_tiled_rectangle.height > 0 &&
 			(instruction->previous_tiled_rectangle.width != rect->width ||
 			instruction->previous_tiled_rectangle.height != rect->height)) {
@@ -303,6 +320,9 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 			node->client->view->wants_fade = false;
 			wlr_scene_node_set_position(&scene_tree->node, rect->x, rect->y);
 			animation_fade_in(node->client->view);
+		} else if (manual_resize) {
+			animation_cancel_node(node);
+			wlr_scene_node_set_position(&scene_tree->node, rect->x, rect->y);
 		} else if (instruction->previous_tiled_rectangle.width > 0 &&
 				instruction->previous_tiled_rectangle.height > 0) {
 			animation_apply_geometry_from(node, scene_tree, instruction->previous_tiled_rectangle, *rect,
@@ -444,6 +464,9 @@ static bool should_configure(node_t *node, transaction_inst_t *instruction) {
 		wlr_log(WLR_DEBUG, "Node %u is a new window and needs a configure", node->id);
 		return true;
 	}
+
+	if (node_in_manual_resize(node))
+		return false;
 
 	// determine target size based on state
 	struct wlr_box target_rect;

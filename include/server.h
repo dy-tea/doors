@@ -216,6 +216,8 @@ typedef struct server_t {
 	struct node_t *tiled_resize_parent_horizontal;
 	double tiled_resize_initial_ratio_v;
 	double tiled_resize_initial_ratio_h;
+	double tiled_resize_initial_width;
+	double tiled_resize_initial_height;
 
 	// tiling drag state
 	struct node_t *tiling_drag_node;

@@ -1,3 +1,4 @@
+#include "animation.h"
 #include "config.h"
 #include "effects/effects.h"
 #include "input/cursor.h"
@@ -63,11 +64,29 @@ static uint32_t get_time_ms(void) {
 	return (uint32_t)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
 }
 
+static void clear_resize_anchors(desktop_t *d);
+
 static void reset_cursor_mode(void) {
 	if (server.tiled_resize_node) {
 		node_t *node = server.tiled_resize_node;
-		if (node->output && node->desktop)
-			arrange(node->output, node->desktop, true);
+		output_t *m = node->output;
+		desktop_t *d = node->desktop;
+
+		clear_resize_anchors(d);
+		server.tiled_resize_node = NULL;
+		server.tiled_resize_parent_vertical = NULL;
+		server.tiled_resize_parent_horizontal = NULL;
+
+		if (m && d)
+			arrange(m, d, true);
+
+		if (d) {
+			FOR_EACH_LEAF(n, d->root) {
+				if (!n->client || !n->client->view || !IS_TILED(n->client))
+					continue;
+				view_center_and_clip_surface(n->client->view);
+			}
+		}
 	}
 
 	server.cursor_mode = CURSOR_PASSTHROUGH;
@@ -75,6 +94,8 @@ static void reset_cursor_mode(void) {
 	server.tiled_resize_node = NULL;
 	server.tiled_resize_parent_vertical = NULL;
 	server.tiled_resize_parent_horizontal = NULL;
+	server.tiled_resize_initial_width = 0;
+	server.tiled_resize_initial_height = 0;
 }
 
 void *desktop_type_at(double lx, double ly, struct wlr_surface **surface, double *sx, double *sy) {
@@ -157,45 +178,94 @@ static void apply_leaf_positions(desktop_t *d) {
 		return;
 
 	FOR_EACH_LEAF(n, d->root) {
-		if (!n->client)
+		client_t *c = n->client;
+		if (!c || !c->view || !IS_TILED(c) || node_is_invisible(n))
 			continue;
 
-		struct wlr_box r = n->client->arranged_rectangle;
+		struct wlr_box r = c->arranged_rectangle;
 		if (r.width < 1 || r.height < 1)
 			continue;
 
-		struct wlr_scene_tree *st = client_get_scene_tree(n->client);
-		if (!st)
-			continue;
+		view_t *tl = c->view;
 
-		if (st->node.x != r.x || st->node.y != r.y) {
+		animation_cancel_node(n);
+		if (tl->saved_surface_tree)
+			view_remove_saved_buffer(tl);
+
+		struct wlr_scene_tree *st = client_get_scene_tree(c);
+		if (st && (st->node.x != r.x || st->node.y != r.y)) {
 			wlr_scene_node_set_position(&st->node, r.x, r.y);
 			if (n->output)
 				effects_dirty_corner_masks(n->output);
 		}
 
-		view_t *tl = n->client ? n->client->view : NULL;
-		if (tl)
-			view_configure(tl, r);
+		c->tiled_rectangle = r;
+		c->committed_tiled_rectangle = r;
 
-		unsigned int bw = effective_border_width(d);
-		if (bw != 0) {
-			struct wlr_box geo = {
-				0,
-				0,
-				r.width,
-				r.height
-			};
-			update_borders(client_border_tree(n->client), client_border_rects(n->client), geo, bw, 0, 0);
-			update_border_colors(n->client);
-			if (n->client->border_radius > 0.0f) {
-				surface_rounded_t *rounded = client_get_rounded(n->client);
-				if (rounded) {
-					rounded_mark_border_size(rounded, r.width, r.height, (int)bw,
-						n->client->view && n->client->view->node &&
-						n->client->view->node->output ? n->client->view->node->output->wlr_output->scale : 1.0f);
-				}
-			}
+		bool size_changed = r.width != tl->last_requested.width || r.height != tl->last_requested.height;
+		bool pos_changed = r.x != tl->last_requested.x || r.y != tl->last_requested.y;
+
+		if (size_changed || (pos_changed && view_to_xwayland(tl))) {
+			view_configure(tl, r);
+			tl->last_requested = r;
+		}
+
+		view_center_and_clip_surface(tl);
+	}
+}
+
+// edge of a leaf's slot that doesn't move when ancestor is resized
+static int leaf_resize_anchor(node_t *leaf, node_t *ancestor) {
+	if (!ancestor)
+		return 0;
+
+	node_t *child = leaf;
+	while (child && child->parent != ancestor)
+		child = child->parent;
+
+	if (!child)
+		return 0;
+
+	return child == ancestor->first_child ? -1 : 1;
+}
+
+static void clear_resize_anchors(desktop_t *d) {
+	if (!d || !d->root)
+		return;
+
+	FOR_EACH_LEAF(n, d->root) {
+		if (!n->client || !n->client->view)
+			continue;
+		n->client->view->content_anchor_x = 0;
+		n->client->view->content_anchor_y = 0;
+	}
+}
+
+static void set_resize_anchors(desktop_t *d, node_t *v_ancestor, node_t *h_ancestor) {
+	if (!d || !d->root)
+		return;
+
+	bool scroller = d->layout == LAYOUT_SCROLLER;
+
+	FOR_EACH_LEAF(n, d->root) {
+		if (!n->client || !n->client->view || !IS_TILED(n->client))
+			continue;
+
+		client_t *c = n->client;
+
+		// only pin a window that already fills its slot
+		bool fills_x = c->view->geometry.width <= 0 ||
+			c->view->geometry.width + 2 >= c->arranged_rectangle.width;
+		bool fills_y = c->view->geometry.height <= 0 ||
+			c->view->geometry.height + 2 >= c->arranged_rectangle.height;
+
+		if (scroller) {
+			// column only grows or shrinks on its trailing edge
+			c->view->content_anchor_x = fills_x ? -1 : 0;
+			c->view->content_anchor_y = 0;
+		} else {
+			c->view->content_anchor_x = fills_x ? leaf_resize_anchor(n, v_ancestor) : 0;
+			c->view->content_anchor_y = fills_y ? leaf_resize_anchor(n, h_ancestor) : 0;
 		}
 	}
 }
@@ -242,7 +312,13 @@ static void process_cursor_tiled_resize(void) {
 
 		if (server.resize_edges & (WLR_EDGE_LEFT | WLR_EDGE_RIGHT)) {
 			double area_w = max_d(1.0, (double)s->working_area.width);
-			s->columns[col].width.value += delta_x / area_w;
+
+			// resolve against the width the drag started from instead of
+			// adding every motion delta again
+			double initial_width = server.tiled_resize_initial_width;
+			if (!(initial_width > 0.0))
+				initial_width = s->columns[col].width.value;
+			s->columns[col].width.value = initial_width + delta_x / area_w;
 			if (s->columns[col].width.value < 0.1)
 				s->columns[col].width.value = 0.1;
 			if (s->columns[col].width.value > 1.0)
@@ -259,8 +335,8 @@ static void process_cursor_tiled_resize(void) {
 	if (server.tiled_resize_parent_vertical &&
 			(server.resize_edges & (WLR_EDGE_LEFT | WLR_EDGE_RIGHT))) {
 		node_t *parent = server.tiled_resize_parent_vertical;
-		double total_width = (double)parent->rectangle.width;
 
+		double total_width = server.tiled_resize_initial_width;
 		if (total_width <= 0)
 			total_width = 1.0;
 
@@ -284,8 +360,7 @@ static void process_cursor_tiled_resize(void) {
 	if (server.tiled_resize_parent_horizontal &&
 			(server.resize_edges & (WLR_EDGE_TOP | WLR_EDGE_BOTTOM))) {
 		node_t *parent = server.tiled_resize_parent_horizontal;
-		double total_height = (double)parent->rectangle.height;
-
+		double total_height = server.tiled_resize_initial_height;
 		if (total_height <= 0)
 			total_height = 1.0;
 
@@ -571,6 +646,8 @@ void view_begin_interactive(view_t *view, enum cursor_mode mode, uint32_t edges)
 	server.tiled_resize_node = NULL;
 	server.tiled_resize_parent_vertical = NULL;
 	server.tiled_resize_parent_horizontal = NULL;
+	server.tiled_resize_initial_width = 0;
+	server.tiled_resize_initial_height = 0;
 
 	if (mode == CURSOR_MOVE) {
 		if (view->node && view->node->client) {
@@ -584,12 +661,29 @@ void view_begin_interactive(view_t *view, enum cursor_mode mode, uint32_t edges)
 			server.tiled_resize_parent_vertical = find_vertical_ancestor(view->node);
 			server.tiled_resize_parent_horizontal = find_horizontal_ancestor(view->node);
 
-			// store initial ratios
-			if (server.tiled_resize_parent_vertical)
+			// store initial ratios and split sizes
+			if (server.tiled_resize_parent_vertical) {
 				server.tiled_resize_initial_ratio_v = server.tiled_resize_parent_vertical->split_ratio;
+				server.tiled_resize_initial_width =
+					(double)server.tiled_resize_parent_vertical->rectangle.width;
+			}
 
-			if (server.tiled_resize_parent_horizontal)
+			if (server.tiled_resize_parent_horizontal) {
 				server.tiled_resize_initial_ratio_h = server.tiled_resize_parent_horizontal->split_ratio;
+				server.tiled_resize_initial_height =
+					(double)server.tiled_resize_parent_horizontal->rectangle.height;
+			}
+
+			// remember which edge of every slot stays put for this drag
+			set_resize_anchors(view->node->desktop, server.tiled_resize_parent_vertical,
+				server.tiled_resize_parent_horizontal);
+
+			desktop_t *d = view->node->desktop;
+			if (d && d->layout == LAYOUT_SCROLLER && d->scroller_state) {
+				int col = find_scroller_column(d->scroller_state, view->node->client);
+				if (col >= 0)
+					server.tiled_resize_initial_width = d->scroller_state->columns[col].width.value;
+			}
 
 			// store grab position
 			server.grab_x = server.cursor->x;
