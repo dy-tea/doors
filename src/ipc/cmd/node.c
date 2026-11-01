@@ -102,15 +102,6 @@ static const str_pair_t direction_values[] = {
 	IPC_ENUM_END,
 };
 
-static const str_pair_t circulate_values[] = {
-	{"forward", 1},
-	{"f", 1},
-	{"backward", -1},
-	{"back", -1},
-	{"b", -1},
-	IPC_ENUM_END,
-};
-
 // look up a node on the focused desktop by its reported id
 static node_t *find_node_by_id(ipc_args_t *a, desktop_t *desk, const char *what) {
 	const char *arg;
@@ -786,25 +777,6 @@ static void node_ratio(ipc_args_t *a) {
 	ipc_ok(a, "Ratio changed\n");
 }
 
-static void node_circulate(ipc_args_t *a) {
-	long value;
-	if (!ipc_enum(a, "direction", circulate_values, &value))
-		return;
-
-	output_t *m;
-	node_t *n = ipc_focused(a, &m);
-	if (!n)
-		return;
-
-	node_t *next = value > 0 ? next_leaf(n, m->desk->root) : prev_leaf(n, m->desk->root);
-	if (next) {
-		m->desk->focus = next;
-		focus_node(m, m->desk, next);
-	}
-
-	ipc_ok(a, "Circulated\n");
-}
-
 static void node_insert_receptacle(ipc_args_t *a) {
 	output_t *m = server.focused_output;
 	if (!m || !m->desk) {
@@ -864,13 +836,9 @@ static void node_presel_dir(ipc_args_t *a) {
 		return;
 
 	output_t *m;
-	node_t *n = ipc_focused(a, &m);
+	node_t *n = ipc_focused_nonvacant(a, &m);
 	if (!n)
 		return;
-	if (n->vacant) {
-		ipc_fail(a, "Focused node is a receptacle\n");
-		return;
-	}
 
 	if (streq(arg, "cancel")) {
 		free(n->presel);
@@ -886,32 +854,6 @@ static void node_presel_dir(ipc_args_t *a) {
 	presel_dir(n, (direction_t)dir);
 	transaction_commit_dirty();
 	ipc_ok(a, "Presel set\n");
-}
-
-static void node_presel_ratio(ipc_args_t *a) {
-	double rat;
-	if (!ipc_double(a, "ratio", 0, 1, &rat))
-		return;
-	if (rat <= 0 || rat >= 1) {
-		ipc_fail(a, "Ratio must be between 0 and 1\n");
-		return;
-	}
-
-	output_t *m;
-	node_t *n = ipc_focused(a, &m);
-	if (!n)
-		return;
-	if (n->vacant) {
-		ipc_fail(a, "Focused node is a receptacle\n");
-		return;
-	}
-
-	if (!n->presel)
-		n->presel = make_presel();
-	n->presel->split_ratio = rat;
-
-	transaction_commit_dirty();
-	ipc_ok(a, "Presel ratio set\n");
 }
 
 static void node_swap(ipc_args_t *a) {
@@ -953,10 +895,10 @@ const ipc_sub_t node_subs[] = {
 	IPC_SUB("-y", "--type", "node -y | --type [tabbed|horizontal|vertical|next_tab|prev_tab]",
 		node_type),
 	IPC_SUB("-r", "--ratio", "node -r | --ratio [+|-]<ratio|px>", node_ratio),
-	IPC_SUB("-C", "--circulate", "node -C | --circulate <forward|backward>", node_circulate),
+	IPC_SUB("-C", "--circulate", "node -C | --circulate <forward|backward>", ipc_circulate),
 	IPC_SUB("-i", "--insert-receptacle", "node -i | --insert-receptacle", node_insert_receptacle),
 	IPC_SUB("-p", "--presel-dir", "node -p | --presel-dir <direction|cancel>", node_presel_dir),
-	IPC_SUB("-o", "--presel-ratio", "node -o | --presel-ratio <ratio>", node_presel_ratio),
+	IPC_SUB("-o", "--presel-ratio", "node -o | --presel-ratio <ratio>", ipc_presel_ratio),
 	IPC_SUB("-s", "--swap", "node -s | --swap <id>", node_swap),
 	IPC_SUB_END,
 };

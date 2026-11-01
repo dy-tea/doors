@@ -1,16 +1,12 @@
 #include "ipc/helpers.h"
-#include "ipc/helpers.h"
-#include "protocol/workspace.h"
 #include "protocol/workspace.h"
 #include "server.h"
-#include "server.h"
-#include <stdbool.h>
+#include "transaction.h"
+#include "tree.h"
+#include "tree_focus.h"
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <stdlib.h>
-#include <string.h>
 #include <string.h>
 
 // parse a hex-digit character, invalid ends up as 0
@@ -115,6 +111,18 @@ node_t *ipc_focused(ipc_args_t *a, output_t **out) {
 	return n;
 }
 
+// like ipc_focused(), but a receptacle has no client to act on
+node_t *ipc_focused_nonvacant(ipc_args_t *a, output_t **out) {
+	node_t *n = ipc_focused(a, out);
+	if (!n)
+		return NULL;
+	if (n->vacant) {
+		ipc_fail(a, "Focused node is a receptacle\n");
+		return NULL;
+	}
+	return n;
+}
+
 desktop_t *ipc_focused_desk(ipc_args_t *a, output_t **out) {
 	output_t *m = server.focused_output;
 	desktop_t *d = m ? m->desk : NULL;
@@ -141,4 +149,56 @@ desktop_t *ipc_desktop_by_name(ipc_args_t *a, const char *name) {
 	if (!d)
 		ipc_fail(a, "Desktop \"%s\" not found\n", name);
 	return d;
+}
+
+// shared by "node -o" and "tree presel_ratio"
+void ipc_presel_ratio(ipc_args_t *a) {
+	double rat;
+	if (!ipc_double(a, "ratio", 0, 1, &rat))
+		return;
+	if (rat <= 0 || rat >= 1) {
+		ipc_fail(a, "Ratio must be between 0 and 1\n");
+		return;
+	}
+
+	output_t *m;
+	node_t *n = ipc_focused_nonvacant(a, &m);
+	if (!n)
+		return;
+
+	if (!n->presel)
+		n->presel = make_presel();
+	n->presel->split_ratio = rat;
+
+	transaction_commit_dirty();
+	ipc_ok(a, "Presel ratio set\n");
+}
+
+static const str_pair_t circulate_values[] = {
+	{"forward", 1},
+	{"f", 1},
+	{"backward", -1},
+	{"back", -1},
+	{"b", -1},
+	IPC_ENUM_END,
+};
+
+// shared by "node -C" and "tree circulate"
+void ipc_circulate(ipc_args_t *a) {
+	long value;
+	if (!ipc_enum(a, "direction", circulate_values, &value))
+		return;
+
+	output_t *m;
+	node_t *n = ipc_focused(a, &m);
+	if (!n)
+		return;
+
+	node_t *next = value > 0 ? next_leaf(n, m->desk->root) : prev_leaf(n, m->desk->root);
+	if (next) {
+		m->desk->focus = next;
+		focus_node(m, m->desk, next);
+	}
+
+	ipc_ok(a, "Circulated\n");
 }

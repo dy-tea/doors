@@ -95,68 +95,14 @@ static void tree_presel(ipc_args_t *a) {
 	ipc_ok(a, "Presel set\n");
 }
 
-static void tree_presel_ratio(ipc_args_t *a) {
-	double rat;
-	if (!ipc_double(a, "ratio", 0, 1, &rat))
-		return;
-	if (rat <= 0 || rat >= 1) {
-		ipc_fail(a, "Ratio must be between 0 and 1\n");
-		return;
-	}
-
-	output_t *m;
-	node_t *n = ipc_focused(a, &m);
-	if (!n)
-		return;
-	if (n->vacant) {
-		ipc_fail(a, "Focused node is a receptacle\n");
-		return;
-	}
-
-	if (!n->presel)
-		n->presel = make_presel();
-	n->presel->split_ratio = rat;
-
-	transaction_commit_dirty();
-	ipc_ok(a, "Presel ratio set\n");
-}
-
-static const str_pair_t circulate_values[] = {
-	{"forward", 1},
-	{"f", 1},
-	{"backward", -1},
-	{"back", -1},
-	{"b", -1},
-	IPC_ENUM_END,
-};
-
-static void tree_circulate(ipc_args_t *a) {
-	long value;
-	if (!ipc_enum(a, "direction", circulate_values, &value))
-		return;
-
-	output_t *m;
-	node_t *n = ipc_focused(a, &m);
-	if (!n)
-		return;
-
-	node_t *next = value > 0 ? next_leaf(n, m->desk->root) : prev_leaf(n, m->desk->root);
-	if (next) {
-		m->desk->focus = next;
-		focus_node(m, m->desk, next);
-	}
-
-	ipc_ok(a, "Circulated\n");
-}
-
 const ipc_sub_t tree_subs[] = {
 	IPC_SUB("balance", NULL, "tree balance", tree_balance),
 	IPC_SUB("equalize", NULL, "tree equalize", tree_equalize),
 	IPC_SUB("rotate", NULL, "tree rotate <clockwise|counterclockwise>", tree_rotate),
 	IPC_SUB("flip", NULL, "tree flip <horizontal|vertical>", tree_flip),
 	IPC_SUB("presel", NULL, "tree presel <west|east|north|south|cancel>", tree_presel),
-	IPC_SUB("presel_ratio", "presel-ratio", "tree presel_ratio <ratio>", tree_presel_ratio),
-	IPC_SUB("circulate", NULL, "tree circulate <forward|backward>", tree_circulate),
+	IPC_SUB("presel_ratio", "presel-ratio", "tree presel_ratio <ratio>", ipc_presel_ratio),
+	IPC_SUB("circulate", NULL, "tree circulate <forward|backward>", ipc_circulate),
 	IPC_SUB_END,
 };
 

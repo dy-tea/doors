@@ -8,6 +8,7 @@
 #include "tabs.h"
 #include "test.h"
 #include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -180,6 +181,52 @@ static void test_dry_run_input(void) {
 	CHECK(num_input_configs == before);
 }
 
+static const char *reply_body(const char *reply) {
+	const char *colon = strchr(reply + 1, ':');
+	return colon ? colon + 1 : reply + 1;
+}
+
+static void check_parity(const char *node_msg, size_t node_len, const char *tree_msg,
+	size_t tree_len) {
+	char node_reply[512];
+	char tree_reply[512];
+
+	size_t nn = exchange(node_msg, node_len, node_reply, sizeof(node_reply));
+	size_t tn = exchange(tree_msg, tree_len, tree_reply, sizeof(tree_reply));
+
+	CHECK(nn > 1);
+	CHECK(tn > 1);
+	CHECK(node_reply[0] == tree_reply[0]);
+	CHECK(strcmp(reply_body(node_reply), reply_body(tree_reply)) == 0);
+}
+
+static void test_shared_subcommand_parity(void) {
+	const char node_ratio[] = "node\0-o\0"
+		"0.4\0";
+	const char tree_ratio[] = "tree\0presel_ratio\0"
+		"0.4\0";
+	check_parity(node_ratio, sizeof(node_ratio) - 1, tree_ratio, sizeof(tree_ratio) - 1);
+
+	const char node_bad[] = "node\0-o\0"
+		"bogus\0";
+	const char tree_bad[] = "tree\0presel_ratio\0"
+		"bogus\0";
+	check_parity(node_bad, sizeof(node_bad) - 1, tree_bad, sizeof(tree_bad) - 1);
+
+	const char node_circ[] = "node\0-C\0"
+		"forward\0";
+	const char tree_circ[] = "tree\0circulate\0"
+		"forward\0";
+	check_parity(node_circ, sizeof(node_circ) - 1, tree_circ, sizeof(tree_circ) - 1);
+
+	const char node_circ_bad[] = "node\0-C\0"
+		"sideways\0";
+	const char tree_circ_bad[] = "tree\0circulate\0"
+		"sideways\0";
+	check_parity(node_circ_bad, sizeof(node_circ_bad) - 1, tree_circ_bad,
+		sizeof(tree_circ_bad) - 1);
+}
+
 static void test_apply_still_works(void) {
 	int before = settings.border_width;
 	const char msg[] = "config\0border_width\0"
@@ -205,6 +252,7 @@ static void run_tests(void) {
 	test_dry_run_env();
 	test_dry_run_curves();
 	test_dry_run_input();
+	test_shared_subcommand_parity();
 	test_apply_still_works();
 }
 
