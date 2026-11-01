@@ -477,14 +477,14 @@ bind_event_result_t handle_keybind(uint32_t modifiers, xkb_keysym_t sym) {
 }
 
 void focus_dir(direction_t dir) {
-	if (mon == NULL || mon->desk == NULL)
+	if (output_focused() == NULL || output_focused()->desk == NULL)
 		return;
 
-	desktop_t *d = mon->desk;
+	desktop_t *d = output_focused()->desk;
 
 	if (node_is_invisible(d->focus)) {
 		node_t *next = desktop_fallback_focus(d, NULL);
-		if (next == NULL || !focus_node(mon, d, next))
+		if (next == NULL || !focus_node(output_focused(), d, next))
 			return;
 	}
 
@@ -495,8 +495,8 @@ void focus_dir(direction_t dir) {
 	if (tab_anc != NULL) {
 		node_t *prev = tab_prev_leaf(tab_anc, d->focus);
 		if (prev != NULL && prev != d->focus) {
-			focus_node(mon, d, prev);
-			arrange(mon, d, true);
+			focus_node(output_focused(), d, prev);
+			arrange(output_focused(), d, true);
 		}
 		return;
 	}
@@ -507,31 +507,38 @@ void focus_dir(direction_t dir) {
 }
 
 void swap_dir(direction_t dir) {
-	if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL)
+	output_t *focused = output_focused();
+
+	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL)
 		return;
 
-	const layout_impl_t *impl = layout_get_impl(mon->desk->layout);
+	const layout_impl_t *impl = layout_get_impl(focused->desk->layout);
 	if (impl && impl->swap)
-		impl->swap(mon, mon->desk, dir);
+		impl->swap(focused, focused->desk, dir);
 }
 
 void close_focused(void) {
-	if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL)
+	output_t *focused = output_focused();
+
+	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL)
 		return;
 
-	kill_node(mon->desk, mon->desk->focus);
+	kill_node(focused->desk, focused->desk->focus);
 
 	wlr_log(WLR_INFO, "Closing focused window");
 }
 
 void toggle_block_out_from_screenshare(void) {
-	if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL) {
-		wlr_log(WLR_DEBUG, "Mon=%p desk=%p focus=%p", (void *)mon, mon ? (void *)mon->desk : NULL,
-			(mon && mon->desk) ? (void *)mon->desk->focus : NULL);
+	output_t *focused = output_focused();
+
+	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL) {
+		wlr_log(WLR_DEBUG, "output=%p desk=%p focus=%p", (void *)focused,
+			focused ? (void *)focused->desk : NULL,
+			(focused && focused->desk) ? (void *)focused->desk->focus : NULL);
 		return;
 	}
 
-	node_t *n = mon->desk->focus;
+	node_t *n = focused->desk->focus;
 	if (n->client == NULL) {
 		wlr_log(WLR_DEBUG, "No client on focus");
 		return;
@@ -559,16 +566,18 @@ void toggle_block_out_from_screenshare(void) {
 }
 
 void toggle_floating(void) {
-	if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL)
+	output_t *focused = output_focused();
+
+	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL)
 		return;
 
-	node_t *n = mon->desk->focus;
+	node_t *n = focused->desk->focus;
 	if (n->client == NULL)
 		return;
 
 	wlr_log(WLR_INFO, "Node=%u state=%d hidden=%d parent=%u root=%u focus=%u", n->id, n->client->state,
-		n->hidden, n->parent ? n->parent->id : 0, mon->desk->root ? mon->desk->root->id : 0,
-		mon->desk->focus ? mon->desk->focus->id : 0);
+		n->hidden, n->parent ? n->parent->id : 0, focused->desk->root ? focused->desk->root->id : 0,
+		focused->desk->focus ? focused->desk->focus->id : 0);
 
 	switch (n->client->state) {
 	case STATE_FLOATING:
@@ -576,20 +585,21 @@ void toggle_floating(void) {
 			wlr_log(WLR_ERROR, "Floating node %u has non-NULL parent %u, unexpected state", n->id,
 				n->parent->id);
 
-		tile_node(mon, mon->desk, n);
+		tile_node(focused, focused->desk, n);
 
 		wlr_log(WLR_INFO, "Now tiled, node=%u parent=%u root=%u", n->id, n->parent ? n->parent->id : 0,
-			mon->desk->root ? mon->desk->root->id : 0);
+			focused->desk->root ? focused->desk->root->id : 0);
 		break;
 	case STATE_TILED:
-		if (n->parent == NULL && mon->desk->root != n)
+		if (n->parent == NULL && focused->desk->root != n)
 			wlr_log(WLR_ERROR, "Tiled node %u has no parent and is not root, "
 				"already detached", n->id);
 
-		float_node(mon, mon->desk, n, NULL);
+		float_node(focused, focused->desk, n, NULL);
 
 		wlr_log(WLR_INFO, "Now floating, node=%u root=%u focus=%u", n->id,
-			mon->desk->root ? mon->desk->root->id : 0, mon->desk->focus ? mon->desk->focus->id : 0);
+			focused->desk->root ? focused->desk->root->id : 0,
+			focused->desk->focus ? focused->desk->focus->id : 0);
 		break;
 	default:
 		break;
@@ -597,9 +607,11 @@ void toggle_floating(void) {
 }
 
 void tile_focused(void) {
-	if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL)
+	output_t *focused = output_focused();
+
+	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL)
 		return;
-	node_t *n = mon->desk->focus;
+	node_t *n = focused->desk->focus;
 
 	if (n->client == NULL)
 		return;
@@ -615,67 +627,75 @@ void tile_focused(void) {
 		// xdd
 		break;
 	default:
-		set_state(mon, mon->desk, n, STATE_TILED);
+		set_state(focused, focused->desk, n, STATE_TILED);
 	}
 }
 
 void toggle_fullscreen(void) {
-	if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL)
+	output_t *focused = output_focused();
+
+	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL)
 		return;
 
-	mon->desk->fullscreen_recreate_pending_window_id = 0;
-	mon->desk->fullscreen_recreate_pending_pid = 0;
-	node_t *n = mon->desk->focus;
+	focused->desk->fullscreen_recreate_pending_window_id = 0;
+	focused->desk->fullscreen_recreate_pending_pid = 0;
+	node_t *n = focused->desk->focus;
 	if (n->client == NULL)
 		return;
 
 	bool entering = n->client->state != STATE_FULLSCREEN;
-	client_set_fullscreen(mon, mon->desk, n, entering);
+	client_set_fullscreen(focused, focused->desk, n, entering);
 	wlr_log(WLR_INFO, "Fullscreen %s", entering ? "enabled" : "disabled");
 }
 
 void toggle_maximize(void) {
-	if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL)
+	output_t *focused = output_focused();
+
+	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL)
 		return;
 
-	node_t *n = mon->desk->focus;
+	node_t *n = focused->desk->focus;
 	if (n->client == NULL)
 		return;
 
 	if (n->client->state == STATE_FULLSCREEN)
-		client_set_fullscreen(mon, mon->desk, n, false);
+		client_set_fullscreen(focused, focused->desk, n, false);
 
-	client_set_maximized(mon, mon->desk, n, !n->client->flags.maximized);
+	client_set_maximized(focused, focused->desk, n, !n->client->flags.maximized);
 }
 
 void toggle_minimize(void) {
-	if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL)
+	output_t *focused = output_focused();
+
+	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL)
 		return;
 
-	node_t *n = mon->desk->focus;
+	node_t *n = focused->desk->focus;
 	if (n->client == NULL)
 		return;
 
-	client_set_minimized(mon, mon->desk, n, !n->client->flags.minimized);
+	client_set_minimized(focused, focused->desk, n, !n->client->flags.minimized);
 }
 
 void restore_minimized(void) {
-	if (mon == NULL || mon->desk == NULL)
+	if (output_focused() == NULL || output_focused()->desk == NULL)
 		return;
 
-	client_restore_last_minimized(mon, mon->desk);
+	client_restore_last_minimized(output_focused(), output_focused()->desk);
 }
 
 void toggle_pseudo_tiled(void) {
-	if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL)
+	output_t *focused = output_focused();
+
+	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL)
 		return;
 
-	node_t *n = mon->desk->focus;
+	node_t *n = focused->desk->focus;
 	if (n->client == NULL)
 		return;
 
 	if (n->client->state == STATE_PSEUDO_TILED) {
-		set_state(mon, mon->desk, n, STATE_TILED);
+		set_state(focused, focused->desk, n, STATE_TILED);
 		wlr_log(WLR_INFO, "Window tiled");
 	} else {
 		struct wlr_box base_rect = {0};
@@ -694,7 +714,7 @@ void toggle_pseudo_tiled(void) {
 			.width = base_rect.width,
 			.height = base_rect.height
 		};
-		set_state(mon, mon->desk, n, STATE_PSEUDO_TILED);
+		set_state(focused, focused->desk, n, STATE_PSEUDO_TILED);
 		wlr_log(WLR_INFO, "Window pseudo_tiled");
 	}
 }
@@ -727,19 +747,19 @@ void focus_last_desktop(void) {
 
 static void send_focused_node_to_desktop(desktop_t *target, bool apply_initial_polarity,
 		bool clamp_float) {
-	if (mon == NULL || target == NULL)
+	if (output_focused() == NULL || target == NULL)
 		return;
 
-	if (mon->desk == target)
+	if (output_focused()->desk == target)
 		return;
-	if (mon->desk == NULL || mon->desk->focus == NULL)
+	if (output_focused()->desk == NULL || output_focused()->desk->focus == NULL)
 		return;
 
-	node_t *n = mon->desk->focus;
+	node_t *n = output_focused()->desk->focus;
 	if (n == NULL || n->client == NULL)
 		return;
 
-	desktop_t *src_desk = mon->desk;
+	desktop_t *src_desk = output_focused()->desk;
 
 	output_t *target_mon = find_monitor_for_desktop(target);
 	if (target_mon == NULL) {
@@ -764,7 +784,7 @@ static void send_focused_node_to_desktop(desktop_t *target, bool apply_initial_p
 			node_t *new_focus = first_extrema(src_desk->root);
 			if (new_focus != NULL) {
 				src_desk->focus = new_focus;
-				focus_node(mon, src_desk, new_focus);
+				focus_node(output_focused(), src_desk, new_focus);
 			} else {
 				src_desk->focus = NULL;
 			}
@@ -806,7 +826,7 @@ static void send_focused_node_to_desktop(desktop_t *target, bool apply_initial_p
 		}
 	}
 
-	arrange(mon, src_desk, true);
+	arrange(output_focused(), src_desk, true);
 	arrange(target_mon, target, false);
 
 	n->output = target_mon;
@@ -819,13 +839,13 @@ static void send_focused_node_to_desktop(desktop_t *target, bool apply_initial_p
 }
 
 void send_to_desktop(int desktop_index) {
-	if (mon == NULL)
+	if (output_focused() == NULL)
 		return;
 
 	// get index of desktop
 	desktop_t *target = NULL, *d;
 	int idx = 0;
-	wl_list_for_each(d, &mon->desk_list, link) {
+	wl_list_for_each(d, &output_focused()->desk_list, link) {
 		if (idx == desktop_index) {
 			target = d;
 			break;
@@ -842,7 +862,7 @@ void send_to_desktop(int desktop_index) {
 }
 
 void send_to_desktop_by_name(const char *name) {
-	if (mon == NULL)
+	if (output_focused() == NULL)
 		return;
 
 	desktop_t *target = find_desktop_by_name(name);
@@ -855,11 +875,13 @@ void send_to_desktop_by_name(const char *name) {
 }
 
 void send_to_next_desktop(void) {
-	if (mon == NULL || mon->desk == NULL)
+	output_t *focused = output_focused();
+
+	if (focused == NULL || focused->desk == NULL)
 		return;
 
-	desktop_t *next = mon->desk->link.next != &mon->desk_list ? wl_container_of(mon->desk->link.next,
-		next, link) : NULL;
+	desktop_t *next = focused->desk->link.next != &focused->desk_list ?
+		wl_container_of(focused->desk->link.next, next, link) : NULL;
 	if (next != NULL) {
 		send_to_desktop_by_name(next->name);
 		wlr_log(WLR_INFO, "Sent window to next desktop");
@@ -867,11 +889,13 @@ void send_to_next_desktop(void) {
 }
 
 void send_to_prev_desktop(void) {
-	if (mon == NULL || mon->desk == NULL)
+	output_t *focused = output_focused();
+
+	if (focused == NULL || focused->desk == NULL)
 		return;
 
-	desktop_t *prev = mon->desk->link.prev != &mon->desk_list ? wl_container_of(mon->desk->link.prev,
-		prev, link) : NULL;
+	desktop_t *prev = focused->desk->link.prev != &focused->desk_list ?
+		wl_container_of(focused->desk->link.prev, prev, link) : NULL;
 	if (prev != NULL) {
 		send_to_desktop_by_name(prev->name);
 		wlr_log(WLR_INFO, "Sent window to previous desktop");
@@ -900,49 +924,49 @@ void monocle_toggle(output_t *m, desktop_t *d) {
 }
 
 void toggle_monocle(void) {
-	if (mon == NULL || mon->desk == NULL)
+	if (output_focused() == NULL || output_focused()->desk == NULL)
 		return;
 
-	monocle_toggle(mon, mon->desk);
+	monocle_toggle(output_focused(), output_focused()->desk);
 }
 
 void set_tiled_layout(void) {
-	if (mon == NULL || mon->desk == NULL)
+	if (output_focused() == NULL || output_focused()->desk == NULL)
 		return;
-	desktop_t *d = mon->desk;
+	desktop_t *d = output_focused()->desk;
 
 	layout_set(d, LAYOUT_TILED);
 	d->user_layout = LAYOUT_TILED;
 
-	arrange(mon, d, true);
+	arrange(output_focused(), d, true);
 	ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name,
 		layout_to_char(d->layout));
 
 	if (d->focus != NULL)
-		focus_node(mon, d, d->focus);
+		focus_node(output_focused(), d, d->focus);
 }
 
 void toggle_master_stack(void) {
-	if (mon == NULL || mon->desk == NULL)
+	if (output_focused() == NULL || output_focused()->desk == NULL)
 		return;
 
-	desktop_t *d = mon->desk;
+	desktop_t *d = output_focused()->desk;
 
 	layout_toggle(d, LAYOUT_MASTER_STACK);
 
-	arrange(mon, d, true);
+	arrange(output_focused(), d, true);
 	ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name,
 		layout_to_char(d->layout));
 
 	if (d->focus != NULL)
-		focus_node(mon, d, d->focus);
+		focus_node(output_focused(), d, d->focus);
 }
 
 void toggle_floating_layout(void) {
-	if (mon == NULL || mon->desk == NULL)
+	if (output_focused() == NULL || output_focused()->desk == NULL)
 		return;
 
-	desktop_t *d = mon->desk;
+	desktop_t *d = output_focused()->desk;
 
 	// bring toplevels back into the tree
 	if (d->layout == LAYOUT_FLOATING) {
@@ -952,36 +976,40 @@ void toggle_floating_layout(void) {
 		int count = desktop_toplevels(d, &toplevels);
 		for (int i = 0; i < count; i++) {
 			if (toplevels[i]->client != NULL && IS_FLOATING(toplevels[i]->client))
-				tile_node(mon, d, toplevels[i]);
+				tile_node(output_focused(), d, toplevels[i]);
 		}
 		free(toplevels);
 	} else {
 		layout_toggle(d, LAYOUT_FLOATING);
 	}
 
-	arrange(mon, d, true);
+	arrange(output_focused(), d, true);
 	ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name,
 		layout_to_char(d->layout));
 
 	if (d->focus != NULL)
-		focus_node(mon, d, d->focus);
+		focus_node(output_focused(), d, d->focus);
 }
 
 void rotate_clockwise(void) {
-	if (mon == NULL || mon->desk == NULL || mon->desk->root == NULL)
+	output_t *focused = output_focused();
+
+	if (focused == NULL || focused->desk == NULL || focused->desk->root == NULL)
 		return;
 
-	rotate_tree(mon->desk->root, 90);
-	arrange(mon, mon->desk, true);
+	rotate_tree(focused->desk->root, 90);
+	arrange(focused, focused->desk, true);
 	wlr_log(WLR_INFO, "Rotated tree clockwise");
 }
 
 void rotate_counterclockwise(void) {
-	if (mon == NULL || mon->desk == NULL || mon->desk->root == NULL)
+	output_t *focused = output_focused();
+
+	if (focused == NULL || focused->desk == NULL || focused->desk->root == NULL)
 		return;
 
-	rotate_tree(mon->desk->root, 270);
-	arrange(mon, mon->desk, true);
+	rotate_tree(focused->desk->root, 270);
+	arrange(focused, focused->desk, true);
 	wlr_log(WLR_INFO, "Rotated tree counterclockwise");
 }
 
@@ -989,11 +1017,11 @@ void rotate_counterclockwise(void) {
 #define RESIZE_AMOUNT 0.05
 
 static bool resize_master_stack_ratio(bool horizontal, float delta) {
-	if (mon->desk->layout != LAYOUT_MASTER_STACK)
+	if (output_focused()->desk->layout != LAYOUT_MASTER_STACK)
 		return false;
 
 	master_area_orientation_t orientation =
-		(master_area_orientation_t)mon->desk->master_stack.orientation;
+		(master_area_orientation_t)output_focused()->desk->master_stack.orientation;
 
 	bool horizontal_split = orientation == MASTER_LEFT || orientation == MASTER_RIGHT ||
 		orientation == MASTER_CENTER;
@@ -1003,28 +1031,31 @@ static bool resize_master_stack_ratio(bool horizontal, float delta) {
 	if (orientation == MASTER_RIGHT || orientation == MASTER_BOTTOM)
 		delta = -delta;
 
-	if (master_stack_adjust_ratio(mon->desk, delta))
-		arrange(mon, mon->desk, true);
+	if (master_stack_adjust_ratio(output_focused()->desk, delta))
+		arrange(output_focused(), output_focused()->desk, true);
 	return true;
 }
 
 void resize_left(void) {
-	if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL) {
-		wlr_log(WLR_ERROR, "Invalid state mon=%p desk=%p focus=%p", (void *)mon,
-			mon ? (void *)mon->desk : NULL, mon && mon->desk ? (void *)mon->desk->focus : NULL);
+	output_t *focused = output_focused();
+
+	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL) {
+		wlr_log(WLR_ERROR, "Invalid state output=%p desk=%p focus=%p", (void *)focused,
+			focused ? (void *)focused->desk : NULL,
+			focused && focused->desk ? (void *)focused->desk->focus : NULL);
 		return;
 	}
 	if (resize_master_stack_ratio(true, -RESIZE_AMOUNT))
 		return;
-	if (mon->desk->layout == LAYOUT_SCROLLER) {
-		if (scroller_resize_width(mon->desk, -RESIZE_AMOUNT)) {
-			arrange(mon, mon->desk, true);
+	if (focused->desk->layout == LAYOUT_SCROLLER) {
+		if (scroller_resize_width(focused->desk, -RESIZE_AMOUNT)) {
+			arrange(focused, focused->desk, true);
 			wlr_log(WLR_INFO, "Resized left (scroller)");
 		}
 		return;
 	}
 
-	node_t *n = mon->desk->focus;
+	node_t *n = focused->desk->focus;
 	if (n->parent == NULL) {
 		wlr_log(WLR_ERROR, "No parent for left resize of node %u", n->id);
 		return;
@@ -1046,7 +1077,7 @@ void resize_left(void) {
 			ratio = 0.1;
 		node_set_split_ratio(p, ratio);
 		wlr_log(WLR_INFO, "Ratio after=%f for left resize of node %u", p->split_ratio, p->id);
-		arrange(mon, mon->desk, true);
+		arrange(focused, focused->desk, true);
 		wlr_log(WLR_INFO, "Resized left");
 	} else {
 		wlr_log(WLR_ERROR, "No vertical ancestor for left resize of node %u", n->id);
@@ -1054,21 +1085,23 @@ void resize_left(void) {
 }
 
 void resize_right(void) {
-	if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL) {
+	output_t *focused = output_focused();
+
+	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL) {
 		wlr_log(WLR_ERROR, "Invalid state");
 		return;
 	}
 	if (resize_master_stack_ratio(true, RESIZE_AMOUNT))
 		return;
-	if (mon->desk->layout == LAYOUT_SCROLLER) {
-		if (scroller_resize_width(mon->desk, RESIZE_AMOUNT)) {
-			arrange(mon, mon->desk, true);
+	if (focused->desk->layout == LAYOUT_SCROLLER) {
+		if (scroller_resize_width(focused->desk, RESIZE_AMOUNT)) {
+			arrange(focused, focused->desk, true);
 			wlr_log(WLR_INFO, "Resized right (scroller)");
 		}
 		return;
 	}
 
-	node_t *n = mon->desk->focus;
+	node_t *n = focused->desk->focus;
 	if (n->parent == NULL) {
 		wlr_log(WLR_ERROR, "No parent for right resize of node %u", n->id);
 		return;
@@ -1090,7 +1123,7 @@ void resize_right(void) {
 			ratio = 0.9;
 		node_set_split_ratio(p, ratio);
 		wlr_log(WLR_INFO, "Ratio after=%f for right resize of node %u", p->split_ratio, p->id);
-		arrange(mon, mon->desk, true);
+		arrange(focused, focused->desk, true);
 		wlr_log(WLR_INFO, "Resized right");
 	} else {
 		wlr_log(WLR_ERROR, "No vertical ancestor for right resize of node %u", n->id);
@@ -1098,24 +1131,26 @@ void resize_right(void) {
 }
 
 void resize_up(void) {
-	if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL) {
+	output_t *focused = output_focused();
+
+	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL) {
 		wlr_log(WLR_ERROR, "Invalid state");
 		return;
 	}
 	if (resize_master_stack_ratio(false, -RESIZE_AMOUNT))
 		return;
-	if (mon->desk->layout == LAYOUT_SCROLLER) {
+	if (focused->desk->layout == LAYOUT_SCROLLER) {
 		float delta = -RESIZE_AMOUNT;
-		if (mon->desk->scroller_state)
-			delta *= (float)mon->desk->scroller_state->working_area.height;
-		if (scroller_resize_stack(mon->desk, delta)) {
-			arrange(mon, mon->desk, true);
+		if (focused->desk->scroller_state)
+			delta *= (float)focused->desk->scroller_state->working_area.height;
+		if (scroller_resize_stack(focused->desk, delta)) {
+			arrange(focused, focused->desk, true);
 			wlr_log(WLR_INFO, "Resized up (scroller)");
 		}
 		return;
 	}
 
-	node_t *n = mon->desk->focus;
+	node_t *n = focused->desk->focus;
 	if (n->parent == NULL) {
 		wlr_log(WLR_ERROR, "No parent for up resize of node %u", n->id);
 		return;
@@ -1137,7 +1172,7 @@ void resize_up(void) {
 			ratio = 0.1;
 		node_set_split_ratio(p, ratio);
 		wlr_log(WLR_INFO, "Ratio after=%f for up resize of node %u", p->split_ratio, p->id);
-		arrange(mon, mon->desk, true);
+		arrange(focused, focused->desk, true);
 		wlr_log(WLR_INFO, "Resized up");
 	} else {
 		wlr_log(WLR_ERROR, "No horizontal ancestor for up resize of node %u", n->id);
@@ -1145,24 +1180,26 @@ void resize_up(void) {
 }
 
 void resize_down(void) {
-	if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL) {
+	output_t *focused = output_focused();
+
+	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL) {
 		wlr_log(WLR_ERROR, "Invalid state");
 		return;
 	}
 	if (resize_master_stack_ratio(false, RESIZE_AMOUNT))
 		return;
-	if (mon->desk->layout == LAYOUT_SCROLLER) {
+	if (focused->desk->layout == LAYOUT_SCROLLER) {
 		float delta = RESIZE_AMOUNT;
-		if (mon->desk->scroller_state)
-			delta *= (float)mon->desk->scroller_state->working_area.height;
-		if (scroller_resize_stack(mon->desk, delta)) {
-			arrange(mon, mon->desk, true);
+		if (focused->desk->scroller_state)
+			delta *= (float)focused->desk->scroller_state->working_area.height;
+		if (scroller_resize_stack(focused->desk, delta)) {
+			arrange(focused, focused->desk, true);
 			wlr_log(WLR_INFO, "Resized down (scroller)");
 		}
 		return;
 	}
 
-	node_t *n = mon->desk->focus;
+	node_t *n = focused->desk->focus;
 	if (n->parent == NULL) {
 		wlr_log(WLR_ERROR, "No parent for down resize of node %u", n->id);
 		return;
@@ -1184,7 +1221,7 @@ void resize_down(void) {
 			ratio = 0.9;
 		node_set_split_ratio(p, ratio);
 		wlr_log(WLR_INFO, "Ratio after=%f for down resize of node %u", p->split_ratio, p->id);
-		arrange(mon, mon->desk, true);
+		arrange(focused, focused->desk, true);
 		wlr_log(WLR_INFO, "Resized down");
 	} else {
 		wlr_log(WLR_ERROR, "No horizontal ancestor for down resize of node %u", n->id);
@@ -1192,10 +1229,12 @@ void resize_down(void) {
 }
 
 void cancel_presel(void) {
-	if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL)
+	output_t *focused = output_focused();
+
+	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL)
 		return;
 
-	presel_cancel(mon->desk->focus);
+	presel_cancel(focused->desk->focus);
 	wlr_log(WLR_INFO, "Cancelled preselection");
 }
 

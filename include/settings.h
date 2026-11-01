@@ -17,7 +17,6 @@ bool config_validate_value(const char *name, const char *value, char *err, size_
 
 void config_snapshot_defaults(void);
 
-extern struct output_t *mon;
 extern struct wl_list mon_list;
 extern struct wl_list orphan_desk_list;
 extern uint32_t next_node_id;

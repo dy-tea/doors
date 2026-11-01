@@ -5,6 +5,7 @@
 #include "layout/master_stack.h"
 #include "layout/scroller.h"
 #include "layout/tree.h"
+#include "output/output.h"
 #include "transaction.h"
 #include "tree.h"
 #include "types.h"
@@ -232,11 +233,11 @@ static bool tiled_focus(desktop_t *d, direction_t dir) {
 
 	node_t *n = focus_fence_leaf(d->focus, dir);
 	if (n != NULL)
-		return focus_node(mon, d, n);
+		return focus_node(output_focused(), d, n);
 
 	n = wrapped_focus_leaf(d, dir);
 	if (n != NULL)
-		return focus_node(mon, d, n);
+		return focus_node(output_focused(), d, n);
 
 	return false;
 }
@@ -382,12 +383,12 @@ void layout_set(desktop_t *d, layout_t new_layout) {
 	layout_t old_layout = d->layout;
 
 	if (old_layout == new_layout) {
-		layout_desktop_changed(d->output ? d->output : mon, d);
+		layout_desktop_changed(d->output ? d->output : output_focused(), d);
 		return;
 	}
 
 	d->user_layout = old_layout;
-	output_t *m = d->output != NULL ? d->output : mon;
+	output_t *m = d->output != NULL ? d->output : output_focused();
 
 	// let the outgoing layout drop the per-desktop state it owns
 	const layout_impl_t *old_impl = layout_get_impl(old_layout);

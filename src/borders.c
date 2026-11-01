@@ -181,7 +181,12 @@ void update_border_colors(client_t *client) {
 			if (rounded->corner_mask_node)
 				wlr_scene_node_set_enabled(&rounded->corner_mask_node->node, false);
 			// mark dirty so the border re-renders when leaving fullscreen
-			static const float transparent[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+			static const float transparent[4] = {
+				0.0f,
+				0.0f,
+				0.0f,
+				0.0f
+			};
 			if (memcmp(rounded->border_color, transparent, sizeof(rounded->border_color)) != 0) {
 				memcpy(rounded->border_color, transparent, sizeof(rounded->border_color));
 				rounded->border_dirty = true;
@@ -189,7 +194,12 @@ void update_border_colors(client_t *client) {
 			}
 		}
 		if (border_tree) {
-			static const float transparent[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+			static const float transparent[4] = {
+				0.0f,
+				0.0f,
+				0.0f,
+				0.0f
+			};
 			struct wlr_scene_rect **rects = client_border_rects(client);
 			for (int i = 0; i < 4; i++)
 				if (rects[i])

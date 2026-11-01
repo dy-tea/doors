@@ -1372,6 +1372,8 @@ bool is_interactive_bind(const keybind_t *kb) {
 }
 
 void execute_bind(bind_t b) {
+	output_t *focused = output_focused();
+
 	switch (b.action) {
 	case BIND_QUIT:
 		wl_display_terminate(server.wl_display);
@@ -1428,10 +1430,10 @@ void execute_bind(bind_t b) {
 	case BIND_PRESEL_WEST:
 	case BIND_PRESEL_SOUTH:
 	case BIND_PRESEL_EAST:
-		if (mon == NULL || mon->desk == NULL || mon->desk->focus == NULL)
+		if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL)
 			return;
 
-		presel_dir(mon->desk->focus, b.action - BIND_PRESEL_NORTH);
+		presel_dir(focused->desk->focus, b.action - BIND_PRESEL_NORTH);
 		break;
 	case BIND_PRESEL_CANCEL:
 		cancel_presel();
@@ -1466,38 +1468,38 @@ void execute_bind(bind_t b) {
 		toggle_floating_layout();
 		break;
 	case BIND_MASTER_STACK_INC:
-		if (mon && mon->desk) {
-			master_stack_increment(mon->desk);
-			if (mon->desk->layout == LAYOUT_MASTER_STACK)
-				arrange(mon, mon->desk, true);
+		if (focused && focused->desk) {
+			master_stack_increment(focused->desk);
+			if (focused->desk->layout == LAYOUT_MASTER_STACK)
+				arrange(focused, focused->desk, true);
 		}
 		break;
 	case BIND_MASTER_STACK_DEC:
-		if (mon && mon->desk) {
-			master_stack_decrement(mon->desk);
-			if (mon->desk->layout == LAYOUT_MASTER_STACK)
-				arrange(mon, mon->desk, true);
+		if (focused && focused->desk) {
+			master_stack_decrement(focused->desk);
+			if (focused->desk->layout == LAYOUT_MASTER_STACK)
+				arrange(focused, focused->desk, true);
 		}
 		break;
 	case BIND_MASTER_STACK_FLIP:
-		if (mon && mon->desk) {
-			master_stack_flip_orientation(mon->desk);
-			if (mon->desk->layout == LAYOUT_MASTER_STACK)
-				arrange(mon, mon->desk, true);
+		if (focused && focused->desk) {
+			master_stack_flip_orientation(focused->desk);
+			if (focused->desk->layout == LAYOUT_MASTER_STACK)
+				arrange(focused, focused->desk, true);
 		}
 		break;
 	case BIND_MASTER_STACK_CYCLE_ORIENTATION:
-		if (mon && mon->desk) {
-			master_stack_cycle_orientation(mon->desk);
-			if (mon->desk->layout == LAYOUT_MASTER_STACK)
-				arrange(mon, mon->desk, true);
+		if (focused && focused->desk) {
+			master_stack_cycle_orientation(focused->desk);
+			if (focused->desk->layout == LAYOUT_MASTER_STACK)
+				arrange(focused, focused->desk, true);
 		}
 		break;
 	case BIND_MASTER_STACK_CYCLE_STACK_LAYOUT:
-		if (mon && mon->desk) {
-			master_stack_cycle_stack_layout(mon->desk);
-			if (mon->desk->layout == LAYOUT_MASTER_STACK)
-				arrange(mon, mon->desk, true);
+		if (focused && focused->desk) {
+			master_stack_cycle_stack_layout(focused->desk);
+			if (focused->desk->layout == LAYOUT_MASTER_STACK)
+				arrange(focused, focused->desk, true);
 		}
 		break;
 	case BIND_SCROLLER_CYCLE_PRESET:
@@ -1520,12 +1522,12 @@ void execute_bind(bind_t b) {
 	case BIND_MOVE_COLUMN_DOWN:
 	case BIND_MOVE_COLUMN_FIRST:
 	case BIND_MOVE_COLUMN_LAST: {
-		if (mon == NULL || mon->desk == NULL || mon->desk->layout != LAYOUT_SCROLLER)
+		if (focused == NULL || focused->desk == NULL || focused->desk->layout != LAYOUT_SCROLLER)
 			return;
 
-		bool changed = scroller_bind_action(mon->desk, b.action);
+		bool changed = scroller_bind_action(focused->desk, b.action);
 		if (changed)
-			arrange(mon, mon->desk, true);
+			arrange(focused, focused->desk, true);
 		break;
 	}
 	case BIND_ROTATE_CW:
@@ -1536,11 +1538,11 @@ void execute_bind(bind_t b) {
 		break;
 	case BIND_FLIP_HORIZONTAL:
 	case BIND_FLIP_VERTICAL:
-		if (mon == NULL || mon->desk == NULL || mon->desk->root == NULL)
+		if (focused == NULL || focused->desk == NULL || focused->desk->root == NULL)
 			return;
 
-		flip_tree(mon->desk->root, b.action - BIND_FLIP_HORIZONTAL);
-		arrange(mon, mon->desk, true);
+		flip_tree(focused->desk->root, b.action - BIND_FLIP_HORIZONTAL);
+		arrange(focused, focused->desk, true);
 		break;
 	case BIND_RESIZE_LEFT:
 		resize_left();

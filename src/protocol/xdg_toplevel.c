@@ -194,7 +194,7 @@ void xdg_toplevel_adopt(xdg_toplevel_t *toplevel) {
 		if (valid_output) {
 			m = valid_output;
 			d = m->desk;
-			server.focused_output = m;
+			output_set_focused(m);
 		} else {
 			wlr_log(WLR_ERROR, "No desktop available for toplevel %p", (void *)toplevel);
 			return;
@@ -459,7 +459,7 @@ void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 		view_save_buffer(&toplevel->view);
 
 	node_t *n = toplevel->view.node;
-	output_t *m = n->output ? n->output : mon;
+	output_t *m = n->output ? n->output : output_focused();
 	desktop_t *d = desktop_for_node(n);
 	bool node_held = false;
 
@@ -746,7 +746,7 @@ static void xdg_toplevel_handle_maximize(xdg_toplevel_t *toplevel, bool requeste
 		return;
 
 	output_t *m = n->output;
-	desktop_t *d = m != NULL ? m->desk : (mon != NULL ? mon->desk : NULL);
+	desktop_t *d = m != NULL ? m->desk : (output_focused() != NULL ? output_focused()->desk : NULL);
 	if (d == NULL)
 		return;
 

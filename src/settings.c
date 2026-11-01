@@ -1,5 +1,5 @@
+#include "borders.h"
 #include "settings.h"
-#include "tree.h"
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -156,7 +156,6 @@ void settings_fini(void) {
 }
 
 // global state
-output_t *mon = NULL;
 struct wl_list mon_list;
 uint32_t next_node_id = 1;
 uint32_t next_desktop_id = 1;

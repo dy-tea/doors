@@ -211,7 +211,7 @@ void view_set_activated(view_t *view, bool activated) {
 		tablet_pads_set_focus(s, surface);
 
 	if (view->node && view->node->output)
-		server.focused_output = view->node->output;
+		output_set_focused(view->node->output);
 
 	// update borders
 	if (view->node) {

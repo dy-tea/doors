@@ -79,6 +79,7 @@ output_t *output_get_valid(void);
 void output_schedule_frame(output_t *output);
 bool output_supports_hdr(output_t *output, const char **unsupported_reason_ptr);
 void output_set_focused(output_t *m);
+output_t *output_focused(void);
 void set_orphan_active_desk(desktop_t *d);
 output_t *output_at(double x, double y);
 output_t *find_output_by_name(const char *name);

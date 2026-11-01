@@ -568,21 +568,11 @@ void remove_node(desktop_t *d, node_t *n) {
 				else
 					rotate_tree(b, 90);
 			} else if (settings.automatic_scheme == SCHEME_LONGEST_SIDE || g == NULL) {
-				if (!is_leaf(b)) {
-					if (old_rect.width > old_rect.height) {
-						node_set_split_type(b, TYPE_VERTICAL);
-					} else {
-						node_set_split_type(b, TYPE_HORIZONTAL);
-					}
-				}
+				if (!is_leaf(b))
+					node_set_split_type(b, old_rect.width > old_rect.height ? TYPE_VERTICAL : TYPE_HORIZONTAL);
 			} else if (settings.automatic_scheme == SCHEME_ALTERNATE) {
-				if (g != NULL && !is_leaf(b)) {
-					if (g->split_type == TYPE_HORIZONTAL) {
-						node_set_split_type(b, TYPE_VERTICAL);
-					} else {
-						node_set_split_type(b, TYPE_HORIZONTAL);
-					}
-				}
+				if (g != NULL && !is_leaf(b))
+					node_set_split_type(b, g->split_type == TYPE_HORIZONTAL ? TYPE_VERTICAL : TYPE_HORIZONTAL);
 			}
 		}
 
@@ -594,7 +584,7 @@ void remove_node(desktop_t *d, node_t *n) {
 
 			// give kb focus to new node
 			if (d->focus != NULL && d->focus->client != NULL)
-				focus_node(d->output ? d->output : mon, d, d->focus);
+				focus_node(d->output ? d->output : output_focused(), d, d->focus);
 		}
 	}
 

@@ -401,7 +401,7 @@ static void out_focus(ipc_args_t *a) {
 		return;
 
 	output_t *mon = ctx_of(a)->mon;
-	server.focused_output = mon;
+	output_set_focused(mon);
 	focus_node(mon, mon->desk, mon->desk ? mon->desk->focus : NULL);
 	ipc_ok(a, "Focused\n");
 }
@@ -580,9 +580,9 @@ static void out_swap_desktops(ipc_args_t *a) {
 		d->output = m1;
 
 	if (server.focused_output == m0)
-		server.focused_output = m1;
+		output_set_focused(m1);
 	else if (server.focused_output == m1)
-		server.focused_output = m0;
+		output_set_focused(m0);
 
 	transaction_commit_dirty();
 	ipc_ok(a, "Swapped\n");

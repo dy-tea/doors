@@ -606,7 +606,7 @@ static void process_cursor_motion(uint32_t time, double dx, double dy, double dx
 
 	output_t *m = output_at(server.cursor->x, server.cursor->y);
 	if (m && m != server.focused_output)
-		server.focused_output = m;
+		output_set_focused(m);
 
 	if (surface) {
 		wlr_seat_pointer_notify_enter(seat, surface, sx, sy);

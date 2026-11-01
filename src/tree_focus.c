@@ -164,7 +164,8 @@ bool activate_node(output_t *m, desktop_t *d, node_t *n) {
 	}
 
 	// focus only if on currently focused desktop
-	bool on_current_desktop = (mon && mon->desk == d);
+	output_t *focused = output_focused();
+	bool on_current_desktop = (focused && focused->desk == d);
 	return focus_node_impl(m, d, n, on_current_desktop);
 }
 

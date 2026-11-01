@@ -426,8 +426,6 @@ void output_teardown(output_t *output) {
 
 	if (server.focused_output == output)
 		output_set_focused(next ? next : prev);
-	if (mon == output)
-		mon = wl_list_empty(&mon_list) ? NULL : wl_container_of(mon_list.next, mon, link);
 
 	wlr_color_transform_unref(output->color_transform);
 	output->color_transform = NULL;
@@ -563,11 +561,8 @@ void output_create(struct wlr_output *wlr_output) {
 	wl_list_init(&output->link);
 	wl_list_insert(mon_list.prev, &output->link);
 
-	if (!mon)
-		mon = output;
-
 	if (!server.focused_output)
-		server.focused_output = output;
+		output_set_focused(output);
 
 	struct wlr_output_state state;
 	wlr_output_state_init(&state);
@@ -767,8 +762,11 @@ output_t *output_get_valid(void) {
 }
 
 void output_set_focused(output_t *m) {
-	mon = m;
 	server.focused_output = m;
+}
+
+output_t *output_focused(void) {
+	return server.focused_output;
 }
 
 output_t *output_at(double x, double y) {

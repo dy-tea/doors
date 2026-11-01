@@ -177,7 +177,7 @@ static struct wlr_box cascade_rect(struct wlr_box area, struct wlr_box size, int
 
 static struct wlr_box float_area(output_t *m, desktop_t *d) {
 	if (m == NULL)
-		m = d ? d->output : mon;
+		m = d ? d->output : output_focused();
 	if (m == NULL)
 		return (struct wlr_box){0};
 
@@ -570,7 +570,7 @@ bool floating_focus(desktop_t *d, direction_t dir) {
 
 		free(toplevels);
 
-		return best != NULL && focus_node(mon, d, best);
+		return best != NULL && focus_node(output_focused(), d, best);
 	}
 
 	for (int i = 0; i < count; i++) {
@@ -621,7 +621,7 @@ bool floating_focus(desktop_t *d, direction_t dir) {
 	if (best == NULL)
 		return false;
 
-	return focus_node(mon, d, best);
+	return focus_node(output_focused(), d, best);
 }
 
 bool floating_places_floating(desktop_t *d, client_t *c) {
