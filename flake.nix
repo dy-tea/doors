@@ -69,6 +69,14 @@
               --replace-fail "/usr/share/wayland-sessions" "${placeholder "out"}/share/wayland-sessions"
             '';
 
+            postInstall = ''
+              # Convert POD documentation to man pages and install them.
+              install -d $out/share/man/man1 $out/share/man/man5
+              ${pkgs.perl}/bin/pod2man -s 1 -c "doors" -r "doors" "$src/docs/doorsctl.pod" > $out/share/man/man1/doorsctl.1
+              ${pkgs.perl}/bin/pod2man -s 5 -c "doors" -r "doors" "$src/docs/doorsrc.pod" > $out/share/man/man5/doorsrc.5
+              ${pkgs.perl}/bin/pod2man -s 5 -c "doors" -r "doors" "$src/docs/doorshkrc.pod" > $out/share/man/man5/doorshkrc.5
+            '';
+
             passthru.providedSessions = [ "doors" ];
 
             meta = {
