@@ -2908,6 +2908,4 @@ const effects_backend_t vk_backend = {
 	.compile_screen_shader = vk_compile_screen_shader,
 	.destroy_screen_shader = vk_destroy_screen_shader,
 };
-
-
 #endif

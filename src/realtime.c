@@ -12,8 +12,6 @@ static void child_fork_callback(void) {
 	};
 	pthread_setschedparam(pthread_self(), SCHED_OTHER, &param);
 }
-
-
 #endif
 
 void set_rr_scheduling(void) {

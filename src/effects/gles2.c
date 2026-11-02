@@ -1302,6 +1302,4 @@ const effects_backend_t gles2_backend = {
 	.compile_screen_shader = gles2_compile_screen_shader,
 	.destroy_screen_shader = gles2_destroy_screen_shader,
 };
-
-
 #endif
