@@ -4,7 +4,6 @@
 #include "input/cursor.h"
 #include "input/input_method.h"
 #include "ipc/ipc.h"
-#include "layout/floating.h"
 #include "layout/layout.h"
 #include "layout/scroller.h"
 #include "output/output.h"
@@ -12,10 +11,8 @@
 #include "protocol/session_mgmt.h"
 #include "protocol/workspace.h"
 #include "protocol/xdg_toplevel.h"
-#include "protocol/xwayland.h"
 #include "render_unfocused.h"
 #include "rule.h"
-#include "scratchpad.h"
 #include "server.h"
 #include "surface.h"
 #include "tabs.h"
@@ -27,17 +24,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wayland-server-core.h>
-#include <wlr/types/wlr_buffer.h>
-#include <wlr/types/wlr_content_type_v1.h>
-#include <wlr/types/wlr_damage_ring.h>
 #include <wlr/types/wlr_ext_background_effect_v1.h>
-#include <wlr/types/wlr_ext_image_capture_source_v1.h>
 #include <wlr/types/wlr_fractional_scale_v1.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_xdg_decoration_v1.h>
 #include <wlr/types/wlr_xdg_shell.h>
-#include <wlr/types/wlr_xdg_toplevel_tag_v1.h>
 #include <wlr/util/log.h>
 
 static void xdg_toplevel_handle_maximize(xdg_toplevel_t *toplevel, bool requested_maximized);

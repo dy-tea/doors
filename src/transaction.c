@@ -2,7 +2,7 @@
 #include "diagnostics.h"
 #include "effects/effects.h"
 #include "input/cursor.h"
-#include "once.h"
+#include "macros.h"
 #include "output/output.h"
 #include "protocol/idle.h"
 #include "protocol/xdg_toplevel.h"
@@ -11,15 +11,14 @@
 #include "tree.h"
 #include "types.h"
 #include <stdlib.h>
-#include <string.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/box.h>
 
 // transaction state
 static struct {
-	struct transaction_t *pending_transaction;
-	struct transaction_t *queued_transaction;
+	transaction_t *pending_transaction;
+	transaction_t *queued_transaction;
 	node_t **dirty_nodes;
 	size_t dirty_count;
 	size_t dirty_capacity;
@@ -33,7 +32,7 @@ void transaction_stats(transaction_stats_t *out) {
 		.timeouts = txn_state.timeouts,
 	};
 
-	transaction_t *txn = txn_state.queued_transaction ? txn_state.queued_transaction :
+	const transaction_t *txn = txn_state.queued_transaction ? txn_state.queued_transaction :
 		txn_state.pending_transaction;
 	if (txn != NULL) {
 		out->pending = wl_list_length(&txn->instructions);
@@ -45,8 +44,8 @@ static void transaction_commit(struct transaction_t *txn);
 static void transaction_commit_pending(void);
 static void _transaction_commit_dirty(bool server_request);
 
-static struct transaction_t *transaction_create(void) {
-	struct transaction_t *txn = calloc(1, sizeof(*txn));
+static transaction_t *transaction_create(void) {
+	transaction_t *txn = calloc(1, sizeof(*txn));
 	if (!txn) {
 		wlr_log(WLR_ERROR, "Failed to allocate transaction");
 		return NULL;
@@ -63,7 +62,7 @@ static void transaction_destroy(transaction_t *txn) {
 	if (!txn)
 		return;
 
-	bool is_pending = (txn == txn_state.pending_transaction);
+	const bool is_pending = (txn == txn_state.pending_transaction);
 
 	// free all instructions
 	transaction_inst_t *instruction, *tmp;
@@ -152,7 +151,7 @@ static void transaction_add_node(transaction_t *txn, node_t *node, bool server_r
 	wl_list_insert(&txn->instructions, &instruction->link);
 }
 
-static bool node_in_manual_resize(node_t *node) {
+static bool node_in_manual_resize(const node_t *node) {
 	if (server.tiled_resize.node == NULL || node == NULL || node->desktop == NULL)
 		return false;
 	if (node->desktop != server.tiled_resize.node->desktop)
@@ -166,7 +165,7 @@ static void copy_node_current_state(node_t *node, transaction_inst_t *instructio
 	if (!node || !instruction)
 		return;
 
-	bool manual_resize = node_in_manual_resize(node);
+	const bool manual_resize = node_in_manual_resize(node);
 
 	node->current.rectangle = manual_resize ? node->pending.rectangle : instruction->rectangle;
 	node->current.split_ratio = manual_resize ? node->pending.split_ratio : instruction->split_ratio;
@@ -214,11 +213,10 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 
 	view_t *view = node->client->view;
 
-	bool ready = view_is_ready(view);
-	if (!ready)
+	if (!view_is_ready(view))
 		return;
 
-	bool manual_resize = node_in_manual_resize(node);
+	const bool manual_resize = node_in_manual_resize(node);
 
 	struct wlr_box *rect;
 	if (instruction->state == STATE_FULLSCREEN) {
@@ -269,7 +267,7 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 		return;
 	}
 
-	// don't wait for rountrip with xwayland toplevels
+	// don't wait for roundtrip with xwayland toplevels
 	if (view_to_xwayland(view)) {
 		wlr_log(WLR_INFO, "Transaction xwayland node %u: target=(%d,%d %dx%d) current=(%dx%d) state=%d",
 			node->id, rect->x, rect->y, rect->width, rect->height, view->geometry.width,
@@ -304,8 +302,8 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 			instruction->previous_tiled_rectangle.height, rect->width, rect->height, snapshot_resize);
 	}
 
-	bool resizing = snapshot_resize || animation_is_resizing(node);
-	bool shrinking = instruction->previous_tiled_rectangle.width > 0 &&
+	const bool resizing = snapshot_resize || animation_is_resizing(node);
+	const bool shrinking = instruction->previous_tiled_rectangle.width > 0 &&
 		instruction->previous_tiled_rectangle.height > 0 &&
 		rect->width <= instruction->previous_tiled_rectangle.width &&
 		rect->height <= instruction->previous_tiled_rectangle.height;
@@ -341,8 +339,8 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 
 			if (node->client->view) {
 				view_t *tl = node->client->view;
-				int bwi = (int)bw;
-				struct wlr_box container = {
+				const int bwi = (int)bw;
+				const struct wlr_box container = {
 					0,
 					0,
 					rect->width,
@@ -357,14 +355,14 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 				surface_rounded_t *rounded = client_get_rounded(node->client);
 				if (rounded && (node->client->border_radius > 0.0f || rounded->gradient_count >= 2)) {
 					if (rounded->border_shader_node) {
-						int new_fw = border_size.width + 2 * bwi;
-						int new_fh = border_size.height + 2 * bwi;
+						const int new_fw = border_size.width + 2 * bwi;
+						const int new_fh = border_size.height + 2 * bwi;
 						if (new_fw > 0 && new_fh > 0) {
-							float scale = node->client->view && node->client->view->node &&
+							const float scale = node->client->view && node->client->view->node &&
 								node->client->view->node->output ? node->client->view->node->output->wlr_output->scale :
 								1.0f;
-							int pfw = (int)((double)new_fw * scale + 0.5);
-							int pfh = (int)((double)new_fh * scale + 0.5);
+							const int pfw = (int)((double)new_fw * scale + 0.5);
+							const int pfh = (int)((double)new_fh * scale + 0.5);
 							if (rounded->border_shader_buf_w != pfw || rounded->border_shader_buf_h != pfh) {
 								rounded->border_dirty = true;
 								rounded->corner_mask_dirty = true;
@@ -391,13 +389,8 @@ static void arrange_node_geometry(node_t *node, transaction_inst_t *instruction)
 	}
 }
 
-static bool node_in_transaction(transaction_t *txn, node_t *node) {
-	(void)txn;
-	return node && node->pending_inst;
-}
-
-static bool should_skip_node(node_t *node) {
-	return txn_state.pending_transaction && node_in_transaction(txn_state.pending_transaction, node);
+static bool should_skip_node(const node_t *node) {
+	return txn_state.pending_transaction && node && node->pending_inst;
 }
 
 static void transaction_apply(transaction_t *txn) {
@@ -409,7 +402,7 @@ static void transaction_apply(transaction_t *txn) {
 	if (settings.debug_txn_timings) {
 		struct timespec now;
 		clock_gettime(CLOCK_MONOTONIC, &now);
-		double ms = (now.tv_sec - txn->commit_time.tv_sec) * 1000.0 + (now.tv_nsec -
+		const double ms = (double)(now.tv_sec - txn->commit_time.tv_sec) * 1000.0 + (double)(now.tv_nsec -
 			txn->commit_time.tv_nsec) / 1000000.0;
 		wlr_log(WLR_INFO, "Transaction applying after %.1fms (%zu waiting, %zu total)", ms,
 			txn->num_waiting, (size_t)wl_list_length(&txn->instructions));
@@ -451,7 +444,7 @@ static bool should_configure(node_t *node, transaction_inst_t *instruction) {
 		return false;
 	if (!node->client || !node->client->view)
 		return false;
-	xdg_toplevel_t *xdg = view_to_xdg(node->client->view);
+	const xdg_toplevel_t *xdg = view_to_xdg(node->client->view);
 	if (xdg == NULL || xdg->xdg_toplevel == NULL)
 		return false;
 	if (node->destroying)
@@ -575,7 +568,7 @@ static void transaction_commit(transaction_t *txn) {
 	size_t num_configures = 0;
 
 	// send configure to clients and save buffers
-	struct transaction_inst_t *instruction;
+	transaction_inst_t *instruction;
 	wl_list_for_each(instruction, &txn->instructions, link) {
 		node_t *node = instruction->node;
 
@@ -601,7 +594,7 @@ static void transaction_commit(transaction_t *txn) {
 
 				node->client->view->last_requested = *rect;
 
-				bool has_stable_frame = node->client->view->geometry.width > 0 ||
+				const bool has_stable_frame = node->client->view->geometry.width > 0 ||
 					node->client->view->geometry.height > 0;
 				instruction->require_geometry_match = has_stable_frame && node->client->flags.shown &&
 					node->client->view->configured;
@@ -780,9 +773,8 @@ bool transaction_notify_view_ready_by_geometry(view_t *view, int x, int y, int w
 
 	transaction_inst_t *instruction = node->instruction;
 
-	if (instruction->waiting && (int)instruction->content_rect.x == x &&
-			(int)instruction->content_rect.y == y && (int)instruction->content_rect.width == width &&
-			(int)instruction->content_rect.height == height) {
+	if (instruction->waiting && instruction->content_rect.x == x && instruction->content_rect.y == y &&
+			instruction->content_rect.width == width && instruction->content_rect.height == height) {
 
 		wlr_log(WLR_DEBUG, "View ready by geometry (%d,%d %dx%d) for node %u", x, y, width, height,
 			node->id);

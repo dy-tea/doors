@@ -20,7 +20,6 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
-#include <wayland-server-core.h>
 #include <wlr/backend/drm.h>
 #include <wlr/backend/headless.h>
 #include <wlr/backend/libinput.h>
@@ -81,7 +80,7 @@ static void json_str(ipc_buf_t *b, const char *s) {
 	ipc_buff(b, "\"");
 }
 
-static const char *backend_kind(struct wlr_backend *backend) {
+static const char *backend_kind(const struct wlr_backend *backend) {
 	if (wlr_backend_is_drm(backend))
 		return "drm";
 	if (wlr_backend_is_wl(backend))
@@ -102,12 +101,12 @@ typedef struct {
 static void collect_backend(struct wlr_backend *backend, void *data) {
 	backend_names_t *names = data;
 	const char *kind = backend_kind(backend);
-	size_t len = strlen(kind);
+	const size_t len = strlen(kind);
 
 	// session can hold more than one backend of same kind
 	for (const char *p = names->text; *p; ) {
 		const char *end = strchr(p, '+');
-		size_t n = end ? (size_t)(end - p) : strlen(p);
+		const size_t n = end ? (size_t)(end - p) : strlen(p);
 		if (n == len && strncmp(p, kind, len) == 0)
 			return;
 		if (end == NULL)
@@ -157,7 +156,7 @@ static void gpu_json(ipc_buf_t *b) {
 	if (server.renderer == NULL)
 		return;
 
-	int fd = wlr_renderer_get_drm_fd(server.renderer);
+	const int fd = wlr_renderer_get_drm_fd(server.renderer);
 	if (fd < 0)
 		return;
 
@@ -165,8 +164,8 @@ static void gpu_json(ipc_buf_t *b) {
 	if (fstat(fd, &st) == -1 || !S_ISCHR(st.st_mode))
 		return;
 
-	unsigned int maj = (unsigned int)((st.st_rdev >> 8) & 0xfff);
-	unsigned int min = (unsigned int)((st.st_rdev & 0xff) | ((st.st_rdev >> 12) & 0xfff00));
+	const unsigned int maj = (unsigned int)((st.st_rdev >> 8) & 0xfff);
+	const unsigned int min = (unsigned int)((st.st_rdev & 0xff) | ((st.st_rdev >> 12) & 0xfff00));
 
 	char path[128];
 	snprintf(path, sizeof(path), "/sys/dev/char/%u:%u/device/uevent", maj, min);

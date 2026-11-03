@@ -1,5 +1,5 @@
 #include "launcher.h"
-#include "once.h"
+#include "macros.h"
 #include "output/output.h"
 #include "server.h"
 #include "str.h"
@@ -14,7 +14,7 @@
 #include <wlr/types/wlr_xdg_activation_v1.h>
 #include <wlr/types/wlr_xdg_shell.h>
 
-static pid_t get_parent_pid(pid_t child) {
+static pid_t get_parent_pid(const pid_t child) {
 	pid_t parent = -1;
 	char file_name[100];
 	char *buffer = NULL;
@@ -126,7 +126,7 @@ launcher_ctx_t *launcher_ctx_create(struct wlr_xdg_activation_token_v1 *token,
 	return ctx;
 }
 
-const char *launcher_ctx_get_token_name(launcher_ctx_t *ctx) {
+const char *launcher_ctx_get_token_name(const launcher_ctx_t *ctx) {
 	return wlr_xdg_activation_token_v1_get_name(ctx->token);
 }
 
@@ -164,7 +164,7 @@ static void handle_xdg_activation_request_activate(struct wl_listener *listener,
 	if (event->surface == NULL)
 		return;
 
-	struct wlr_xdg_surface *xdg_surface = wlr_xdg_surface_try_from_wlr_surface(event->surface);
+	const struct wlr_xdg_surface *xdg_surface = wlr_xdg_surface_try_from_wlr_surface(event->surface);
 	if (xdg_surface == NULL) {
 		wlr_log(WLR_DEBUG, "Surface is not an xdg surface");
 		return;
@@ -200,7 +200,7 @@ static void handle_xdg_activation_new_token(struct wl_listener *listener, void *
 	struct wlr_xdg_activation_token_v1 *token = data;
 
 	const char *desktop_name = NULL;
-	output_t *output = server.focused_output;
+	const output_t *output = server.focused_output;
 	if (output && output->desk)
 		desktop_name = output->desk->name;
 
@@ -218,15 +218,12 @@ static void handle_xdg_activation_new_token(struct wl_listener *listener, void *
 	wlr_log(WLR_DEBUG, "New token for desktop '%s'", desktop_name);
 }
 
-// Ignored signals stay ignored through exec() and the signal mask is inherited too, programs
-// that wait for their own children or write to pipes rely on the defaults, so every forked
-// child gets them back (same as sway). SIGPIPE is ignored by the log setup.
 static void restore_signals(void) {
 	sigset_t set;
 	sigemptyset(&set);
 	sigprocmask(SIG_SETMASK, &set, NULL);
 
-	struct sigaction sa_dfl = {
+	const struct sigaction sa_dfl = {
 		.sa_handler = SIG_DFL
 	};
 	sigaction(SIGCHLD, &sa_dfl, NULL);
@@ -237,9 +234,7 @@ void launcher_init(void) {
 	ONCE();
 	wl_list_init(&server.pending_launcher_ctxs);
 
-	// Commands started by doors are children of the compositor and nothing waits for them.
-	// Ignoring SIGCHLD makes the kernel reap them instead of leaving zombies behind.
-	struct sigaction sa_ign = {
+	const struct sigaction sa_ign = {
 		.sa_handler = SIG_IGN
 	};
 	sigaction(SIGCHLD, &sa_ign, NULL);

@@ -5,7 +5,7 @@
 #include "layout/layout.h"
 #include "layout/master_stack.h"
 #include "layout/scroller.h"
-#include "once.h"
+#include "macros.h"
 #include "output/output.h"
 #include "protocol/workspace.h"
 #include "server.h"
@@ -17,9 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 #include <sys/inotify.h>
-#include <sys/wait.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_keyboard.h>
@@ -52,7 +50,7 @@ static char hotkey_config_path[CONFIG_PATH_MAX];
 static struct wl_event_loop *hotkey_event_loop = NULL;
 static struct wl_event_source *hotkey_event_source = NULL;
 static struct wl_event_source *doorsrc_debounce_timer = NULL;
-static void setup_inotify_watch(const char *config_path);
+static void setup_inotify_watch(const char *path);
 static void add_hotkey_listener_to_event_loop(void);
 
 // whether an inotify event name is the file at `path`
@@ -194,7 +192,7 @@ bool parse_bind_flags(const char *str, uint32_t *out_flags) {
 	return ok;
 }
 
-char *bind_flags_text(uint32_t flags, char *buf, size_t size) {
+char *bind_flags_text(const uint32_t flags, char *buf, const size_t size) {
 	buf[0] = '\0';
 	if (flags == 0)
 		return buf;
@@ -260,7 +258,7 @@ const char *parse_hotkey_spec(const char *spec, uint32_t *modifiers, xkb_keysym_
 				use_kc = true;
 		}
 	} else {
-		char *key_part = str_trim(buf);
+		const char *key_part = str_trim(buf);
 		if (streqi(key_part, "catchall"))
 			is_catchall = true;
 		else {
@@ -424,7 +422,7 @@ bind_action_t parse_action(const char *cmd, int *desktop_index, char *submap_nam
 	if (streq(args[0], "node") && argc >= 2) {
 		if (streq(args[1], "-d") || streq(args[1], "--to-desktop")) {
 			if (argc >= 3) {
-				int d = atoi(args[2]);
+				const int d = atoi(args[2]);
 				if (d >= 1 && d <= 10) {
 					*desktop_index = d;
 					return BIND_SEND_TO_DESKTOP_1;
@@ -438,7 +436,7 @@ bind_action_t parse_action(const char *cmd, int *desktop_index, char *submap_nam
 		if (streq(args[1], "-f") || streq(args[1], "--focus"))
 			return (argc >= 3 && streq(args[2], "last")) ? BIND_DESKTOP_LAST : BIND_DESKTOP_FOCUS;
 
-		int d = atoi(args[1]);
+		const int d = atoi(args[1]);
 		if (d >= 1 && d <= 10) {
 			*desktop_index = d;
 			return BIND_DESKTOP_1;
@@ -544,8 +542,8 @@ static void expand_braces_recursive(const char *input, char *prefix, size_t pref
 	}
 
 	if (is_range) {
-		char first = content[0];
-		char last = content[content_len - 1];
+		const char first = content[0];
+		const char last = content[content_len - 1];
 		for (char c = first; c <= last; c++) {
 			char choice[2] = {
 				c,
@@ -564,7 +562,7 @@ static void expand_braces_recursive(const char *input, char *prefix, size_t pref
 				choice_depth--;
 			} else if (content[i] == ',' && choice_depth == 0) {
 				char choice[MAXLEN];
-				size_t choice_len = i - choice_start;
+				const size_t choice_len = i - choice_start;
 				if (choice_len < MAXLEN) {
 					memcpy(choice, content + choice_start, choice_len);
 					choice[choice_len] = '\0';
@@ -585,7 +583,7 @@ static void expand_braces_recursive(const char *input, char *prefix, size_t pref
 		// last choice
 		if (choice_start <= content_len) {
 			char choice[MAXLEN];
-			size_t choice_len = content_len - choice_start;
+			const size_t choice_len = content_len - choice_start;
 			if (choice_len < MAXLEN) {
 				memcpy(choice, content + choice_start, choice_len);
 				choice[choice_len] = '\0';
@@ -635,9 +633,9 @@ static bool bind_flags_valid(const keybind_t *kb, bind_action_t action) {
 	return true;
 }
 
-void add_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode, bool use_keycode,
-		uint32_t flags, bind_action_t action, int desktop_index, const char *external_cmd,
-		const char *submap_name) {
+void add_keybind(const uint32_t modifiers, const xkb_keysym_t keysym, const uint32_t keycode,
+		const bool use_keycode, const uint32_t flags, const bind_action_t action, const int desktop_index,
+		const char *external_cmd, const char *submap_name) {
 	size_t *num_ptr;
 	keybind_t *kb_array;
 
@@ -692,8 +690,9 @@ void add_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode, bool
 		keysym, keycode, action, desktop_index, flag_text, submap_name ? submap_name : "global");
 }
 
-static void add_gesturebind(enum gesture_type type, uint8_t fingers, uint32_t directions,
-		const char *input, bind_action_t action, int desktop_index, const char *external_cmd) {
+static void add_gesturebind(const enum gesture_type type, const uint8_t fingers,
+		const uint32_t directions, const char *input, const bind_action_t action, const int desktop_index,
+		const char *external_cmd) {
 	if (num_gesturebinds >= MAX_GESTUREBINDS) {
 		wlr_log(WLR_ERROR, "Maximum number of gesture binds reached");
 		return;
@@ -746,8 +745,8 @@ static void parse_gesture_hotkey_line(const char *gesture_str, const char *comma
 	}
 }
 
-static void add_hotcornerbind(int corner_x, int corner_y, bind_action_t action, int desktop_index,
-		const char *external_cmd) {
+static void add_hotcornerbind(const int corner_x, const int corner_y, const bind_action_t action,
+		const int desktop_index, const char *external_cmd) {
 	if (num_hotcornerbinds >= MAX_HOTCORNERBINDS) {
 		wlr_log(WLR_ERROR, "Maximum number of hotcorner binds reached");
 		return;
@@ -800,7 +799,7 @@ static void parse_hotcorner_hotkey_line(const char *hotcorner_str, const char *c
 	int desktop_index = 0;
 	char submap_name[MAXLEN];
 	submap_name[0] = '\0';
-	bind_action_t action = parse_action(command_str, &desktop_index, submap_name);
+	const bind_action_t action = parse_action(command_str, &desktop_index, submap_name);
 
 	if (action != BIND_EXTERNAL)
 		add_hotcornerbind(corner_x, corner_y, action, desktop_index, NULL);
@@ -825,7 +824,7 @@ static void parse_hotkey_line(const char *hotkey_str, const char *command_str) {
 		int desktop_index = 0;
 		char submap_name[MAXLEN];
 		submap_name[0] = '\0';
-		bind_action_t action = parse_action(command_str, &desktop_index, submap_name);
+		const bind_action_t action = parse_action(command_str, &desktop_index, submap_name);
 		if (action != BIND_EXTERNAL) {
 			bell_bind = (keybind_t){
 				.action = action,
@@ -978,11 +977,11 @@ static void flush_pending_bind(struct pending_bind *p) {
 	p->indent = 0;
 }
 
-void load_hotkeys(const char *config_path) {
-	wlr_log(WLR_DEBUG, "Loading hotkeys from path: %s", config_path);
-	FILE *f = fopen(config_path, "r");
+void load_hotkeys(const char *path) {
+	wlr_log(WLR_DEBUG, "Loading hotkeys from path: %s", path);
+	FILE *f = fopen(path, "r");
 	if (!f) {
-		wlr_log(WLR_INFO, "No hotkey config found at %s", config_path);
+		wlr_log(WLR_INFO, "No hotkey config found at %s", path);
 		return;
 	}
 
@@ -996,7 +995,7 @@ void load_hotkeys(const char *config_path) {
 	bell_bind = (keybind_t){0};
 
 	char line[MAXLEN * 2];
-	int offset = 0;
+	unsigned long offset = 0;
 	struct pending_bind pending = {0};
 
 	while (fgets(line, sizeof(line), f)) {
@@ -1011,7 +1010,7 @@ void load_hotkeys(const char *config_path) {
 		char *content_start = ptr;
 		while (*content_start == ' ' || *content_start == '\t')
 			content_start++;
-		char first_char = *content_start;
+		const char first_char = *content_start;
 
 		if (line[0] == '#' || line[0] == '\0')
 			continue;
@@ -1020,7 +1019,7 @@ void load_hotkeys(const char *config_path) {
 			if (indent == 0) {
 				flush_pending_bind(&pending);
 				pending.indent = 0;
-				char *submap_name = content_start + 1;
+				const char *submap_name = content_start + 1;
 				current_parsing_submap = find_or_create_submap(submap_name);
 			} else {
 				str_copy(pending.command, sizeof(pending.command), content_start);
@@ -1062,8 +1061,8 @@ void load_hotkeys(const char *config_path) {
 					flush_pending_bind(&pending);
 				} else {
 					if (pending.command[0] != '\0') {
-						size_t cur_len = strlen(pending.command);
-						size_t rem = sizeof(pending.command) - cur_len - 1;
+						const size_t cur_len = strlen(pending.command);
+						const size_t rem = sizeof(pending.command) - cur_len - 1;
 						if (rem > 0)
 							str_append_sep(pending.command, sizeof(pending.command), " ", content_start);
 					} else {
@@ -1103,11 +1102,10 @@ void load_hotkeys(const char *config_path) {
 
 	fclose(f);
 	wlr_log(WLR_INFO, "Loaded %zu keybinds, %zu gesturebinds, %zu hotcornerbinds "
-		"and %zu submaps from %s", num_keybinds, num_gesturebinds, num_hotcornerbinds, num_submaps,
-			config_path);
+		"and %zu submaps from %s", num_keybinds, num_gesturebinds, num_hotcornerbinds, num_submaps, path);
 }
 
-static void setup_inotify_watch(const char *config_path) {
+static void setup_inotify_watch(const char *path) {
 	if (hotkey_event_source) {
 		wl_event_source_remove(hotkey_event_source);
 		hotkey_event_source = NULL;
@@ -1124,12 +1122,12 @@ static void setup_inotify_watch(const char *config_path) {
 		return;
 	}
 
-	str_copy(hotkey_config_path, sizeof(hotkey_config_path), config_path);
+	str_copy(hotkey_config_path, sizeof(hotkey_config_path), path);
 
 	char dir_path[CONFIG_PATH_MAX];
-	str_copy(dir_path, sizeof(dir_path), config_path);
+	str_copy(dir_path, sizeof(dir_path), path);
 	char *last_slash = strrchr(dir_path, '/');
-	uint32_t mask = IN_MODIFY | IN_CLOSE_WRITE | IN_MOVED_TO | IN_CREATE;
+	const uint32_t mask = IN_MODIFY | IN_CLOSE_WRITE | IN_MOVED_TO | IN_CREATE;
 	if (last_slash) {
 		*last_slash = '\0';
 		inotify_add_watch(hotkey_watch_fd, dir_path, mask);
@@ -1214,7 +1212,7 @@ static int hotkey_reload_handler(int fd, uint32_t mask, void *data) {
 		return 0;
 
 	char buf[sizeof(struct inotify_event) + NAME_MAX + 1];
-	ssize_t len = read(fd, buf, sizeof(buf));
+	const ssize_t len = read(fd, buf, sizeof(buf));
 	if (len <= 0)
 		return 0;
 
@@ -1257,8 +1255,8 @@ static int hotkey_reload_handler(int fd, uint32_t mask, void *data) {
 	return 0;
 }
 
-bool keybind_matches(const keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysym,
-		uint32_t keycode) {
+bool keybind_matches(const keybind_t *kb, const uint32_t modifiers, const xkb_keysym_t keysym,
+		const uint32_t keycode) {
 	if (!kb)
 		return false;
 
@@ -1277,12 +1275,12 @@ bool keybind_matches(const keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysy
 
 	if (kb->keysym == keysym)
 		return true;
-	xkb_keysym_t lower = xkb_keysym_to_lower(keysym);
+	const xkb_keysym_t lower = xkb_keysym_to_lower(keysym);
 	return kb->keysym == lower;
 }
 
-static bool keybind_matches_now(const keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysym,
-		uint32_t keycode, bool prefer_keycode) {
+static bool keybind_matches_now(const keybind_t *kb, const uint32_t modifiers,
+		const xkb_keysym_t keysym, const uint32_t keycode, const bool prefer_keycode) {
 	if (kb->use_keycode != prefer_keycode)
 		return false;
 	return keybind_matches(kb, modifiers, keysym, keycode);
@@ -1293,8 +1291,8 @@ static bool keybind_is_deferred(const keybind_t *kb) {
 	return (kb->flags & (BINDF_RELEASE | BINDF_CATCH_ALL)) != 0;
 }
 
-keybind_t *find_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode,
-		bool prefer_keycode, bool fallback_to_global) {
+keybind_t *find_keybind(const uint32_t modifiers, const xkb_keysym_t keysym, const uint32_t keycode,
+		const bool prefer_keycode, const bool fallback_to_global) {
 	if (active_submap) {
 		for (size_t i = 0; i < active_submap->num_keybinds; i++) {
 			keybind_t *kb = &active_submap->keybinds[i];
@@ -1339,8 +1337,8 @@ submap_t *find_submap_by_name(const char *name) {
 	return NULL;
 }
 
-keybind_t *find_release_bind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode,
-		const char *submap_at_press) {
+keybind_t *find_release_bind(const uint32_t modifiers, const xkb_keysym_t keysym,
+		const uint32_t keycode, const char *submap_at_press) {
 	submap_t *sm = submap_at_press ? find_submap_by_name(submap_at_press) : NULL;
 	if (sm) {
 		for (size_t i = 0; i < sm->num_keybinds; i++) {
@@ -1523,8 +1521,7 @@ void execute_bind(bind_t b) {
 		if (focused == NULL || focused->desk == NULL || focused->desk->layout != LAYOUT_SCROLLER)
 			return;
 
-		bool changed = scroller_bind_action(focused->desk, b.action);
-		if (changed)
+		if (scroller_bind_action(focused->desk, b.action))
 			arrange(focused, focused->desk, true);
 		break;
 	}
@@ -1613,7 +1610,7 @@ void execute_bind(bind_t b) {
 void execute_keybind(const keybind_t *kb) {
 	if (!kb)
 		return;
-	bind_t bind = {
+	const bind_t bind = {
 		.action = kb->action,
 		.desktop_index = kb->desktop_index,
 		.submap_name = kb->submap_name,
@@ -1679,7 +1676,8 @@ void set_keyboard_grouping(keyboard_grouping_t grouping) {
 	}
 }
 
-bool gesturebind_matches(const gesturebind_t *gb, enum gesture_type type, uint8_t fingers) {
+bool gesturebind_matches(const gesturebind_t *gb, const enum gesture_type type,
+		const uint8_t fingers) {
 	return !(!gb || gb->type != type || (gb->fingers != GESTURE_FINGERS_ANY &&
 		gb->fingers != fingers));
 }
@@ -1687,7 +1685,7 @@ bool gesturebind_matches(const gesturebind_t *gb, enum gesture_type type, uint8_
 void execute_gesturebind(const gesturebind_t *gb) {
 	if (!gb || gb->action == BIND_ENTER_SUBMAP)
 		return;
-	bind_t bind = {
+	const bind_t bind = {
 		.action = gb->action,
 		.desktop_index = gb->desktop_index,
 		.external_cmd = gb->external_cmd,
@@ -1696,7 +1694,7 @@ void execute_gesturebind(const gesturebind_t *gb) {
 	execute_bind(bind);
 }
 
-bool hotcornerbind_matches(const hotcornerbind_t *hc, int corner_x, int corner_y) {
+bool hotcornerbind_matches(const hotcornerbind_t *hc, const int corner_x, const int corner_y) {
 	if (!hc)
 		return false;
 	return hc->corner_x == corner_x && hc->corner_y == corner_y;
@@ -1713,7 +1711,7 @@ hotcornerbind_t *hotcorner_bind_match(int corner_x, int corner_y) {
 void execute_hotcornerbind(const hotcornerbind_t *hc) {
 	if (!hc || hc->action == BIND_ENTER_SUBMAP)
 		return;
-	bind_t bind = {
+	const bind_t bind = {
 		.action = hc->action,
 		.desktop_index = hc->desktop_index,
 		.external_cmd = hc->external_cmd,
@@ -1829,15 +1827,15 @@ static const char *const bind_action_names[] = {
 _Static_assert(sizeof(bind_action_names) / sizeof(bind_action_names[0]) == BIND_ACTION_COUNT,
 	"bind_action_name() must have exactly one name per bind_action_t value");
 
-const char *bind_action_name(bind_action_t action) {
+const char *bind_action_name(const bind_action_t action) {
 	if (action >= 0 && action < BIND_ACTION_COUNT)
 		return bind_action_names[action];
 
 	return "unknown";
 }
 
-void execute_bind_action(bind_action_t action) {
-	bind_t b = {
+void execute_bind_action(const bind_action_t action) {
+	const bind_t b = {
 		.action = action,
 		.desktop_index = 0
 	};

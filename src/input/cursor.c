@@ -3,13 +3,12 @@
 #include "effects/effects.h"
 #include "input/cursor.h"
 #include "input/input.h"
-#include "input/input_method.h"
 #include "input/keyboard.h"
 #include "input/pointer.h"
 #include "input/tablet.h"
 #include "layout/layout.h"
 #include "layout/scroller.h"
-#include "once.h"
+#include "macros.h"
 #include "output/output.h"
 #include "protocol/global_shortcuts.h"
 #include "protocol/idle_power.h"
@@ -67,7 +66,7 @@ static void clear_resize_anchors(desktop_t *d);
 
 static void reset_cursor_mode(void) {
 	if (server.tiled_resize.node) {
-		node_t *node = server.tiled_resize.node;
+		const node_t *node = server.tiled_resize.node;
 		output_t *m = node->output;
 		desktop_t *d = node->desktop;
 
@@ -97,7 +96,8 @@ static void reset_cursor_mode(void) {
 	server.tiled_resize.initial_height = 0;
 }
 
-void *desktop_type_at(double lx, double ly, struct wlr_surface **surface, double *sx, double *sy) {
+void *desktop_type_at(const double lx, const double ly, struct wlr_surface **surface, double *sx,
+		double *sy) {
 	struct wlr_scene_node *node = wlr_scene_node_at(&server.scene->tree.node, lx, ly, sx, sy);
 	if (node == NULL || node->type != WLR_SCENE_NODE_BUFFER)
 		return NULL;
@@ -145,7 +145,7 @@ static uint32_t get_tiled_resizable_edges(node_t *node) {
 	if (!node || !node->parent)
 		return 0;
 
-	node_t *v_ancestor = find_vertical_ancestor(node);
+	const node_t *v_ancestor = find_vertical_ancestor(node);
 	if (v_ancestor) {
 		node_t *child = node;
 		while (child && child->parent != v_ancestor)
@@ -157,7 +157,7 @@ static uint32_t get_tiled_resizable_edges(node_t *node) {
 			edges |= WLR_EDGE_LEFT;
 	}
 
-	node_t *h_ancestor = find_horizontal_ancestor(node);
+	const node_t *h_ancestor = find_horizontal_ancestor(node);
 	if (h_ancestor) {
 		node_t *child = node;
 		while (child && child->parent != h_ancestor)
@@ -201,8 +201,9 @@ static void apply_leaf_positions(desktop_t *d) {
 		c->tiled_rectangle = r;
 		c->committed_tiled_rectangle = r;
 
-		bool size_changed = r.width != tl->last_requested.width || r.height != tl->last_requested.height;
-		bool pos_changed = r.x != tl->last_requested.x || r.y != tl->last_requested.y;
+		const bool size_changed = r.width != tl->last_requested.width ||
+			r.height != tl->last_requested.height;
+		const bool pos_changed = r.x != tl->last_requested.x || r.y != tl->last_requested.y;
 
 		if (size_changed || (pos_changed && view_to_xwayland(tl))) {
 			view_configure(tl, r);
@@ -244,7 +245,7 @@ static void set_resize_anchors(desktop_t *d, node_t *v_ancestor, node_t *h_ances
 	if (!d || !d->root)
 		return;
 
-	bool scroller = d->layout == LAYOUT_SCROLLER;
+	const bool scroller = d->layout == LAYOUT_SCROLLER;
 
 	FOR_EACH_LEAF(n, d->root) {
 		if (!n->client || !n->client->view || !IS_TILED(n->client))
@@ -253,9 +254,9 @@ static void set_resize_anchors(desktop_t *d, node_t *v_ancestor, node_t *h_ances
 		client_t *c = n->client;
 
 		// only pin a window that already fills its slot
-		bool fills_x = c->view->geometry.width <= 0 ||
+		const bool fills_x = c->view->geometry.width <= 0 ||
 			c->view->geometry.width + 2 >= c->arranged_rectangle.width;
-		bool fills_y = c->view->geometry.height <= 0 ||
+		const bool fills_y = c->view->geometry.height <= 0 ||
 			c->view->geometry.height + 2 >= c->arranged_rectangle.height;
 
 		if (scroller) {
@@ -269,22 +270,18 @@ static void set_resize_anchors(desktop_t *d, node_t *v_ancestor, node_t *h_ances
 	}
 }
 
-static int find_scroller_tile_idx(scroller_column_t *col, client_t *c) {
+static int find_scroller_tile_idx(const scroller_column_t *col, const client_t *c) {
 	for (int j = 0; j < col->tile_count; j++)
 		if (col->tiles[j].client == c)
 			return j;
 	return -1;
 }
 
-static int find_scroller_column(scroller_state_t *s, client_t *c) {
+static int find_scroller_column(const scroller_state_t *s, const client_t *c) {
 	for (int i = 0; i < s->column_count; i++)
 		if (find_scroller_tile_idx(&s->columns[i], c) >= 0)
 			return i;
 	return -1;
-}
-
-static double max_d(double a, double b) {
-	return a > b ? a : b;
 }
 
 // process cursor motion for tiled window resizing
@@ -303,14 +300,14 @@ static void process_cursor_tiled_resize(void) {
 		if (s->column_count == 0)
 			return;
 
-		int col = find_scroller_column(s, node->client);
+		const int col = find_scroller_column(s, node->client);
 		if (col < 0)
 			return;
 
-		double delta_x = server.cursor->x - server.grab_x;
+		const double delta_x = server.cursor->x - server.grab_x;
 
 		if (server.resize_edges & (WLR_EDGE_LEFT | WLR_EDGE_RIGHT)) {
-			double area_w = max_d(1.0, (double)s->working_area.width);
+			const double area_w = (double)s->working_area.width > 1.0 ? (double)s->working_area.width : 1.0;
 
 			// resolve against the width the drag started from instead of
 			// adding every motion delta again
@@ -340,10 +337,10 @@ static void process_cursor_tiled_resize(void) {
 			total_width = 1.0;
 
 		// calculate delta from initial grab position
-		double delta_x = server.cursor->x - server.grab_x;
+		const double delta_x = server.cursor->x - server.grab_x;
 
 		// convert to ratio change
-		double ratio_delta = delta_x / total_width;
+		const double ratio_delta = delta_x / total_width;
 		double new_ratio = server.tiled_resize.initial_ratio_v + ratio_delta;
 
 		// clamp to valid range
@@ -364,10 +361,10 @@ static void process_cursor_tiled_resize(void) {
 			total_height = 1.0;
 
 		// calculate delta from initial grab position
-		double delta_y = server.cursor->y - server.grab_y;
+		const double delta_y = server.cursor->y - server.grab_y;
 
 		// convert to ratio change
-		double ratio_delta = delta_y / total_height;
+		const double ratio_delta = delta_y / total_height;
 		double new_ratio = server.tiled_resize.initial_ratio_h + ratio_delta;
 
 		// clamp to valid range
@@ -427,8 +424,8 @@ static void process_cursor_resize(void) {
 
 	view_t *view = server.grabbed_view;
 
-	double border_x = server.cursor->x - server.grab_x;
-	double border_y = server.cursor->y - server.grab_y;
+	const int border_x = (int)(server.cursor->x - server.grab_x);
+	const int border_y = (int)(server.cursor->y - server.grab_y);
 
 	int new_left = server.grab_geobox.x;
 	int new_right = server.grab_geobox.x + server.grab_geobox.width;
@@ -488,7 +485,7 @@ static void process_cursor_resize(void) {
 	});
 
 	// update borders
-	unsigned int bw = effective_border_width(view->node->desktop);
+	const unsigned int bw = effective_border_width(view->node->desktop);
 	if (bw != 0) {
 		const struct wlr_box geo = {
 			0,
@@ -505,13 +502,13 @@ static void process_cursor_resize(void) {
 	}
 }
 
-static void process_cursor_motion(uint32_t time, double dx, double dy, double dx_unaccel,
+static void process_cursor_motion(const uint32_t time, double dx, double dy, double dx_unaccel,
 		double dy_unaccel) {
 	if (time) {
 		wlr_relative_pointer_manager_v1_send_relative_motion(server.relative_pointer_manager, server.seat,
 			time * 1000, dx, dy, dx_unaccel, dy_unaccel);
 
-		struct wlr_pointer_constraint_v1 *pc = server.active_pointer_constraint;
+		const struct wlr_pointer_constraint_v1 *pc = server.active_pointer_constraint;
 		if (pc != NULL && server.cursor_mode != CURSOR_RESIZE && server.cursor_mode != CURSOR_MOVE) {
 			if (pc->surface != server.seat->pointer_state.focused_surface) {
 				pointer_constrain(NULL);
@@ -524,8 +521,8 @@ static void process_cursor_motion(uint32_t time, double dx, double dy, double dx
 					const struct wlr_box geo = node->rectangle;
 
 					// calculate constraint
-					double sx = server.cursor->x - geo.x - geo.width;
-					double sy = server.cursor->y - geo.y - geo.height;
+					const double sx = server.cursor->x - geo.x - geo.width;
+					const double sy = server.cursor->y - geo.y - geo.height;
 					double cx, cy;
 
 					// apply confine on region
@@ -538,15 +535,18 @@ static void process_cursor_motion(uint32_t time, double dx, double dy, double dx
 		}
 	}
 
-	if (server.cursor_mode == CURSOR_MOVE) {
+	switch (server.cursor_mode) {
+	case CURSOR_MOVE:
 		process_cursor_move();
 		return;
-	} else if (server.cursor_mode == CURSOR_RESIZE) {
+	case CURSOR_RESIZE:
 		process_cursor_resize();
 		return;
-	} else if (server.cursor_mode == CURSOR_TILING_DRAG) {
+	case CURSOR_TILING_DRAG:
 		tiling_drag_motion();
 		return;
+	default:
+		break;
 	}
 
 	// hot corner detection
@@ -575,9 +575,9 @@ static void process_cursor_motion(uint32_t time, double dx, double dy, double dx
 			hotcorner_current_y = corner_y;
 
 			if (corner_x != 0 && corner_y != 0) {
-				uint32_t now = get_time_ms();
+				const uint32_t now = get_time_ms();
 				if (now - hotcorner_last_trigger > (uint32_t)hotcorner_cooldown_ms) {
-					hotcornerbind_t *hc = hotcorner_bind_match(corner_x, corner_y);
+					const hotcornerbind_t *hc = hotcorner_bind_match(corner_x, corner_y);
 					if (hc) {
 						hotcorner_last_trigger = now;
 						wlr_log(WLR_DEBUG, "Hot corner triggered: (%d,%d)", corner_x, corner_y);
@@ -599,8 +599,8 @@ static void process_cursor_motion(uint32_t time, double dx, double dy, double dx
 	double sx, sy;
 	struct wlr_seat *seat = server.seat;
 	struct wlr_surface *surface = NULL;
-	void *type = desktop_type_at(server.cursor->x, server.cursor->y, &surface, &sx, &sy);
-	view_t *hover = type ? view_from_wlr_surface(surface) : NULL;
+	const void *type = desktop_type_at(server.cursor->x, server.cursor->y, &surface, &sx, &sy);
+	const view_t *hover = type ? view_from_wlr_surface(surface) : NULL;
 	if (type == NULL && !seat->drag)
 		wlr_cursor_set_xcursor(server.cursor, server.cursor_mgr, "default");
 
@@ -616,11 +616,10 @@ static void process_cursor_motion(uint32_t time, double dx, double dy, double dx
 		if (settings.focus_follows_mouse != FOLLOWS_NO && type != NULL) {
 			node_t *node = NULL;
 
-			struct wlr_xdg_surface *xdg_surface = wlr_xdg_surface_try_from_wlr_surface(surface);
-			bool is_popup = xdg_surface != NULL && xdg_surface->role == WLR_XDG_SURFACE_ROLE_POPUP;
-			if (!is_popup && hover && hover->node) {
+			const struct wlr_xdg_surface *xdg_surface = wlr_xdg_surface_try_from_wlr_surface(surface);
+			const bool is_popup = xdg_surface != NULL && xdg_surface->role == WLR_XDG_SURFACE_ROLE_POPUP;
+			if (!is_popup && hover && hover->node)
 				node = hover->node;
-			}
 
 			if (node && node->output && node->desktop && node->desktop == node->output->desk)
 				focus_node(node->output, node->desktop, node);
@@ -677,9 +676,9 @@ void view_begin_interactive(view_t *view, enum cursor_mode mode, uint32_t edges)
 			set_resize_anchors(view->node->desktop, server.tiled_resize.parent_vertical,
 				server.tiled_resize.parent_horizontal);
 
-			desktop_t *d = view->node->desktop;
+			const desktop_t *d = view->node->desktop;
 			if (d && d->layout == LAYOUT_SCROLLER && d->scroller_state) {
-				int col = find_scroller_column(d->scroller_state, view->node->client);
+				const int col = find_scroller_column(d->scroller_state, view->node->client);
 				if (col >= 0)
 					server.tiled_resize.initial_width = d->scroller_state->columns[col].width.value;
 			}
@@ -736,15 +735,11 @@ void cursor_motion_absolute(struct wl_listener *listener, void *data) {
 }
 
 static uint32_t edges_from_cursor(const struct wlr_box *rect, uint32_t allowed_edges) {
-	double cx = server.cursor->x;
-	double cy = server.cursor->y;
-	double wx = rect->x;
-	double wy = rect->y;
-	double ww = rect->width;
-	double wh = rect->height;
+	const double cx = server.cursor->x, cy = server.cursor->y;
+	const double wx = rect->x, wy = rect->y, ww = rect->width, wh = rect->height;
 
-	double third_w = ww / 3.0;
-	double third_h = wh / 3.0;
+	const double third_w = ww / 3.0;
+	const double third_h = wh / 3.0;
 
 	uint32_t edges = 0;
 	if (cx < wx + third_w)
@@ -806,7 +801,7 @@ void cursor_button(struct wl_listener *listener, void *data) {
 	bind_event_result_t bind_result = {0};
 	bool claimed = false;
 	if (event->state == WL_POINTER_BUTTON_STATE_RELEASED) {
-		int button_index = (int)event->button - MOUSE_BUTTON_KEYCODE_OFFSET;
+		const int button_index = (int)event->button - MOUSE_BUTTON_KEYCODE_OFFSET;
 		if (button_index >= 0 && button_index < 5) {
 			bind_result = handle_keybind_raw(modifiers, mouse_button_to_keycode(button_index), false,
 				XKB_KEY_NoSymbol);
@@ -863,12 +858,12 @@ void cursor_button(struct wl_listener *listener, void *data) {
 		double sx, sy;
 		struct wlr_surface *surface = NULL;
 		void *type = desktop_type_at(server.cursor->x, server.cursor->y, &surface, &sx, &sy);
-		view_t *hover = type ? view_from_wlr_surface(surface) : NULL;
+		const view_t *hover = type ? view_from_wlr_surface(surface) : NULL;
 
 		if (surface == NULL)
 			return;
 
-		struct wlr_xdg_surface *xdg_surface = wlr_xdg_surface_try_from_wlr_surface(surface);
+		const struct wlr_xdg_surface *xdg_surface = wlr_xdg_surface_try_from_wlr_surface(surface);
 		if (xdg_surface != NULL && xdg_surface->role == WLR_XDG_SURFACE_ROLE_POPUP) {
 			// le skip
 		} else if (type == NULL) {
@@ -891,7 +886,7 @@ void cursor_button(struct wl_listener *listener, void *data) {
 		}
 
 		// add to cursor buttons
-		int button_index = (int)event->button - MOUSE_BUTTON_KEYCODE_OFFSET;
+		const int button_index = (int)event->button - MOUSE_BUTTON_KEYCODE_OFFSET;
 		server.cursor_buttons |= 1 << button_index;
 
 		if (button_index >= 0 && button_index < 5) {
@@ -914,18 +909,18 @@ void cursor_button(struct wl_listener *listener, void *data) {
 						else if (IS_TILED(view->node->client))
 							tiling_drag_begin(view->node);
 					} else if (bind_result.bind->action == BIND_INTERACTIVE_RESIZE) {
-						client_t *c = view->node->client;
-						desktop_t *d = view->node->desktop;
+						const client_t *c = view->node->client;
+						const desktop_t *d = view->node->desktop;
 						uint32_t edges = 0;
 
 						if (c->state == STATE_FLOATING) {
 							// floating resize
-							struct wlr_box rect = c->floating_rectangle;
+							const struct wlr_box rect = c->floating_rectangle;
 							edges = edges_from_cursor(&rect,
 								WLR_EDGE_LEFT | WLR_EDGE_RIGHT | WLR_EDGE_TOP | WLR_EDGE_BOTTOM);
 						} else if (IS_TILED(c)) {
 							// for scroller layouts, only allow horizontal edges (column width resize)
-							struct wlr_box rect = c->tiled_rectangle;
+							const struct wlr_box rect = c->tiled_rectangle;
 							if (d && d->layout == LAYOUT_SCROLLER) {
 								edges = edges_from_cursor(&rect, WLR_EDGE_LEFT | WLR_EDGE_RIGHT);
 							} else {
@@ -960,12 +955,12 @@ void cursor_axis(struct wl_listener *listener, void *data) {
 		if (d == NULL)
 			continue;
 
-		node_t *tab_leaf = tabs_hit_test_desktop(d, server.cursor->x, server.cursor->y);
+		const node_t *tab_leaf = tabs_hit_test_desktop(d, server.cursor->x, server.cursor->y);
 		if (tab_leaf != NULL) {
 			node_t *tab_node = tabbed_ancestor(tab_leaf);
 			if (tab_node != NULL) {
 				node_t *next;
-				double delta = event->delta_discrete != 0 ? (double)event->delta_discrete : event->delta;
+				const double delta = event->delta_discrete != 0 ? (double)event->delta_discrete : event->delta;
 				if (delta < 0)
 					next = tab_prev_leaf(tab_node, d->focus);
 				else
@@ -982,7 +977,7 @@ void cursor_axis(struct wl_listener *listener, void *data) {
 
 	m = server.focused_output;
 	desktop_t *d = m ? m->desk : NULL;
-	bool is_touchpad = (event->source == WL_POINTER_AXIS_SOURCE_FINGER);
+	const bool is_touchpad = (event->source == WL_POINTER_AXIS_SOURCE_FINGER);
 
 	// cancel any ongoing touchpad scroll gesture if the layout is not scroller
 	if (server.touchpad_scroll.ongoing && (!d || d->layout != LAYOUT_SCROLLER))
@@ -1011,8 +1006,8 @@ void cursor_axis(struct wl_listener *listener, void *data) {
 		}
 	}
 
-	pointer_t *pointer = event->pointer ? event->pointer->base.data : NULL;
-	double factor = pointer ? pointer->scroll_factor : 1.0;
+	const pointer_t *pointer = event->pointer ? event->pointer->base.data : NULL;
+	const double factor = pointer ? pointer->scroll_factor : 1.0;
 	wlr_seat_pointer_notify_axis(server.seat, event->time_msec, event->orientation,
 		event->delta * factor, (int32_t)round(event->delta_discrete * factor), event->source,
 		event->relative_direction);
@@ -1026,7 +1021,7 @@ void cursor_frame(struct wl_listener *listener, void *data) {
 	wlr_seat_pointer_notify_frame(server.seat);
 }
 
-static bool gesture_binding_check(enum gesture_type type, uint8_t fingers) {
+static bool gesture_binding_check(const enum gesture_type type, const uint8_t fingers) {
 	for (size_t i = 0; i < num_gesturebinds; i++)
 		if (gesturebind_matches(&gesture_bindings[i], type, fingers))
 			return true;
@@ -1034,8 +1029,8 @@ static bool gesture_binding_check(enum gesture_type type, uint8_t fingers) {
 	return false;
 }
 
-static gesturebind_t *gesture_bind_match(enum gesture_type type, uint8_t fingers,
-		uint32_t directions) {
+static gesturebind_t *gesture_bind_match(const enum gesture_type type, const uint8_t fingers,
+		const uint32_t directions) {
 	gesturebind_t *best_match = NULL;
 	int8_t best_score = -1;
 
@@ -1058,7 +1053,7 @@ static gesturebind_t *gesture_bind_match(enum gesture_type type, uint8_t fingers
 			.fingers = gb->fingers,
 			.directions = gb->directions
 		};
-		int8_t score = gesture_compare(&gest, &target);
+		const int8_t score = gesture_compare(&gest, &target);
 
 		if (score > best_score) {
 			best_score = score;
@@ -1096,7 +1091,8 @@ void handle_pointer_hold_end(struct wl_listener *listener, void *data) {
 		return;
 	}
 
-	gesturebind_t *binding = gesture_bind_match(GESTURE_TYPE_HOLD, server.gesture_tracker.fingers, 0);
+	const gesturebind_t *binding = gesture_bind_match(GESTURE_TYPE_HOLD, server.gesture_tracker.fingers,
+		0);
 	if (binding)
 		execute_gesturebind(binding);
 
@@ -1222,7 +1218,7 @@ void handle_pointer_swipe_end(struct wl_listener *listener, void *data) {
 
 	output_t *m = server.focused_output;
 	desktop_t *d = m ? m->desk : NULL;
-	bool panned = server.gesture_tracker.fingers == settings.scroller_pan_fingers && d &&
+	const bool panned = server.gesture_tracker.fingers == settings.scroller_pan_fingers && d &&
 		d->layout == LAYOUT_SCROLLER;
 
 	if (panned) {
@@ -1231,7 +1227,7 @@ void handle_pointer_swipe_end(struct wl_listener *listener, void *data) {
 	}
 
 	uint32_t directions = GESTURE_DIRECTION_NONE;
-	double threshold = 30.0;
+	const double threshold = 30.0;
 
 	if (server.gesture_tracker.dx < -threshold)
 		directions |= GESTURE_DIRECTION_LEFT;
@@ -1243,7 +1239,7 @@ void handle_pointer_swipe_end(struct wl_listener *listener, void *data) {
 	else if (server.gesture_tracker.dy > threshold)
 		directions |= GESTURE_DIRECTION_DOWN;
 
-	gesturebind_t *binding = panned ? NULL : gesture_bind_match(GESTURE_TYPE_SWIPE,
+	const gesturebind_t *binding = panned ? NULL : gesture_bind_match(GESTURE_TYPE_SWIPE,
 		server.gesture_tracker.fingers, directions);
 	if (binding)
 		execute_gesturebind(binding);
@@ -1273,7 +1269,7 @@ static void handle_tablet_tool_axis(struct wl_listener *listener, void *data) {
 	}
 
 	// send other axis events via tablet
-	tablet_tool_t *tool = event->tool->data;
+	const tablet_tool_t *tool = event->tool->data;
 	if (tool && tool->tablet_v2_tool) {
 		if (event->updated_axes & WLR_TABLET_TOOL_AXIS_PRESSURE)
 			wlr_tablet_v2_tablet_tool_notify_pressure(tool->tablet_v2_tool, event->pressure);
@@ -1312,7 +1308,7 @@ static void handle_tablet_tool_proximity(struct wl_listener *listener, void *dat
 		}
 		handle_tablet_tool_position(event->tool, tablet, false, event->x, event->y, event->time_msec);
 	} else {
-		tablet_tool_t *tool = event->tool->data;
+		const tablet_tool_t *tool = event->tool->data;
 		if (tool && tool->tablet_v2_tool)
 			wlr_tablet_v2_tablet_tool_notify_proximity_out(tool->tablet_v2_tool);
 	}

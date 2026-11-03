@@ -24,14 +24,14 @@ static void scroller_preset_release(scroller_size_t **list, int *count) {
 	*count = 0;
 }
 
-void settings_set_scroller_preset_column_widths(scroller_size_t *list, int count) {
+void settings_set_scroller_preset_column_widths(scroller_size_t *list, const int count) {
 	scroller_preset_release(&settings.scroller_preset_column_widths,
 		&settings.scroller_preset_column_widths_count);
 	settings.scroller_preset_column_widths = list;
 	settings.scroller_preset_column_widths_count = count;
 }
 
-void settings_set_scroller_preset_window_heights(scroller_size_t *list, int count) {
+void settings_set_scroller_preset_window_heights(scroller_size_t *list, const int count) {
 	scroller_preset_release(&settings.scroller_preset_window_heights,
 		&settings.scroller_preset_window_heights_count);
 	settings.scroller_preset_window_heights = list;

@@ -7,7 +7,6 @@
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 
 #define STALL_DEFAULT_MS 500
@@ -75,8 +74,8 @@ void diag_stage_enter(diag_stage_t stage) {
 }
 
 void diag_stage_leave(void) {
-	uint64_t start = atomic_load_explicit(&current_start, memory_order_acquire);
-	int stage = atomic_load_explicit(&current_stage, memory_order_relaxed);
+	const uint64_t start = atomic_load_explicit(&current_start, memory_order_acquire);
+	const int stage = atomic_load_explicit(&current_stage, memory_order_relaxed);
 
 	if (start != 0 && atomic_load_explicit(&reported_start, memory_order_relaxed) == start) {
 		uint64_t now = diag_monotonic_ms();

@@ -5,44 +5,43 @@
 #include "view.h"
 #include <string.h>
 
-struct wlr_scene_tree *client_get_scene_tree(client_t *client) {
+struct wlr_scene_tree *client_get_scene_tree(const client_t *client) {
 	return client && client->view ? client->view->scene_tree : NULL;
 }
 
-struct wlr_scene_tree *client_get_content_tree(client_t *client) {
+struct wlr_scene_tree *client_get_content_tree(const client_t *client) {
 	return client && client->view ? client->view->content_tree : NULL;
 }
 
-struct wlr_scene_tree *client_border_tree(client_t *client) {
+struct wlr_scene_tree *client_border_tree(const client_t *client) {
 	return client && client->view ? client->view->border_tree : NULL;
 }
 
-struct wlr_scene_rect **client_border_rects(client_t *client) {
+struct wlr_scene_rect **client_border_rects(const client_t *client) {
 	return client && client->view ? client->view->border_rects : NULL;
 }
 
-surface_rounded_t *client_get_rounded(client_t *client) {
+surface_rounded_t *client_get_rounded(const client_t *client) {
 	return client && client->view ? client->view->rounded : NULL;
 }
 
-surface_blur_t **client_blur_slot(client_t *client) {
+surface_blur_t **client_blur_slot(const client_t *client) {
 	return client && client->view ? &client->view->blur : NULL;
 }
 
-surface_rounded_t **client_rounded_slot(client_t *client) {
+surface_rounded_t **client_rounded_slot(const client_t *client) {
 	return client && client->view ? &client->view->rounded : NULL;
 }
 
-surface_shadow_t **client_shadow_slot(client_t *client) {
+surface_shadow_t **client_shadow_slot(const client_t *client) {
 	return client && client->view ? &client->view->shadow : NULL;
 }
 
-// Whether the client's view is currently mapped.
 bool client_is_mapped(const client_t *client) {
 	return client && client->view && client->view->mapped;
 }
 
-struct wlr_surface *client_wlr_surface(client_t *client) {
+struct wlr_surface *client_wlr_surface(const client_t *client) {
 	return client ? view_wlr_surface(client->view) : NULL;
 }
 
@@ -55,7 +54,7 @@ struct wlr_foreign_toplevel_handle_v1 *client_get_foreign_toplevel(const client_
 }
 
 // flips a client between visible and hidden in the scene graph
-void client_set_visible(client_t *client, bool show) {
+void client_set_visible(client_t *client, const bool show) {
 	if (client == NULL)
 		return;
 
@@ -69,7 +68,7 @@ void client_set_visible(client_t *client, bool show) {
 		wlr_scene_node_set_enabled(&st->node, show);
 }
 
-node_t *client_get_node(client_t *client) {
+node_t *client_get_node(const client_t *client) {
 	return client && client->view ? client->view->node : NULL;
 }
 
@@ -89,7 +88,7 @@ void client_set_app_id(client_t *client, const char *app_id) {
 	client->app_id[MAXLEN - 1] = '\0';
 }
 
-output_t *client_get_output(client_t *client) {
+output_t *client_get_output(const client_t *client) {
 	node_t *n = client_get_node(client);
 	return n ? n->output : NULL;
 }
@@ -123,7 +122,7 @@ struct wlr_scene_tree *client_layer_tree(const client_t *client) {
 	return tree;
 }
 
-void client_apply_layer(client_t *client) {
+void client_apply_layer(const client_t *client) {
 	struct wlr_scene_tree *scene_tree = client_get_scene_tree(client);
 	struct wlr_scene_tree *parent = client_layer_tree(client);
 	if (scene_tree == NULL || parent == NULL)

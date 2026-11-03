@@ -1,13 +1,12 @@
 #include "input/cursor.h"
 #include "input/touch.h"
-#include "once.h"
+#include "macros.h"
 #include "protocol/idle_power.h"
 #include "protocol/layer.h"
 #include "server.h"
 #include "tree.h"
 #include <wayland-util.h>
 #include <wlr/types/wlr_cursor.h>
-#include <wlr/types/wlr_idle_inhibit_v1.h>
 #include <wlr/types/wlr_idle_notify_v1.h>
 #include <wlr/types/wlr_xdg_shell.h>
 
@@ -32,9 +31,9 @@ static void handle_touch_down(struct wl_listener *listener, void *data) {
 		if (type) {
 			output_t *output = output_at(lx, ly);
 
-			struct wlr_xdg_surface *xdg_surface = wlr_xdg_surface_try_from_wlr_surface(surface);
+			const struct wlr_xdg_surface *xdg_surface = wlr_xdg_surface_try_from_wlr_surface(surface);
 			if (xdg_surface != NULL && xdg_surface->role != WLR_XDG_SURFACE_ROLE_POPUP) {
-				view_t *view = type;
+				const view_t *view = type;
 				if (view && view->node) {
 					if (output)
 						focus_node(output, view->node->desktop, view->node);
@@ -47,7 +46,7 @@ static void handle_touch_down(struct wl_listener *listener, void *data) {
 				struct wlr_xwayland_surface *xwayland_surface =
 					wlr_xwayland_surface_try_from_wlr_surface(surface);
 				if (xwayland_surface != NULL) {
-					view_t *view = type;
+					const view_t *view = type;
 					if (view && view->node) {
 						if (output)
 							focus_node(output, view->node->desktop, view->node);

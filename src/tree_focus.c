@@ -14,9 +14,8 @@
 #include "types.h"
 #include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_scene.h>
-#include <wlr/util/log.h>
 
-bool node_focusable(node_t *n) {
+bool node_focusable(const node_t *n) {
 	if (n == NULL || n->client == NULL || n->destroying || n->freed)
 		return false;
 
@@ -24,12 +23,12 @@ bool node_focusable(node_t *n) {
 	return n->client->view != NULL;
 }
 
-node_t *desktop_fallback_focus(desktop_t *d, node_t *skip) {
+node_t *desktop_fallback_focus(desktop_t *d, const node_t *skip) {
 	if (d == NULL)
 		return NULL;
 
 	node_t **toplevels = NULL;
-	int count = desktop_toplevels(d, &toplevels);
+	const int count = desktop_toplevels(d, &toplevels);
 	if (toplevels == NULL)
 		return NULL;
 
@@ -73,14 +72,14 @@ node_t *desktop_fallback_focus(desktop_t *d, node_t *skip) {
 	return best != NULL && node_focusable(best) ? best : NULL;
 }
 
-static bool focus_node_impl(output_t *m, desktop_t *d, node_t *n, bool give_keyboard_focus) {
+static bool focus_node_impl(output_t *m, desktop_t *d, node_t *n, const bool give_keyboard_focus) {
 	if (m == NULL || d == NULL || n == NULL)
 		return false;
 
 	d->focus = n;
 	output_set_focused(m);
 
-	bool is_current_desktop = (m->desk == d);
+	const bool is_current_desktop = (m->desk == d);
 
 	if (!is_current_desktop) {
 		if (give_keyboard_focus) {
@@ -179,14 +178,12 @@ node_t *find_fence_from(node_t *n, direction_t dir) {
 		node_t *brother = (is_first_child(n)) ? p->second_child : p->first_child;
 
 		if (brother != NULL) {
-			bool vertical = (dir == DIR_WEST || dir == DIR_EAST);
-			bool horizontal = (dir == DIR_NORTH || dir == DIR_SOUTH);
+			const bool vertical = (dir == DIR_WEST || dir == DIR_EAST);
+			const bool horizontal = (dir == DIR_NORTH || dir == DIR_SOUTH);
 
 			if ((vertical && p->split_type == TYPE_VERTICAL) || (horizontal &&
 					p->split_type == TYPE_HORIZONTAL)) {
-				bool first = (dir == DIR_WEST || dir == DIR_NORTH);
-
-				if (first != is_first_child(n))
+				if ((dir == DIR_WEST || dir == DIR_NORTH) != is_first_child(n))
 					return brother;
 			}
 		}

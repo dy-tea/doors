@@ -1,8 +1,7 @@
 #include "client.h"
 #include "ipc/ipc.h"
-#include "layout/floating.h"
 #include "layout/layout.h"
-#include "once.h"
+#include "macros.h"
 #include "output/output.h"
 #include "protocol/xwayland.h"
 #include "scratchpad.h"
@@ -44,7 +43,7 @@ static scratchpad_entry_t *scratchpad_find_entry(node_t *n) {
 	return NULL;
 }
 
-bool scratchpad_has(node_t *n) {
+bool scratchpad_has(const node_t *n) {
 	return n != NULL && n->scratchpad;
 }
 
@@ -62,7 +61,8 @@ static void save_tree_position(scratchpad_entry_t *entry, node_t *n) {
 	entry->saved_split_type = n->parent->split_type;
 }
 
-static void restore_tree_position(bool was_first_child, split_type_t split_type, node_t *n) {
+static void restore_tree_position(const bool was_first_child, const split_type_t split_type,
+		node_t *n) {
 	node_t *p = n->parent;
 	if (p == NULL)
 		return;
@@ -326,11 +326,11 @@ void scratchpad_toggle(node_t *n) {
 }
 
 void scratchpad_toggle_auto(void) {
-	output_t *out = server.focused_output;
+	const output_t *out = server.focused_output;
 	if (out == NULL || out->desk == NULL)
 		return;
 
-	desktop_t *current_desk = out->desk;
+	const desktop_t *current_desk = out->desk;
 
 	node_t *focused = current_desk->focus;
 	if (focused != NULL && focused->client != NULL && focused->scratchpad &&
@@ -403,7 +403,7 @@ int scratchpad_count(void) {
 	return count;
 }
 
-node_t *scratchpad_nth(int index) {
+node_t *scratchpad_nth(const int index) {
 	if (index < 0)
 		return NULL;
 

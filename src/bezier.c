@@ -1,5 +1,5 @@
 #include "bezier.h"
-#include "once.h"
+#include "macros.h"
 #include "str.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,10 +28,10 @@ void bezier_fini(void) {
 }
 
 static void bake_curve(bezier_curve_t *curve) {
-	double p0x = 0.0, p0y = 0.0;
-	double p1x = curve->p1x, p1y = curve->p1y;
-	double p2x = curve->p2x, p2y = curve->p2y;
-	double p3x = 1.0, p3y = 1.0;
+	const double p0x = 0.0, p0y = 0.0;
+	const double p1x = curve->p1x, p1y = curve->p1y;
+	const double p2x = curve->p2x, p2y = curve->p2y;
+	const double p3x = 1.0, p3y = 1.0;
 
 	for (int i = 0; i < BEZIER_BAKED_POINTS; i++) {
 		double t = (double)i / (BEZIER_BAKED_POINTS - 1);
@@ -47,7 +47,8 @@ static void bake_curve(bezier_curve_t *curve) {
 	}
 }
 
-bezier_curve_t *bezier_add(const char *name, double p1x, double p1y, double p2x, double p2y) {
+bezier_curve_t *bezier_add(const char *name, const double p1x, const double p1y, const double p2x,
+		const double p2y) {
 	if (!name || name[0] == '\0')
 		return NULL;
 
@@ -114,21 +115,21 @@ double bezier_evaluate_curve(const bezier_curve_t *curve, double x) {
 	// binary search through baked points
 	int lo = 0, hi = BEZIER_BAKED_POINTS - 1;
 	while (lo < hi - 1) {
-		int mid = (lo + hi) / 2;
+		const int mid = (lo + hi) / 2;
 		if (curve->baked[mid].x < x)
 			lo = mid;
 		else
 			hi = mid;
 	}
 
-	float x0 = curve->baked[lo].x;
-	float x1 = curve->baked[hi].x;
-	float y0 = curve->baked[lo].y;
-	float y1 = curve->baked[hi].y;
+	const float x0 = curve->baked[lo].x;
+	const float x1 = curve->baked[hi].x;
+	const float y0 = curve->baked[lo].y;
+	const float y1 = curve->baked[hi].y;
 
 	if (x1 - x0 < 0.000001f)
 		return y0;
 
-	float t = (float)((x - x0) / (x1 - x0));
+	const float t = (float)((x - x0) / (x1 - x0));
 	return y0 + t * (y1 - y0);
 }

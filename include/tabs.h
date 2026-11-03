@@ -36,20 +36,20 @@ void tabs_create(node_t *n);
 void tabs_destroy(node_t *n);
 
 void tabs_rebuild(node_t *n);
-void tabs_arrange(node_t *n, struct wlr_box rect);
+void tabs_arrange(const node_t *n, struct wlr_box rect);
 void tabs_update_focus(node_t *n, node_t *focus);
-void tabs_update_label_for_leaf(node_t *leaf);
+void tabs_update_label_for_leaf(const node_t *leaf);
 
-node_t *tabbed_ancestor(node_t *n);
+node_t *tabbed_ancestor(const node_t *n);
 node_t *tab_focus_leaf(node_t *tabbed_node, node_t *focus);
 node_t *tab_next_leaf(node_t *tabbed_node, node_t *focus);
 node_t *tab_prev_leaf(node_t *tabbed_node, node_t *focus);
 
 node_t *tabs_hit_test(const node_t *n, double lx, double ly);
-node_t *tabs_hit_test_desktop(desktop_t *d, double lx, double ly);
+node_t *tabs_hit_test_desktop(const desktop_t *d, double lx, double ly);
 
-void tabs_show(node_t *n, bool show);
+void tabs_show(const node_t *n, bool show);
 
-void tabs_set_active_leaf(node_t *tabbed, node_t *active);
+void tabs_set_active_leaf(node_t *tabbed, const node_t *active);
 void tabs_arrange_group(output_t *m, desktop_t *d, node_t *tabbed, struct wlr_box rect,
 	struct wlr_box root_rect);

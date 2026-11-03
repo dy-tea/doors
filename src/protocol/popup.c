@@ -4,7 +4,6 @@
 #include "protocol/xdg_toplevel.h"
 #include "server.h"
 #include <stdlib.h>
-#include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_xdg_shell.h>

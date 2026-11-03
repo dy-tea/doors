@@ -4,7 +4,7 @@
 #include "input/seat.h"
 #include "input/tablet.h"
 #include "input/touch.h"
-#include "once.h"
+#include "macros.h"
 #include "output/output.h"
 #include "server.h"
 #include <wlr/backend.h>

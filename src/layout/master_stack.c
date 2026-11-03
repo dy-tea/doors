@@ -2,7 +2,6 @@
 #include "layout/master_stack.h"
 #include "output/output.h"
 #include "tree.h"
-#include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <wlr/util/log.h>
@@ -26,8 +25,8 @@ static int ms_count(const desktop_t *d) {
 static int compare_node_order(const void *lhs, const void *rhs) {
 	const node_t *a = *(node_t *const *)lhs;
 	const node_t *b = *(node_t *const *)rhs;
-	uint64_t a_order = a->client->master_stack_order;
-	uint64_t b_order = b->client->master_stack_order;
+	const uint64_t a_order = a->client->master_stack_order;
+	const uint64_t b_order = b->client->master_stack_order;
 
 	if (a_order < b_order)
 		return -1;
@@ -39,8 +38,8 @@ static int compare_node_order(const void *lhs, const void *rhs) {
 static int compare_master_then_order(const void *lhs, const void *rhs) {
 	const node_t *a = *(node_t *const *)lhs;
 	const node_t *b = *(node_t *const *)rhs;
-	bool a_master = a->client->flags.master_stack_master;
-	bool b_master = b->client->flags.master_stack_master;
+	const bool a_master = a->client->flags.master_stack_master;
+	const bool b_master = b->client->flags.master_stack_master;
 
 	if (a_master != b_master)
 		return a_master ? -1 : 1;
@@ -87,7 +86,7 @@ static void reconcile_master_membership(desktop_t *d, node_t **nodes, int count)
 }
 
 static int collect_tiled_nodes(desktop_t *d, node_t ***out_nodes) {
-	int count = collect_tiled_leaves(d, out_nodes);
+	const int count = collect_tiled_leaves(d, out_nodes);
 	if (count == 0)
 		return 0;
 
@@ -112,7 +111,7 @@ static void set_node_geom(node_t *n, struct wlr_box geom, output_t *m, desktop_t
 		return;
 	}
 
-	unsigned int bw = effective_border_width(d);
+	const unsigned int bw = effective_border_width(d);
 	struct wlr_box r = geom;
 	r.x += bw;
 	r.y += bw;
@@ -155,27 +154,27 @@ static void set_node_geom(node_t *n, struct wlr_box geom, output_t *m, desktop_t
 	node_set_dirty(n);
 }
 
-static void distribute_area(struct wlr_box area, struct wlr_box *out, int count, int gap,
-		bool vertical) {
+static void distribute_area(const struct wlr_box area, struct wlr_box *out, const int count,
+		const int gap, const bool vertical) {
 	if (count <= 0)
 		return;
 
-	int span = vertical ? area.height : area.width;
+	const int span = vertical ? area.height : area.width;
 	int actual_gap = gap > 0 ? gap : 0;
 	if (count > 1 && (long long)actual_gap * (count - 1) >= span) {
-		int room_for_gaps = span - count;
+		const int room_for_gaps = span - count;
 		actual_gap = room_for_gaps > 0 ? room_for_gaps / (count - 1) : 0;
 	}
 
 	int usable = span - actual_gap * (count - 1);
 	if (usable < 0)
 		usable = 0;
-	int base = usable / count;
-	int remainder = usable % count;
+	const int base = usable / count;
+	const int remainder = usable % count;
 	int cursor = vertical ? area.y : area.x;
 
 	for (int i = 0; i < count; i++) {
-		int size = base + (i < remainder ? 1 : 0);
+		const int size = base + (i < remainder ? 1 : 0);
 		out[i] = area;
 		if (vertical) {
 			out[i].y = cursor;
@@ -201,23 +200,23 @@ static int master_span_size(const desktop_t *d, int span, int gap_count, int gap
 	return size;
 }
 
-static void apply_group(output_t *m, desktop_t *d, node_t **nodes, int count, struct wlr_box area,
-		int gap, bool vertical, struct wlr_box *geoms) {
+static void apply_group(output_t *m, desktop_t *d, node_t **nodes, const int count,
+		const struct wlr_box area, const int gap, const bool vertical, struct wlr_box *geoms) {
 	distribute_area(area, geoms, count, gap, vertical);
 	for (int i = 0; i < count; i++)
 		set_node_geom(nodes[i], geoms[i], m, d);
 }
 
-static bool arrange_center(output_t *m, desktop_t *d, node_t **nodes, int mc, int sc,
-		struct wlr_box rect, int gap, struct wlr_box *geoms) {
+static bool arrange_center(output_t *m, desktop_t *d, node_t **nodes, const int mc, const int sc,
+		const struct wlr_box rect, const int gap, struct wlr_box *geoms) {
 	if (sc == 0) {
 		apply_group(m, d, nodes, mc, rect, gap, true, geoms);
 		return true;
 	}
 
-	int master_width = master_span_size(d, rect.width, 2, gap);
-	int master_x = rect.x + (rect.width - master_width) / 2;
-	struct wlr_box master_area = {
+	const int master_width = master_span_size(d, rect.width, 2, gap);
+	const int master_x = rect.x + (rect.width - master_width) / 2;
+	const struct wlr_box master_area = {
 		.x = master_x,
 		.y = rect.y,
 		.width = master_width,
@@ -243,9 +242,9 @@ static bool arrange_center(output_t *m, desktop_t *d, node_t **nodes, int mc, in
 
 	apply_group(m, d, nodes, mc, master_area, gap, true, geoms);
 
-	int left_count = (sc + 1) / 2;
-	int right_count = sc / 2;
-	int side_capacity = left_count > right_count ? left_count : right_count;
+	const int left_count = (sc + 1) / 2;
+	const int right_count = sc / 2;
+	const int side_capacity = left_count > right_count ? left_count : right_count;
 	node_t **side_nodes = calloc((size_t)side_capacity, sizeof(*side_nodes));
 	if (!side_nodes) {
 		wlr_log(WLR_ERROR, "Master-stack side allocation failed");
@@ -271,11 +270,11 @@ void master_stack_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 		return;
 
 	node_t **nodes = NULL;
-	int count = collect_tiled_nodes(d, &nodes);
+	const int count = collect_tiled_nodes(d, &nodes);
 	if (count == 0)
 		return;
 
-	int gap = compute_window_gap(d);
+	const int gap = compute_window_gap(d);
 	struct wlr_box rect = available;
 	rect.x += gap;
 	rect.y += gap;
@@ -332,8 +331,8 @@ void master_stack_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 		return;
 	}
 
-	bool horizontal_split = orientation == MASTER_LEFT || orientation == MASTER_RIGHT;
-	bool master_first = orientation == MASTER_LEFT || orientation == MASTER_TOP;
+	const bool horizontal_split = orientation == MASTER_LEFT || orientation == MASTER_RIGHT;
+	const bool master_first = orientation == MASTER_LEFT || orientation == MASTER_TOP;
 
 	if (sc == 0) {
 		apply_group(m, d, nodes, mc, rect, gap, horizontal_split, geoms);
@@ -342,8 +341,8 @@ void master_stack_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 		return;
 	}
 
-	int span = horizontal_split ? rect.width : rect.height;
-	int master_size = master_span_size(d, span, 1, gap);
+	const int span = horizontal_split ? rect.width : rect.height;
+	const int master_size = master_span_size(d, span, 1, gap);
 	struct wlr_box master_area = rect;
 	struct wlr_box stack_area = rect;
 
@@ -386,15 +385,15 @@ static int find_node_index(node_t **nodes, int count, const node_t *node) {
 
 bool master_stack_increment(desktop_t *d) {
 	node_t **nodes = NULL;
-	int count = collect_tiled_nodes(d, &nodes);
-	int mc = master_count_clamped(d, count);
+	const int count = collect_tiled_nodes(d, &nodes);
+	const int mc = master_count_clamped(d, count);
 	if (count == 0 || mc >= count) {
 		free(nodes);
 		return false;
 	}
 
-	node_t *target = d->focus && d->focus->client && !d->focus->client->flags.master_stack_master &&
-		IS_TILED(d->focus->client) ? d->focus : nodes[mc];
+	const node_t *target = d->focus && d->focus->client &&
+		!d->focus->client->flags.master_stack_master && IS_TILED(d->focus->client) ? d->focus : nodes[mc];
 	target->client->flags.master_stack_master = true;
 	d->master_stack.count = mc + 1;
 	free(nodes);
@@ -403,14 +402,14 @@ bool master_stack_increment(desktop_t *d) {
 
 bool master_stack_decrement(desktop_t *d) {
 	node_t **nodes = NULL;
-	int count = collect_tiled_nodes(d, &nodes);
-	int mc = master_count_clamped(d, count);
+	const int count = collect_tiled_nodes(d, &nodes);
+	const int mc = master_count_clamped(d, count);
 	if (mc == 0) {
 		free(nodes);
 		return false;
 	}
 
-	node_t *target = d->focus && d->focus->client && d->focus->client->flags.master_stack_master &&
+	const node_t *target = d->focus && d->focus->client && d->focus->client->flags.master_stack_master &&
 		IS_TILED(d->focus->client) ? d->focus : nodes[mc - 1];
 	target->client->flags.master_stack_master = false;
 	d->master_stack.count = mc - 1;
@@ -420,9 +419,9 @@ bool master_stack_decrement(desktop_t *d) {
 
 bool master_stack_promote(desktop_t *d) {
 	node_t **nodes = NULL;
-	int count = collect_tiled_nodes(d, &nodes);
-	int mc = master_count_clamped(d, count);
-	int focus_index = find_node_index(nodes, count, d ? d->focus : NULL);
+	const int count = collect_tiled_nodes(d, &nodes);
+	const int mc = master_count_clamped(d, count);
+	const int focus_index = find_node_index(nodes, count, d ? d->focus : NULL);
 	if (focus_index < 0 || nodes[focus_index]->client->flags.master_stack_master) {
 		free(nodes);
 		return false;
@@ -440,8 +439,8 @@ bool master_stack_demote(desktop_t *d) {
 		return false;
 
 	node_t **nodes = NULL;
-	int count = collect_tiled_nodes(d, &nodes);
-	int mc = master_count_clamped(d, count);
+	const int count = collect_tiled_nodes(d, &nodes);
+	const int mc = master_count_clamped(d, count);
 	if (mc == 0) {
 		free(nodes);
 		return false;
@@ -453,13 +452,13 @@ bool master_stack_demote(desktop_t *d) {
 	return true;
 }
 
-void master_stack_set_count(desktop_t *d, int count) {
+void master_stack_set_count(desktop_t *d, const int count) {
 	if (!d)
 		return;
 	d->master_stack.count = count < 0 ? 0 : count;
 }
 
-bool master_stack_adjust_ratio(desktop_t *d, float delta) {
+bool master_stack_adjust_ratio(desktop_t *d, const float delta) {
 	if (d == NULL)
 		return false;
 
@@ -475,7 +474,7 @@ bool master_stack_adjust_ratio(desktop_t *d, float delta) {
 	return true;
 }
 
-void master_stack_set_orientation(desktop_t *d, master_area_orientation_t orientation) {
+void master_stack_set_orientation(desktop_t *d, const master_area_orientation_t orientation) {
 	if (d == NULL || orientation < MASTER_LEFT || orientation > MASTER_CENTER)
 		return;
 
@@ -525,7 +524,7 @@ int master_stack_collect(desktop_t *d, node_t ***out_nodes) {
 
 static node_t **gather_focused(desktop_t *d, int *out_total, int *out_index) {
 	node_t **nodes = NULL;
-	int count = collect_tiled_nodes(d, &nodes);
+	const int count = collect_tiled_nodes(d, &nodes);
 
 	int visible = 0;
 	for (int i = 0; i < count; i++) {
@@ -538,7 +537,7 @@ static node_t **gather_focused(desktop_t *d, int *out_total, int *out_index) {
 		visible++;
 	}
 
-	int index = visible > 0 ? find_node_index(nodes, visible, d ? d->focus : NULL) : -1;
+	const int index = visible > 0 ? find_node_index(nodes, visible, d ? d->focus : NULL) : -1;
 	if (index < 0) {
 		free(nodes);
 		return NULL;
@@ -556,34 +555,31 @@ static struct wlr_box node_layout_box(const node_t *node) {
 }
 
 static bool aligned_with(const struct wlr_box *source, const struct wlr_box *candidate,
-		direction_t direction) {
+		const direction_t direction) {
 	if (direction == DIR_NORTH || direction == DIR_SOUTH)
 		return source->x < candidate->x + candidate->width && candidate->x < source->x + source->width;
 	return source->y < candidate->y + candidate->height && candidate->y < source->y + source->height;
 }
 
-static int directional_target(node_t **nodes, int count, int source_index, direction_t direction,
-		bool wrap) {
-	struct wlr_box source = node_layout_box(nodes[source_index]);
-	int64_t source_x = (int64_t)source.x * 2 + source.width;
-	int64_t source_y = (int64_t)source.y * 2 + source.height;
+static int directional_target(node_t **nodes, const int count, const int source_index,
+		const direction_t direction, const bool wrap) {
+	const struct wlr_box source = node_layout_box(nodes[source_index]);
+	const int64_t source_x = (int64_t)source.x * 2 + source.width;
+	const int64_t source_y = (int64_t)source.y * 2 + source.height;
 	int aligned_target = -1;
-	int64_t aligned_primary = INT64_MAX;
-	int64_t aligned_secondary = INT64_MAX;
+	int64_t aligned_primary = INT64_MAX, aligned_secondary = INT64_MAX;
 	int target = -1;
-	int64_t best_primary = INT64_MAX;
-	int64_t best_secondary = INT64_MAX;
+	int64_t best_primary = INT64_MAX, best_secondary = INT64_MAX;
 
 	for (int i = 0; i < count; i++) {
 		if (i == source_index)
 			continue;
 		struct wlr_box candidate = node_layout_box(nodes[i]);
-		int64_t x = (int64_t)candidate.x * 2 + candidate.width;
-		int64_t y = (int64_t)candidate.y * 2 + candidate.height;
-		int64_t dx = x - source_x;
-		int64_t dy = y - source_y;
-		int64_t primary = 0;
-		int64_t secondary = 0;
+		const int64_t x = (int64_t)candidate.x * 2 + candidate.width;
+		const int64_t y = (int64_t)candidate.y * 2 + candidate.height;
+		const int64_t dx = x - source_x;
+		const int64_t dy = y - source_y;
+		int64_t primary = 0, secondary = 0;
 		bool eligible = false;
 
 		switch (direction) {
@@ -638,11 +634,10 @@ static int directional_target(node_t **nodes, int count, int source_index, direc
 	for (int i = 0; i < count; i++) {
 		if (i == source_index)
 			continue;
-		struct wlr_box candidate = node_layout_box(nodes[i]);
-		int64_t x = (int64_t)candidate.x * 2 + candidate.width;
-		int64_t y = (int64_t)candidate.y * 2 + candidate.height;
-		int64_t primary;
-		int64_t secondary;
+		const struct wlr_box candidate = node_layout_box(nodes[i]);
+		const int64_t x = (int64_t)candidate.x * 2 + candidate.width;
+		const int64_t y = (int64_t)candidate.y * 2 + candidate.height;
+		int64_t primary, secondary;
 
 		if (direction == DIR_WEST || direction == DIR_EAST) {
 			primary = direction == DIR_WEST ? -x : x;
@@ -661,7 +656,7 @@ static int directional_target(node_t **nodes, int count, int source_index, direc
 	return target;
 }
 
-bool master_stack_focus(desktop_t *d, direction_t direction) {
+bool master_stack_focus(desktop_t *d, const direction_t direction) {
 	node_t **nodes = NULL;
 	int count = 0;
 	int index = -1;
@@ -669,7 +664,7 @@ bool master_stack_focus(desktop_t *d, direction_t direction) {
 	if (!nodes)
 		return false;
 
-	int target = directional_target(nodes, count, index, direction, settings.focus_wrapping);
+	const int target = directional_target(nodes, count, index, direction, settings.focus_wrapping);
 	if (target >= 0) {
 		d->focus = nodes[target];
 		if (d->output)
@@ -679,7 +674,7 @@ bool master_stack_focus(desktop_t *d, direction_t direction) {
 	return target >= 0;
 }
 
-bool master_stack_swap(output_t *m, desktop_t *d, direction_t direction) {
+bool master_stack_swap(output_t *m, desktop_t *d, const direction_t direction) {
 	node_t **nodes = NULL;
 	int count = 0;
 	int index = -1;
@@ -687,7 +682,7 @@ bool master_stack_swap(output_t *m, desktop_t *d, direction_t direction) {
 	if (!nodes)
 		return false;
 
-	int target = directional_target(nodes, count, index, direction, settings.focus_wrapping);
+	const int target = directional_target(nodes, count, index, direction, settings.focus_wrapping);
 	if (target < 0) {
 		free(nodes);
 		return false;
@@ -695,8 +690,8 @@ bool master_stack_swap(output_t *m, desktop_t *d, direction_t direction) {
 
 	client_t *focused = nodes[index]->client;
 	client_t *other = nodes[target]->client;
-	uint64_t order = focused->master_stack_order;
-	bool is_master = focused->flags.master_stack_master;
+	const uint64_t order = focused->master_stack_order;
+	const bool is_master = focused->flags.master_stack_master;
 	focused->master_stack_order = other->master_stack_order;
 	focused->flags.master_stack_master = other->flags.master_stack_master;
 	other->master_stack_order = order;

@@ -9,7 +9,7 @@ void scratchpad_fini(void);
 
 void scratchpad_add(node_t *n);
 void scratchpad_remove(node_t *n);
-bool scratchpad_has(node_t *n);
+bool scratchpad_has(const node_t *n);
 
 void scratchpad_show(node_t *n);
 void scratchpad_hide(node_t *n);

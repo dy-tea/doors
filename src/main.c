@@ -8,7 +8,6 @@
 #include "types.h"
 #include <stdio.h>
 #include <string.h>
-#include <wlr/util/log.h>
 
 static void usage(const char *argv0) {
 	printf("Usage: %s [-c <config-dir>]\n", argv0);

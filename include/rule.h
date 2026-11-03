@@ -104,4 +104,4 @@ bool remove_rule_by_index(int idx);
 void list_rules(char *buf, size_t buf_size);
 rule_consequence_t *find_matching_rule(const char *app_id, const char *title, const char *tag);
 void rule_apply_consequence(node_t *node, client_t *client, const rule_consequence_t *rule);
-void rule_apply_view_consequence(view_t *view, const rule_consequence_t *rule);
+void rule_apply_view_consequence(const view_t *view, const rule_consequence_t *rule);

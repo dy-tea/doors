@@ -1,4 +1,4 @@
-#include "once.h"
+#include "macros.h"
 #include "output/config.h"
 #include "output/output.h"
 #include "permission.h"

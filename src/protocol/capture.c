@@ -1,20 +1,16 @@
 #include "layout/tree.h"
-#include "once.h"
 #include "output/output.h"
 #include "protocol/capture.h"
 #include "server.h"
 #include "types.h"
-#include "view.h"
 #include <drm_fourcc.h>
 #include <math.h>
 #include <wlr/render/pass.h>
-#include <wlr/types/wlr_buffer.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/util/box.h>
-#include <wlr/util/transform.h>
 
-static bool blocked_view_rect(output_t *o, view_t *view, struct wlr_box *logical) {
+static bool blocked_view_rect(const output_t *o, const view_t *view, struct wlr_box *logical) {
 	if (!view->node || !view->node->client || !view->scene_tree)
 		return false;
 
@@ -49,7 +45,7 @@ static bool blocked_view_rect(output_t *o, view_t *view, struct wlr_box *logical
 	if (!wlr_scene_node_coords(&view->scene_tree->node, &x, &y))
 		return false;
 
-	int border = effective_border_width(view->node->desktop);
+	const int border = effective_border_width(view->node->desktop);
 	*logical = (struct wlr_box){
 		.x = x - border - o->rectangle.x,
 		.y = y - border - o->rectangle.y,
@@ -59,7 +55,7 @@ static bool blocked_view_rect(output_t *o, view_t *view, struct wlr_box *logical
 	return true;
 }
 
-size_t capture_block_out_rects(struct wlr_output *output, struct wlr_box *rects, size_t max) {
+size_t capture_block_out_rects(struct wlr_output *output, struct wlr_box *rects, const size_t max) {
 	if (!output || !output->enabled || !output->renderer || max == 0)
 		return 0;
 
@@ -67,15 +63,14 @@ size_t capture_block_out_rects(struct wlr_output *output, struct wlr_box *rects,
 	if (!o)
 		return 0;
 
-	int buffer_width = output->width;
-	int buffer_height = output->height;
+	const int buffer_width = output->width, buffer_height = output->height;
 	if (buffer_width <= 0 || buffer_height <= 0)
 		return 0;
 
 	int trans_width, trans_height;
 	wlr_output_transformed_resolution(output, &trans_width, &trans_height);
 
-	float scale = output->scale;
+	const float scale = output->scale;
 	size_t nrects = 0;
 
 	view_t *view;
@@ -93,10 +88,10 @@ size_t capture_block_out_rects(struct wlr_output *output, struct wlr_box *rects,
 			continue;
 
 		// output logical coordinates -> buffer coordinates
-		double x0 = floor((double)logical.x * scale);
-		double y0 = floor((double)logical.y * scale);
-		double x1 = ceil((double)(logical.x + logical.width) * scale);
-		double y1 = ceil((double)(logical.y + logical.height) * scale);
+		const double x0 = floor((double)logical.x * scale);
+		const double y0 = floor((double)logical.y * scale);
+		const double x1 = ceil((double)(logical.x + logical.width) * scale);
+		const double y1 = ceil((double)(logical.y + logical.height) * scale);
 
 		struct wlr_box buffer_box = {
 			.x = (int)x0,
@@ -123,7 +118,8 @@ size_t capture_block_out_rects(struct wlr_output *output, struct wlr_box *rects,
 	return nrects;
 }
 
-void capture_block_out_render(struct wlr_render_pass *pass, const struct wlr_box *rects, size_t n) {
+void capture_block_out_render(struct wlr_render_pass *pass, const struct wlr_box *rects,
+		const size_t n) {
 	for (size_t i = 0; i < n; i++) {
 		wlr_render_pass_add_rect(pass, &(struct wlr_render_rect_options){
 			.box = rects[i],
@@ -133,8 +129,9 @@ void capture_block_out_render(struct wlr_render_pass *pass, const struct wlr_box
 	}
 }
 
-void capture_block_out_fill_shm(void *data, uint32_t format, size_t stride, uint32_t buffer_width,
-		uint32_t buffer_height, const struct wlr_box *rects, size_t n) {
+void capture_block_out_fill_shm(void *data, const uint32_t format, const size_t stride,
+		const uint32_t buffer_width, const uint32_t buffer_height, const struct wlr_box *rects,
+		const size_t n) {
 	if (!data || stride == 0)
 		return;
 
@@ -150,10 +147,10 @@ void capture_block_out_fill_shm(void *data, uint32_t format, size_t stride, uint
 
 	for (size_t i = 0; i < n; i++) {
 		const struct wlr_box *r = &rects[i];
-		int x0 = r->x < 0 ? 0 : r->x;
-		int y0 = r->y < 0 ? 0 : r->y;
-		int x1 = r->x + r->width > (int)buffer_width ? (int)buffer_width : r->x + r->width;
-		int y1 = r->y + r->height > (int)buffer_height ? (int)buffer_height : r->y + r->height;
+		const int x0 = r->x < 0 ? 0 : r->x;
+		const int y0 = r->y < 0 ? 0 : r->y;
+		const int x1 = r->x + r->width > (int)buffer_width ? (int)buffer_width : r->x + r->width;
+		const int y1 = r->y + r->height > (int)buffer_height ? (int)buffer_height : r->y + r->height;
 		if (x1 <= x0 || y1 <= y0)
 			continue;
 

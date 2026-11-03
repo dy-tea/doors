@@ -1,7 +1,6 @@
-#include "once.h"
+#include "macros.h"
 #include "protocol/xdg_toplevel.h"
 #include "server.h"
-#include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_xdg_shell.h>
 
 static void handle_new_xdg_toplevel(struct wl_listener *listener, void *data) {

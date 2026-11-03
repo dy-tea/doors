@@ -10,16 +10,15 @@
 #include "tree.h"
 #include "types.h"
 #include "view.h"
-#include <stdlib.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/util/log.h>
 
-void arrange(output_t *m, desktop_t *d, bool use_transaction) {
+void arrange(output_t *m, desktop_t *d, const bool use_transaction) {
 	if (d == NULL)
 		return;
 
 	if (m != NULL) {
-		struct wlr_box rect = desktop_usable_area(m, d);
+		const struct wlr_box rect = desktop_usable_area(m, d);
 
 		const layout_impl_t *impl = layout_get_impl(d->layout);
 		if (impl && impl->arrange)
@@ -33,7 +32,7 @@ void arrange(output_t *m, desktop_t *d, bool use_transaction) {
 }
 
 static void tiled_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
-	int wg = compute_window_gap(d);
+	const int wg = compute_window_gap(d);
 	available.x += wg;
 	available.y += wg;
 	available.width -= wg;
@@ -74,7 +73,7 @@ static void monocle_on_client_state(output_t *m, desktop_t *d, node_t *n, client
 	if (d->root == NULL)
 		return;
 
-	node_t *reveal = d->focus;
+	const node_t *reveal = d->focus;
 	FOR_EACH_LEAF(node, d->root) {
 		if (node->client != NULL && (client_is_maximized(node->client) ||
 				node->client->state == STATE_FULLSCREEN)) {
@@ -161,7 +160,7 @@ static bool scroller_focus(desktop_t *d, direction_t dir) {
 
 // pick the leaf of `sub` that is adjacent to `from` in direction `dir`
 static node_t *closest_leaf(node_t *sub, node_t *from, direction_t dir) {
-	bool horiz = dir == DIR_WEST || dir == DIR_EAST;
+	const bool horiz = dir == DIR_WEST || dir == DIR_EAST;
 	struct wlr_box f = from->rectangle;
 	node_t *best = NULL;
 	long best_overlap = -1, best_dist = 0;
@@ -170,7 +169,7 @@ static node_t *closest_leaf(node_t *sub, node_t *from, direction_t dir) {
 		if (node_is_invisible(leaf))
 			continue;
 
-		struct wlr_box r = leaf->rectangle;
+		const struct wlr_box r = leaf->rectangle;
 		long lo, hi, dist;
 		if (horiz) {
 			lo = r.y > f.y ? r.y : f.y;
@@ -181,7 +180,7 @@ static node_t *closest_leaf(node_t *sub, node_t *from, direction_t dir) {
 			hi = r.x + r.width < f.x + f.width ? r.x + r.width : f.x + f.width;
 			dist = dir == DIR_SOUTH ? r.y : -(r.y + r.height);
 		}
-		long overlap = hi - lo;
+		const long overlap = hi - lo;
 		if (best == NULL || overlap > best_overlap || (overlap == best_overlap && dist < best_dist)) {
 			best = leaf;
 			best_overlap = overlap;
@@ -191,7 +190,7 @@ static node_t *closest_leaf(node_t *sub, node_t *from, direction_t dir) {
 	return best;
 }
 
-static node_t *focus_fence_leaf(node_t *from, direction_t dir) {
+static node_t *focus_fence_leaf(node_t *from, const direction_t dir) {
 	node_t *cursor = from;
 
 	while (cursor != NULL) {
@@ -209,7 +208,7 @@ static node_t *focus_fence_leaf(node_t *from, direction_t dir) {
 	return NULL;
 }
 
-static node_t *wrapped_focus_leaf(desktop_t *d, direction_t dir) {
+static node_t *wrapped_focus_leaf(const desktop_t *d, const direction_t dir) {
 	if (!settings.focus_wrapping || d->root == NULL)
 		return NULL;
 
@@ -227,7 +226,7 @@ static node_t *wrapped_focus_leaf(desktop_t *d, direction_t dir) {
 	return w != NULL && w != d->focus ? w : NULL;
 }
 
-static bool tiled_focus(desktop_t *d, direction_t dir) {
+static bool tiled_focus(desktop_t *d, const direction_t dir) {
 	if (d->focus == NULL)
 		return false;
 
@@ -375,12 +374,12 @@ void layout_desktop_changed(output_t *m, desktop_t *d) {
 	layout_client_state_changed(m, d, NULL, STATE_TILED);
 }
 
-void layout_set(desktop_t *d, layout_t new_layout) {
+void layout_set(desktop_t *d, const layout_t new_layout) {
 	if (d == NULL || new_layout >= sizeof(registry) / sizeof(registry[0]) ||
 		registry[new_layout] == NULL)
 		return;
 
-	layout_t old_layout = d->layout;
+	const layout_t old_layout = d->layout;
 
 	if (old_layout == new_layout) {
 		layout_desktop_changed(d->output ? d->output : output_focused(), d);
@@ -405,7 +404,7 @@ void layout_set(desktop_t *d, layout_t new_layout) {
 	layout_desktop_changed(m, d);
 }
 
-void layout_toggle(desktop_t *d, layout_t target) {
+void layout_toggle(desktop_t *d, const layout_t target) {
 	if (d == NULL)
 		return;
 

@@ -10,7 +10,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wayland-server-core.h>
-#include <wayland-server-protocol.h>
 #include <wlr/interfaces/wlr_buffer.h>
 #include <wlr/types/wlr_buffer.h>
 #include <wlr/types/wlr_output.h>
@@ -129,7 +128,7 @@ static void text_calc_size(text_buffer_t *buffer) {
 		buffer->props.height);
 }
 
-static void render_backing_buffer(text_buffer_t *buffer) {
+static void render_backing_buffer(const text_buffer_t *buffer) {
 	if (!buffer->visible)
 		return;
 
@@ -138,9 +137,9 @@ static void render_backing_buffer(text_buffer_t *buffer) {
 		return;
 	}
 
-	float scale = buffer->scale > 0 ? buffer->scale : 1.0f;
-	int width = (int)ceilf(get_text_width(&buffer->props) * scale);
-	int height = (int)ceilf(buffer->props.height * scale);
+	const float scale = buffer->scale > 0 ? buffer->scale : 1.0f;
+	const int width = (int)ceilf((float)get_text_width(&buffer->props) * scale);
+	const int height = (int)ceilf((float)buffer->props.height * scale);
 
 	if (width <= 0 || height <= 0) {
 		wlr_scene_buffer_set_buffer(buffer->buffer_node, NULL);
@@ -168,12 +167,12 @@ static void render_backing_buffer(text_buffer_t *buffer) {
 
 	cairo_set_antialias(cairo, CAIRO_ANTIALIAS_BEST);
 
-	float *bg = buffer->props.background;
+	const float *bg = buffer->props.background;
 	cairo_set_source_rgba(cairo, bg[0], bg[1], bg[2], bg[3]);
 	cairo_rectangle(cairo, 0, 0, width, height);
 	cairo_fill(cairo);
 
-	float *fg = buffer->props.color;
+	const float *fg = buffer->props.color;
 	cairo_set_source_rgba(cairo, fg[0], fg[1], fg[2], fg[3]);
 
 	PangoLayout *layout = make_pango_layout(cairo, buffer->text, buffer->props.pango_markup);
@@ -226,7 +225,7 @@ static void handle_destroy(struct wl_listener *listener, void *data) {
 }
 
 text_node_t *text_node_create(struct wlr_scene_tree *parent, const char *text, const float color[4],
-		bool pango_markup) {
+		const bool pango_markup) {
 	text_buffer_t *buffer = calloc(1, sizeof(*buffer));
 	if (!buffer)
 		return NULL;

@@ -3,10 +3,9 @@
 #include "layout/floating.h"
 #include "layout/layout.h"
 #include "layout/tree.h"
-#include "once.h"
+#include "macros.h"
 #include "output/output.h"
 #include "protocol/session_mgmt.h"
-#include "protocol/workspace.h"
 #include "protocol/xdg_toplevel.h"
 #include "server.h"
 #include "str.h"
@@ -1131,7 +1130,7 @@ void session_mgmt_handle_mapped(struct wlr_xdg_toplevel *xdg_toplevel) {
 			d = m ? m->desk : NULL;
 
 		if (m && d) {
-			struct wlr_box rect = session_clamp_rect(m, d, tl->restore.rect);
+			const struct wlr_box rect = session_clamp_rect(m, d, tl->restore.rect);
 
 			if (tl->restore.floating) {
 				if (!IS_FLOATING(n->client))

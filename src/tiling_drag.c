@@ -11,7 +11,9 @@
 #include <wlr/util/edges.h>
 #include <wlr/util/log.h>
 
-static struct wlr_box get_leaf_rect(node_t *node) {
+#define EDGE_THRESHOLD 0.3
+
+static struct wlr_box get_leaf_rect(const node_t *node) {
 	if (node) {
 		if (node->client)
 			return node->client->tiled_rectangle;
@@ -20,19 +22,18 @@ static struct wlr_box get_leaf_rect(node_t *node) {
 	return (struct wlr_box){0};
 }
 
-static enum wlr_edges determine_drop_edge(node_t *target, double lx, double ly) {
-	struct wlr_box rect = get_leaf_rect(target);
-	double edge_threshold = 0.3;
+static enum wlr_edges determine_drop_edge(const node_t *target, const double lx, const double ly) {
+	const struct wlr_box rect = get_leaf_rect(target);
 
-	double dw = rect.width > 0 ? (double)rect.width : 1.0;
-	double dh = rect.height > 0 ? (double)rect.height : 1.0;
-	double min_dim = fmin(dw, dh);
-	double threshold = min_dim * edge_threshold;
+	const double dw = rect.width > 0 ? (double)rect.width : 1.0;
+	const double dh = rect.height > 0 ? (double)rect.height : 1.0;
+	const double min_dim = fmin(dw, dh);
+	const double threshold = min_dim * EDGE_THRESHOLD;
 
-	double dist_left = lx - rect.x;
-	double dist_right = (rect.x + rect.width) - lx;
-	double dist_top = ly - rect.y;
-	double dist_bottom = (rect.y + rect.height) - ly;
+	const double dist_left = lx - rect.x;
+	const double dist_right = (rect.x + rect.width) - lx;
+	const double dist_top = ly - rect.y;
+	const double dist_bottom = (rect.y + rect.height) - ly;
 
 	if (dist_left < threshold && dist_left <= dist_right && dist_left <= dist_top &&
 		dist_left <= dist_bottom)
@@ -57,7 +58,7 @@ static void update_indicator(enum wlr_edges edge, node_t *target) {
 		return;
 	}
 
-	struct wlr_box rect = get_leaf_rect(target);
+	const struct wlr_box rect = get_leaf_rect(target);
 	if (rect.width == 0 || rect.height == 0) {
 		wlr_scene_node_set_enabled(&server.tiling_drag_indicator->node, false);
 		return;
@@ -190,7 +191,7 @@ void tiling_drag_finish(void) {
 	wlr_log(WLR_DEBUG, "Dragged=%u target=%u edge=%d", dragged->id, target->id,
 		server.tiling_drag_target_edge);
 
-	enum wlr_edges edge = server.tiling_drag_target_edge;
+	const enum wlr_edges edge = server.tiling_drag_target_edge;
 	desktop_t *src_desk = dragged->desktop;
 	output_t *src_out = dragged->output;
 

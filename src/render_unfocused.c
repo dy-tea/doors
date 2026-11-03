@@ -1,5 +1,5 @@
 #include "client.h"
-#include "once.h"
+#include "macros.h"
 #include "render_unfocused.h"
 #include "server.h"
 #include "types.h"
@@ -64,7 +64,7 @@ void render_unfocused_client_update(client_t *client) {
 	if (!client)
 		return;
 
-	bool enabled = client->render_unfocused_fps > 0;
+	const bool enabled = client->render_unfocused_fps > 0;
 
 	struct render_unfocused_link *rfl, *tmp;
 	wl_list_for_each_safe(rfl, tmp, &render_unfocused_clients, link) {

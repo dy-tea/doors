@@ -6,11 +6,10 @@
 #include <pixman.h>
 #include <stdlib.h>
 #include <string.h>
-#include <wlr/types/wlr_buffer.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/util/log.h>
 
-static bool corner_mask_no_input(struct wlr_scene_buffer *buffer, double *sx, double *sy) {
+bool scene_buffer_no_input(struct wlr_scene_buffer *buffer, double *sx, double *sy) {
 	(void)buffer;
 	(void)sx;
 	(void)sy;
@@ -30,7 +29,7 @@ void blur_pool_destroy(blur_node_pool_t *p) {
 	p->cap = 0;
 }
 
-void blur_pool_set_count(blur_node_pool_t *p, struct wlr_scene_tree *parent, size_t count) {
+void blur_pool_set_count(blur_node_pool_t *p, struct wlr_scene_tree *parent, const size_t count) {
 	if (!p || !parent)
 		return;
 
@@ -92,7 +91,7 @@ typedef struct {
 	uint64_t *native;
 } effect_fields_t;
 
-static effect_fields_t get_effect_fields(surface_blur_t *b, surface_effect_t effect) {
+static effect_fields_t get_effect_fields(surface_blur_t *b, const surface_effect_t effect) {
 	effect_fields_t f = {0};
 	switch (effect) {
 	case EFFECT_MICA:
@@ -109,8 +108,8 @@ static effect_fields_t get_effect_fields(surface_blur_t *b, surface_effect_t eff
 	return f;
 }
 
-void surface_set_effect(struct wlr_scene_tree *scene_tree, node_t *node, surface_blur_t **blur,
-		surface_effect_t effect, bool enabled) {
+void surface_set_effect(struct wlr_scene_tree *scene_tree, const node_t *node, surface_blur_t **blur,
+		const surface_effect_t effect, const bool enabled) {
 	if (!scene_tree)
 		return;
 
@@ -136,7 +135,7 @@ void surface_set_effect(struct wlr_scene_tree *scene_tree, node_t *node, surface
 				}
 			}
 		} else {
-			effect_fields_t f = get_effect_fields(*blur, effect);
+			const effect_fields_t f = get_effect_fields(*blur, effect);
 			if (!*f.node) {
 				*f.node = wlr_scene_buffer_create(scene_tree, NULL);
 				if (*f.node) {
@@ -171,8 +170,8 @@ void surface_set_effect(struct wlr_scene_tree *scene_tree, node_t *node, surface
 	}
 }
 
-void surface_blur_region_clip(pixman_region32_t *dst, const pixman_region32_t *region, int surface_w,
-		int surface_h) {
+void surface_blur_region_clip(pixman_region32_t *dst, const pixman_region32_t *region,
+		const int surface_w, const int surface_h) {
 	if (!dst || !region)
 		return;
 
@@ -215,7 +214,7 @@ void surface_set_border_radius(struct wlr_scene_tree *scene_tree,
 				if (border_tree)
 					wlr_scene_node_place_below(&(*rounded)->corner_mask_node->node, &border_tree->node);
 
-				(*rounded)->corner_mask_node->point_accepts_input = corner_mask_no_input;
+				(*rounded)->corner_mask_node->point_accepts_input = scene_buffer_no_input;
 			}
 		}
 		if ((*rounded)->cached_radius != radius) {
@@ -253,8 +252,8 @@ void surface_set_border_radius(struct wlr_scene_tree *scene_tree,
 	}
 }
 
-void surface_set_shadow(struct wlr_scene_tree *scene_tree, node_t *node, surface_shadow_t **shadow,
-		bool enabled) {
+void surface_set_shadow(struct wlr_scene_tree *scene_tree, const node_t *node,
+		surface_shadow_t **shadow, const bool enabled) {
 	if (!scene_tree)
 		return;
 
@@ -322,12 +321,13 @@ void surface_update_rounded(surface_rounded_t **rounded, float color[4], border_
 	}
 }
 
-void surface_client_set_effect(client_t *client, surface_effect_t effect, bool enabled) {
+void surface_client_set_effect(const client_t *client, const surface_effect_t effect,
+		const bool enabled) {
 	surface_set_effect(client_get_scene_tree(client), client_get_node(client), client_blur_slot(client),
 		effect, enabled);
 }
 
-void surface_client_set_border_radius(client_t *client, float radius) {
+void surface_client_set_border_radius(client_t *client, const float radius) {
 	if (client_get_scene_tree(client) == NULL) {
 		// no view yet, just remember it for when there is one
 		client->border_radius = radius;
@@ -357,18 +357,18 @@ void surface_set_opacity(struct wlr_scene_node *node, float opacity) {
 		wlr_scene_node_for_each_buffer(node, surface_set_opacity_for_each_buffer, &opacity);
 }
 
-void rounded_mark_border_size(surface_rounded_t *rounded, int content_w, int content_h, int border_w,
-		float scale) {
+void rounded_mark_border_size(surface_rounded_t *rounded, const int content_w, const int content_h,
+		const int border_w, const float scale) {
 	if (!rounded)
 		return;
 
-	int new_fw = content_w + 2 * border_w;
-	int new_fh = content_h + 2 * border_w;
+	const int new_fw = content_w + 2 * border_w;
+	const int new_fh = content_h + 2 * border_w;
 	if (new_fw <= 0 || new_fh <= 0)
 		return;
 
-	int pfw = (int)((double)new_fw * scale + 0.5);
-	int pfh = (int)((double)new_fh * scale + 0.5);
+	const int pfw = (int)((double)new_fw * scale + 0.5);
+	const int pfh = (int)((double)new_fh * scale + 0.5);
 	if (rounded->border_shader_buf_w != pfw || rounded->border_shader_buf_h != pfh) {
 		rounded->border_dirty = true;
 		rounded->corner_mask_dirty = true;

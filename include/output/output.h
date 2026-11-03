@@ -77,7 +77,7 @@ void output_update_geometry(output_t *output);
 void output_update_scale(output_t *output, float scale);
 output_t *output_get_valid(void);
 void output_schedule_frame(output_t *output);
-bool output_supports_hdr(output_t *output, const char **unsupported_reason_ptr);
+bool output_supports_hdr(const output_t *output, const char **unsupported_reason_ptr);
 void output_set_focused(output_t *m);
 output_t *output_focused(void);
 void set_orphan_active_desk(desktop_t *d);

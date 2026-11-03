@@ -4,9 +4,7 @@
 #include "layout/layout.h"
 #include "layout/master_stack.h"
 #include "layout/scroller.h"
-#include "output/output.h"
 #include "server.h"
-#include "tree.h"
 #include <limits.h>
 #include <string.h>
 

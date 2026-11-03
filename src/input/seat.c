@@ -8,7 +8,6 @@
 #include <string.h>
 #include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_data_device.h>
-#include <wlr/types/wlr_primary_selection_v1.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_seat.h>
 #include <wlr/util/log.h>
@@ -51,7 +50,7 @@ static void handle_drag_icon_destroy(struct wl_listener *listener, void *data) {
 
 static void handle_start_drag(struct wl_listener *listener, void *data) {
 	(void)listener;
-	struct wlr_drag *drag = data;
+	const struct wlr_drag *drag = data;
 	if (!drag->icon)
 		return;
 
@@ -144,7 +143,6 @@ seat_t *seat_default(void) {
 	if (wl_list_empty(&server.seats))
 		return NULL;
 
-	seat_t *s = NULL;
-	s = wl_container_of(server.seats.next, s, link);
-	return s;
+	seat_t *s;
+	return wl_container_of(server.seats.next, s, link);
 }

@@ -151,7 +151,7 @@ static bool subject_pattern(rule_pattern_t *p, const char *spec, char *err, size
 		return false;
 	}
 
-	bool explicit_mode = str_starts(pat, "exact:") || str_starts(pat, "glob:") || str_starts(pat,
+	const bool explicit_mode = str_starts(pat, "exact:") || str_starts(pat, "glob:") || str_starts(pat,
 		"regex:");
 
 	char buf[RULE_RE_MAX + 16];
@@ -185,7 +185,7 @@ bool permission_subject(struct wl_client *client, perm_subject_t *out) {
 	snprintf(proc, sizeof(proc), "/proc/%d/exe", (int)out->pid);
 
 	char path[PATH_MAX];
-	ssize_t len = readlink(proc, path, sizeof(path) - 1);
+	const ssize_t len = readlink(proc, path, sizeof(path) - 1);
 	if (len > 0) {
 		path[len] = '\0';
 
@@ -224,8 +224,8 @@ static bool remember_expired(const perm_remember_entry_t *e, int64_t now) {
 	return e->expires != 0 && e->expires <= now;
 }
 
-static int remembered_entry(const char *exe, perm_cap_t cap) {
-	int64_t now = (int64_t)time(NULL);
+static int remembered_entry(const char *exe, const perm_cap_t cap) {
+	const int64_t now = (int64_t)time(NULL);
 
 	for (size_t i = remember_len; i > 0; i--) {
 		const perm_remember_entry_t *e = &remembered[i - 1];
@@ -237,7 +237,7 @@ static int remembered_entry(const char *exe, perm_cap_t cap) {
 	return -1;
 }
 
-perm_result_t permission_decide(const perm_subject_t *subject, perm_cap_t cap) {
+perm_result_t permission_decide(const perm_subject_t *subject, const perm_cap_t cap) {
 	perm_result_t result = {
 		.decision = defaults[cap],
 		.source = "default",
@@ -250,7 +250,7 @@ perm_result_t permission_decide(const perm_subject_t *subject, perm_cap_t cap) {
 		return result;
 	}
 
-	int rule = matching_rule(subject->exe, cap);
+	const int rule = matching_rule(subject->exe, cap);
 	if (rule >= 0) {
 		result.decision = rules[rule].decision;
 		result.source = "policy";
@@ -258,7 +258,7 @@ perm_result_t permission_decide(const perm_subject_t *subject, perm_cap_t cap) {
 		return result;
 	}
 
-	int entry = remembered_entry(subject->exe, cap);
+	const int entry = remembered_entry(subject->exe, cap);
 	if (entry >= 0) {
 		result.decision = remembered[entry].decision;
 		result.source = "remember";
@@ -317,8 +317,8 @@ static perm_client_t *client_entry(struct wl_client *client) {
 	return c;
 }
 
-perm_result_t permission_check(struct wl_client *client, perm_cap_t cap) {
-	perm_client_t *c = client ? client_entry(client) : NULL;
+perm_result_t permission_check(struct wl_client *client, const perm_cap_t cap) {
+	const perm_client_t *c = client ? client_entry(client) : NULL;
 
 	if (c && c->has[cap])
 		return (perm_result_t){
@@ -345,7 +345,7 @@ static void pending_publish_request(const perm_pending_t *p) {
 		permission_cap_name(p->cap), subject_name(&p->subject), app);
 }
 
-static perm_pending_t *pending_find(struct wl_client *client, perm_cap_t cap) {
+static perm_pending_t *pending_find(const struct wl_client *client, const perm_cap_t cap) {
 	perm_pending_t *p;
 	wl_list_for_each(p, &pending, link) {
 		if (p->client == client && p->cap == cap)
@@ -392,7 +392,7 @@ static void pending_destroy(perm_pending_t *p) {
 static void pending_resolve(perm_pending_t *p, perm_decision_t decision, const char *reason) {
 	char token[PERM_TOKEN_LEN + 1];
 	str_copy(token, sizeof(token), p->token);
-	perm_cap_t cap = p->cap;
+	const perm_cap_t cap = p->cap;
 
 	// detach the waiters so a resolving callback may destroy the frame that
 	// owns its waiter without touching the pending request
@@ -435,7 +435,7 @@ static void pending_client_destroyed(struct wl_listener *listener, void *data) {
 }
 
 static perm_pending_t *pending_create(struct wl_client *client, const perm_subject_t *subject,
-		perm_cap_t cap) {
+		const perm_cap_t cap) {
 	perm_pending_t *p = calloc(1, sizeof(*p));
 	if (!p)
 		return NULL;
@@ -507,8 +507,7 @@ void permission_unpark(perm_waiter_t *waiter) {
 	if (!waiter)
 		return;
 
-	// detached by pending_resolve: it is still alive until the loop frees it,
-	// but its callback must not run now that the frame is gone
+	// detached by pending_resolve
 	if (!waiter->pending) {
 		waiter->cancelled = true;
 		return;
@@ -540,8 +539,8 @@ bool permission_prompt(struct wl_client *client, perm_cap_t cap) {
 	return pending_create(client, &c->subject, cap) != NULL;
 }
 
-bool permission_answer_token(const char *token, perm_decision_t decision,
-		perm_remember_t remember) {
+bool permission_answer_token(const char *token, const perm_decision_t decision,
+		const perm_remember_t remember) {
 	if (!token || (decision != PERM_ALLOW && decision != PERM_DENY))
 		return false;
 
@@ -556,11 +555,7 @@ bool permission_answer_token(const char *token, perm_decision_t decision,
 	if (!p)
 		return false;
 
-	struct wl_client *client = p->client;
-	perm_subject_t subject = p->subject;
-	perm_cap_t cap = p->cap;
-
-	permission_answer(client, &subject, cap, decision, remember);
+	permission_answer(p->client, &p->subject, p->cap, decision, remember);
 	pending_resolve(p, decision, "answer");
 	return true;
 }
@@ -573,7 +568,7 @@ size_t permission_pending_count(void) {
 	return n;
 }
 
-bool permission_pending_at(size_t index, perm_pending_info_t *out) {
+bool permission_pending_at(const size_t index, perm_pending_info_t *out) {
 	perm_pending_t *p;
 	size_t i = 0;
 	wl_list_for_each(p, &pending, link) {
@@ -590,7 +585,8 @@ bool permission_pending_at(size_t index, perm_pending_info_t *out) {
 	return false;
 }
 
-void permission_log_denial(struct wl_client *client, perm_cap_t cap, const perm_result_t *result) {
+void permission_log_denial(struct wl_client *client, const perm_cap_t cap,
+		const perm_result_t *result) {
 	perm_subject_t s = {0};
 	permission_subject(client, &s);
 
@@ -609,12 +605,12 @@ void permission_log_denial(struct wl_client *client, perm_cap_t cap, const perm_
 		s.app_id[0] ? " app_id=" : "", s.app_id, where);
 }
 
-void permission_set_ask_timeout(uint32_t ms) {
+void permission_set_ask_timeout(const uint32_t ms) {
 	ask_timeout_ms = ms;
 }
 
-void permission_answer(struct wl_client *client, const perm_subject_t *subject, perm_cap_t cap,
-		perm_decision_t decision, perm_remember_t remember) {
+void permission_answer(struct wl_client *client, const perm_subject_t *subject, const perm_cap_t cap,
+		const perm_decision_t decision, const perm_remember_t remember) {
 	if (remember != PERM_REMEMBER_NONE) {
 		if (!subject || !subject->known) {
 			wlr_log(WLR_ERROR, "permission: cannot remember %s for an unknown executable",
@@ -639,8 +635,8 @@ void permission_answer(struct wl_client *client, const perm_subject_t *subject, 
 	c->decision[cap] = decision;
 }
 
-int permission_rule_add(const char *exe_spec, perm_cap_t cap, perm_decision_t decision, char *err,
-		size_t errsz) {
+int permission_rule_add(const char *exe_spec, const perm_cap_t cap, const perm_decision_t decision,
+		char *err, size_t errsz) {
 	if (rule_len >= MAX_PERMISSION_RULES) {
 		snprintf(err, errsz, "too many permission rules, the limit is %d", MAX_PERMISSION_RULES);
 		return -1;
@@ -660,7 +656,7 @@ int permission_rule_add(const char *exe_spec, perm_cap_t cap, perm_decision_t de
 	return index;
 }
 
-bool permission_rule_remove(int index) {
+bool permission_rule_remove(const int index) {
 	if (index < 0 || (size_t)index >= rule_len)
 		return false;
 
@@ -678,7 +674,7 @@ size_t permission_rule_count(void) {
 	return rule_len;
 }
 
-bool permission_rule_at(size_t index, perm_rule_info_t *out) {
+bool permission_rule_at(const size_t index, perm_rule_info_t *out) {
 	if (index >= rule_len)
 		return false;
 
@@ -688,11 +684,11 @@ bool permission_rule_at(size_t index, perm_rule_info_t *out) {
 	return true;
 }
 
-perm_decision_t permission_default(perm_cap_t cap) {
+perm_decision_t permission_default(const perm_cap_t cap) {
 	return defaults[cap];
 }
 
-void permission_set_default(perm_cap_t cap, perm_decision_t decision) {
+void permission_set_default(const perm_cap_t cap, const perm_decision_t decision) {
 	if (defaults[cap] == decision)
 		return;
 
@@ -701,7 +697,7 @@ void permission_set_default(perm_cap_t cap, perm_decision_t decision) {
 }
 
 static void remember_purge(void) {
-	int64_t now = (int64_t)time(NULL);
+	const int64_t now = (int64_t)time(NULL);
 	size_t kept = 0;
 
 	for (size_t i = 0; i < remember_len; i++) {
@@ -735,8 +731,8 @@ bool permission_remember_at(size_t index, perm_remember_info_t *out) {
 	return true;
 }
 
-static bool remember_put(const char *exe, perm_cap_t cap, perm_decision_t decision, int64_t expires,
-		bool persistent) {
+static bool remember_put(const char *exe, const perm_cap_t cap, const perm_decision_t decision,
+		const int64_t expires, const bool persistent) {
 	if (!exe || exe[0] == '\0' || strlen(exe) >= RULE_RE_MAX)
 		return false;
 
@@ -762,8 +758,8 @@ static bool remember_put(const char *exe, perm_cap_t cap, perm_decision_t decisi
 	return true;
 }
 
-bool permission_remember_add(const char *exe, perm_cap_t cap, perm_decision_t decision,
-		int64_t expires, bool persistent) {
+bool permission_remember_add(const char *exe, const perm_cap_t cap, const perm_decision_t decision,
+		const int64_t expires, const bool persistent) {
 	if (!remember_put(exe, cap, decision, expires, persistent))
 		return false;
 

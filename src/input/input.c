@@ -2,7 +2,7 @@
 #include "input/keyboard.h"
 #include "input/pointer.h"
 #include "input/touch.h"
-#include "once.h"
+#include "macros.h"
 #include "server.h"
 #include "str.h"
 #include <float.h>
@@ -333,15 +333,13 @@ bool input_config_set_value(input_config_t *config, const char *name, const char
 		return true;
 	}
 	if (streq(name, "drag_lock")) {
-		int lock = parse_bool(value, -1);
+		const int lock = parse_bool(value, -1);
 		if (lock != -1)
 			config->drag_lock = lock ? INPUT_CONFIG_DRAG_LOCK_ENABLED : INPUT_CONFIG_DRAG_LOCK_DISABLED;
 		return true;
 	}
 	if (streq(name, "click_method")) {
-		if (streq(value, "clickfinger"))
-			config->click_method = INPUT_CONFIG_CLICK_METHOD_CLICKFINGER;
-		else if (streq(value, "none"))
+		if (streq(value, "none"))
 			config->click_method = INPUT_CONFIG_CLICK_METHOD_NONE;
 		else
 			config->click_method = INPUT_CONFIG_CLICK_METHOD_BUTTON_AREAS;
@@ -352,8 +350,6 @@ bool input_config_set_value(input_config_t *config, const char *name, const char
 			config->scroll_method = INPUT_CONFIG_SCROLL_METHOD_EDGE;
 		else if (streq(value, "button"))
 			config->scroll_method = INPUT_CONFIG_SCROLL_METHOD_BUTTON;
-		else if (streq(value, "twofinger"))
-			config->scroll_method = INPUT_CONFIG_SCROLL_METHOD_TWOFINGER;
 		else if (streq(value, "none"))
 			config->scroll_method = INPUT_CONFIG_SCROLL_METHOD_NONE;
 		else

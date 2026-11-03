@@ -1,4 +1,4 @@
-#include "once.h"
+#include "macros.h"
 #include "permission.h"
 #include "server.h"
 #include <wlr/types/wlr_cursor.h>

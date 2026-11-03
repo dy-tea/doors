@@ -1,7 +1,7 @@
 #include "diagnostics.h"
 #include "fs.h"
 #include "log.h"
-#include "once.h"
+#include "macros.h"
 #include "str.h"
 #include <dirent.h>
 #include <errno.h>
@@ -44,7 +44,7 @@ static int log_compare(const void *a, const void *b) {
 static bool is_log_entry(const struct dirent *entry) {
 	if (entry->d_type == DT_DIR)
 		return false;
-	size_t len = strlen(entry->d_name);
+	const size_t len = strlen(entry->d_name);
 	return len > 4 && streq(entry->d_name + len - 4, ".log");
 }
 
@@ -176,7 +176,7 @@ int log_init(const char *log_file_path) {
 			}
 		}
 
-		time_t now = time(NULL);
+		const time_t now = time(NULL);
 		struct tm tm_info;
 		localtime_r(&now, &tm_info);
 		char time_str[32];
@@ -198,7 +198,7 @@ int log_init(const char *log_file_path) {
 
 	// log startup
 	fprintf(log_file, "\n");
-	time_t now = time(NULL);
+	const time_t now = time(NULL);
 	struct tm tm_info;
 	localtime_r(&now, &tm_info);
 	char time_str[32];

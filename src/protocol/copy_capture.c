@@ -1,24 +1,20 @@
 #include "ext-image-capture-source-v1-protocol.h"
-#include "once.h"
+#include "macros.h"
 #include "permission.h"
 #include "protocol/capture.h"
 #include "protocol/copy_capture.h"
 #include "server.h"
 #include <assert.h>
 #include <stdlib.h>
-#include <wayland-server.h>
 #include <wlr/interfaces/wlr_ext_image_capture_source_v1.h>
 #include <wlr/interfaces/wlr_output.h>
-#include <wlr/render/allocator.h>
 #include <wlr/render/pass.h>
 #include <wlr/render/swapchain.h>
-#include <wlr/render/wlr_renderer.h>
 #include <wlr/render/wlr_texture.h>
 #include <wlr/types/wlr_buffer.h>
 #include <wlr/types/wlr_ext_image_capture_source_v1.h>
 #include <wlr/types/wlr_ext_image_copy_capture_v1.h>
 #include <wlr/types/wlr_output.h>
-#include <wlr/types/wlr_scene.h>
 #include <wlr/util/addon.h>
 #include <wlr/util/log.h>
 

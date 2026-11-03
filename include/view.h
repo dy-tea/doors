@@ -75,10 +75,10 @@ bool view_is_ready(view_t *view);
 
 view_t *view_from_wlr_surface(struct wlr_surface *surface);
 
-void view_resolve_content_layout(view_t *view, struct wlr_box container,
+void view_resolve_content_layout(const view_t *view, struct wlr_box container,
 	struct wlr_box *content_offset, struct wlr_box *border_size);
 
-void view_resolve_tiled_layout(view_t *view, struct wlr_box container,
+void view_resolve_tiled_layout(const view_t *view, struct wlr_box container,
 	struct wlr_box *content_offset, struct wlr_box *border_size, struct wlr_box *border_offset);
 
 void view_center_and_clip_surface(view_t *view);
@@ -90,8 +90,8 @@ void view_set_activated(view_t *view, bool activated);
 void view_close(view_t *view);
 void view_configure(view_t *view, struct wlr_box rect);
 
-void view_set_title(view_t *view, const char *title);
-void view_set_app_id(view_t *view, const char *app_id);
+void view_set_title(const view_t *view, const char *title);
+void view_set_app_id(const view_t *view, const char *app_id);
 
 void view_create_foreign_toplevels(view_t *view, const char *app_id, const char *title);
 void view_destroy_foreign_toplevels(view_t *view);

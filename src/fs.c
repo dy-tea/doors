@@ -11,7 +11,7 @@ static bool ensure_dir(const char *path, mode_t mode) {
 }
 
 // mkdir -p, only the last component is created with mode
-bool mkdir_p(const char *path, mode_t mode) {
+bool mkdir_p(const char *path, const mode_t mode) {
 	if (path == NULL || path[0] != '/')
 		return false;
 

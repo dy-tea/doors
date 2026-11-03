@@ -7,15 +7,10 @@
 #include "text.h"
 #include "tree.h"
 #include "types.h"
-#include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <wayland-server-core.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/util/log.h>
-
-extern struct server_t server;
 
 int tab_bar_height(node_t *n) {
 	if (settings.hide_lone_tab && n && tabbed_leaf_count(n) <= 1)
@@ -23,7 +18,7 @@ int tab_bar_height(node_t *n) {
 	return TAB_BAR_HEIGHT;
 }
 
-node_t *tabbed_ancestor(node_t *n) {
+node_t *tabbed_ancestor(const node_t *n) {
 	for (node_t *p = n ? n->parent : NULL; p != NULL; p = p->parent)
 		if (p->split_type == TYPE_TABBED)
 			return p;
@@ -31,7 +26,7 @@ node_t *tabbed_ancestor(node_t *n) {
 	return NULL;
 }
 
-static size_t collect_leaves(node_t *n, node_t **out, size_t cap) {
+static size_t collect_leaves(node_t *n, node_t **out, const size_t cap) {
 	if (n == NULL)
 		return 0;
 
@@ -72,7 +67,7 @@ node_t *tab_focus_leaf(node_t *tabbed_node, node_t *focus) {
 	return first;
 }
 
-static node_t *tab_step_leaf(node_t *tabbed_node, node_t *focus, int step) {
+static node_t *tab_step_leaf(node_t *tabbed_node, node_t *focus, const int step) {
 	if (tabbed_node == NULL)
 		return NULL;
 	size_t n = tabbed_leaf_count(tabbed_node);
@@ -82,14 +77,14 @@ static node_t *tab_step_leaf(node_t *tabbed_node, node_t *focus, int step) {
 	if (!arr)
 		return NULL;
 	collect_leaves(tabbed_node, arr, n);
-	node_t *cur = tab_focus_leaf(tabbed_node, focus);
+	const node_t *cur = tab_focus_leaf(tabbed_node, focus);
 	size_t idx = 0;
 	for (size_t i = 0; i < n; i++)
 		if (arr[i] == cur) {
 			idx = i;
 		break;
 	}
-	size_t next = step > 0 ? (idx + 1) % n : (idx + n - 1) % n;
+	const size_t next = step > 0 ? (idx + 1) % n : (idx + n - 1) % n;
 	node_t *res = arr[next];
 	free(arr);
 	return res;
@@ -103,7 +98,7 @@ node_t *tab_prev_leaf(node_t *tabbed_node, node_t *focus) {
 	return tab_step_leaf(tabbed_node, focus, -1);
 }
 
-static const char *leaf_label(node_t *leaf) {
+static const char *leaf_label(const node_t *leaf) {
 	if (leaf == NULL || leaf->client == NULL)
 		return "?";
 	if (leaf->client->title[0] != '\0')
@@ -113,7 +108,7 @@ static const char *leaf_label(node_t *leaf) {
 	return "(untitled)";
 }
 
-static void destroy_entries(struct tab_bar_t *bar) {
+static void destroy_entries(tab_bar_t *bar) {
 	if (bar == NULL || bar->entries == NULL)
 		return;
 	for (size_t i = 0; i < bar->entry_count; i++)
@@ -124,7 +119,7 @@ static void destroy_entries(struct tab_bar_t *bar) {
 	bar->entry_count = 0;
 }
 
-static void build_entries(struct tab_bar_t *bar) {
+static void build_entries(tab_bar_t *bar) {
 	destroy_entries(bar);
 
 	size_t count = tabbed_leaf_count(bar->owner);
@@ -166,7 +161,7 @@ void tabs_create(node_t *n) {
 	if (n->tab_bar != NULL)
 		return;
 
-	struct tab_bar_t *bar = calloc(1, sizeof(*bar));
+	tab_bar_t *bar = calloc(1, sizeof(*bar));
 	if (!bar)
 		return;
 
@@ -205,7 +200,7 @@ void tabs_rebuild(node_t *n) {
 	tabs_update_focus(n, NULL);
 }
 
-void tabs_arrange(node_t *n, struct wlr_box rect) {
+void tabs_arrange(const node_t *n, const struct wlr_box rect) {
 	if (n == NULL || n->tab_bar == NULL)
 		return;
 
@@ -223,17 +218,17 @@ void tabs_arrange(node_t *n, struct wlr_box rect) {
 	if (bar->entry_count == 0)
 		return;
 
-	int total_w = rect.width;
-	int n_entries = (int)bar->entry_count;
+	const int total_w = rect.width;
+	const int n_entries = (int)bar->entry_count;
 	int per = total_w / n_entries;
 	if (per < 1)
 		per = 1;
-	int remainder = total_w - per * n_entries;
+	const int remainder = total_w - per * n_entries;
 
 	int x = 0;
 	for (int i = 0; i < n_entries; i++) {
 		tab_entry_t *e = &bar->entries[i];
-		int w = per + (i < remainder ? 1 : 0);
+		const int w = per + (i < remainder ? 1 : 0);
 
 		if (e->tree)
 			wlr_scene_node_set_position(&e->tree->node, x, 0);
@@ -248,8 +243,7 @@ void tabs_arrange(node_t *n, struct wlr_box rect) {
 			if (label_max < 0)
 				label_max = 0;
 			text_node_set_max_width(e->label, label_max);
-			int text_h = text_node_default_height();
-			int label_y = (TAB_BAR_HEIGHT - TAB_BAR_BORDER - text_h) / 2;
+			int label_y = (TAB_BAR_HEIGHT - TAB_BAR_BORDER - text_node_default_height()) / 2;
 			if (label_y < 0)
 				label_y = 0;
 			wlr_scene_node_set_position(e->label->node, 4, label_y);
@@ -266,7 +260,7 @@ void tabs_arrange(node_t *n, struct wlr_box rect) {
 	}
 }
 
-void tabs_show(node_t *n, bool show) {
+void tabs_show(const node_t *n, const bool show) {
 	if (n == NULL || n->tab_bar == NULL || n->tab_bar->tree == NULL)
 		return;
 
@@ -277,10 +271,10 @@ void tabs_update_focus(node_t *n, node_t *focus) {
 	if (n == NULL || n->tab_bar == NULL)
 		return;
 
-	node_t *active = tab_focus_leaf(n, focus);
+	const node_t *active = tab_focus_leaf(n, focus);
 	for (size_t i = 0; i < n->tab_bar->entry_count; i++) {
-		tab_entry_t *e = &n->tab_bar->entries[i];
-		bool is_active = (e->leaf == active);
+		const tab_entry_t *e = &n->tab_bar->entries[i];
+		const bool is_active = (e->leaf == active);
 
 		if (e->bg)
 			wlr_scene_rect_set_color(e->bg,
@@ -293,22 +287,22 @@ void tabs_update_focus(node_t *n, node_t *focus) {
 	}
 }
 
-void tabs_update_label_for_leaf(node_t *leaf) {
+void tabs_update_label_for_leaf(const node_t *leaf) {
 	if (leaf == NULL)
 		return;
 
-	node_t *t = tabbed_ancestor(leaf);
+	const node_t *t = tabbed_ancestor(leaf);
 	if (t == NULL || t->tab_bar == NULL)
 		return;
 
 	for (size_t i = 0; i < t->tab_bar->entry_count; i++) {
-		tab_entry_t *e = &t->tab_bar->entries[i];
+		const tab_entry_t *e = &t->tab_bar->entries[i];
 		if (e->leaf == leaf && e->label)
 			text_node_set_text(e->label, leaf_label(leaf));
 	}
 }
 
-node_t *tabs_hit_test(const node_t *n, double lx, double ly) {
+node_t *tabs_hit_test(const node_t *n, const double lx, const double ly) {
 	if (n == NULL || n->tab_bar == NULL || n->tab_bar->tree == NULL)
 		return NULL;
 	if (!n->tab_bar->tree->node.enabled)
@@ -328,7 +322,7 @@ node_t *tabs_hit_test(const node_t *n, double lx, double ly) {
 	return NULL;
 }
 
-static node_t *hit_test_subtree(node_t *n, double lx, double ly) {
+static node_t *hit_test_subtree(node_t *n, const double lx, const double ly) {
 	if (n == NULL)
 		return NULL;
 
@@ -348,15 +342,15 @@ static node_t *hit_test_subtree(node_t *n, double lx, double ly) {
 	return hit_test_subtree(n->second_child, lx, ly);
 }
 
-node_t *tabs_hit_test_desktop(desktop_t *d, double lx, double ly) {
+node_t *tabs_hit_test_desktop(const desktop_t *d, const double lx, const double ly) {
 	if (d == NULL || d->root == NULL)
 		return NULL;
 
 	return hit_test_subtree(d->root, lx, ly);
 }
 
-// shows only `active` among the leaves of a tab group, hiding the rest
-void tabs_set_active_leaf(node_t *tabbed, node_t *active) {
+// shows only `active` among the leaves of a tab group
+void tabs_set_active_leaf(node_t *tabbed, const node_t *active) {
 	FOR_EACH_LEAF_SANS_ROOT(leaf, tabbed) {
 		if (leaf->client == NULL || IS_FLOATING(leaf->client))
 			continue;
@@ -365,8 +359,8 @@ void tabs_set_active_leaf(node_t *tabbed, node_t *active) {
 	}
 }
 
-static void arrange_tabbed_subtree(output_t *m, desktop_t *d, node_t *n, struct wlr_box content_rect,
-		struct wlr_box root_rect) {
+static void arrange_tabbed_subtree(output_t *m, desktop_t *d, node_t *n,
+		const struct wlr_box content_rect, const struct wlr_box root_rect) {
 	if (n == NULL)
 		return;
 	if (n->client && n->client->state == STATE_FLOATING)
@@ -387,16 +381,16 @@ static void arrange_tabbed_subtree(output_t *m, desktop_t *d, node_t *n, struct 
 
 // lays out the bar of a tab group and the subtree below it, then reveals the
 // active tab
-void tabs_arrange_group(output_t *m, desktop_t *d, node_t *tabbed, struct wlr_box rect,
-		struct wlr_box root_rect) {
-	bool show_deco = settings.decoration_mode == DECORATION_ALWAYS ||
+void tabs_arrange_group(output_t *m, desktop_t *d, node_t *tabbed, const struct wlr_box rect,
+		const struct wlr_box root_rect) {
+	const bool show_deco = settings.decoration_mode == DECORATION_ALWAYS ||
 		settings.decoration_mode == DECORATION_TABS;
 
 	int bar_h = 0;
 	if (show_deco) {
 		bar_h = tab_bar_height(tabbed);
-		int wg = compute_window_gap(d);
-		struct wlr_box bar_rect = {
+		const int wg = compute_window_gap(d);
+		const struct wlr_box bar_rect = {
 			.x = rect.x,
 			.y = rect.y,
 			.width = (wg < rect.width) ? rect.width - wg : 0,

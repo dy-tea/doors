@@ -1,6 +1,6 @@
 #include "animation.h"
 #include "bezier.h"
-#include "once.h"
+#include "macros.h"
 #include "output/output.h"
 #include "protocol/layer.h"
 #include "spring.h"
@@ -110,8 +110,8 @@ int animation_type_from_name(const char *name) {
 }
 
 bool animation_set_type_config(const char *type_name, const char *bezier_name,
-		uint32_t duration_ms) {
-	int idx = animation_type_from_name(type_name);
+		const uint32_t duration_ms) {
+	const int idx = animation_type_from_name(type_name);
 	if (idx < 0)
 		return false;
 
@@ -129,14 +129,14 @@ bool animation_set_type_config(const char *type_name, const char *bezier_name,
 }
 
 const char *animation_type_get_bezier(const char *type_name) {
-	int idx = animation_type_from_name(type_name);
+	const int idx = animation_type_from_name(type_name);
 	if (idx < 0)
 		return NULL;
 	return anim_type_configs[idx].bezier_name[0] ? anim_type_configs[idx].bezier_name : NULL;
 }
 
 uint32_t animation_type_get_duration(const char *type_name) {
-	int idx = animation_type_from_name(type_name);
+	const int idx = animation_type_from_name(type_name);
 	if (idx < 0)
 		return 0;
 	return anim_type_configs[idx].duration_ms;
@@ -154,7 +154,7 @@ static animation_entry_t *create_animation_entry(void) {
 	return entry;
 }
 
-static animation_entry_t *find_animation(node_t *node) {
+static animation_entry_t *find_animation(const node_t *node) {
 	animation_entry_t *entry;
 	wl_list_for_each(entry, &animations, link)
 		if (entry->node == node)
@@ -176,8 +176,9 @@ bool animation_is_opacity_fading(view_t *view) {
 	return false;
 }
 
-static double elapsed_ms(struct timespec start, struct timespec now) {
-	return (now.tv_sec - start.tv_sec) * 1000.0 + (now.tv_nsec - start.tv_nsec) / 1000000.0;
+static double elapsed_ms(const struct timespec start, const struct timespec now) {
+	return (double)(now.tv_sec - start.tv_sec) * 1000.0 + (double)(now.tv_nsec - start.tv_nsec) /
+		1000000.0;
 }
 
 void animation_set_bezier(const char *name) {
@@ -195,7 +196,7 @@ const char *animation_get_bezier(void) {
 	return default_bezier_name;
 }
 
-void animation_set_duration(uint32_t ms) {
+void animation_set_duration(const uint32_t ms) {
 	if (ms > 0) {
 		ANIMATION_DURATION_MS = ms;
 		wlr_log(WLR_DEBUG, "Default duration set to %u ms", ms);
@@ -213,13 +214,13 @@ static void schedule_output(output_t *output) {
 	output_schedule_frame(output);
 }
 
-static void tick_entry(animation_entry_t *entry, struct timespec now) {
+static void tick_entry(animation_entry_t *entry, const struct timespec now) {
 	if (entry->use_spring) {
-		double elapsed = elapsed_ms(entry->spring_last_tick, now) / 1000.0;
+		const double elapsed = elapsed_ms(entry->spring_last_tick, now) / 1000.0;
 		entry->spring_last_tick = now;
 		entry->spring_accumulator += elapsed;
 
-		spring_curve_t *curve = spring_find(entry->curve_name);
+		const spring_curve_t *curve = spring_find(entry->curve_name);
 
 		if (curve) {
 			int remaining = SPRING_MAX_STEPS;
@@ -245,7 +246,7 @@ static void tick_entry(animation_entry_t *entry, struct timespec now) {
 	}
 }
 
-static bool is_entry_done(animation_entry_t *entry) {
+static bool is_entry_done(const animation_entry_t *entry) {
 	if (entry->use_spring)
 		return entry->spring_done;
 
@@ -253,7 +254,7 @@ static bool is_entry_done(animation_entry_t *entry) {
 }
 
 bool animation_set_type_spring(const char *type_name, const char *spring_name) {
-	int idx = animation_type_from_name(type_name);
+	const int idx = animation_type_from_name(type_name);
 
 	if (idx < 0)
 		return false;
@@ -270,15 +271,15 @@ bool animation_set_type_spring(const char *type_name, const char *spring_name) {
 }
 
 const char *animation_type_get_spring(const char *type_name) {
-	int idx = animation_type_from_name(type_name);
+	const int idx = animation_type_from_name(type_name);
 	if (idx < 0)
 		return NULL;
 
 	return anim_type_configs[idx].spring_name[0] ? anim_type_configs[idx].spring_name : NULL;
 }
 
-bool animation_type_set_enabled(const char *type_name, bool enabled) {
-	int idx = animation_type_from_name(type_name);
+bool animation_type_set_enabled(const char *type_name, const bool enabled) {
+	const int idx = animation_type_from_name(type_name);
 	if (idx < 0)
 		return false;
 	anim_type_configs[idx].enabled = enabled;
@@ -286,7 +287,7 @@ bool animation_type_set_enabled(const char *type_name, bool enabled) {
 }
 
 bool animation_type_get_enabled(const char *type_name) {
-	int idx = animation_type_from_name(type_name);
+	const int idx = animation_type_from_name(type_name);
 	if (idx < 0)
 		return true;
 	return anim_type_configs[idx].enabled;
@@ -312,7 +313,7 @@ void animation_fini(void) {
 	}
 }
 
-void animation_cancel_node(node_t *node) {
+void animation_cancel_node(const node_t *node) {
 	animation_entry_t *entry = find_animation(node);
 	if (!entry)
 		return;
@@ -360,7 +361,7 @@ void animation_cancel_view(view_t *view) {
 	}
 }
 
-void animation_cancel_scene_tree(struct wlr_scene_tree *scene_tree) {
+void animation_cancel_scene_tree(const struct wlr_scene_tree *scene_tree) {
 	animation_entry_t *entry, *tmp;
 	wl_list_for_each_safe(entry, tmp, &animations, link) {
 		if (entry->scene_tree != scene_tree)
@@ -503,7 +504,7 @@ bool animation_fade_out_layer(layer_surface_t *layer) {
 	return true;
 }
 
-bool animation_workspace_switch_active(output_t *output) {
+bool animation_workspace_switch_active(const output_t *output) {
 	animation_entry_t *entry;
 	wl_list_for_each(entry, &animations, link)
 		if (entry->kind == ANIM_KIND_WORKSPACE_SLIDE && entry->output == output)
@@ -512,13 +513,14 @@ bool animation_workspace_switch_active(output_t *output) {
 	return false;
 }
 
-bool animation_node_workspace_slide_out(node_t *node) {
-	animation_entry_t *entry = find_animation(node);
+bool animation_node_workspace_slide_out(const node_t *node) {
+	const animation_entry_t *entry = find_animation(node);
 	return entry && entry->kind == ANIM_KIND_WORKSPACE_SLIDE && entry->slide_out;
 }
 
 bool animation_start_workspace_slide(output_t *output, node_t *node,
-		struct wlr_scene_tree *scene_tree, struct wlr_box from, struct wlr_box to, bool slide_out) {
+		struct wlr_scene_tree *scene_tree, const struct wlr_box from, const struct wlr_box to,
+		const bool slide_out) {
 	if (!node || !scene_tree || !output || !settings.enable_animations)
 		return false;
 
@@ -592,15 +594,15 @@ static bool anim_entry_box(const animation_entry_t *entry, struct wlr_box *out) 
 	if (r.height < 1)
 		r.height = 1;
 
-	int from_right = entry->from.x + entry->from.width;
-	int to_right = entry->to.x + entry->to.width;
+	const int from_right = entry->from.x + entry->from.width;
+	const int to_right = entry->to.x + entry->to.width;
 	if (entry->from.x == entry->to.x)
 		r.x = entry->from.x;
 	else if (from_right == to_right)
 		r.x = from_right - r.width;
 
-	int from_bottom = entry->from.y + entry->from.height;
-	int to_bottom = entry->to.y + entry->to.height;
+	const int from_bottom = entry->from.y + entry->from.height;
+	const int to_bottom = entry->to.y + entry->to.height;
 	if (entry->from.y == entry->to.y)
 		r.y = entry->from.y;
 	else if (from_bottom == to_bottom)
@@ -672,15 +674,12 @@ bool animation_start_resize(view_t *view, struct wlr_box from, struct wlr_box to
 	return true;
 }
 
-static int resize_surface_offset(int anim_start, int anim_span, int target_start, int target_span,
-		int geo_span, int resting) {
-	bool near_fixed = anim_start == target_start;
-	bool far_fixed = anim_start + anim_span == target_start + target_span;
-
+static int resize_surface_offset(const int anim_start, const int anim_span, const int target_start,
+		const int target_span, const int geo_span, const int resting) {
 	int offset;
-	if (near_fixed)
+	if (anim_start == target_start)
 		offset = resting;
-	else if (far_fixed)
+	else if (anim_start + anim_span == target_start + target_span)
 		offset = anim_span - geo_span;
 	else
 		offset = (anim_span - geo_span) / 2;
@@ -699,15 +698,12 @@ static void update_resize_entry(animation_entry_t *entry) {
 	if (!anim_entry_box(entry, &box))
 		return;
 
-	int x = box.x;
-	int y = box.y;
-	int width = box.width;
-	int height = box.height;
+	const int x = box.x, y = box.y, width = box.width, height = box.height;
 
 	// update scene tree position
 	wlr_scene_node_set_position(&entry->view->scene_tree->node, x, y);
 
-	bool frozen = entry->view->saved_surface_tree != NULL;
+	const bool frozen = entry->view->saved_surface_tree != NULL;
 	struct wlr_box content_offset = {0};
 	struct wlr_box border_size = box;
 
@@ -729,13 +725,13 @@ static void update_resize_entry(animation_entry_t *entry) {
 			border_size.height = visible.height;
 		}
 	} else {
-		struct wlr_box animating = {
+		const struct wlr_box animating = {
 			.x = entry->view->geometry.x,
 			.y = entry->view->geometry.y,
 			.width = width,
 			.height = height,
 		};
-		struct wlr_box target = {
+		const struct wlr_box target = {
 			.x = entry->to.x,
 			.y = entry->to.y,
 			.width = entry->to.width,
@@ -762,7 +758,7 @@ static void update_resize_entry(animation_entry_t *entry) {
 	entry->border_size = border_size;
 
 	if (!frozen && entry->node && entry->node->client) {
-		client_t *c = entry->node->client;
+		const client_t *c = entry->node->client;
 		if (IS_TILED(c) || c->state == STATE_FLOATING || c->state == STATE_FULLSCREEN)
 			wlr_scene_node_set_position(&entry->view->content_tree->node, content_offset.x,
 				content_offset.y);
@@ -795,7 +791,7 @@ static void update_resize_entry(animation_entry_t *entry) {
 bool animation_is_resizing(node_t *node) {
 	if (!node)
 		return false;
-	animation_entry_t *entry = find_animation(node);
+	const animation_entry_t *entry = find_animation(node);
 	return entry && entry->kind == ANIM_KIND_RESIZE;
 }
 
@@ -803,7 +799,7 @@ bool animation_get_geometry_progress(view_t *view, struct wlr_box *out) {
 	if (!view || !view->node)
 		return false;
 
-	animation_entry_t *entry = find_animation(view->node);
+	const animation_entry_t *entry = find_animation(view->node);
 	if (!entry)
 		return false;
 
@@ -844,8 +840,8 @@ bool animation_has_fade_out(struct wlr_scene_tree *scene_tree) {
 	return false;
 }
 
-bool animation_apply_geometry(node_t *node, struct wlr_scene_tree *scene_tree, struct wlr_box target,
-		bool animate) {
+bool animation_apply_geometry(node_t *node, struct wlr_scene_tree *scene_tree,
+		const struct wlr_box target, const bool animate) {
 	struct wlr_box from;
 	from.x = scene_tree->node.x;
 	from.y = scene_tree->node.y;
@@ -855,7 +851,7 @@ bool animation_apply_geometry(node_t *node, struct wlr_scene_tree *scene_tree, s
 }
 
 bool animation_apply_geometry_from(node_t *node, struct wlr_scene_tree *scene_tree,
-		struct wlr_box from, struct wlr_box target, bool animate) {
+		struct wlr_box from, const struct wlr_box target, const bool animate) {
 	if (!node || !scene_tree)
 		return false;
 
@@ -1039,7 +1035,7 @@ void animation_update_slide_blur(output_t *output) {
 	}
 }
 
-bool animation_update_output(output_t *output, struct timespec now) {
+bool animation_update_output(output_t *output, const struct timespec now) {
 	bool active = false;
 	animation_entry_t *entry, *tmp;
 
@@ -1070,7 +1066,7 @@ bool animation_update_output(output_t *output, struct timespec now) {
 				wl_list_remove(&entry->link);
 				free(entry);
 			} else {
-				float opacity = (float)(entry->from_opacity + (entry->to_opacity - entry->from_opacity) *
+				const float opacity = (float)(entry->from_opacity + (entry->to_opacity - entry->from_opacity) *
 					entry->eased);
 				surface_set_opacity(&entry->scene_tree->node, opacity);
 				active = true;
@@ -1120,8 +1116,8 @@ bool animation_update_output(output_t *output, struct timespec now) {
 			}
 		} else {
 			// interpolate position only
-			int x = (int)(entry->from.x + (entry->to.x - entry->from.x) * entry->eased);
-			int y = (int)(entry->from.y + (entry->to.y - entry->from.y) * entry->eased);
+			const int x = (int)(entry->from.x + (entry->to.x - entry->from.x) * entry->eased);
+			const int y = (int)(entry->from.y + (entry->to.y - entry->from.y) * entry->eased);
 			wlr_scene_node_set_position(&entry->scene_tree->node, x, y);
 
 			if (entry->kind == ANIM_KIND_WORKSPACE_SLIDE) {
@@ -1150,8 +1146,8 @@ bool animation_update_output(output_t *output, struct timespec now) {
 				free(entry);
 			} else {
 				if (entry->from_opacity != entry->to_opacity) {
-					float cur_opacity = (float)(entry->from_opacity + (entry->to_opacity - entry->from_opacity) *
-						entry->eased);
+					const float cur_opacity = (float)(entry->from_opacity + (entry->to_opacity -
+						entry->from_opacity) * entry->eased);
 					surface_set_opacity(&entry->scene_tree->node, cur_opacity);
 				}
 				active = true;

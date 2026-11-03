@@ -4,7 +4,7 @@
 #include "input/seat.h"
 #include "input/tablet.h"
 #include "layout/layout.h"
-#include "once.h"
+#include "macros.h"
 #include "output/output.h"
 #include "protocol/layer.h"
 #include "protocol/popup.h"
@@ -12,7 +12,6 @@
 #include "tree.h"
 #include <stdlib.h>
 #include <wayland-server-core.h>
-#include <wlr/types/wlr_buffer.h>
 #include <wlr/types/wlr_damage_ring.h>
 #include <wlr/types/wlr_ext_background_effect_v1.h>
 #include <wlr/types/wlr_fractional_scale_v1.h>

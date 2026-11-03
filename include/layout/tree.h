@@ -13,7 +13,7 @@ typedef struct node_t node_t;
 #define MIN_RENDER_HEIGHT 1
 
 // the area of a desktop that tiles may occupy, after output and desktop padding
-struct wlr_box desktop_usable_area(output_t *m, desktop_t *d);
+struct wlr_box desktop_usable_area(const output_t *m, const desktop_t *d);
 
 // writes pending rectangles for the subtree rooted at n, and each tiled leaf's arranged_rectangle
 void apply_layout(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect,
@@ -21,10 +21,10 @@ void apply_layout(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect,
 
 // resolves a single leaf's final rect (gaps, borders, min size, centring)
 // from the slot the layout gave it
-void render_leaf(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect, struct wlr_box root_rect,
-	bool omit_window_gap);
+void render_leaf(const output_t *m, desktop_t *d, const node_t *n, struct wlr_box rect,
+	struct wlr_box root_rect, bool omit_window_gap);
 
-unsigned int node_area(node_t *n);
+unsigned int node_area(const node_t *n);
 
 // tiles in a subtree, counting empty leaves as tiles when asked
 int tiled_count(node_t *n, bool include_receptacles);

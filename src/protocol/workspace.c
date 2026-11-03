@@ -3,7 +3,7 @@
 #include "layout/floating.h"
 #include "layout/layout.h"
 #include "layout/master_stack.h"
-#include "once.h"
+#include "macros.h"
 #include "output/output.h"
 #include "protocol/workspace.h"
 #include "server.h"

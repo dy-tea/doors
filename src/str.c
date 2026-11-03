@@ -12,7 +12,7 @@ bool streqi(const char *a, const char *b) {
 	return a == b || (a && b && strcasecmp(a, b) == 0);
 }
 
-size_t str_copy(char *dst, size_t cap, const char *src) {
+size_t str_copy(char *dst, const size_t cap, const char *src) {
 	if (!dst || cap == 0)
 		return 0;
 
@@ -28,7 +28,7 @@ size_t str_copy(char *dst, size_t cap, const char *src) {
 	return len;
 }
 
-size_t str_append(char *dst, size_t cap, const char *src) {
+size_t str_append(char *dst, const size_t cap, const char *src) {
 	if (!dst || cap == 0)
 		return 0;
 
@@ -39,7 +39,7 @@ size_t str_append(char *dst, size_t cap, const char *src) {
 	return str_copy(dst + at, cap - at, src);
 }
 
-bool str_append_sep(char *dst, size_t cap, const char *sep, const char *item) {
+bool str_append_sep(char *dst, const size_t cap, const char *sep, const char *item) {
 	if (!dst || cap == 0 || !item)
 		return false;
 
@@ -62,25 +62,25 @@ bool str_append_sep(char *dst, size_t cap, const char *sep, const char *item) {
 	return item_len == strlen(item);
 }
 
-bool str_starts_impl(const char *s, const char *prefix, size_t prefix_len) {
+bool str_starts_impl(const char *s, const char *prefix, const size_t prefix_len) {
 	if (!s)
 		return false;
 
 	return strncmp(s, prefix, prefix_len) == 0;
 }
 
-const char *str_skip_prefix_impl(const char *s, const char *prefix, size_t prefix_len) {
+const char *str_skip_prefix_impl(const char *s, const char *prefix, const size_t prefix_len) {
 	if (!str_starts_impl(s, prefix, prefix_len))
 		return NULL;
 
 	return s + prefix_len;
 }
 
-bool str_ends_impl(const char *s, const char *suffix, size_t suffix_len) {
+bool str_ends_impl(const char *s, const char *suffix, const size_t suffix_len) {
 	if (!s)
 		return false;
 
-	size_t len = strlen(s);
+	const size_t len = strlen(s);
 	if (len < suffix_len)
 		return false;
 
@@ -167,7 +167,7 @@ const char *str_bool_text(bool value) {
 	return texts[value];
 }
 
-int str_split(char *s, const char *delims, char *out[], int max) {
+int str_split(char *s, const char *delims, char *out[], const int max) {
 	if (!s || !out || max == 0)
 		return 0;
 
@@ -182,7 +182,7 @@ int str_split(char *s, const char *delims, char *out[], int max) {
 	return n;
 }
 
-int str_hex_digit(char c) {
+int str_hex_digit(const char c) {
 	if (c >= '0' && c <= '9')
 		return c - '0';
 	if (c >= 'a' && c <= 'f')
@@ -203,7 +203,7 @@ const str_pair_t *str_table_find(const str_pair_t *tbl, const char *name) {
 	return NULL;
 }
 
-const str_pair_t *str_table_find_value(const str_pair_t *tbl, long value) {
+const str_pair_t *str_table_find_value(const str_pair_t *tbl, const long value) {
 	if (!tbl)
 		return NULL;
 

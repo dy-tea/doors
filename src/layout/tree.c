@@ -4,22 +4,21 @@
 #include "transaction.h"
 #include "tree.h"
 #include "types.h"
-#include <wlr/types/wlr_scene.h>
 #include <wlr/util/log.h>
 
-struct wlr_box desktop_usable_area(output_t *m, desktop_t *d) {
+struct wlr_box desktop_usable_area(const output_t *m, const desktop_t *d) {
 	if (m == NULL || d == NULL)
 		return (struct wlr_box){0};
 
 	return m->usable_area;
 }
 
-void render_leaf(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect, struct wlr_box root_rect,
-		bool omit_window_gap) {
+void render_leaf(const output_t *m, desktop_t *d, const node_t *n, const struct wlr_box rect,
+		const struct wlr_box root_rect, const bool omit_window_gap) {
 	if (n == NULL || n->client == NULL)
 		return;
 
-	unsigned int bw = effective_border_width(d);
+	const unsigned int bw = effective_border_width(d);
 
 	struct wlr_box r;
 	struct wlr_box slot = {0};
@@ -88,8 +87,9 @@ void render_leaf(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect, stru
 }
 
 static void validate_split_children(node_t *n) {
-	bool first_valid = n->first_child != NULL && !n->first_child->freed && !n->first_child->destroying;
-	bool second_valid = n->second_child != NULL && !n->second_child->freed &&
+	const bool first_valid = n->first_child != NULL && !n->first_child->freed &&
+		!n->first_child->destroying;
+	const bool second_valid = n->second_child != NULL && !n->second_child->freed &&
 		!n->second_child->destroying;
 
 	if (n->first_child != NULL && !first_valid) {
@@ -107,10 +107,10 @@ static void validate_split_children(node_t *n) {
 	}
 }
 
-static bool repair_split_node(node_t *n, desktop_t *d, output_t *m, struct wlr_box rect,
+static bool repair_split_node(node_t *n, desktop_t *d, output_t *m, const struct wlr_box rect,
 		struct wlr_box root_rect) {
-	bool first_ok = n->first_child != NULL;
-	bool second_ok = n->second_child != NULL;
+	const bool first_ok = n->first_child != NULL;
+	const bool second_ok = n->second_child != NULL;
 
 	if ((first_ok && !second_ok) || (!first_ok && second_ok)) {
 		node_t *valid = first_ok ? n->first_child : n->second_child;
@@ -130,8 +130,8 @@ static bool repair_split_node(node_t *n, desktop_t *d, output_t *m, struct wlr_b
 	return false;
 }
 
-static void split_dimension(int total, double split_ratio, uint16_t first_min, uint16_t second_min,
-		int *first_out, int *second_out, int *offset_out) {
+static void split_dimension(const int total, const double split_ratio, const uint16_t first_min,
+		const uint16_t second_min, int *first_out, int *second_out, int *offset_out) {
 	int fence = (int)(split_ratio * total);
 
 	if (first_min + second_min <= total) {
@@ -211,13 +211,13 @@ static void compute_split_rects(node_t *n, desktop_t *d, struct wlr_box rect,
 	*first_rect = rect;
 	*second_rect = rect;
 
-	uint16_t first_min_w = settings.respect_tiled_min_size &&
+	const uint16_t first_min_w = settings.respect_tiled_min_size &&
 		n->first_child ? n->first_child->constraints.min_width : 0;
-	uint16_t second_min_w = settings.respect_tiled_min_size &&
+	const uint16_t second_min_w = settings.respect_tiled_min_size &&
 		n->second_child ? n->second_child->constraints.min_width : 0;
-	uint16_t first_min_h = settings.respect_tiled_min_size &&
+	const uint16_t first_min_h = settings.respect_tiled_min_size &&
 		n->first_child ? n->first_child->constraints.min_height : 0;
-	uint16_t second_min_h = settings.respect_tiled_min_size &&
+	const uint16_t second_min_h = settings.respect_tiled_min_size &&
 		n->second_child ? n->second_child->constraints.min_height : 0;
 
 	if (n->split_type == TYPE_VERTICAL) {
@@ -229,8 +229,8 @@ static void compute_split_rects(node_t *n, desktop_t *d, struct wlr_box rect,
 	}
 }
 
-void apply_layout(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect,
-		struct wlr_box root_rect) {
+void apply_layout(output_t *m, desktop_t *d, node_t *n, const struct wlr_box rect,
+		const struct wlr_box root_rect) {
 	if (n == NULL)
 		return;
 
@@ -251,7 +251,6 @@ void apply_layout(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect,
 		render_leaf(m, d, n, rect, root_rect, false);
 	} else if (n->split_type == TYPE_TABBED && d->layout != LAYOUT_MONOCLE) {
 		tabs_arrange_group(m, d, n, rect, root_rect);
-		return;
 	} else {
 		struct wlr_box first_rect;
 		struct wlr_box second_rect;
@@ -269,7 +268,7 @@ void apply_layout(output_t *m, desktop_t *d, node_t *n, struct wlr_box rect,
 }
 
 // tiles a desktop shows, optionally counting empty leaves as tiles too
-int tiled_count(node_t *n, bool include_receptacles) {
+int tiled_count(node_t *n, const bool include_receptacles) {
 	if (n == NULL)
 		return 0;
 
@@ -290,7 +289,7 @@ int visible_tiled_count(desktop_t *d) {
 	return tiled_count(d->root, false);
 }
 
-unsigned int node_area(node_t *n) {
+unsigned int node_area(const node_t *n) {
 	if (n == NULL)
 		return 0;
 

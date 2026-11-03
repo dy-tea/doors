@@ -45,7 +45,7 @@ struct wlr_surface *view_wlr_surface(view_t *view) {
 	if (!view)
 		return NULL;
 
-	xdg_toplevel_t *xdg = view_to_xdg(view);
+	const xdg_toplevel_t *xdg = view_to_xdg(view);
 	if (xdg)
 		return xdg->xdg_toplevel ? xdg->xdg_toplevel->base->surface : NULL;
 
@@ -59,7 +59,7 @@ struct wlr_surface *view_wlr_surface(view_t *view) {
 bool view_is_ready(view_t *view) {
 	if (!view || !view->mapped)
 		return false;
-	struct wlr_surface *surface = view_wlr_surface(view);
+	const struct wlr_surface *surface = view_wlr_surface(view);
 	return surface && surface->mapped;
 }
 
@@ -67,7 +67,7 @@ view_t *view_from_wlr_surface(struct wlr_surface *surface) {
 	if (!surface)
 		return NULL;
 
-	struct wlr_xdg_surface *xdg_surface = wlr_xdg_surface_try_from_wlr_surface(surface);
+	const struct wlr_xdg_surface *xdg_surface = wlr_xdg_surface_try_from_wlr_surface(surface);
 	if (xdg_surface) {
 		if (xdg_surface->role != WLR_XDG_SURFACE_ROLE_TOPLEVEL)
 			return NULL;
@@ -83,7 +83,7 @@ view_t *view_from_wlr_surface(struct wlr_surface *surface) {
 
 	// a client may render its window into a subsurface, in which case the view
 	// that owns it is the one owning the subsurface's parent surface
-	struct wlr_subsurface *subsurface = wlr_subsurface_try_from_wlr_surface(surface);
+	const struct wlr_subsurface *subsurface = wlr_subsurface_try_from_wlr_surface(surface);
 	if (subsurface)
 		return view_from_wlr_surface(subsurface->parent);
 
@@ -95,68 +95,67 @@ static void handle_foreign_fullscreen_request(struct wl_listener *listener, void
 static void handle_foreign_close_request(struct wl_listener *listener, void *data);
 static void handle_foreign_destroy(struct wl_listener *listener, void *data);
 
-void client_update_ext_foreign_toplevel(client_t *c) {
-	if (!c)
+void client_update_ext_foreign_toplevel(client_t *client) {
+	if (!client)
 		return;
-	view_t *view = c->view;
+	view_t *view = client->view;
 	if (!view || !view->ext_foreign_toplevel)
 		return;
 
 	struct wlr_ext_foreign_toplevel_handle_v1_state state = {0};
 
-	if (c->title[0] != '\0')
-		state.title = c->title;
-	if (c->app_id[0] != '\0')
-		state.app_id = c->app_id;
+	if (client->title[0] != '\0')
+		state.title = client->title;
+	if (client->app_id[0] != '\0')
+		state.app_id = client->app_id;
 
 	wlr_ext_foreign_toplevel_handle_v1_update_state(view->ext_foreign_toplevel, &state);
 }
 
-void client_update_foreign_toplevel_state(client_t *c) {
-	if (!c)
+void client_update_foreign_toplevel_state(client_t *client) {
+	if (!client)
 		return;
-	view_t *view = c->view;
+	view_t *view = client->view;
 	if (!view || !view->foreign_toplevel)
 		return;
 
-	node_t *n = view->node;
-	bool maximized = client_reports_maximized(c, n ? n->desktop : NULL);
-	bool fullscreen = (c->state == STATE_FULLSCREEN);
-	bool minimized = c->flags.minimized;
-
-	wlr_foreign_toplevel_handle_v1_set_fullscreen(view->foreign_toplevel, fullscreen);
-	wlr_foreign_toplevel_handle_v1_set_maximized(view->foreign_toplevel, maximized);
-	wlr_foreign_toplevel_handle_v1_set_minimized(view->foreign_toplevel, minimized);
+	const node_t *n = view->node;
+	wlr_foreign_toplevel_handle_v1_set_fullscreen(view->foreign_toplevel,
+		client->state == STATE_FULLSCREEN);
+	wlr_foreign_toplevel_handle_v1_set_maximized(view->foreign_toplevel,
+		client_reports_maximized(client, n ? n->desktop : NULL));
+	wlr_foreign_toplevel_handle_v1_set_minimized(view->foreign_toplevel, client->flags.minimized);
 }
 
-void client_connect_foreign_toplevel(client_t *c, struct wlr_foreign_toplevel_handle_v1 *ft) {
-	if (c == NULL || ft == NULL)
+void client_connect_foreign_toplevel(client_t *client,
+		struct wlr_foreign_toplevel_handle_v1 *handle) {
+	if (client == NULL || handle == NULL)
 		return;
 
-	c->foreign.activate.notify = handle_foreign_activate_request;
-	wl_signal_add(&ft->events.request_activate, &c->foreign.activate);
-	c->foreign.fullscreen.notify = handle_foreign_fullscreen_request;
-	wl_signal_add(&ft->events.request_fullscreen, &c->foreign.fullscreen);
-	c->foreign.close.notify = handle_foreign_close_request;
-	wl_signal_add(&ft->events.request_close, &c->foreign.close);
-	c->foreign.destroy.notify = handle_foreign_destroy;
-	wl_signal_add(&ft->events.destroy, &c->foreign.destroy);
+	client->foreign.activate.notify = handle_foreign_activate_request;
+	wl_signal_add(&handle->events.request_activate, &client->foreign.activate);
+	client->foreign.fullscreen.notify = handle_foreign_fullscreen_request;
+	wl_signal_add(&handle->events.request_fullscreen, &client->foreign.fullscreen);
+	client->foreign.close.notify = handle_foreign_close_request;
+	wl_signal_add(&handle->events.request_close, &client->foreign.close);
+	client->foreign.destroy.notify = handle_foreign_destroy;
+	wl_signal_add(&handle->events.destroy, &client->foreign.destroy);
 }
 
-void client_disconnect_foreign_toplevel(client_t *c) {
-	if (c == NULL)
+void client_disconnect_foreign_toplevel(client_t *client) {
+	if (client == NULL)
 		return;
-	wl_list_remove(&c->foreign.activate.link);
-	wl_list_remove(&c->foreign.fullscreen.link);
-	wl_list_remove(&c->foreign.close.link);
-	wl_list_remove(&c->foreign.destroy.link);
+	wl_list_remove(&client->foreign.activate.link);
+	wl_list_remove(&client->foreign.fullscreen.link);
+	wl_list_remove(&client->foreign.close.link);
+	wl_list_remove(&client->foreign.destroy.link);
 }
 
-void client_send_activated(client_t *c, bool activated) {
-	if (c == NULL)
+void client_send_activated(const client_t *client, const bool activated) {
+	if (client == NULL)
 		return;
 
-	view_t *view = c->view;
+	view_t *view = client->view;
 	if (!view)
 		return;
 
@@ -166,7 +165,7 @@ void client_send_activated(client_t *c, bool activated) {
 	view->impl->set_activated(view, activated);
 }
 
-void view_set_activated(view_t *view, bool activated) {
+void view_set_activated(view_t *view, const bool activated) {
 	if (view == NULL)
 		return;
 
@@ -182,7 +181,7 @@ void view_set_activated(view_t *view, bool activated) {
 	if (surface == NULL)
 		return;
 
-	struct wlr_surface *prev_surface = seat->keyboard_state.focused_surface;
+	const struct wlr_surface *prev_surface = seat->keyboard_state.focused_surface;
 	if (prev_surface == surface)
 		return;
 
@@ -215,8 +214,8 @@ void view_set_activated(view_t *view, bool activated) {
 
 	// update borders
 	if (view->node) {
-		output_t *m = view->node->output;
-		desktop_t *d = m ? m->desk : NULL;
+		const output_t *m = view->node->output;
+		const desktop_t *d = m ? m->desk : NULL;
 		if (d && d->root != NULL) {
 			FOR_EACH_LEAF(node, d->root) {
 				if (node->client == NULL)
@@ -233,14 +232,14 @@ void view_close(view_t *view) {
 		view->impl->close(view);
 }
 
-void view_configure(view_t *view, struct wlr_box rect) {
+void view_configure(view_t *view, const struct wlr_box rect) {
 	if (view == NULL || view->impl == NULL || view->impl->configure == NULL)
 		return;
 
 	view->impl->configure(view, rect);
 }
 
-void view_set_title(view_t *view, const char *title) {
+void view_set_title(const view_t *view, const char *title) {
 	if (view == NULL || view->client == NULL)
 		return;
 
@@ -261,7 +260,7 @@ void view_set_title(view_t *view, const char *title) {
 		c->app_id[0] ? c->app_id : "?", title ? title : "?", view->node ? view->node->id : 0);
 }
 
-void view_set_app_id(view_t *view, const char *app_id) {
+void view_set_app_id(const view_t *view, const char *app_id) {
 	if (view == NULL || view->client == NULL)
 		return;
 
@@ -286,7 +285,7 @@ void view_create_foreign_toplevels(view_t *view, const char *app_id, const char 
 	if (view == NULL)
 		return;
 
-	struct wlr_ext_foreign_toplevel_handle_v1_state ext_state = {
+	const struct wlr_ext_foreign_toplevel_handle_v1_state ext_state = {
 		.app_id = app_id,
 		.title = title,
 	};
@@ -351,7 +350,7 @@ static void handle_foreign_activate_request(struct wl_listener *listener, void *
 	if (toplevel_desk->focus == n)
 		return;
 
-	node_t *prev = toplevel_desk->focus;
+	const node_t *prev = toplevel_desk->focus;
 	if (prev != NULL && prev != n)
 		client_send_activated(prev->client, false);
 
@@ -384,14 +383,6 @@ static void handle_foreign_destroy(struct wl_listener *listener, void *data) {
 	client_disconnect_foreign_toplevel(c);
 }
 
-bool view_output_handler_point_accepts_input(struct wlr_scene_buffer *buffer, double *x,
-		double *y) {
-	(void)buffer;
-	(void)x;
-	(void)y;
-	return false;
-}
-
 static void view_disconnect_outputs_update(view_t *view) {
 	if (view == NULL)
 		return;
@@ -401,7 +392,7 @@ static void view_disconnect_outputs_update(view_t *view) {
 
 void view_handle_outputs_update(struct wl_listener *listener, void *data) {
 	view_t *view = wl_container_of(listener, view, outputs_update);
-	struct wlr_scene_outputs_update_event *event = data;
+	const struct wlr_scene_outputs_update_event *event = data;
 
 	struct wlr_foreign_toplevel_handle_v1 *ft = view->foreign_toplevel;
 	if (ft) {
@@ -409,7 +400,7 @@ void view_handle_outputs_update(struct wl_listener *listener, void *data) {
 		wl_list_for_each_safe(toplevel_output, tmp, &ft->outputs, link) {
 			bool active = false;
 			for (size_t i = 0; i < event->size; i++) {
-				struct wlr_scene_output *scene_output = event->active[i];
+				const struct wlr_scene_output *scene_output = event->active[i];
 				if (scene_output->output == toplevel_output->output) {
 					active = true;
 					break;
@@ -430,16 +421,16 @@ void view_handle_outputs_update(struct wl_listener *listener, void *data) {
 	}
 }
 
-void view_resolve_content_layout(view_t *view, struct wlr_box container,
+void view_resolve_content_layout(const view_t *view, const struct wlr_box container,
 		struct wlr_box *content_offset, struct wlr_box *border_size) {
-	int container_w = container.width > 0 ? container.width : 0;
-	int container_h = container.height > 0 ? container.height : 0;
+	const int container_w = container.width > 0 ? container.width : 0;
+	const int container_h = container.height > 0 ? container.height : 0;
 	int off_x = 0, off_y = 0;
 	int border_w = container_w, border_h = container_h;
 
 	if (view && view->geometry.width > 0 && view->geometry.height > 0) {
-		int geo_w = (int)view->geometry.width;
-		int geo_h = (int)view->geometry.height;
+		const int geo_w = view->geometry.width;
+		const int geo_h = view->geometry.height;
 
 		if (geo_w < container_w) {
 			off_x = (container_w - geo_w) / 2;
@@ -467,12 +458,12 @@ void view_resolve_content_layout(view_t *view, struct wlr_box container,
 		};
 }
 
-void view_resolve_tiled_layout(view_t *view, struct wlr_box container,
+void view_resolve_tiled_layout(const view_t *view, const struct wlr_box container,
 		struct wlr_box *content_offset, struct wlr_box *border_size, struct wlr_box *border_offset) {
-	int cw = container.width > 0 ? container.width : 0;
-	int ch = container.height > 0 ? container.height : 0;
-	int gw = view->geometry.width > 0 ? view->geometry.width : 0;
-	int gh = view->geometry.height > 0 ? view->geometry.height : 0;
+	const int cw = container.width > 0 ? container.width : 0;
+	const int ch = container.height > 0 ? container.height : 0;
+	const int gw = view->geometry.width > 0 ? view->geometry.width : 0;
+	const int gh = view->geometry.height > 0 ? view->geometry.height : 0;
 	int ox = 0, oy = 0;
 
 	if (gw > 0 && cw > 0) {
@@ -516,10 +507,10 @@ void view_center_and_clip_surface(view_t *view) {
 		return;
 
 	client_t *c = view->client;
-	bool floating = (c->state == STATE_FLOATING);
-	bool fullscreen = (c->state == STATE_FULLSCREEN);
-	bool tiled = IS_TILED(c);
-	struct wlr_box *container_rect = NULL;
+	const bool floating = (c->state == STATE_FLOATING);
+	const bool fullscreen = (c->state == STATE_FULLSCREEN);
+	const bool tiled = IS_TILED(c);
+	const struct wlr_box *container_rect = NULL;
 	bool clip_to_geometry = true;
 
 	if (floating)
@@ -530,7 +521,7 @@ void view_center_and_clip_surface(view_t *view) {
 	} else if (tiled)
 		container_rect = &c->tiled_rectangle;
 
-	int bw = effective_border_width(view->node->desktop);
+	const int bw = effective_border_width(view->node->desktop);
 	struct wlr_box content_offset = {0};
 	struct wlr_box border_size = {0};
 	struct wlr_box border_offset = {0};
@@ -553,8 +544,7 @@ void view_center_and_clip_surface(view_t *view) {
 		}
 	}
 
-	int x = content_offset.x;
-	int y = content_offset.y;
+	const int x = content_offset.x, y = content_offset.y;
 
 	if (container_rect && (floating || fullscreen) && (x != 0 || y != 0)) {
 		wlr_log(WLR_DEBUG, "Centering surface: %dx%d at offset (%d,%d) in container %dx%d",
@@ -595,30 +585,26 @@ void view_center_and_clip_surface(view_t *view) {
 				clip_x -= x;
 				clip_w = container_rect->width;
 			} else {
-				clip_w = (int)view->geometry.width < container_rect->width ? view->geometry.width :
+				clip_w = view->geometry.width < container_rect->width ? view->geometry.width :
 					container_rect->width;
 			}
 			if (y < 0) {
 				clip_y -= y;
 				clip_h = container_rect->height;
 			} else {
-				clip_h = (int)view->geometry.height < container_rect->height ? view->geometry.height :
+				clip_h = view->geometry.height < container_rect->height ? view->geometry.height :
 					container_rect->height;
 			}
 		}
 
-		struct wlr_box clip = {
+		const struct wlr_box clip = {
 			.x = clip_x,
 			.y = clip_y,
 			.width = clip_w,
 			.height = clip_h
 		};
 
-		if (clip_to_geometry) {
-			wlr_scene_subsurface_tree_set_clip(&view->content_tree->node, &clip);
-		} else {
-			wlr_scene_subsurface_tree_set_clip(&view->content_tree->node, NULL);
-		}
+		wlr_scene_subsurface_tree_set_clip(&view->content_tree->node, clip_to_geometry ? &clip : NULL);
 	}
 
 	if (view->shadow)
@@ -631,8 +617,7 @@ void view_update_image_capture_block_out(view_t *view) {
 	if (!view || !view->image_capture || !view->client)
 		return;
 
-	bool blocked = view->client->flags.block_out_from_screenshare;
-	if (!blocked) {
+	if (!view->client->flags.block_out_from_screenshare) {
 		if (view->image_capture_rect) {
 			wlr_scene_node_destroy(&view->image_capture_rect->node);
 			view->image_capture_rect = NULL;
@@ -640,8 +625,8 @@ void view_update_image_capture_block_out(view_t *view) {
 		return;
 	}
 
-	int width = (int)view->geometry.width;
-	int height = (int)view->geometry.height;
+	int width = view->geometry.width;
+	int height = view->geometry.height;
 	if (width < 1)
 		width = 1;
 	if (height < 1)
@@ -666,8 +651,8 @@ bool view_get_surface_offset(view_t *view, int *ox, int *oy) {
 	if (!view || !view->scene_tree || !view->content_tree)
 		return false;
 
-	int x = view->content_tree->node.x - view->geometry.x;
-	int y = view->content_tree->node.y - view->geometry.y;
+	const int x = view->content_tree->node.x - view->geometry.x;
+	const int y = view->content_tree->node.y - view->geometry.y;
 	if (ox)
 		*ox = x;
 	if (oy)
@@ -689,8 +674,8 @@ static struct wlr_fbox clamp_scene_buffer_source_box(struct wlr_scene_buffer *bu
 		box.y = 0.0f;
 	}
 
-	float max_w = (float)buffer->buffer->width;
-	float max_h = (float)buffer->buffer->height;
+	const float max_w = (float)buffer->buffer->width;
+	const float max_h = (float)buffer->buffer->height;
 
 	if (max_w < 1.0f || max_h < 1.0f)
 		return (struct wlr_fbox){
@@ -727,7 +712,8 @@ static struct wlr_fbox clamp_scene_buffer_source_box(struct wlr_scene_buffer *bu
 
 static int buffer_copy_count = 0;
 
-static void save_buffer_iterator(struct wlr_scene_buffer *buffer, int sx, int sy, void *data) {
+static void save_buffer_iterator(struct wlr_scene_buffer *buffer, const int sx, const int sy,
+		void *data) {
 	struct wlr_scene_tree *tree = data;
 
 	buffer_copy_count++;
@@ -747,7 +733,7 @@ static void save_buffer_iterator(struct wlr_scene_buffer *buffer, int sx, int sy
 
 	wlr_scene_buffer_set_dest_size(sbuf, buffer->dst_width, buffer->dst_height);
 	wlr_scene_buffer_set_opaque_region(sbuf, &buffer->opaque_region);
-	struct wlr_fbox src_box = clamp_scene_buffer_source_box(buffer, buffer->src_box);
+	const struct wlr_fbox src_box = clamp_scene_buffer_source_box(buffer, buffer->src_box);
 	wlr_scene_buffer_set_source_box(sbuf, &src_box);
 	wlr_scene_node_set_position(&sbuf->node, sx, sy);
 	wlr_scene_buffer_set_transform(sbuf, buffer->transform);
@@ -830,15 +816,13 @@ static void saved_crop_union(struct wlr_box *box, int x, int y, int width, int h
 	box->height = y2 - box->y;
 }
 
-static void crop_saved_buffer(struct wlr_scene_buffer *buffer, int sx, int sy, void *data) {
+static void crop_saved_buffer(struct wlr_scene_buffer *buffer, const int sx, const int sy,
+		void *data) {
 	saved_crop_t *crop = data;
-	struct wlr_box *box = &crop->box;
-	int bx = box->x;
-	int by = box->y;
-	int bw = box->width;
-	int bh = box->height;
-	int vx = sx > bx ? sx : bx;
-	int vy = sy > by ? sy : by;
+	const struct wlr_box *box = &crop->box;
+	const int bx = box->x, by = box->y;
+	const int bw = box->width, bh = box->height;
+	const int vx = sx > bx ? sx : bx, vy = sy > by ? sy : by;
 	int vx2 = sx + buffer->dst_width;
 	int vy2 = sy + buffer->dst_height;
 	if (vx2 > bx + bw)
@@ -853,10 +837,11 @@ static void crop_saved_buffer(struct wlr_scene_buffer *buffer, int sx, int sy, v
 
 	wlr_scene_node_set_enabled(&buffer->node, true);
 
-	double kx = buffer->dst_width > 0 ? (double)buffer->src_box.width / buffer->dst_width : 1.0;
-	double ky = buffer->dst_height > 0 ? (double)buffer->src_box.height / buffer->dst_height : 1.0;
+	const double kx = buffer->dst_width > 0 ? (double)buffer->src_box.width / buffer->dst_width : 1.0;
+	const double ky = buffer->dst_height > 0 ? (double)buffer->src_box.height / buffer->dst_height :
+		1.0;
 
-	struct wlr_fbox src = {
+	const struct wlr_fbox src = {
 		.x = buffer->src_box.x + (vx - sx) * kx,
 		.y = buffer->src_box.y + (vy - sy) * ky,
 		.width = (vx2 - vx) * kx,
@@ -923,8 +908,8 @@ void view_send_frame_done_iterator(struct wlr_scene_buffer *scene_buffer, int x,
 		void *data) {
 	(void)x;
 	(void)y;
-	struct timespec *when = data;
-	struct wlr_scene_surface *scene_surface = wlr_scene_surface_try_from_buffer(scene_buffer);
+	const struct timespec *when = data;
+	const struct wlr_scene_surface *scene_surface = wlr_scene_surface_try_from_buffer(scene_buffer);
 	if (scene_surface == NULL)
 		return;
 
@@ -977,7 +962,7 @@ bool view_init(view_t *view, view_type_t type) {
 	if (!view->output_handler) {
 		wlr_log(WLR_ERROR, "Failed to create output handler for view %p", (void *)view);
 	} else {
-		view->output_handler->point_accepts_input = view_output_handler_point_accepts_input;
+		view->output_handler->point_accepts_input = scene_buffer_no_input;
 		view->outputs_update.notify = view_handle_outputs_update;
 		wl_signal_add(&view->output_handler->events.outputs_update, &view->outputs_update);
 	}

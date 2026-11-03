@@ -1,4 +1,4 @@
-#include "once.h"
+#include "macros.h"
 #include "output/output.h"
 #include "permission.h"
 #include "protocol/capture.h"
@@ -17,7 +17,6 @@
 #include <wlr/types/wlr_buffer.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
-#include <wlr/types/wlr_scene.h>
 #include <wlr/util/box.h>
 #include <wlr/util/transform.h>
 

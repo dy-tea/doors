@@ -15,14 +15,14 @@ static void child_fork_callback(void) {
 #endif
 
 void set_rr_scheduling(void) {
-	int prio = sched_get_priority_min(SCHED_RR);
-	struct sched_param param = {
+	const int prio = sched_get_priority_min(SCHED_RR);
+	const struct sched_param param = {
 		.sched_priority = prio
 	};
 #ifdef SCHED_RESET_ON_FORK
-	int sched_policy = SCHED_RR | SCHED_RESET_ON_FORK;
+	const int sched_policy = SCHED_RR | SCHED_RESET_ON_FORK;
 #else
-	int sched_policy = SCHED_RR;
+	const int sched_policy = SCHED_RR;
 #endif
 	if (sched_setscheduler(0, sched_policy, &param) != 0) {
 		wlr_log(WLR_INFO, "Failed to set real-time scheduling to %d", prio);

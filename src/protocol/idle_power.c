@@ -1,4 +1,4 @@
-#include "once.h"
+#include "macros.h"
 #include "output/output.h"
 #include "protocol/idle.h"
 #include "protocol/idle_power.h"

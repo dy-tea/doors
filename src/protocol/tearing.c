@@ -1,9 +1,8 @@
-#include "once.h"
+#include "macros.h"
 #include "server.h"
 #include "view.h"
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_tearing_control_v1.h>
-#include <wlr/types/wlr_xdg_shell.h>
 
 typedef struct {
 	struct wlr_tearing_control_v1 *tearing_control;

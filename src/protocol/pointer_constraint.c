@@ -1,4 +1,4 @@
-#include "once.h"
+#include "macros.h"
 #include "protocol/pointer_constraint.h"
 #include "protocol/xwayland.h"
 #include "server.h"

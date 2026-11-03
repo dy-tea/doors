@@ -1,5 +1,5 @@
 #include "config.h"
-#include "once.h"
+#include "macros.h"
 #include "server.h"
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_xdg_system_bell_v1.h>

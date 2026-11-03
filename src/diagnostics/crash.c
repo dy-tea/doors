@@ -42,10 +42,10 @@ void diag_log_line(const char *line) {
 
 	pthread_mutex_lock(&tail_lock);
 
-	size_t head = atomic_load_explicit(&tail_head, memory_order_relaxed);
-	size_t stored = atomic_load_explicit(&tail_len, memory_order_relaxed);
+	const size_t head = atomic_load_explicit(&tail_head, memory_order_relaxed);
+	const size_t stored = atomic_load_explicit(&tail_len, memory_order_relaxed);
 
-	size_t first = n < LOG_TAIL_CAP - head ? n : LOG_TAIL_CAP - head;
+	const size_t first = n < LOG_TAIL_CAP - head ? n : LOG_TAIL_CAP - head;
 	memcpy(tail_ring + head, line, first);
 	memcpy(tail_ring, line + first, n - first);
 
@@ -56,12 +56,12 @@ void diag_log_line(const char *line) {
 	pthread_mutex_unlock(&tail_lock);
 }
 
-void diag_log_tail_write(int fd) {
+void diag_log_tail_write(const int fd) {
 	if (fd < 0)
 		return;
 
-	size_t len = atomic_load_explicit(&tail_len, memory_order_acquire);
-	size_t head = atomic_load_explicit(&tail_head, memory_order_relaxed);
+	const size_t len = atomic_load_explicit(&tail_len, memory_order_acquire);
+	const size_t head = atomic_load_explicit(&tail_head, memory_order_relaxed);
 
 	if (len < LOG_TAIL_CAP) {
 		diag_write_all(fd, tail_ring, len);
@@ -96,7 +96,7 @@ static void prepare_crash_dir(void) {
 	if (!mkdir_p(root, 0700))
 		return;
 
-	time_t now = time(NULL);
+	const time_t now = time(NULL);
 	struct tm tm_info;
 	localtime_r(&now, &tm_info);
 	char stamp[32];
@@ -147,7 +147,7 @@ static void write_int(int fd, long value) {
 	diag_write_str(fd, buf + i);
 }
 
-static const char *signal_name(int sig) {
+static const char *signal_name(const int sig) {
 	switch (sig) {
 	case SIGSEGV:
 		return "SIGSEGV (segmentation fault)";
@@ -159,11 +159,12 @@ static const char *signal_name(int sig) {
 		return "SIGFPE (floating point error)";
 	case SIGILL:
 		return "SIGILL (illegal instruction)";
+	default:
 	}
 	return "unknown signal";
 }
 
-static void crash_header(int fd, int sig) {
+static void crash_header(const int fd, const int sig) {
 	diag_write_str(fd, "########## doors crash ##########\n");
 	diag_write_str(fd, "signal: ");
 	diag_write_str(fd, signal_name(sig));
@@ -180,10 +181,10 @@ static void crash_header(int fd, int sig) {
 	diag_write_str(fd, "\n#################################\n\n");
 }
 
-void diag_crash_bundle(int sig) {
+void diag_crash_bundle(const int sig) {
 #if defined(__linux__) && (defined(__GLIBC__) || defined(__GNU_LIBRARY__))
 	void *addrs[CRASH_MAX_BACKTRACE];
-	int count = (int)backtrace(addrs, CRASH_MAX_BACKTRACE);
+	const int count = (int)backtrace(addrs, CRASH_MAX_BACKTRACE);
 #endif
 
 	crash_header(STDOUT_FILENO, sig);
@@ -191,7 +192,7 @@ void diag_crash_bundle(int sig) {
 	backtrace_symbols_fd(addrs, count, STDOUT_FILENO);
 #endif
 
-	int log_fd = diag_log_fd();
+	const int log_fd = diag_log_fd();
 	if (log_fd >= 0 && log_fd != STDOUT_FILENO) {
 		crash_header(log_fd, sig);
 #if defined(__linux__) && (defined(__GLIBC__) || defined(__GNU_LIBRARY__))
@@ -224,7 +225,7 @@ void diag_crash_bundle(int sig) {
 	}
 }
 
-static void crash_handler(int sig) {
+static void crash_handler(const int sig) {
 	diag_crash_bundle(sig);
 	_exit(128 + sig);
 }
@@ -232,15 +233,14 @@ static void crash_handler(int sig) {
 static void install_signals(void) {
 	static char altstack[ALTSTACK_SIZE];
 
-	stack_t ss = {
+	const stack_t ss = {
 		.ss_sp = altstack,
 		.ss_size = sizeof(altstack),
 		.ss_flags = 0,
 	};
 	sigaltstack(&ss, NULL);
 
-	struct sigaction sa;
-	memset(&sa, 0, sizeof(sa));
+	struct sigaction sa = {0};
 	sa.sa_handler = crash_handler;
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = SA_RESETHAND | SA_ONSTACK;
@@ -268,8 +268,7 @@ void diag_crash_fini(void) {
 	if (crash_ready)
 		rmdir(crash_dir);
 
-	struct sigaction dfl;
-	memset(&dfl, 0, sizeof(dfl));
+	struct sigaction dfl = {0};
 	dfl.sa_handler = SIG_DFL;
 	sigaction(SIGSEGV, &dfl, NULL);
 	sigaction(SIGBUS, &dfl, NULL);

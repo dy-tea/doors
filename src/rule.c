@@ -1,6 +1,6 @@
 #include "ipc/ipc.h"
 #include "layout/scroller.h"
-#include "once.h"
+#include "macros.h"
 #include "rule.h"
 #include "str.h"
 #include "settings.h"
@@ -72,7 +72,7 @@ void remove_rule(rule_t *r) {
 	free_rule(r);
 }
 
-bool remove_rule_by_index(int idx) {
+bool remove_rule_by_index(const int idx) {
 	int i = 0;
 	rule_t *r, *tmp;
 	wl_list_for_each_safe(r, tmp, &rule_list, link) {
@@ -432,17 +432,16 @@ void rule_pattern_clear(rule_pattern_t *p) {
 }
 
 rule_consequence_t *find_matching_rule(const char *app_id, const char *title, const char *tag) {
-	static rule_consequence_t merged;
-	memset(&merged, 0, sizeof(merged));
+	static rule_consequence_t merged = {0};
 
 	rule_t *r, *tmp;
 	wl_list_for_each_safe(r, tmp, &rule_list, link) {
-		bool app_id_matches = rule_pattern_match(&r->match.app_id, app_id);
-		bool title_matches = rule_pattern_match(&r->match.title, title);
-		bool tag_matches = rule_pattern_match(&r->match.tag, tag);
+		const bool app_id_matches = rule_pattern_match(&r->match.app_id, app_id);
+		const bool title_matches = rule_pattern_match(&r->match.title, title);
+		const bool tag_matches = rule_pattern_match(&r->match.tag, tag);
 
 		if (app_id_matches && title_matches && tag_matches) {
-			rule_type_t bits = r->consequence.has;
+			const rule_type_t bits = r->consequence.has;
 			merged.has |= bits;
 			merged.flags = (merged.flags & ~bits) | (r->consequence.flags & bits);
 
@@ -539,7 +538,7 @@ void rule_apply_consequence(node_t *node, client_t *client, const rule_consequen
 
 // build the shader/region nodes a rule asks for, on top of the flags
 // rule_apply_consequence already set on the client
-void rule_apply_view_consequence(view_t *view, const rule_consequence_t *rule) {
+void rule_apply_view_consequence(const view_t *view, const rule_consequence_t *rule) {
 	if (view == NULL || rule == NULL || view->client == NULL)
 		return;
 

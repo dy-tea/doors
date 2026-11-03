@@ -2,7 +2,7 @@
 #include "dim.h"
 #include "effects/backend.h"
 #include "effects/effects.h"
-#include "once.h"
+#include "macros.h"
 #include "output/output.h"
 #include "protocol/layer.h"
 #include "server.h"
@@ -20,11 +20,7 @@
 #include <wlr/backend/interface.h>
 #include <wlr/config.h>
 #include <wlr/interfaces/wlr_output.h>
-#include <wlr/render/allocator.h>
 #include <wlr/render/drm_format_set.h>
-#include <wlr/render/wlr_renderer.h>
-#include <wlr/render/wlr_texture.h>
-#include <wlr/types/wlr_buffer.h>
 #include <wlr/types/wlr_damage_ring.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_scene.h>
@@ -44,9 +40,6 @@ extern const effects_backend_t vk_backend;
 #endif
 
 static const struct wlr_drm_format *s_render_fmt = NULL;
-
-// input callbacks for effect overlay buffers
-static bool scene_buffer_no_input(struct wlr_scene_buffer *buffer, double *sx, double *sy);
 
 effects_state_t effects_state = {0};
 const effects_backend_t *effects_backend = NULL;
@@ -1569,13 +1562,6 @@ static bool damage_reaches_visible_surface(output_t *output, effects_output_t *c
 				return true;
 		}
 	}
-	return false;
-}
-
-static bool scene_buffer_no_input(struct wlr_scene_buffer *buffer, double *sx, double *sy) {
-	(void)buffer;
-	(void)sx;
-	(void)sy;
 	return false;
 }
 

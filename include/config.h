@@ -202,7 +202,7 @@ void config_fini(void);
 void run_config(const char *config_path);
 void run_config_idle(void *data);
 void load_hotkeys_idle(void *data);
-void load_hotkeys(const char *config_path);
+void load_hotkeys(const char *path);
 void reload_hotkeys(void);
 bool keybind_matches(const keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysym,
 	uint32_t keycode);

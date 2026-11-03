@@ -20,7 +20,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
@@ -380,7 +379,8 @@ node_t *insert_node(desktop_t *d, node_t *n, node_t *f) {
 	n->parent = c;
 
 	if (f->presel == NULL) {
-		bool single_tiled = f->client != NULL && IS_TILED(f->client) && tiled_count(d->root, true) == 1;
+		const bool single_tiled = f->client != NULL && IS_TILED(f->client) && tiled_count(d->root,
+			true) == 1;
 
 		if (p == NULL || settings.automatic_scheme != SCHEME_SPIRAL || single_tiled || (p != NULL &&
 				p->split_type == TYPE_TABBED)) {
@@ -509,7 +509,7 @@ void remove_node(desktop_t *d, node_t *n) {
 			tabbed_chain[tabbed_chain_count++] = q;
 
 	node_t *p = n->parent;
-	bool n_is_first = is_first_child(n);
+	const bool n_is_first = is_first_child(n);
 	node_t *displaced_parent = NULL;
 
 	if (p == NULL) {
@@ -542,8 +542,8 @@ void remove_node(desktop_t *d, node_t *n) {
 		}
 
 		displaced_parent = p;
-		split_type_t old_split_type = p->split_type;
-		struct wlr_box old_rect = p->rectangle;
+		const split_type_t old_split_type = p->split_type;
+		const struct wlr_box old_rect = p->rectangle;
 
 		node_replace_child(d, p, b, g);
 		p->first_child = NULL;
@@ -642,8 +642,8 @@ void swap_nodes(output_t *m1, desktop_t *d1, node_t *n1, output_t *m2, desktop_t
 	animation_cancel_node(n1);
 	animation_cancel_node(n2);
 
-	bool n1_focused = (d1->focus == n1);
-	bool n2_focused = (d2->focus == n2);
+	const bool n1_focused = (d1->focus == n1);
+	const bool n2_focused = (d2->focus == n2);
 
 	client_t *c1 = n1->client;
 	client_t *c2 = n2->client;
@@ -651,11 +651,11 @@ void swap_nodes(output_t *m1, desktop_t *d1, node_t *n1, output_t *m2, desktop_t
 	n1->client = c2;
 	n2->client = c1;
 
-	bool tmp_vacant = n1->vacant;
-	bool tmp_marked = n1->marked;
-	bool tmp_locked = n1->locked;
-	bool tmp_sticky = n1->sticky;
-	bool tmp_private = n1->private_node;
+	const bool tmp_vacant = n1->vacant;
+	const bool tmp_marked = n1->marked;
+	const bool tmp_locked = n1->locked;
+	const bool tmp_sticky = n1->sticky;
+	const bool tmp_private = n1->private_node;
 
 	n1->vacant = n2->vacant;
 	n1->marked = n2->marked;
@@ -729,16 +729,12 @@ bool set_state(output_t *m, desktop_t *d, node_t *n, client_state_t s) {
 
 static void tell_client_fullscreen(node_t *n, bool value) {
 	view_t *view = n->client ? n->client->view : NULL;
-	xdg_toplevel_t *xdg = view_to_xdg(view);
+	const xdg_toplevel_t *xdg = view_to_xdg(view);
 	xwayland_toplevel_t *xwayland = view_to_xwayland(view);
 	if (xdg != NULL && xdg->xdg_toplevel != NULL) {
 		wlr_xdg_toplevel_set_fullscreen(xdg->xdg_toplevel, value);
-		// wlr_xdg_toplevel_set_fullscreen only flips the state bit, the configure
-		// it schedules keeps whatever size was scheduled last. Seed the fullscreen
-		// size here so the configure can never pair the fullscreen state with the
-		// stale, pre-fullscreen size.
 		if (value && n->output != NULL) {
-			struct wlr_box r = n->output->rectangle;
+			const struct wlr_box r = n->output->rectangle;
 			wlr_xdg_toplevel_set_size(xdg->xdg_toplevel, r.width, r.height);
 			view->last_requested = r;
 		}
@@ -746,13 +742,13 @@ static void tell_client_fullscreen(node_t *n, bool value) {
 		wlr_xwayland_surface_set_fullscreen(xwayland->xwayland_surface, value);
 }
 
-static void tell_client_maximized(node_t *n, bool value) {
-	xdg_toplevel_t *xdg = view_to_xdg(n->client ? n->client->view : NULL);
+static void tell_client_maximized(const node_t *n, const bool value) {
+	const xdg_toplevel_t *xdg = view_to_xdg(n->client ? n->client->view : NULL);
 	if (xdg != NULL && xdg->xdg_toplevel != NULL)
 		wlr_xdg_toplevel_set_maximized(xdg->xdg_toplevel, value);
 }
 
-void client_set_fullscreen(output_t *m, desktop_t *d, node_t *n, bool value) {
+void client_set_fullscreen(output_t *m, desktop_t *d, node_t *n, const bool value) {
 	if (n == NULL || n->client == NULL)
 		return;
 
@@ -761,8 +757,7 @@ void client_set_fullscreen(output_t *m, desktop_t *d, node_t *n, bool value) {
 		return;
 	}
 
-	bool was = n->client->state == STATE_FULLSCREEN;
-	if (was == value)
+	if ((n->client->state == STATE_FULLSCREEN) == value)
 		return;
 
 	// leaving fullscreen returns the window to whatever it was before
@@ -786,7 +781,7 @@ void client_set_fullscreen(output_t *m, desktop_t *d, node_t *n, bool value) {
 		client_update_foreign_toplevel_state(n->client);
 }
 
-bool client_set_maximized(output_t *m, desktop_t *d, node_t *n, bool value) {
+bool client_set_maximized(output_t *m, desktop_t *d, node_t *n, const bool value) {
 	if (n == NULL || n->client == NULL)
 		return false;
 
@@ -838,7 +833,7 @@ desktop_t *desktop_for_node(node_t *n) {
 	if (n == NULL)
 		return NULL;
 
-	output_t *m = n->output;
+	const output_t *m = n->output;
 	if (m) {
 		node_t *root = n;
 		while (root->parent != NULL)
@@ -875,7 +870,7 @@ void desktop_minimized_clear(desktop_t *d) {
 }
 
 // remember a toplevel so the restore bind can bring it back later
-void desktop_minimized_push(desktop_t *d, node_t *n) {
+void desktop_minimized_push(const desktop_t *d, node_t *n) {
 	if (d == NULL || n == NULL)
 		return;
 
@@ -985,7 +980,7 @@ presel_t *make_presel(void) {
 	return p;
 }
 
-void presel_dir(node_t *n, direction_t dir) {
+void presel_dir(node_t *n, const direction_t dir) {
 	if (n == NULL || !is_leaf(n))
 		return;
 
@@ -994,9 +989,8 @@ void presel_dir(node_t *n, direction_t dir) {
 
 	n->presel->split_dir = dir;
 
-	if (n->client) {
+	if (n->client)
 		update_border_colors(n->client);
-	}
 }
 
 void presel_cancel(node_t *n) {
@@ -1006,23 +1000,21 @@ void presel_cancel(node_t *n) {
 	free(n->presel);
 	n->presel = NULL;
 
-	if (n->client) {
+	if (n->client)
 		update_border_colors(n->client);
-	}
 }
 
-void rotate_tree(node_t *n, int deg) {
+void rotate_tree(node_t *n, const int deg) {
 	if (n == NULL || is_leaf(n) || deg == 0)
 		return;
 
-	node_t *tmp;
 	bool rotated = false;
 
 	// swap children
 	if ((deg == 90 && n->split_type == TYPE_HORIZONTAL) || (deg == 270 &&
 			n->split_type == TYPE_VERTICAL) || (deg == -90 && n->split_type == TYPE_VERTICAL) ||
 			(deg == -270 && n->split_type == TYPE_HORIZONTAL) || deg == 180 || deg == -180) {
-		tmp = n->first_child;
+		node_t *tmp = n->first_child;
 		n->first_child = n->second_child;
 		n->second_child = tmp;
 		n->split_ratio = 1.0 - n->split_ratio;
@@ -1045,7 +1037,7 @@ void rotate_tree(node_t *n, int deg) {
 	rotate_tree(n->second_child, deg);
 }
 
-void flip_tree(node_t *n, flip_t flp) {
+void flip_tree(node_t *n, const flip_t flp) {
 	if (n == NULL || is_leaf(n))
 		return;
 
@@ -1119,7 +1111,7 @@ void node_set_pending_rectangle(node_t *n, struct wlr_box rect) {
 	node_set_dirty(n);
 }
 
-void node_set_hidden(node_t *n, bool hidden) {
+void node_set_hidden(node_t *n, const bool hidden) {
 	if (!n || n->hidden == hidden)
 		return;
 
@@ -1128,7 +1120,7 @@ void node_set_hidden(node_t *n, bool hidden) {
 	node_set_dirty(n);
 }
 
-static bool validate_subtree(node_t *n, node_t *expected_parent, int depth) {
+static bool validate_subtree(node_t *n, const node_t *expected_parent, const int depth) {
 	if (n == NULL)
 		return true;
 

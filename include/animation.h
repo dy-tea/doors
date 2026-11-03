@@ -48,12 +48,12 @@ bool animation_fade_out(view_t *view);
 bool animation_fade_out_layer(layer_surface_t *layer);
 bool animation_is_opacity_fading(view_t *view);
 
-bool animation_workspace_switch_active(output_t *output);
-bool animation_node_workspace_slide_out(node_t *node);
-void animation_cancel_node(node_t *node);
+bool animation_workspace_switch_active(const output_t *output);
+bool animation_node_workspace_slide_out(const node_t *node);
+void animation_cancel_node(const node_t *node);
 void animation_cancel_view(view_t *view);
 bool animation_has_fade_out(struct wlr_scene_tree *scene_tree);
-void animation_cancel_scene_tree(struct wlr_scene_tree *scene_tree);
+void animation_cancel_scene_tree(const struct wlr_scene_tree *scene_tree);
 
 bool animation_update_output(output_t *output, struct timespec now);
 void animation_update_slide_blur(output_t *output);

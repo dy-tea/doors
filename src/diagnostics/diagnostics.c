@@ -19,20 +19,20 @@ uint64_t diag_monotonic_ms(void) {
 	return (uint64_t)ts.tv_sec * 1000 + (uint64_t)ts.tv_nsec / 1000000;
 }
 
-void diag_write_all(int fd, const char *buf, size_t len) {
+void diag_write_all(const int fd, const char *buf, size_t len) {
 	while (len > 0) {
-		ssize_t n = write(fd, buf, len);
+		const ssize_t n = write(fd, buf, len);
 		if (n > 0) {
 			buf += n;
 			len -= (size_t)n;
 		} else if (n < 0 && errno == EINTR)
-			continue;
+			;
 		else
 			return;
 	}
 }
 
-void diag_write_str(int fd, const char *text) {
+void diag_write_str(const int fd, const char *text) {
 	diag_write_all(fd, text, strlen(text));
 }
 

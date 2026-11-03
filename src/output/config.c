@@ -1,15 +1,13 @@
 #include "ipc/ipc.h"
-#include "once.h"
+#include "macros.h"
 #include "output/config.h"
 #include "output/output.h"
 #include "server.h"
 #include "settings.h"
 #include "str.h"
 #include <drm_fourcc.h>
-#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
-#include <wayland-server-core.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_output_management_v1.h>
@@ -303,7 +301,7 @@ void output_update_manager_config(void) {
 		state->adaptive_sync_enabled = output->wlr_output->adaptive_sync_status ==
 			WLR_OUTPUT_ADAPTIVE_SYNC_ENABLED;
 
-		struct wlr_output_layout_output *layout_output = wlr_output_layout_get(server.output_layout,
+		const struct wlr_output_layout_output *layout_output = wlr_output_layout_get(server.output_layout,
 			output->wlr_output);
 		if (layout_output) {
 			state->x = layout_output->x;

@@ -2,14 +2,14 @@
 
 #include "effects/backend.h"
 #include "types.h"
+#include <wlr/types/wlr_scene.h>
 #include <pixman.h>
-#include <stdbool.h>
 #include <stdint.h>
+
+bool scene_buffer_no_input(struct wlr_scene_buffer *buffer, double *sx, double *sy);
 
 struct wlr_scene_tree;
 
-// a blur region is rendered as one scene buffer per region rectangle. The pool
-// is grown as needed and nodes beyond the current count are disabled.
 typedef struct blur_node_pool_t {
 	struct wlr_scene_buffer **nodes;
 	size_t count;
@@ -124,17 +124,18 @@ typedef enum {
 
 struct wlr_scene_node;
 
-void surface_set_effect(struct wlr_scene_tree *scene_tree, struct node_t *node,
+void surface_set_effect(struct wlr_scene_tree *scene_tree, const struct node_t *node,
 	struct surface_blur_t **blur, surface_effect_t effect, bool enabled);
 void surface_set_border_radius(struct wlr_scene_tree *scene_tree,
 	struct wlr_scene_tree *content_tree, struct wlr_scene_tree *border_tree, struct node_t *node,
 	struct surface_rounded_t **rounded, struct surface_shadow_t **shadow, float radius);
-void surface_set_shadow(struct wlr_scene_tree *scene_tree, struct node_t *node,
+void surface_set_shadow(struct wlr_scene_tree *scene_tree, const struct node_t *node,
 	struct surface_shadow_t **shadow, bool enabled);
 
 void surface_update_rounded(struct surface_rounded_t **rounded, float color[4], border_theme_t *bt);
 
-void surface_client_set_effect(struct client_t *client, surface_effect_t effect, bool enabled);
+void surface_client_set_effect(const struct client_t *client, surface_effect_t effect,
+	bool enabled);
 void surface_client_set_border_radius(struct client_t *client, float radius);
 void surface_client_set_shadow(struct client_t *client, bool enabled);
 

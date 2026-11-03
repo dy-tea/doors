@@ -64,7 +64,7 @@ static void dim_track_path(cairo_t *cairo, double x, double y, double width, dou
 		return;
 	}
 
-	double half = (width < height ? width : height) * 0.5;
+	const double half = (width < height ? width : height) * 0.5;
 	if (radius > half)
 		radius = half;
 
@@ -76,14 +76,14 @@ static void dim_track_path(cairo_t *cairo, double x, double y, double width, dou
 	cairo_close_path(cairo);
 }
 
-static struct wlr_buffer *dim_buffer_create(const float color[4], int width, int height,
-		double radius) {
+static struct wlr_buffer *dim_buffer_create(const float color[4], const int width, const int height,
+		const double radius) {
 	if (width <= 0 || height <= 0)
 		return NULL;
 
-	bool rounded = (radius > 0.0);
-	int buf_w = rounded ? width : 1;
-	int buf_h = rounded ? height : 1;
+	const bool rounded = (radius > 0.0);
+	const int buf_w = rounded ? width : 1;
+	const int buf_h = rounded ? height : 1;
 
 	cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, buf_w, buf_h);
 	if (cairo_surface_status(surface) != CAIRO_STATUS_SUCCESS) {
@@ -119,13 +119,6 @@ static struct wlr_buffer *dim_buffer_create(const float color[4], int width, int
 	return &buffer->base;
 }
 
-static bool dim_no_input(struct wlr_scene_buffer *buffer, double *sx, double *sy) {
-	(void)buffer;
-	(void)sx;
-	(void)sy;
-	return false;
-}
-
 static struct dim_scrim_t *dim_ensure(struct dim_scrim_t **slot, struct wlr_scene_tree *parent) {
 	if (*slot != NULL)
 		return *slot;
@@ -140,18 +133,18 @@ static struct dim_scrim_t *dim_ensure(struct dim_scrim_t **slot, struct wlr_scen
 		free(scrim);
 		return NULL;
 	}
-	scrim->node->point_accepts_input = dim_no_input;
+	scrim->node->point_accepts_input = scene_buffer_no_input;
 
 	*slot = scrim;
 	return scrim;
 }
 
-static int dim_px(double value) {
+static int dim_px(const double value) {
 	return (int)(value >= 0.0 ? value + 0.5 : value - 0.5);
 }
 
-static void dim_apply_scrim(struct dim_scrim_t *scrim, const float color[4], int buf_w, int buf_h,
-		float radius) {
+static void dim_apply_scrim(struct dim_scrim_t *scrim, const float color[4], const int buf_w,
+		const int buf_h, const float radius) {
 	if (scrim->has_color && buf_w == scrim->buf_width && buf_h == scrim->buf_height &&
 		radius == scrim->radius && memcmp(scrim->color, color, sizeof(scrim->color)) == 0)
 		return;
@@ -186,12 +179,12 @@ static void dim_place_before(struct wlr_scene_node *node, struct wlr_scene_node 
 	pos->prev = elm;
 }
 
-static void dim_scrim_reset(struct dim_scrim_t *scrim) {
+static void dim_scrim_reset(const struct dim_scrim_t *scrim) {
 	if (scrim != NULL)
 		wlr_scene_node_set_enabled(&scrim->node->node, false);
 }
 
-static bool dim_can_dim(view_t *view) {
+static bool dim_can_dim(const view_t *view) {
 	if (view == NULL || view->client == NULL || view->scene_tree == NULL)
 		return false;
 	if (!view->mapped || view->client->flags.freed)
@@ -201,7 +194,7 @@ static bool dim_can_dim(view_t *view) {
 }
 
 static bool view_occupied_box(view_t *view, struct wlr_box *out) {
-	client_t *client = view->client;
+	const client_t *client = view->client;
 
 	if (client->state == STATE_FULLSCREEN) {
 		output_t *m = view->node ? view->node->output : NULL;
@@ -224,8 +217,8 @@ static bool view_dim_box(view_t *view, struct wlr_box *out) {
 
 	int off_x = 0, off_y = 0;
 	if (view->geometry.width > 0 && view->geometry.height > 0) {
-		int geo_w = (int)view->geometry.width;
-		int geo_h = (int)view->geometry.height;
+		const int geo_w = (int)view->geometry.width;
+		const int geo_h = (int)view->geometry.height;
 
 		if (geo_w < out->width) {
 			off_x = (out->width - geo_w) / 2;
@@ -345,7 +338,7 @@ bool dim_scrim_below_view(const view_t *view, const output_t *output) {
 	if (view == NULL || output == NULL || !settings.dim_inactive)
 		return false;
 
-	desktop_t *desk = output->desk;
+	const desktop_t *desk = output->desk;
 	if (desk == NULL || desk->focus == NULL || desk->focus->client == NULL)
 		return false;
 

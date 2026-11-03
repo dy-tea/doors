@@ -17,14 +17,14 @@
 #define FLOATING_DEFAULT_WIDTH 60
 #define FLOATING_DEFAULT_HEIGHT 60
 
-static bool node_outside_tree(node_t *n, desktop_t *d) {
+static bool node_outside_tree(node_t *n, const desktop_t *d) {
 	for (node_t *p = n; p != NULL; p = p->parent)
 		if (p == d->root)
 			return false;
 	return true;
 }
 
-int desktop_toplevels(desktop_t *d, node_t ***out_nodes) {
+int desktop_toplevels(const desktop_t *d, node_t ***out_nodes) {
 	if (out_nodes != NULL)
 		*out_nodes = NULL;
 	if (d == NULL || out_nodes == NULL)
@@ -67,7 +67,7 @@ int desktop_toplevels(desktop_t *d, node_t ***out_nodes) {
 	return count;
 }
 
-bool desktop_has_toplevels(desktop_t *d) {
+bool desktop_has_toplevels(const desktop_t *d) {
 	if (d == NULL)
 		return false;
 
@@ -86,12 +86,12 @@ bool desktop_has_toplevels(desktop_t *d) {
 	return false;
 }
 
-void desktop_clear_output(desktop_t *d, output_t *m) {
+void desktop_clear_output(const desktop_t *d, output_t *m) {
 	if (d == NULL)
 		return;
 
 	node_t **toplevels = NULL;
-	int count = desktop_toplevels(d, &toplevels);
+	const int count = desktop_toplevels(d, &toplevels);
 	if (toplevels == NULL)
 		return;
 
@@ -103,7 +103,7 @@ void desktop_clear_output(desktop_t *d, output_t *m) {
 	free(toplevels);
 }
 
-struct wlr_box node_current_rect(node_t *n) {
+struct wlr_box node_current_rect(const node_t *n) {
 	if (n == NULL || n->client == NULL)
 		return (struct wlr_box){0};
 
@@ -115,7 +115,7 @@ struct wlr_box node_current_rect(node_t *n) {
 }
 
 // size the client asked for, falling back to a fraction of the desktop
-static struct wlr_box client_requested_size(client_t *c, struct wlr_box area) {
+static struct wlr_box client_requested_size(const client_t *c, const struct wlr_box area) {
 	struct wlr_box size = {0};
 
 	xdg_toplevel_t *xdg = view_to_xdg(c->view);
@@ -150,7 +150,7 @@ static struct wlr_box client_requested_size(client_t *c, struct wlr_box area) {
 	return size;
 }
 
-static struct wlr_box cascade_rect(struct wlr_box area, struct wlr_box size, int index) {
+static struct wlr_box cascade_rect(const struct wlr_box area, struct wlr_box size, int index) {
 	if (size.width > area.width)
 		size.width = area.width;
 	if (size.height > area.height)
@@ -162,8 +162,9 @@ static struct wlr_box cascade_rect(struct wlr_box area, struct wlr_box size, int
 	if (index < 0)
 		index = 0;
 
-	int max_steps_x = size.width >= area.width ? 0 : (area.width - size.width) / FLOATING_CASCADE_STEP;
-	int max_steps_y = size.height >= area.height ? 0 : (area.height - size.height) /
+	const int max_steps_x = size.width >= area.width ? 0 : (area.width - size.width) /
+		FLOATING_CASCADE_STEP;
+	const int max_steps_y = size.height >= area.height ? 0 : (area.height - size.height) /
 		FLOATING_CASCADE_STEP;
 
 	return (struct wlr_box){
@@ -187,7 +188,7 @@ static struct wlr_box float_area(output_t *m, desktop_t *d) {
 // moves a toplevel to a floating geometry
 static void apply_float_rect(node_t *n, struct wlr_box r) {
 	client_t *c = n->client;
-	struct wlr_scene_tree *st = client_get_scene_tree(c);
+	const struct wlr_scene_tree *st = client_get_scene_tree(c);
 	if (st != NULL && (st->node.x != r.x || st->node.y != r.y))
 		effects_dirty_corner_masks(n->output);
 
@@ -232,7 +233,7 @@ void float_node_clamp(output_t *m, desktop_t *d, node_t *n) {
 	if (wlr_box_intersects(&m->rectangle, &n->client->floating_rectangle))
 		return;
 
-	struct wlr_box available = desktop_usable_area(m, d);
+	const struct wlr_box available = desktop_usable_area(m, d);
 	struct wlr_box size = n->client->floating_rectangle;
 	if (size.width > available.width)
 		size.width = available.width;
@@ -244,7 +245,7 @@ void float_node_clamp(output_t *m, desktop_t *d, node_t *n) {
 
 // `announce` is false for windows that were never announced to ipc subscribers yet
 static void float_node_impl(output_t *m, desktop_t *d, node_t *n, const struct wlr_box *rect,
-		bool announce) {
+		const bool announce) {
 	if (n == NULL || n->client == NULL)
 		return;
 
@@ -262,8 +263,8 @@ static void float_node_impl(output_t *m, desktop_t *d, node_t *n, const struct w
 		// keep the place the toplevel had in the tree, sized to its own geometry
 		target = c->tiled_rectangle;
 		if (c->view != NULL && c->view->geometry.width > 0 && c->view->geometry.height > 0) {
-			int off_x = (target.width - c->view->geometry.width) / 2;
-			int off_y = (target.height - c->view->geometry.height) / 2;
+			const int off_x = (target.width - c->view->geometry.width) / 2;
+			const int off_y = (target.height - c->view->geometry.height) / 2;
 			target.width = c->view->geometry.width;
 			target.height = c->view->geometry.height;
 			target.x += off_x > 0 ? off_x : 0;
@@ -271,14 +272,14 @@ static void float_node_impl(output_t *m, desktop_t *d, node_t *n, const struct w
 		}
 	} else {
 		node_t **toplevels = NULL;
-		int index = d != NULL ? desktop_toplevels(d, &toplevels) : 0;
+		const int index = d != NULL ? desktop_toplevels(d, &toplevels) : 0;
 		free(toplevels);
-		struct wlr_box area = float_area(m, d);
+		const struct wlr_box area = float_area(m, d);
 		target = cascade_rect(area, client_requested_size(c, area), index);
 	}
 
 	if (d != NULL && (n->parent != NULL || d->root == n)) {
-		bool keep_focus = d->focus == n;
+		const bool keep_focus = d->focus == n;
 		remove_node(d, n);
 		n->parent = NULL;
 
@@ -353,9 +354,9 @@ void tile_node(output_t *m, desktop_t *d, node_t *n) {
 			c->title[0] ? c->title : "?", n->id, 'T');
 	} else if (c->state == STATE_TILED) {
 		if (c->view != NULL) {
-			view_t *tl = c->view;
-			int off_x = (c->tiled_rectangle.width - tl->geometry.width) / 2;
-			int off_y = (c->tiled_rectangle.height - tl->geometry.height) / 2;
+			const view_t *tl = c->view;
+			const int off_x = (c->tiled_rectangle.width - tl->geometry.width) / 2;
+			const int off_y = (c->tiled_rectangle.height - tl->geometry.height) / 2;
 			c->floating_rectangle = (struct wlr_box){
 				.x = c->tiled_rectangle.x + (off_x > 0 ? off_x : 0),
 				.y = c->tiled_rectangle.y + (off_y > 0 ? off_y : 0),
@@ -394,11 +395,11 @@ bool floating_init_client(output_t *m, desktop_t *d, client_t *c) {
 
 	// float the new toplevel right away
 	node_t **toplevels = NULL;
-	int index = desktop_toplevels(d, &toplevels);
+	const int index = desktop_toplevels(d, &toplevels);
 	free(toplevels);
 
-	struct wlr_box area = float_area(m, d);
-	struct wlr_box rect = cascade_rect(area, client_requested_size(c, area), index);
+	const struct wlr_box area = float_area(m, d);
+	const struct wlr_box rect = cascade_rect(area, client_requested_size(c, area), index);
 	float_node_impl(m, d, n, &rect, false);
 
 	return true;
@@ -409,7 +410,7 @@ void floating_enter(output_t *m, desktop_t *d) {
 		return;
 
 	node_t **toplevels = NULL;
-	int count = desktop_toplevels(d, &toplevels);
+	const int count = desktop_toplevels(d, &toplevels);
 	if (toplevels == NULL)
 		return;
 
@@ -417,13 +418,13 @@ void floating_enter(output_t *m, desktop_t *d) {
 	node_t *first = count > 0 ? toplevels[0] : NULL;
 
 	int index = 0;
-	struct wlr_box area = float_area(m, d);
+	const struct wlr_box area = float_area(m, d);
 	for (int i = 0; i < count; i++) {
 		node_t *n = toplevels[i];
 		if (n->client == NULL || !IS_TILED(n->client))
 			continue;
 
-		struct wlr_box size = client_requested_size(n->client, area);
+		const struct wlr_box size = client_requested_size(n->client, area);
 		struct wlr_box rect = cascade_rect(area, size, index++);
 		float_node(m, d, n, &rect);
 	}
@@ -444,7 +445,7 @@ void floating_enter(output_t *m, desktop_t *d) {
 
 // true if the toplevel is on any output, used to bring back toplevels left behind by an output
 // that went away
-static bool rect_on_any_output(struct wlr_box r) {
+static bool rect_on_any_output(const struct wlr_box r) {
 	output_t *m;
 	wl_list_for_each(m, &mon_list, link)
 		if (wlr_box_intersects(&m->rectangle, &r))
@@ -453,7 +454,7 @@ static bool rect_on_any_output(struct wlr_box r) {
 	return false;
 }
 
-static struct wlr_box gapped_area(struct wlr_box area, int wg) {
+static struct wlr_box gapped_area(struct wlr_box area, const int wg) {
 	area.x += wg;
 	area.y += wg;
 	area.width -= wg;
@@ -472,14 +473,14 @@ void floating_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 	}
 
 	node_t **toplevels = NULL;
-	int count = desktop_toplevels(d, &toplevels);
+	const int count = desktop_toplevels(d, &toplevels);
 	if (toplevels == NULL)
 		return;
 
 	int index = 0;
 	for (int i = 0; i < count; i++) {
 		node_t *n = toplevels[i];
-		client_t *c = n->client;
+		const client_t *c = n->client;
 
 		if (c == NULL || c->state != STATE_FLOATING)
 			continue;
@@ -488,14 +489,14 @@ void floating_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 
 		// a maximized window fills the usable area, with the gaps and border still applied
 		if (client_is_maximized(c)) {
-			int wg = compute_window_gap(d);
-			struct wlr_box maxed = apply_bleed(gapped_area(usable, wg), (int)effective_border_width(d), wg);
+			const int wg = compute_window_gap(d);
+			const struct wlr_box maxed = apply_bleed(gapped_area(usable, wg), effective_border_width(d), wg);
 			apply_float_rect(n, maxed);
 			n->output = m;
 			continue;
 		}
 
-		struct wlr_box r = c->floating_rectangle;
+		const struct wlr_box r = c->floating_rectangle;
 
 		if (r.width < MIN_RENDER_WIDTH || r.height < MIN_RENDER_HEIGHT) {
 			apply_float_rect(n, cascade_rect(available, client_requested_size(c, available), index));
@@ -522,12 +523,12 @@ void floating_on_focus(output_t *m, desktop_t *d, node_t *n) {
 		return;
 
 	node_t **toplevels = NULL;
-	int count = desktop_toplevels(d, &toplevels);
+	const int count = desktop_toplevels(d, &toplevels);
 	if (toplevels == NULL)
 		return;
 
 	for (int i = 0; i < count; i++) {
-		node_t *w = toplevels[i];
+		const node_t *w = toplevels[i];
 		if (w->client == NULL || w->client->state == STATE_FULLSCREEN)
 			continue;
 		if (node_is_minimized(w))
@@ -542,29 +543,27 @@ void floating_on_focus(output_t *m, desktop_t *d, node_t *n) {
 	free(toplevels);
 }
 
-bool floating_focus(desktop_t *d, direction_t dir) {
+bool floating_focus(desktop_t *d, const direction_t dir) {
 	if (d == NULL || d->focus == NULL)
 		return false;
 
 	node_t **toplevels = NULL;
-	int count = desktop_toplevels(d, &toplevels);
+	const int count = desktop_toplevels(d, &toplevels);
 	if (toplevels == NULL)
 		return false;
 
-	bool horiz = dir == DIR_WEST || dir == DIR_EAST;
-	struct wlr_box from = node_current_rect(d->focus);
+	const bool horiz = dir == DIR_WEST || dir == DIR_EAST;
+	const struct wlr_box from = node_current_rect(d->focus);
 	node_t *best = NULL;
 	long best_overlap = -1, best_dist = 0;
 
-	// with fullscreen directions cycle through the toplevels instead
+	// with fullscreen directions cycle through the toplevels
 	if (d->focus->client != NULL && d->focus->client->state == STATE_FULLSCREEN) {
 		for (int i = 0; i < count; i++) {
 			node_t *n = toplevels[i];
 			if (n == d->focus || node_is_invisible(n) || n->client->state == STATE_FULLSCREEN)
 				continue;
-			if (dir == DIR_EAST || dir == DIR_SOUTH)
-				best = n;
-			else if (best == NULL)
+			if ((dir == DIR_EAST || dir == DIR_SOUTH) || best == NULL)
 				best = n;
 		}
 
@@ -578,7 +577,7 @@ bool floating_focus(desktop_t *d, direction_t dir) {
 		if (n == d->focus || node_is_invisible(n) || n->client->state == STATE_FULLSCREEN)
 			continue;
 
-		struct wlr_box r = node_current_rect(n);
+		const struct wlr_box r = node_current_rect(n);
 		long lo, hi, dist;
 		if (horiz) {
 			lo = r.y > from.y ? r.y : from.y;
@@ -608,9 +607,7 @@ bool floating_focus(desktop_t *d, direction_t dir) {
 			node_t *n = toplevels[i];
 			if (n == d->focus || node_is_invisible(n) || n->client->state == STATE_FULLSCREEN)
 				continue;
-			if (dir == DIR_EAST || dir == DIR_SOUTH)
-				wrapped = n;
-			else if (wrapped == NULL)
+			if ((dir == DIR_EAST || dir == DIR_SOUTH) || wrapped == NULL)
 				wrapped = n;
 		}
 		best = wrapped;
@@ -636,7 +633,7 @@ int floating_collect(desktop_t *d, node_t ***out_nodes) {
 		return 0;
 
 	node_t **toplevels = NULL;
-	int count = desktop_toplevels(d, &toplevels);
+	const int count = desktop_toplevels(d, &toplevels);
 	if (toplevels == NULL)
 		return 0;
 

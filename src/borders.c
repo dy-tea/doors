@@ -17,7 +17,7 @@ border_state_t get_border_state(client_t *client) {
 	return state;
 }
 
-static int hex_digit(char c) {
+static int hex_digit(const char c) {
 	if (c >= '0' && c <= '9')
 		return c - '0';
 	if (c >= 'a' && c <= 'f')
@@ -37,7 +37,7 @@ void parse_color(const char *hex, float *color) {
 	if (*hex == '#')
 		hex++;
 
-	size_t len = strlen(hex);
+	const size_t len = strlen(hex);
 	if (len != 6 && len != 8) {
 		color[0] = color[1] = color[2] = 0.5f;
 		color[3] = 1.0f;
@@ -60,13 +60,13 @@ static void get_border_color(client_t *client, float *color) {
 		return;
 	}
 
-	border_state_t bs = get_border_state(client);
+	const border_state_t bs = get_border_state(client);
 
-	bool the_only_window = (wl_list_length(&mon_list) == 1) && bs.desk && bs.desk->root &&
+	const bool the_only_window = (wl_list_length(&mon_list) == 1) && bs.desk && bs.desk->root &&
 		bs.desk->root->client;
-	bool no_border = (settings.borderless_monocle && bs.desk && bs.desk->layout == LAYOUT_MONOCLE &&
-		IS_TILED(client)) || (settings.borderless_singleton && the_only_window) ||
-		client->state == STATE_FULLSCREEN;
+	const bool no_border = (settings.borderless_monocle && bs.desk &&
+		bs.desk->layout == LAYOUT_MONOCLE && IS_TILED(client)) || (settings.borderless_singleton &&
+		the_only_window) || client->state == STATE_FULLSCREEN;
 
 	if (no_border) {
 		color[0] = color[1] = color[2] = 0.0f;
@@ -75,7 +75,7 @@ static void get_border_color(client_t *client, float *color) {
 	}
 
 	// check if this client's node has an active preselection
-	node_t *n = client_get_node(client);
+	const node_t *n = client_get_node(client);
 	if (n && n->presel) {
 		memcpy(color, settings.presel_feedback_color_rgba, sizeof(float) * 4);
 		return;
@@ -128,7 +128,7 @@ void destroy_borders(struct wlr_scene_tree **border_tree, struct wlr_scene_rect 
 }
 
 void update_borders(struct wlr_scene_tree *border_tree, struct wlr_scene_rect *rects[4],
-		struct wlr_box geo, unsigned int bw, int off_x, int off_y) {
+		const struct wlr_box geo, const unsigned int bw, const int off_x, const int off_y) {
 	if (!border_tree)
 		return;
 
@@ -139,9 +139,9 @@ void update_borders(struct wlr_scene_tree *border_tree, struct wlr_scene_rect *r
 
 	wlr_scene_node_set_enabled(&border_tree->node, true);
 
-	int w = geo.width;
-	int h = geo.height;
-	int bwi = (int)bw;
+	const int w = geo.width;
+	const int h = geo.height;
+	const int bwi = (int)bw;
 
 	wlr_scene_node_set_position(&border_tree->node, off_x - bwi, off_y - bwi);
 
@@ -252,7 +252,7 @@ void update_border_colors(client_t *client) {
 			}
 		}
 	} else {
-		surface_rounded_t *rounded = client_get_rounded(client);
+		const surface_rounded_t *rounded = client_get_rounded(client);
 		if (rounded && rounded->border_shader_node)
 			wlr_scene_node_set_enabled(&rounded->border_shader_node->node, false);
 	}

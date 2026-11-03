@@ -1,6 +1,6 @@
 #include "ipc/ipc.h"
 #include "layout/floating.h"
-#include "once.h"
+#include "macros.h"
 #include "output/output.h"
 #include "server.h"
 #include "tree.h"

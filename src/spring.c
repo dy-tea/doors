@@ -1,4 +1,4 @@
-#include "once.h"
+#include "macros.h"
 #include "spring.h"
 #include "str.h"
 #include <math.h>
@@ -7,8 +7,8 @@
 
 static struct wl_list springs;
 
-spring_curve_t *spring_add(const char *name, double stiffness, double damping, double mass,
-		double value_epsilon, double velocity_epsilon) {
+spring_curve_t *spring_add(const char *name, const double stiffness, const double damping,
+		const double mass, const double value_epsilon, const double velocity_epsilon) {
 	if (!name || name[0] == '\0')
 		return NULL;
 
@@ -67,44 +67,44 @@ double spring_evaluate(const spring_curve_t *curve, double dt, double *position,
 	if (curve->mass <= 0.0 || curve->stiffness <= 0.0)
 		return *position;
 
-	double o = sqrt(curve->stiffness / curve->mass);
-	double denom = 2.0 * sqrt(curve->stiffness * curve->mass);
+	const double o = sqrt(curve->stiffness / curve->mass);
+	const double denom = 2.0 * sqrt(curve->stiffness * curve->mass);
 	if (denom <= 0.0)
 		return *position;
-	double zeta = curve->damping / denom;
+	const double zeta = curve->damping / denom;
 
 	if (zeta < 1.0) {
 		// underdamped
-		double od = o * sqrt(1.0 - zeta * zeta);
-		double sinTerm = sin(od * dt);
-		double cosTerm = cos(od * dt);
-		double expTerm = exp(-zeta * o * dt);
+		const double od = o * sqrt(1.0 - zeta * zeta);
+		const double sinTerm = sin(od * dt);
+		const double cosTerm = cos(od * dt);
+		const double expTerm = exp(-zeta * o * dt);
 
-		double c1 = dT;
-		double c2 = (v + zeta * o * dT) / od;
+		const double c1 = dT;
+		const double c2 = (v + zeta * o * dT) / od;
 
 		p = 1.0 + expTerm * (c1 * cosTerm + c2 * sinTerm);
 		v = expTerm * ((-c1 * zeta * o + c2 * od) * cosTerm + (-c2 * zeta * o - c1 * od) * sinTerm);
 	} else if (zeta == 1.0) {
 		// critically damped
-		double c1 = dT;
-		double c2 = v + o * dT;
+		const double c1 = dT;
+		const double c2 = v + o * dT;
 
-		double expTerm = exp(-o * dt);
+		const double expTerm = exp(-o * dt);
 
 		p = 1.0 + expTerm * (c1 + c2 * dt);
 		v = expTerm * (v - c2 * o * dt);
 	} else {
 		// overdamped
-		double sqrtTerm = sqrt(zeta * zeta - 1.0);
-		double r1 = -o * (zeta - sqrtTerm);
-		double r2 = -o * (zeta + sqrtTerm);
+		const double sqrtTerm = sqrt(zeta * zeta - 1.0);
+		const double r1 = -o * (zeta - sqrtTerm);
+		const double r2 = -o * (zeta + sqrtTerm);
 
-		double c2 = (v - r1 * dT) / (r2 - r1);
-		double c1 = dT - c2;
+		const double c2 = (v - r1 * dT) / (r2 - r1);
+		const double c1 = dT - c2;
 
-		double expTerm1 = exp(r1 * dt);
-		double expTerm2 = exp(r2 * dt);
+		const double expTerm1 = exp(r1 * dt);
+		const double expTerm2 = exp(r2 * dt);
 
 		p = 1.0 + c1 * expTerm1 + c2 * expTerm2;
 		v = c1 * r1 * expTerm1 + c2 * r2 * expTerm2;
@@ -113,10 +113,8 @@ double spring_evaluate(const spring_curve_t *curve, double dt, double *position,
 	*position = p;
 	*velocity = v;
 
-	bool settled = fabs(p - 1.0) < curve->value_epsilon && fabs(v) < curve->velocity_epsilon;
-
 	if (done)
-		*done = settled;
+		*done = fabs(p - 1.0) < curve->value_epsilon && fabs(v) < curve->velocity_epsilon;
 
 	return p;
 }

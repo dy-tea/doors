@@ -1,5 +1,4 @@
 #include "config.h"
-#include "fallthrough.h"
 #include "input/input.h"
 #include "input/input_method.h"
 #include "input/keyboard.h"
@@ -9,6 +8,7 @@
 #include "layout/layout.h"
 #include "layout/master_stack.h"
 #include "layout/scroller.h"
+#include "macros.h"
 #include "output/output.h"
 #include "protocol/global_shortcuts.h"
 #include "protocol/idle_power.h"
@@ -17,7 +17,6 @@
 #include "protocol/xwayland.h"
 #include "server.h"
 #include "tabs.h"
-#include "transaction.h"
 #include "tree.h"
 #include "types.h"
 #include <stdlib.h>
@@ -30,11 +29,8 @@
 #include <wlr/types/wlr_keyboard_shortcuts_inhibit_v1.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_seat.h>
-#include <wlr/types/wlr_virtual_keyboard_v1.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
-
-extern struct server_t server;
 
 extern keybind_t keybinds[MAX_KEYBINDS];
 extern size_t num_keybinds;
@@ -133,18 +129,18 @@ void keyboard_key(struct wl_listener *listener, void *data) {
 	cancel_bind_repeat();
 
 	// get keysym
-	uint32_t keycode = event->keycode + 8;
+	const uint32_t keycode = event->keycode + 8;
 	const xkb_keysym_t *syms;
 	int nsyms = xkb_state_key_get_syms(keyboard->wlr_keyboard->xkb_state, keycode, &syms);
 
 	bool handled = false;
 	bool forward = false;
-	uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->wlr_keyboard);
+	const uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->wlr_keyboard);
 
 	// check keyboard shortcuts inhibitor
 	bool shortcuts_inhibited = false;
 	if (server.keyboard_shortcuts_inhibit_manager) {
-		struct wlr_surface *focused = wlr_seat->keyboard_state.focused_surface;
+		const struct wlr_surface *focused = wlr_seat->keyboard_state.focused_surface;
 		struct wlr_keyboard_shortcuts_inhibitor_v1 *inhib;
 		wl_list_for_each(inhib, &server.keyboard_shortcuts_inhibit_manager->inhibitors, link) {
 			if (inhib->active && inhib->surface == focused && inhib->seat == wlr_seat) {
@@ -156,7 +152,7 @@ void keyboard_key(struct wl_listener *listener, void *data) {
 
 	if (!shortcuts_inhibited && event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
 		// raw keycode for number keys
-		bind_event_result_t r = handle_keybind_raw(modifiers, event->keycode, true,
+		const bind_event_result_t r = handle_keybind_raw(modifiers, event->keycode, true,
 			nsyms > 0 ? syms[0] : XKB_KEY_NoSymbol);
 		handled = r.consumed;
 		forward = r.forward;
@@ -176,7 +172,7 @@ void keyboard_key(struct wl_listener *listener, void *data) {
 
 		if (!handled && active_submap) {
 			// catch-all bind owns key
-			keybind_t *catchall = find_catchall_bind(active_submap);
+			const keybind_t *catchall = find_catchall_bind(active_submap);
 			if (catchall) {
 				handled = true;
 				forward = (catchall->flags & BINDF_NON_CONSUMING) != 0;
@@ -191,7 +187,7 @@ void keyboard_key(struct wl_listener *listener, void *data) {
 		forward = r.forward;
 	}
 
-	// xx-hotkey-v1 global shortcuts (client-driven; consumed unless a tap)
+	// xx-hotkey-v1 global shortcuts
 	if (!shortcuts_inhibited && global_shortcuts_handle_key(keyboard->wlr_keyboard, wlr_seat, keycode,
 		event->state, event->time_msec))
 		handled = true;
@@ -215,7 +211,7 @@ void keyboard_destroy(struct wl_listener *listener, void *data) {
 	struct wlr_input_device *device = data;
 	(void)device;
 
-	bool is_standalone = (keyboard->group == NULL);
+	const bool is_standalone = (keyboard->group == NULL);
 
 	if (keyboard->group)
 		keyboard_group_remove(keyboard);
@@ -237,7 +233,7 @@ void keyboard_destroy(struct wl_listener *listener, void *data) {
 	free(keyboard);
 }
 
-void keyboard_detach_seat(struct seat_t *seat) {
+void keyboard_detach_seat(const seat_t *seat) {
 	keyboard_t *keyboard, *tmp;
 
 	wl_list_for_each_safe(keyboard, tmp, &server.physical_keyboards, all_link)
@@ -271,15 +267,15 @@ typedef struct bind_repeat_state {
 static bind_repeat_state_t bind_repeat = {0};
 static struct wl_event_source *bind_repeat_source = NULL;
 
-static bind_press_record_t *find_bind_press_record(uint32_t keycode) {
+static bind_press_record_t *find_bind_press_record(const uint32_t keycode) {
 	for (int i = 0; i < MAX_BIND_PRESSES; i++)
 		if (bind_press_records[i].used && bind_press_records[i].keycode == keycode)
 			return &bind_press_records[i];
 	return NULL;
 }
 
-static void arm_bind_press(uint32_t keycode, xkb_keysym_t keysym, uint32_t modifiers,
-		const char *submap_at_press) {
+static void arm_bind_press(const uint32_t keycode, const xkb_keysym_t keysym,
+		const uint32_t modifiers, const char *submap_at_press) {
 	bind_press_record_t *slot = find_bind_press_record(keycode);
 	if (!slot) {
 		for (int i = 0; i < MAX_BIND_PRESSES; i++) {
@@ -343,8 +339,8 @@ static void schedule_bind_repeat(const keybind_t *kb, keyboard_t *keyboard) {
 	if (!(kb->flags & BINDF_REPEAT))
 		return;
 
-	int rate = keyboard->wlr_keyboard->repeat_info.rate;
-	int delay = keyboard->wlr_keyboard->repeat_info.delay;
+	const int rate = keyboard->wlr_keyboard->repeat_info.rate;
+	const int delay = keyboard->wlr_keyboard->repeat_info.delay;
 	if (rate <= 0)
 		return;
 
@@ -370,8 +366,8 @@ void bind_state_reset(void) {
 	memset(bind_press_records, 0, sizeof(bind_press_records));
 }
 
-static bind_event_result_t dispatch_bind_press(uint32_t modifiers, xkb_keysym_t keysym,
-		uint32_t keycode, bool prefer_keycode) {
+static bind_event_result_t dispatch_bind_press(const uint32_t modifiers, const xkb_keysym_t keysym,
+		const uint32_t keycode, const bool prefer_keycode) {
 	bind_event_result_t result = {0};
 
 	keybind_t *kb = find_keybind(modifiers, keysym, keycode, prefer_keycode, true);
@@ -397,8 +393,8 @@ static bind_event_result_t dispatch_bind_press(uint32_t modifiers, xkb_keysym_t 
 	return result;
 }
 
-bind_event_result_t handle_keybind_raw(uint32_t modifiers, uint32_t keycode, bool pressed,
-		xkb_keysym_t keysym_for_arming) {
+bind_event_result_t handle_keybind_raw(const uint32_t modifiers, const uint32_t keycode,
+		const bool pressed, const xkb_keysym_t keysym_for_arming) {
 	bind_event_result_t result = {0};
 
 	if (pressed) {
@@ -450,7 +446,7 @@ bind_event_result_t handle_keybind_raw(uint32_t modifiers, uint32_t keycode, boo
 	return result;
 }
 
-bind_event_result_t handle_keybind(uint32_t modifiers, xkb_keysym_t sym) {
+bind_event_result_t handle_keybind(const uint32_t modifiers, const xkb_keysym_t sym) {
 	bind_event_result_t result = {0};
 
 	// handle vt switch
@@ -476,7 +472,7 @@ bind_event_result_t handle_keybind(uint32_t modifiers, xkb_keysym_t sym) {
 	return dispatch_bind_press(modifiers, sym, 0, false);
 }
 
-void focus_dir(direction_t dir) {
+void focus_dir(const direction_t dir) {
 	if (output_focused() == NULL || output_focused()->desk == NULL)
 		return;
 
@@ -506,7 +502,7 @@ void focus_dir(direction_t dir) {
 		impl->focus(d, dir);
 }
 
-void swap_dir(direction_t dir) {
+void swap_dir(const direction_t dir) {
 	output_t *focused = output_focused();
 
 	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL)
@@ -518,7 +514,7 @@ void swap_dir(direction_t dir) {
 }
 
 void close_focused(void) {
-	output_t *focused = output_focused();
+	const output_t *focused = output_focused();
 
 	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL)
 		return;
@@ -643,7 +639,7 @@ void toggle_fullscreen(void) {
 	if (n->client == NULL)
 		return;
 
-	bool entering = n->client->state != STATE_FULLSCREEN;
+	const bool entering = n->client->state != STATE_FULLSCREEN;
 	client_set_fullscreen(focused, focused->desk, n, entering);
 	wlr_log(WLR_INFO, "Fullscreen %s", entering ? "enabled" : "disabled");
 }
@@ -700,7 +696,7 @@ void toggle_pseudo_tiled(void) {
 	} else {
 		struct wlr_box base_rect = {0};
 
-		xdg_toplevel_t *xdg = view_to_xdg(n->client ? n->client->view : NULL);
+		const xdg_toplevel_t *xdg = view_to_xdg(n->client ? n->client->view : NULL);
 		if (xdg && xdg->xdg_toplevel)
 			base_rect = xdg->xdg_toplevel->base->geometry;
 		else if (n->client->view)
@@ -745,8 +741,8 @@ void focus_last_desktop(void) {
 	workspace_switch_to_last_desktop();
 }
 
-static void send_focused_node_to_desktop(desktop_t *target, bool apply_initial_polarity,
-		bool clamp_float) {
+static void send_focused_node_to_desktop(desktop_t *target, const bool apply_initial_polarity,
+		const bool clamp_float) {
 	if (output_focused() == NULL || target == NULL)
 		return;
 
@@ -838,7 +834,7 @@ static void send_focused_node_to_desktop(desktop_t *target, bool apply_initial_p
 		(void *)n->output, (void *)target_mon);
 }
 
-void send_to_desktop(int desktop_index) {
+void send_to_desktop(const int desktop_index) {
 	if (output_focused() == NULL)
 		return;
 
@@ -875,7 +871,7 @@ void send_to_desktop_by_name(const char *name) {
 }
 
 void send_to_next_desktop(void) {
-	output_t *focused = output_focused();
+	const output_t *focused = output_focused();
 
 	if (focused == NULL || focused->desk == NULL)
 		return;
@@ -889,7 +885,7 @@ void send_to_next_desktop(void) {
 }
 
 void send_to_prev_desktop(void) {
-	output_t *focused = output_focused();
+	const output_t *focused = output_focused();
 
 	if (focused == NULL || focused->desk == NULL)
 		return;
@@ -973,7 +969,7 @@ void toggle_floating_layout(void) {
 		layout_set(d, d->user_layout);
 
 		node_t **toplevels = NULL;
-		int count = desktop_toplevels(d, &toplevels);
+		const int count = desktop_toplevels(d, &toplevels);
 		for (int i = 0; i < count; i++) {
 			if (toplevels[i]->client != NULL && IS_FLOATING(toplevels[i]->client))
 				tile_node(output_focused(), d, toplevels[i]);
@@ -1016,14 +1012,14 @@ void rotate_counterclockwise(void) {
 
 #define RESIZE_AMOUNT 0.05
 
-static bool resize_master_stack_ratio(bool horizontal, float delta) {
+static bool resize_master_stack_ratio(const bool horizontal, float delta) {
 	if (output_focused()->desk->layout != LAYOUT_MASTER_STACK)
 		return false;
 
-	master_area_orientation_t orientation =
+	const master_area_orientation_t orientation =
 		(master_area_orientation_t)output_focused()->desk->master_stack.orientation;
 
-	bool horizontal_split = orientation == MASTER_LEFT || orientation == MASTER_RIGHT ||
+	const bool horizontal_split = orientation == MASTER_LEFT || orientation == MASTER_RIGHT ||
 		orientation == MASTER_CENTER;
 	if (horizontal != horizontal_split)
 		return true;
@@ -1107,7 +1103,7 @@ void resize_right(void) {
 		return;
 	}
 
-	// walk up to find earest ancestor with VERTICAL split
+	// walk up to find nearest ancestor with VERTICAL split
 	node_t *child = n;
 	node_t *p = n->parent;
 	for (child = p; p != NULL && p->split_type != TYPE_VERTICAL; p = p->parent)
@@ -1229,7 +1225,7 @@ void resize_down(void) {
 }
 
 void cancel_presel(void) {
-	output_t *focused = output_focused();
+	const output_t *focused = output_focused();
 
 	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL)
 		return;
@@ -1282,8 +1278,8 @@ void keyboard_group_remove_invalid(keyboard_t *keyboard) {
 	if (!keyboard->group)
 		return;
 
-	keyboard_group_t *group = keyboard->group;
-	keyboard_grouping_t grouping = get_keyboard_grouping();
+	const keyboard_group_t *group = keyboard->group;
+	const keyboard_grouping_t grouping = get_keyboard_grouping();
 
 	bool should_remove = false;
 	switch (grouping) {
@@ -1307,7 +1303,7 @@ void keyboard_group_remove_invalid(keyboard_t *keyboard) {
 }
 
 void keyboard_group_add(keyboard_t *keyboard) {
-	keyboard_grouping_t grouping = get_keyboard_grouping();
+	const keyboard_grouping_t grouping = get_keyboard_grouping();
 
 	if (grouping == KEYBOARD_GROUP_NONE) {
 		keyboard->modifiers.notify = keyboard_modifiers;

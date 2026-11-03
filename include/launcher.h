@@ -20,7 +20,7 @@ void launcher_ctx_destroy(launcher_ctx_t *ctx);
 launcher_ctx_t *launcher_ctx_create(struct wlr_xdg_activation_token_v1 *token,
 	const char *desktop_name);
 launcher_ctx_t *launcher_ctx_create_internal(void);
-const char *launcher_ctx_get_token_name(launcher_ctx_t *ctx);
+const char *launcher_ctx_get_token_name(const launcher_ctx_t *ctx);
 
 void launcher_exec(const char *cmd);
 

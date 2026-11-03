@@ -28,17 +28,15 @@
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_scene.h>
-#include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/box.h>
 #include <wlr/util/log.h>
-#include <wlr/util/transform.h>
 
 static void handle_output_destroy(struct wl_listener *listener, void *data);
 
 // active desktop of the last removed output, restored when an output comes back
 static desktop_t *orphan_active_desk;
 
-bool output_supports_hdr(output_t *output, const char **unsupported_reason_ptr) {
+bool output_supports_hdr(const output_t *output, const char **unsupported_reason_ptr) {
 	const char *unsupported_reason = NULL;
 	if (!(output->wlr_output->supported_primaries & WLR_COLOR_NAMED_PRIMARIES_BT2020)) {
 		unsupported_reason = "BT2020 primaries not supported by output";
@@ -54,12 +52,12 @@ bool output_supports_hdr(output_t *output, const char **unsupported_reason_ptr) 
 	return unsupported_reason == NULL;
 }
 
-static bool output_is_hdr_active(output_t *output) {
+static bool output_is_hdr_active(const output_t *output) {
 	return output->wlr_output->image_description != NULL;
 }
 
-static enum wlr_scale_filter_mode get_scale_filter(output_t *output,
-		struct wlr_scene_buffer *buffer) {
+static enum wlr_scale_filter_mode get_scale_filter(const output_t *output,
+		const struct wlr_scene_buffer *buffer) {
 	if (buffer->dst_width > 0 && buffer->dst_height > 0 &&
 		(buffer->dst_width < buffer->WLR_PRIVATE.buffer_width ||
 		buffer->dst_height < buffer->WLR_PRIVATE.buffer_height))
@@ -111,13 +109,13 @@ static void output_configure_scene(output_t *output) {
 	output->applied_scale_filter = output->scale_filter_mode;
 }
 
-static struct wlr_surface *fullscreen_surface(output_t *output);
+static struct wlr_surface *fullscreen_surface(const output_t *output);
 
-static bool output_can_tear(output_t *output) {
+static bool output_can_tear(const output_t *output) {
 	return output->allow_tearing;
 }
 
-static client_t *output_fullscreen_client(output_t *output) {
+static client_t *output_fullscreen_client(const output_t *output) {
 	if (output == NULL || output->desk == NULL)
 		return NULL;
 
@@ -148,19 +146,19 @@ static client_t *output_fullscreen_client(output_t *output) {
 	return NULL;
 }
 
-static bool output_has_fullscreen_cover(output_t *output) {
+static bool output_has_fullscreen_cover(const output_t *output) {
 	return client_is_mapped(output_fullscreen_client(output));
 }
 
-static bool fullscreen_has_effects(output_t *output) {
-	client_t *client = output_fullscreen_client(output);
+static bool fullscreen_has_effects(const output_t *output) {
+	const client_t *client = output_fullscreen_client(output);
 	if (client == NULL)
 		return false;
 	return client->flags.blur || client->flags.mica || client->flags.acrylic;
 }
 
-static struct wlr_surface *fullscreen_surface(output_t *output) {
-	client_t *client = output_fullscreen_client(output);
+static struct wlr_surface *fullscreen_surface(const output_t *output) {
+	const client_t *client = output_fullscreen_client(output);
 	if (!client_is_mapped(client))
 		return NULL;
 
@@ -185,9 +183,9 @@ static void output_configure_scene_visible(output_t *output) {
 	output->applied_scale_filter = output->scale_filter_mode;
 }
 
-// Direct scanout bypasses composition, so a software cursor would not be drawn.
-static bool output_needs_software_cursor(output_t *output) {
-	struct wlr_output *wo = output->wlr_output;
+// direct scanout bypasses composition, so a software cursor would not be drawn
+static bool output_needs_software_cursor(const output_t *output) {
+	const struct wlr_output *wo = output->wlr_output;
 	if (wo->software_cursor_locks > 0)
 		return true;
 
@@ -265,8 +263,8 @@ static void output_repaint_frame(output_t *output) {
 	if (!scene_output)
 		return;
 
-	bool has_fs = output_has_fullscreen_cover(output);
-	bool fs_effects = has_fs && fullscreen_has_effects(output);
+	const bool has_fs = output_has_fullscreen_cover(output);
+	const bool fs_effects = has_fs && fullscreen_has_effects(output);
 
 	if (has_fs)
 		output_configure_scene_visible(output);
@@ -352,7 +350,7 @@ static int output_repaint_timer_handler(void *data) {
 	return 0;
 }
 
-void output_frame(struct wl_listener *listener, void *data) {
+static void output_frame(struct wl_listener *listener, void *data) {
 	(void)data;
 	output_t *output = wl_container_of(listener, output, frame);
 	if (!output->wlr_output->enabled)
@@ -380,7 +378,7 @@ void output_frame(struct wl_listener *listener, void *data) {
 			}
 		}
 
-		int delay = msec_until_refresh - output->max_render_time;
+		const int delay = msec_until_refresh - output->max_render_time;
 
 		if (delay < 1) {
 			output_repaint(output);
@@ -407,9 +405,9 @@ static void handle_output_present(struct wl_listener *listener, void *data) {
 void output_request_state(struct wl_listener *listener, void *data) {
 	output_t *output = wl_container_of(listener, output, request_state);
 	struct wlr_output_event_request_state *event = data;
-	float old_scale = output->wlr_output->scale;
+	const float old_scale = output->wlr_output->scale;
 	wlr_output_commit_state(output->wlr_output, event->state);
-	float new_scale = output->wlr_output->scale;
+	const float new_scale = output->wlr_output->scale;
 	if (new_scale != old_scale)
 		output_update_scale(output, new_scale);
 }
@@ -635,8 +633,8 @@ void output_enable(output_t *output) {
 	output_update_usable_area(output);
 
 	if (server.workspace_manager && !wl_list_empty(&server.workspace_manager->groups)) {
-		struct wlr_ext_workspace_group_handle_v1 *group;
-		group = wl_container_of(server.workspace_manager->groups.next, group, link);
+		struct wlr_ext_workspace_group_handle_v1 *group =
+			wl_container_of(server.workspace_manager->groups.next, group, link);
 		wlr_ext_workspace_group_handle_v1_output_enter(group, output->wlr_output);
 	}
 }
@@ -659,7 +657,7 @@ output_t *output_from_wlr_output(struct wlr_output *wlr_output) {
 	return wlr_output->data;
 }
 
-output_t *output_get_in_direction(output_t *reference, uint32_t direction) {
+output_t *output_get_in_direction(output_t *reference, const uint32_t direction) {
 	if (!reference || !direction)
 		return NULL;
 
@@ -713,11 +711,11 @@ void output_update_geometry(output_t *output) {
 	output_schedule_frame(output);
 }
 
-void output_update_scale(output_t *output, float scale) {
+void output_update_scale(output_t *output, const float scale) {
 	if (!output || !output->wlr_output)
 		return;
 
-	struct wlr_output *wlr_output = output->wlr_output;
+	const struct wlr_output *wlr_output = output->wlr_output;
 
 	wlr_log(WLR_INFO, "Updating output '%s' scale to %.2f", wlr_output->name, scale);
 
@@ -769,7 +767,7 @@ output_t *output_focused(void) {
 	return server.focused_output;
 }
 
-output_t *output_at(double x, double y) {
+output_t *output_at(const double x, const double y) {
 	output_t *m;
 	wl_list_for_each(m, &mon_list, link)
 		if (wlr_box_contains_point(&m->rectangle, (int)x, (int)y))

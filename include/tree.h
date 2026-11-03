@@ -72,7 +72,7 @@ desktop_t *desktop_for_node(node_t *n);
 
 void desktop_minimized_forget(node_t *n);
 void desktop_minimized_clear(desktop_t *d);
-void desktop_minimized_push(desktop_t *d, node_t *n);
+void desktop_minimized_push(const desktop_t *d, node_t *n);
 bool client_restore_last_minimized(struct output_t *m, desktop_t *d);
 
 // preselection

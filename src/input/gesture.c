@@ -3,7 +3,6 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
-#include <wlr/util/log.h>
 
 const char *gesture_type_string(enum gesture_type type) {
 	switch (type) {
@@ -100,7 +99,7 @@ char *gesture_parse(const char *input, gesture_t *output) {
 		if (streq(token, "*")) {
 			output->fingers = GESTURE_FINGERS_ANY;
 		} else {
-			int fingers = atoi(token);
+			const int fingers = atoi(token);
 			if (fingers < 1 || fingers > 5) {
 				enum gesture_direction dir = gesture_parse_direction(token);
 				if (dir == GESTURE_DIRECTION_NONE) {
@@ -158,8 +157,8 @@ int8_t gesture_compare(const gesture_t *a, const gesture_t *b) {
 	if (a->fingers != b->fingers)
 		return (a->fingers > b->fingers) ? 1 : -1;
 
-	int a_bits = __builtin_popcount(a->directions);
-	int b_bits = __builtin_popcount(b->directions);
+	const int a_bits = __builtin_popcount(a->directions);
+	const int b_bits = __builtin_popcount(b->directions);
 
 	if (a_bits == b_bits)
 		return 0;
@@ -179,15 +178,15 @@ void gesture_tracker_begin(gesture_tracker_t *tracker, enum gesture_type type, u
 	tracker->rotation = 0;
 }
 
-bool gesture_tracker_check(gesture_tracker_t *tracker, enum gesture_type type) {
+bool gesture_tracker_check(gesture_tracker_t *tracker, const enum gesture_type type) {
 	if (!tracker)
 		return false;
 
 	return tracker->type == type && tracker->fingers > 0;
 }
 
-void gesture_tracker_update(gesture_tracker_t *tracker, double dx, double dy, double scale,
-		double rotation) {
+void gesture_tracker_update(gesture_tracker_t *tracker, const double dx, const double dy,
+		const double scale, const double rotation) {
 	if (!tracker)
 		return;
 

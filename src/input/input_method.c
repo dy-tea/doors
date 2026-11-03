@@ -10,19 +10,18 @@
 
 static bool is_keyboard_emulated_by_input_method(struct wlr_keyboard *keyboard,
 		struct wlr_input_method_v2 *input_method) {
-	struct wlr_virtual_keyboard_v1 *virtual_keyboard;
 	if (!keyboard || !input_method)
 		return false;
 
-	virtual_keyboard = wlr_input_device_get_virtual_keyboard(&keyboard->base);
-
+	const struct wlr_virtual_keyboard_v1 *virtual_keyboard =
+		wlr_input_device_get_virtual_keyboard(&keyboard->base);
 	return virtual_keyboard &&
 		wl_resource_get_client(virtual_keyboard->resource) ==
 		wl_resource_get_client(input_method->resource);
 }
 
 static struct wlr_input_method_keyboard_grab_v2 *get_keyboard_grab(struct wlr_keyboard *keyboard,
-		ime_relay_t *relay) {
+		const ime_relay_t *relay) {
 	struct wlr_input_method_v2 *input_method = relay->input_method;
 
 	if (!input_method || !input_method->keyboard_grab)
@@ -34,7 +33,7 @@ static struct wlr_input_method_keyboard_grab_v2 *get_keyboard_grab(struct wlr_ke
 }
 
 bool input_method_keyboard_grab_forward_modifiers(struct wlr_keyboard *keyboard,
-		ime_relay_t *relay) {
+		const ime_relay_t *relay) {
 	struct wlr_input_method_keyboard_grab_v2 *keyboard_grab = get_keyboard_grab(keyboard, relay);
 
 	if (keyboard_grab) {
@@ -47,7 +46,7 @@ bool input_method_keyboard_grab_forward_modifiers(struct wlr_keyboard *keyboard,
 }
 
 bool input_method_keyboard_grab_forward_key(struct wlr_keyboard *keyboard,
-		struct wlr_keyboard_key_event *event, ime_relay_t *relay) {
+		const struct wlr_keyboard_key_event *event, const ime_relay_t *relay) {
 	struct wlr_input_method_keyboard_grab_v2 *keyboard_grab = get_keyboard_grab(keyboard, relay);
 
 	if (keyboard_grab) {
@@ -60,7 +59,7 @@ bool input_method_keyboard_grab_forward_key(struct wlr_keyboard *keyboard,
 	return false;
 }
 
-static ime_text_t *get_active_text_input(ime_relay_t *relay) {
+static ime_text_t *get_active_text_input(const ime_relay_t *relay) {
 	ime_text_t *text_input;
 
 	if (!relay->input_method)
@@ -88,7 +87,7 @@ static void update_active_text_input(ime_relay_t *relay) {
 	relay->active_text_input = active_text_input;
 }
 
-static void update_text_inputs_focused_surface(ime_relay_t *relay) {
+static void update_text_inputs_focused_surface(const ime_relay_t *relay) {
 	ime_text_t *text_input;
 	wl_list_for_each(text_input, &relay->text_inputs, link) {
 		struct wlr_text_input_v3 *input = text_input->input;
@@ -112,27 +111,25 @@ static void update_text_inputs_focused_surface(ime_relay_t *relay) {
 	}
 }
 
-static void update_popup_position(ime_popup_t *popup) {
-	ime_relay_t *relay = popup->relay;
+static void update_popup_position(const ime_popup_t *popup) {
+	const ime_relay_t *relay = popup->relay;
 	ime_text_t *text_input = relay->active_text_input;
-	struct wlr_box cursor_rect;
-	struct wlr_xdg_surface *xdg_surface;
-	struct wlr_layer_surface_v1 *layer_surface;
-	struct wlr_scene_tree *tree;
-	int32_t lx, ly;
 
-	if (!text_input || !relay->focused_surface || !popup->popup_surface->surface->mapped) {
+	if (!text_input || !relay->focused_surface || !popup->popup_surface->surface->mapped)
 		return;
-	}
 
-	xdg_surface = wlr_xdg_surface_try_from_wlr_surface(relay->focused_surface);
-	layer_surface = wlr_layer_surface_v1_try_from_wlr_surface(relay->focused_surface);
+	const struct wlr_xdg_surface *xdg_surface =
+		wlr_xdg_surface_try_from_wlr_surface(relay->focused_surface);
+	const struct wlr_layer_surface_v1 *layer_surface =
+		wlr_layer_surface_v1_try_from_wlr_surface(relay->focused_surface);
 
+	struct wlr_box cursor_rect;
 	if ((text_input->input->current.features & WLR_TEXT_INPUT_V3_FEATURE_CURSOR_RECTANGLE) &&
 			(xdg_surface || layer_surface)) {
 		cursor_rect = text_input->input->current.cursor_rectangle;
 
-		tree = relay->focused_surface->data;
+		struct wlr_scene_tree *tree = relay->focused_surface->data;
+		int lx, ly;
 		wlr_scene_node_coords(&tree->node, &lx, &ly);
 		cursor_rect.x += lx;
 		cursor_rect.y += ly;
@@ -156,7 +153,7 @@ static void update_popup_position(ime_popup_t *popup) {
 	});
 }
 
-static void update_popups_position(ime_relay_t *relay) {
+static void update_popups_position(const ime_relay_t *relay) {
 	ime_popup_t *popup;
 	wl_list_for_each(popup, &relay->popups, link)
 		update_popup_position(popup);
@@ -164,11 +161,10 @@ static void update_popups_position(ime_relay_t *relay) {
 
 static void handle_input_method_commit(struct wl_listener *listener, void *data) {
 	ime_relay_t *relay = wl_container_of(listener, relay, input_method_commit);
-	struct wlr_input_method_v2 *input_method = data;
-	ime_text_t *text_input;
+	const struct wlr_input_method_v2 *input_method = data;
 	assert(relay->input_method == input_method);
 
-	text_input = relay->active_text_input;
+	ime_text_t *text_input = relay->active_text_input;
 	if (!text_input)
 		return;
 
@@ -188,7 +184,7 @@ static void handle_input_method_commit(struct wl_listener *listener, void *data)
 
 static void handle_keyboard_grab_destroy(struct wl_listener *listener, void *data) {
 	ime_relay_t *relay = wl_container_of(listener, relay, keyboard_grab_destroy);
-	struct wlr_input_method_keyboard_grab_v2 *keyboard_grab = data;
+	const struct wlr_input_method_keyboard_grab_v2 *keyboard_grab = data;
 	wl_list_remove(&relay->keyboard_grab_destroy.link);
 
 	if (keyboard_grab->keyboard)
@@ -295,9 +291,9 @@ static void handle_new_input_method(struct wl_listener *listener, void *data) {
 	update_active_text_input(relay);
 }
 
-static void send_state_to_input_method(ime_relay_t *relay) {
+static void send_state_to_input_method(const ime_relay_t *relay) {
 	struct wlr_input_method_v2 *input_method = relay->input_method;
-	struct wlr_text_input_v3 *input = relay->active_text_input->input;
+	const struct wlr_text_input_v3 *input = relay->active_text_input->input;
 	assert(relay->active_text_input && relay->input_method);
 
 	if (input->active_features & WLR_TEXT_INPUT_V3_FEATURE_SURROUNDING_TEXT) {
@@ -335,7 +331,7 @@ static void handle_text_input_disable(struct wl_listener *listener, void *data) 
 static void handle_text_input_commit(struct wl_listener *listener, void *data) {
 	(void)data;
 	ime_text_t *text_input = wl_container_of(listener, text_input, commit);
-	ime_relay_t *relay = text_input->relay;
+	const ime_relay_t *relay = text_input->relay;
 
 	if (relay->active_text_input == text_input) {
 		update_popups_position(relay);

@@ -1,5 +1,5 @@
 #include "input/seat.h"
-#include "once.h"
+#include "macros.h"
 #include "protocol/global_shortcuts.h"
 #include "server.h"
 #include "xx-hotkey-v1-protocol.h"
