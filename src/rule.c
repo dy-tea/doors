@@ -432,7 +432,8 @@ void rule_pattern_clear(rule_pattern_t *p) {
 }
 
 rule_consequence_t *find_matching_rule(const char *app_id, const char *title, const char *tag) {
-	static rule_consequence_t merged = {0};
+	static rule_consequence_t merged;
+	memset(&merged, 0, sizeof(merged));
 
 	rule_t *r, *tmp;
 	wl_list_for_each_safe(r, tmp, &rule_list, link) {
