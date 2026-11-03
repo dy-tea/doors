@@ -435,6 +435,7 @@ typedef struct {
 	// misc
 	bool record_history;
 	bool allow_tearing;
+	bool direct_scanout;
 	bool auto_float_dialogs;
 	int ignore_ewmh_fullscreen;
 } doors_settings_t;

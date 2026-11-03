@@ -199,6 +199,7 @@ doors_settings_t settings = {
 	// misc
 	.record_history = true,
 	.allow_tearing = false,
+	.direct_scanout = false,
 	.auto_float_dialogs = false,
 	.ignore_ewmh_fullscreen = 0,
 };

@@ -653,6 +653,12 @@ C<doorsctl config allow_tearing [true|false]>
 
 When true, windows may use tearing page flips. Defaults to C<false>.
 
+=item I<direct_scanout>
+
+C<doorsctl config direct_scanout [true|false]>
+
+When true, fullscreen toplevels may use direct scanout. Defaults to C<false>.
+
 =item I<decoration_mode>
 
 C<doorsctl config decoration_mode [none|tabs|always|csd]>

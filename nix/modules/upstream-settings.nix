@@ -388,6 +388,7 @@ in
       (mkBool "pointer_follows_focus" [ "layout" "pointer-follows-focus" ] "Warp the pointer to follow window focus changes." false)
       (mkBool "record_history" [ "layout" "record-history" ] "Record focus history for cycling through previous windows." true)
       (mkBool "allow_tearing" [ "layout" "allow-tearing" ] "Allow eligible windows to use tearing page flips." false)
+      (mkBool "direct_scanout" [ "layout" "direct-scanout" ] "Enable direct scanout for fullscreen toplevels." false)
       (mkBool "auto_float_dialogs" [ "layout" "auto-float-dialogs" ] "Float windows that advertise themselves as dialogs via xdg-dialog-v1." true)
       (mkBool "enable_minimize" [ "layout" "enable-minimize" ] "Advertise and honour minimize requests." true)
       (mkBool "enable_maximize" [ "layout" "enable-maximize" ] "Advertise and honour maximize requests." true)

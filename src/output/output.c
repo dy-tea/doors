@@ -208,6 +208,8 @@ static bool output_try_direct_scanout(output_t *output) {
 		return false;
 	if (server.locked || settings.screen_shader_enabled)
 		return false;
+	if (!settings.direct_scanout)
+		return false;
 
 	struct wlr_surface *surface = fullscreen_surface(output);
 	if (!surface || !wlr_surface_has_buffer(surface) || !surface->buffer)

@@ -304,6 +304,7 @@ const cfg_setting_t settings_table[] = {
 	/* misc */
 	B("record_history", NULL, settings.record_history, 0, NULL),
 	B("allow_tearing", NULL, settings.allow_tearing, CFG_COMMIT, NULL),
+	B("direct_scanout", NULL, settings.direct_scanout, 0, NULL),
 	E("decoration_mode", NULL, settings.decoration_mode, decoration_mode_values, CFG_COMMIT,
 		on_decoration_mode),
 };
