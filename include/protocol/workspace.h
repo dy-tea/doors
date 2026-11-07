@@ -15,6 +15,8 @@ struct wlr_ext_workspace_handle_v1 *workspace_get_active(void);
 typedef struct desktop_t desktop_t;
 typedef struct output_t output_t;
 
+void workspace_update_visibility(output_t *m, desktop_t *d);
+
 desktop_t *find_desktop_by_name(const char *name);
 desktop_t *find_desktop_by_name_in_monitor(output_t *mon, const char *name);
 

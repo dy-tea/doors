@@ -51,6 +51,7 @@ bool animation_is_opacity_fading(view_t *view);
 bool animation_workspace_switch_active(const output_t *output);
 bool animation_node_workspace_slide_out(const node_t *node);
 void animation_cancel_node(const node_t *node);
+void animation_cancel_output(output_t *output);
 void animation_cancel_view(view_t *view);
 bool animation_has_fade_out(struct wlr_scene_tree *scene_tree);
 void animation_cancel_scene_tree(const struct wlr_scene_tree *scene_tree);

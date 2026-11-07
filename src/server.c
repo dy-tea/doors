@@ -10,6 +10,7 @@
 #include "ipc/ipc.h"
 #include "launcher.h"
 #include "output/config.h"
+#include "output/output.h"
 #include "permission.h"
 #include "protocol/bell.h"
 #include "protocol/copy_capture.h"
@@ -171,6 +172,7 @@ void server_init(void) {
 	wl_list_init(&server.views);
 
 	output_mgmt_init();
+	output_init();
 
 	// scene
 	server.scene = wlr_scene_create();
@@ -469,6 +471,7 @@ void server_fini(void) {
 	tearing_fini();
 	session_lock_fini();
 	launcher_fini();
+	output_fini();
 	output_mgmt_fini();
 	toplevel_tag_fini();
 	shortcuts_inhibit_fini();

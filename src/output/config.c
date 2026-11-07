@@ -126,6 +126,12 @@ void output_config_apply(struct output_config *oc) {
 		if (!wlr_output_commit_state(wlr_output, &state))
 			wlr_log(WLR_ERROR, "Failed to commit state for %s", oc->name);
 		wlr_output_state_finish(&state);
+
+		if (output) {
+			output_disable(output);
+			ipc_put_status(SUB_MASK_MONITOR_CHANGE, "monitor_change[%s]\n", output->name);
+		}
+		output_update_manager_config();
 		return;
 	}
 
@@ -272,7 +278,11 @@ void output_config_apply(struct output_config *oc) {
 	if (output && wlr_output->enabled) {
 		strncpy(output->name, wlr_output->name, SMALEN - 1);
 		output->name[SMALEN - 1] = '\0';
+
+		bool was_enabled = output->enabled;
 		output_enable(output);
+		if (!was_enabled)
+			output_update_geometry(output);
 		ipc_put_status(SUB_MASK_MONITOR_CHANGE, "monitor_change[%s]\n", output->name);
 	}
 }

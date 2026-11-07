@@ -33,6 +33,7 @@ typedef struct output_t {
 	struct wl_listener destroy;
 	struct wl_listener present;
 	struct wl_event_source *repaint_timer;
+	struct wl_event_source *present_timer;
 
 	struct wlr_session_lock_surface_v1 *lock_surface;
 	struct wl_listener destroy_lock_surface;
@@ -41,6 +42,12 @@ typedef struct output_t {
 	bool enabled;
 	bool allow_tearing;
 	bool frame_scheduled;
+	bool frame_commit_failed;
+	bool frame_needs_modeset;
+	bool frame_retry_pending;
+	bool awaiting_present;
+	int frame_commit_failures;
+	int present_misses;
 	int lx, ly;
 	int width, height;
 
@@ -66,7 +73,10 @@ typedef struct output_t {
 	struct dim_scrim_t *dim_node;
 } output_t;
 
+void output_init(void);
+void output_fini(void);
 void output_create(struct wlr_output *wlr_output);
+void output_remove(output_t *output);
 void output_enable(output_t *output);
 void output_disable(output_t *output);
 void output_teardown(output_t *output);

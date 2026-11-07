@@ -11,6 +11,7 @@
 #include "tabs.h"
 #include "transaction.h"
 #include "tree.h"
+#include "tree_focus.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -23,6 +24,8 @@
 #include <wlr/backend/multi.h>
 #include <wlr/backend/wayland.h>
 #include <wlr/backend/x11.h>
+#include <wlr/types/wlr_output.h>
+#include <wlr/types/wlr_seat.h>
 #include <wlr/util/box.h>
 #include <wlr/util/log.h>
 
@@ -401,8 +404,24 @@ static void out_focus(ipc_args_t *a) {
 		return;
 
 	output_t *mon = ctx_of(a)->mon;
+	if (!mon->enabled) {
+		ipc_fail(a, "Output \"%s\" is disabled\n", mon->name);
+		return;
+	}
+
 	output_set_focused(mon);
-	focus_node(mon, mon->desk, mon->desk ? mon->desk->focus : NULL);
+
+	desktop_t *desk = mon->desk;
+	if (desk) {
+		node_t *target = node_focusable(desk->focus) ? desk->focus : desktop_fallback_focus(desk, NULL);
+		if (target != NULL) {
+			desk->focus = target;
+			focus_node(mon, desk, target);
+		} else if (server.seat) {
+			wlr_seat_keyboard_notify_clear_focus(server.seat);
+		}
+	}
+
 	ipc_ok(a, "Focused\n");
 }
 
@@ -597,24 +616,15 @@ static void out_remove(ipc_args_t *a) {
 		ipc_fail(a, "Cannot remove the only output\n");
 		return;
 	}
-	if (mon->desk) {
-		ipc_fail(a, "Cannot remove output with desktops\n");
-		return;
-	}
 
-	char name[SMALEN];
-	snprintf(name, sizeof(name), "%s", mon->name);
-	desktop_t *last = mon->last_desk;
+	struct wlr_output_state state;
+	wlr_output_state_init(&state);
+	wlr_output_state_set_enabled(&state, false);
+	wlr_output_commit_state(mon->wlr_output, &state);
+	wlr_output_state_finish(&state);
 
-	output_teardown(mon);
+	output_remove(mon);
 
-	set_orphan_active_desk(last);
-
-	output_t *focused = server.focused_output;
-	if (focused && focused->desk && focused->desk->focus)
-		focus_node(focused, focused->desk, focused->desk->focus);
-
-	ipc_put_status(SUB_MASK_MONITOR_REMOVE, "monitor_remove[%s]\n", name);
 	transaction_commit_dirty();
 	ipc_ok(a, "Removed\n");
 }

@@ -40,8 +40,11 @@ static void handle_touch_down(struct wl_listener *listener, void *data) {
 				}
 			} else if (wlr_layer_surface_v1_try_from_wlr_surface(surface)) {
 				layer_surface_t *layer = type;
-				if (layer)
+				if (layer) {
+					if (layer->output && layer->output->enabled)
+						output_set_focused(layer->output);
 					focus_layer_surface(layer);
+				}
 			} else {
 				struct wlr_xwayland_surface *xwayland_surface =
 					wlr_xwayland_surface_try_from_wlr_surface(surface);

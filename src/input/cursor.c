@@ -860,8 +860,19 @@ void cursor_button(struct wl_listener *listener, void *data) {
 		void *type = desktop_type_at(server.cursor->x, server.cursor->y, &surface, &sx, &sy);
 		const view_t *hover = type ? view_from_wlr_surface(surface) : NULL;
 
-		if (surface == NULL)
+		if (surface == NULL) {
+			output_t *m = output_at(server.cursor->x, server.cursor->y);
+			if (m) {
+				output_set_focused(m);
+				if (!m->desk && !wl_list_empty(&m->desk_list))
+					m->desk = wl_container_of(m->desk_list.next, m->desk, link);
+				if (m->desk && !node_focusable(m->desk->focus))
+					m->desk->focus = NULL;
+				if (server.seat)
+					wlr_seat_keyboard_notify_clear_focus(server.seat);
+			}
 			return;
+		}
 
 		const struct wlr_xdg_surface *xdg_surface = wlr_xdg_surface_try_from_wlr_surface(surface);
 		if (xdg_surface != NULL && xdg_surface->role == WLR_XDG_SURFACE_ROLE_POPUP) {
@@ -870,8 +881,11 @@ void cursor_button(struct wl_listener *listener, void *data) {
 			// goes to the surface below
 		} else if (wlr_layer_surface_v1_try_from_wlr_surface(surface)) {
 			layer_surface_t *layer = type;
-			if (layer)
+			if (layer) {
+				if (layer->output && layer->output->enabled)
+					output_set_focused(layer->output);
 				focus_layer_surface(layer);
+			}
 		} else if (hover && hover->node) {
 			output_t *m = hover->node->output;
 			desktop_t *d = hover->node->desktop;

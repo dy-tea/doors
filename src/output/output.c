@@ -24,17 +24,101 @@
 #include <wlr/backend/headless.h>
 #include <wlr/types/wlr_buffer.h>
 #include <wlr/types/wlr_compositor.h>
+#include <wlr/types/wlr_damage_ring.h>
 #include <wlr/types/wlr_fractional_scale_v1.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_scene.h>
+#include <wlr/types/wlr_seat.h>
 #include <wlr/util/box.h>
 #include <wlr/util/log.h>
 
 static void handle_output_destroy(struct wl_listener *listener, void *data);
+static int output_present_timeout(void *data);
 
 // active desktop of the last removed output, restored when an output comes back
 static desktop_t *orphan_active_desk;
+static char last_removed_name[SMALEN];
+
+static struct wl_listener layout_change;
+
+static void handle_layout_change(struct wl_listener *listener, void *data) {
+	(void)listener;
+	(void)data;
+
+	output_t *m;
+	wl_list_for_each(m, &mon_list, link) {
+		if (!m->enabled || !m->wlr_output || !m->wlr_output->enabled)
+			continue;
+
+		struct wlr_box layout_box;
+		wlr_output_layout_get_box(server.output_layout, m->wlr_output, &layout_box);
+		if (wlr_box_equal(&layout_box, &m->rectangle))
+			continue;
+
+		output_update_geometry(m);
+	}
+}
+
+void output_init(void) {
+	layout_change.notify = handle_layout_change;
+	wl_signal_add(&server.output_layout->events.change, &layout_change);
+}
+
+void output_fini(void) {
+	wl_list_remove(&layout_change.link);
+}
+
+static void output_orphan_desktops(output_t *output) {
+	desktop_t *d, *dtmp;
+	wl_list_for_each_safe(d, dtmp, &output->desk_list, link) {
+		wl_list_remove(&d->link);
+		desktop_clear_output(d, NULL);
+
+		d->output = NULL;
+		wl_list_insert(orphan_desk_list.prev, &d->link);
+	}
+	wl_list_init(&output->desk_list);
+	output->desk = NULL;
+}
+
+static void output_recover_after_removal(desktop_t *active_desk, bool was_focused) {
+	orphan_active_desk = active_desk;
+
+	output_t *survivor = output_get_valid();
+
+	if (!survivor) {
+		if (was_focused) {
+			output_set_focused(NULL);
+			if (server.seat)
+				wlr_seat_keyboard_notify_clear_focus(server.seat);
+		}
+		workspace_sync();
+		return;
+	}
+
+	if (!survivor->desk && !wl_list_empty(&survivor->desk_list))
+		survivor->desk = wl_container_of(survivor->desk_list.next, survivor->desk, link);
+
+	if (was_focused)
+		output_set_focused(survivor);
+
+	if (survivor->desk) {
+		output_update_geometry(survivor);
+		workspace_update_visibility(survivor, survivor->desk);
+
+		node_t *target = survivor->desk->focus != NULL ? survivor->desk->focus :
+			desktop_fallback_focus(survivor->desk, NULL);
+		if (target != NULL) {
+			survivor->desk->focus = target;
+			focus_node(survivor, survivor->desk, target);
+		} else if (was_focused && server.seat) {
+			wlr_seat_keyboard_notify_clear_focus(server.seat);
+		}
+	}
+
+	workspace_sync();
+}
 
 bool output_supports_hdr(const output_t *output, const char **unsupported_reason_ptr) {
 	const char *unsupported_reason = NULL;
@@ -316,8 +400,32 @@ static void output_repaint_frame(output_t *output) {
 		}
 	}
 
-	if (!wlr_output_commit_state(output->wlr_output, &pending))
-		wlr_log(WLR_ERROR, "Failed to commit output state for %s", output->name);
+	if (!wlr_output_commit_state(output->wlr_output, &pending)) {
+		if (!output->frame_commit_failed)
+			wlr_log(WLR_ERROR, "Failed to commit output state for %s", output->name);
+		output->frame_commit_failed = true;
+		output->frame_commit_failures++;
+		if (output->frame_commit_failures >= 60) {
+			output->frame_commit_failures = 0;
+			output->frame_needs_modeset = true;
+		}
+		wlr_damage_ring_add_whole(&scene_output->damage_ring);
+		output->wlr_output->frame_pending = false;
+		output->frame_retry_pending = true;
+		if (output->repaint_timer)
+			wl_event_source_timer_update(output->repaint_timer, 16);
+	} else {
+		if (output->frame_retry_pending) {
+			output->frame_retry_pending = false;
+			if (output->repaint_timer)
+				wl_event_source_timer_update(output->repaint_timer, 0);
+		}
+		if (!wlr_output_is_headless(output->wlr_output) && output->present_timer &&
+				!output->awaiting_present) {
+			output->awaiting_present = true;
+			wl_event_source_timer_update(output->present_timer, 100);
+		}
+	}
 	wlr_output_state_finish(&pending);
 
 	output->hdr = output_is_hdr_active(output);
@@ -342,10 +450,77 @@ void output_schedule_frame(output_t *output) {
 	wlr_output_schedule_frame(output->wlr_output);
 }
 
+static int output_present_timeout(void *data) {
+	output_t *output = data;
+	if (!output->awaiting_present || !output->enabled || !output->wlr_output->enabled)
+		return 0;
+
+	output->awaiting_present = false;
+	output->present_misses++;
+	if (output->present_misses >= 10) {
+		output->present_misses = 0;
+		output->frame_needs_modeset = true;
+		if (output->repaint_timer)
+			wl_event_source_timer_update(output->repaint_timer, 1);
+	} else {
+		output->awaiting_present = true;
+		wl_event_source_timer_update(output->present_timer, 100);
+	}
+
+	return 0;
+}
+
+static void output_force_modeset(output_t *output) {
+	struct wlr_output_state state;
+	wlr_output_state_init(&state);
+	wlr_output_state_set_enabled(&state, true);
+
+	struct wlr_output_mode *mode = output->wlr_output->current_mode;
+	if (!mode)
+		mode = wlr_output_preferred_mode(output->wlr_output);
+	if (mode)
+		wlr_output_state_set_mode(&state, mode);
+
+	wlr_log(WLR_INFO, "Forcing modeset on %s after repeated commit failures", output->name);
+	if (!wlr_output_commit_state(output->wlr_output, &state))
+		wlr_log(WLR_ERROR, "Forced modeset failed for %s", output->name);
+	wlr_output_state_finish(&state);
+
+	output->frame_commit_failures = 0;
+	output->frame_scheduled = false;
+	output->frame_retry_pending = false;
+	output->awaiting_present = false;
+	output->present_misses = 0;
+	output->wlr_output->frame_pending = false;
+	if (output->present_timer)
+		wl_event_source_timer_update(output->present_timer, 0);
+
+	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(server.scene,
+		output->wlr_output);
+	if (scene_output)
+		wlr_damage_ring_add_whole(&scene_output->damage_ring);
+}
+
 static int output_repaint_timer_handler(void *data) {
 	output_t *output = data;
 	if (!output->wlr_output->enabled)
 		return 0;
+
+	output->frame_retry_pending = false;
+
+	if (output->frame_needs_modeset) {
+		output->frame_needs_modeset = false;
+		output_force_modeset(output);
+		if (!output->wlr_output->enabled)
+			return 0;
+	}
+
+	if (output->frame_commit_failed) {
+		struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(server.scene,
+			output->wlr_output);
+		if (scene_output)
+			wlr_damage_ring_add_whole(&scene_output->damage_ring);
+	}
 
 	output->wlr_output->frame_pending = false;
 	output_repaint(output);
@@ -402,6 +577,18 @@ static void handle_output_present(struct wl_listener *listener, void *data) {
 
 	output->last_presentation = event->when;
 	output->refresh_nsec = event->refresh;
+	output->frame_commit_failed = false;
+	output->frame_commit_failures = 0;
+	output->present_misses = 0;
+	output->frame_needs_modeset = false;
+	output->awaiting_present = false;
+	if (output->present_timer)
+		wl_event_source_timer_update(output->present_timer, 0);
+	if (output->frame_retry_pending) {
+		output->frame_retry_pending = false;
+		if (output->repaint_timer)
+			wl_event_source_timer_update(output->repaint_timer, 0);
+	}
 }
 
 void output_request_state(struct wl_listener *listener, void *data) {
@@ -427,22 +614,32 @@ void output_teardown(output_t *output) {
 	if (server.focused_output == output)
 		output_set_focused(next ? next : prev);
 
+	if (output->frame.link.next)
+		wl_list_remove(&output->frame.link);
+	if (output->request_state.link.next)
+		wl_list_remove(&output->request_state.link);
+	if (output->present.link.next)
+		wl_list_remove(&output->present.link);
+	if (output->destroy.link.next)
+		wl_list_remove(&output->destroy.link);
+
+	if (output->repaint_timer) {
+		wl_event_source_remove(output->repaint_timer);
+		output->repaint_timer = NULL;
+	}
+	if (output->present_timer) {
+		wl_event_source_remove(output->present_timer);
+		output->present_timer = NULL;
+	}
+
 	wlr_color_transform_unref(output->color_transform);
 	output->color_transform = NULL;
 	effects_output_fini(output->effects);
 	output->effects = NULL;
 	dim_destroy_output(output);
 
-	desktop_t *d, *dtmp;
-	wl_list_for_each_safe(d, dtmp, &output->desk_list, link) {
-		wl_list_remove(&d->link);
-		desktop_clear_output(d, NULL);
-
-		d->output = NULL;
-		wl_list_insert(orphan_desk_list.prev, &d->link);
-	}
-	wl_list_init(&output->desk_list);
-	output->desk = NULL;
+	animation_cancel_output(output);
+	output_orphan_desktops(output);
 
 	if (output->layer_bg)
 		wlr_scene_node_destroy(&output->layer_bg->node);
@@ -457,8 +654,15 @@ void output_teardown(output_t *output) {
 	output->layer_top = NULL;
 	output->layer_overlay = NULL;
 
-	if (output->wlr_output)
+	if (output->wlr_output) {
+		struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(server.scene,
+			output->wlr_output);
+		if (scene_output)
+			wlr_scene_output_destroy(scene_output);
+		if (wlr_output_layout_get(server.output_layout, output->wlr_output))
+			wlr_output_layout_remove(server.output_layout, output->wlr_output);
 		output->wlr_output->data = NULL;
+	}
 
 	free(output);
 }
@@ -467,9 +671,10 @@ void set_orphan_active_desk(desktop_t *d) {
 	orphan_active_desk = d;
 }
 
-static void handle_output_destroy(struct wl_listener *listener, void *data) {
-	(void)data;
-	output_t *output = wl_container_of(listener, output, destroy);
+void output_remove(output_t *output) {
+	if (!output)
+		return;
+
 	layer_surface_t *layer, *tmp;
 
 	for (size_t i = 0; i < 4; i++)
@@ -479,26 +684,26 @@ static void handle_output_destroy(struct wl_listener *listener, void *data) {
 	if (output->lock_surface)
 		destroy_lock_surface(&output->destroy_lock_surface, NULL);
 
+	char name[SMALEN];
+	snprintf(name, sizeof(name), "%s", output->name);
+	snprintf(last_removed_name, sizeof(last_removed_name), "%s", output->name);
+
 	desktop_t *active_desk = output->desk;
+	bool was_focused = server.focused_output == output;
+
 	if (output->enabled)
 		output_disable(output);
 
-	wl_list_remove(&output->frame.link);
-	wl_list_remove(&output->present.link);
-	wl_list_remove(&output->request_state.link);
-	wl_list_remove(&output->destroy.link);
-
-	if (output->repaint_timer) {
-		wl_event_source_remove(output->repaint_timer);
-		output->repaint_timer = NULL;
-	}
-
 	output_teardown(output);
+	output_recover_after_removal(active_desk, was_focused);
 
-	if (active_desk)
-		orphan_active_desk = active_desk;
+	ipc_put_status(SUB_MASK_MONITOR_REMOVE, "monitor_remove[%s]\n", name);
+}
 
-	ipc_put_status(SUB_MASK_MONITOR_REMOVE, "monitor_remove[%s]\n", output->name);
+static void handle_output_destroy(struct wl_listener *listener, void *data) {
+	(void)data;
+	output_t *output = wl_container_of(listener, output, destroy);
+	output_remove(output);
 }
 
 void output_create(struct wlr_output *wlr_output) {
@@ -547,14 +752,10 @@ void output_create(struct wlr_output *wlr_output) {
 		if (orphan_active_desk && orphan_active_desk->output == output)
 			output->desk = orphan_active_desk;
 		orphan_active_desk = NULL;
-
-		if (output->desk && output->desk->root && output->desk->focus)
-			focus_node(output, output->desk, output->desk->focus);
-		arrange(output, output->desk, true);
 	} else {
 		desktop_t *d = calloc(1, sizeof(desktop_t));
 		if (d)
-			desktop_init(d, output, "default");
+			desktop_init(d, output, output->name);
 	}
 
 	// add to monitor linked list
@@ -586,6 +787,8 @@ void output_create(struct wlr_output *wlr_output) {
 
 	output->repaint_timer = wl_event_loop_add_timer(wl_display_get_event_loop(server.wl_display),
 		output_repaint_timer_handler, output);
+	output->present_timer = wl_event_loop_add_timer(wl_display_get_event_loop(server.wl_display),
+		output_present_timeout, output);
 
 	output->destroy.notify = handle_output_destroy;
 	wl_signal_add(&wlr_output->events.destroy, &output->destroy);
@@ -612,25 +815,60 @@ void output_create(struct wlr_output *wlr_output) {
 	output->effects = effects_output_init(output->rectangle.width, output->rectangle.height);
 
 	output_enable(output);
+
+	// apply the stored output config now, so hotplugged outputs come up configured
+	struct output_config *oc = output_config_find(output->name);
+	if (oc)
+		output_config_apply(oc);
+
+	if (oc && oc->enable != OUTPUT_CONFIG_DISABLE && !wlr_output->enabled)
+		wlr_log(WLR_ERROR, "Output %s is disabled after applying its config", output->name);
+
+	workspace_sync();
+
 	ipc_put_status(SUB_MASK_MONITOR_ADD, "monitor_add[%s]\n", output->name);
 
-	// re-select the restored desktop so the others get hidden
-	if (restored && output->desk && server.focused_output == output)
+	bool reconnected = streq(output->name, last_removed_name);
+	if ((restored || reconnected) && output->enabled && output->desk) {
+		output_set_focused(output);
 		workspace_switch_to_desktop(output->desk->name);
+	}
+
+	output_schedule_frame(output);
+
+	wlr_log(WLR_INFO, "Output %s ready: enabled=%d wlr_enabled=%d rect=%d,%d %dx%d restored=%d "
+		"reconnected=%d focused=%s desk=%s", output->name, output->enabled, wlr_output->enabled,
+			output->rectangle.x, output->rectangle.y, output->rectangle.width, output->rectangle.height,
+			restored, reconnected, server.focused_output ? server.focused_output->name : "none",
+			output->desk ? output->desk->name : "none");
+
 	output_update_manager_config();
 }
 
 void output_enable(output_t *output) {
+	if (output->present_timer)
+		wl_event_source_timer_update(output->present_timer, 0);
+	output->awaiting_present = false;
 	if (output->enabled)
 		return;
 
 	output->enabled = true;
+
+	if (output->wlr_output) {
+		struct wlr_box layout_box;
+		wlr_output_layout_get_box(server.output_layout, output->wlr_output, &layout_box);
+		output->rectangle = layout_box;
+	}
+
 	output->lx = output->rectangle.x;
 	output->ly = output->rectangle.y;
 	output->width = output->rectangle.width;
 	output->height = output->rectangle.height;
 
 	output->scale_filter_mode = SCALE_FILTER_NEAREST;
+
+	if (!server.focused_output)
+		output_set_focused(output);
 
 	output_update_usable_area(output);
 
@@ -642,13 +880,47 @@ void output_enable(output_t *output) {
 }
 
 void output_disable(output_t *output) {
-	if (!output->enabled)
+	if (!output || !output->enabled)
 		return;
 
 	output->enabled = false;
-	if (output->desk) {
-		output->desk->output = NULL;
-		output->desk = NULL;
+	output->awaiting_present = false;
+	if (output->present_timer)
+		wl_event_source_timer_update(output->present_timer, 0);
+
+	if (server.workspace_manager && !wl_list_empty(&server.workspace_manager->groups)) {
+		struct wlr_ext_workspace_group_handle_v1 *group =
+			wl_container_of(server.workspace_manager->groups.next, group, link);
+		wlr_ext_workspace_group_handle_v1_output_leave(group, output->wlr_output);
+	}
+
+	if (server.focused_output != output)
+		return;
+
+	output_t *survivor = output_get_valid();
+	output_set_focused(survivor);
+
+	if (!survivor) {
+		if (server.seat)
+			wlr_seat_keyboard_notify_clear_focus(server.seat);
+		return;
+	}
+
+	if (!survivor->desk && !wl_list_empty(&survivor->desk_list))
+		survivor->desk = wl_container_of(survivor->desk_list.next, survivor->desk, link);
+	if (!survivor->desk)
+		return;
+
+	workspace_update_visibility(survivor, survivor->desk);
+	arrange(survivor, survivor->desk, true);
+
+	node_t *target = survivor->desk->focus != NULL ? survivor->desk->focus :
+		desktop_fallback_focus(survivor->desk, NULL);
+	if (target != NULL) {
+		survivor->desk->focus = target;
+		focus_node(survivor, survivor->desk, target);
+	} else if (server.seat) {
+		wlr_seat_keyboard_notify_clear_focus(server.seat);
 	}
 }
 
@@ -675,7 +947,8 @@ output_t *output_get_in_direction(output_t *reference, const uint32_t direction)
 	if (!wlr_adjacent)
 		return NULL;
 
-	return output_from_wlr_output(wlr_adjacent);
+	output_t *adjacent = output_from_wlr_output(wlr_adjacent);
+	return adjacent && adjacent->enabled ? adjacent : NULL;
 }
 
 void output_update_usable_area(output_t *output) {
@@ -772,7 +1045,8 @@ output_t *output_focused(void) {
 output_t *output_at(const double x, const double y) {
 	output_t *m;
 	wl_list_for_each(m, &mon_list, link)
-		if (wlr_box_contains_point(&m->rectangle, (int)x, (int)y))
+		if (m->enabled && m->wlr_output && m->wlr_output->enabled && wlr_box_contains_point(&m->rectangle,
+			(int)x, (int)y))
 			return m;
 
 	return NULL;

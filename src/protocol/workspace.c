@@ -13,9 +13,9 @@
 #include <stdint.h>
 #include <string.h>
 #include <wlr/types/wlr_scene.h>
+#include <wlr/types/wlr_seat.h>
 
 static void handle_workspace_request(struct wl_listener *listener, void *data);
-static void update_all_toplevels_visibility(output_t *m, desktop_t *current_desktop);
 
 static struct wlr_ext_workspace_handle_v1 *find_workspace_by_name(const char *name) {
 	struct wlr_ext_workspace_handle_v1 *workspace;
@@ -105,7 +105,7 @@ struct desktop_t *find_desktop_by_name(const char *name) {
 		int i = 0;
 		wl_list_for_each(m, &mon_list, link) {
 			if (i == mon_idx) {
-				found = true;
+				found = m->enabled;
 				break;
 			}
 			i++;
@@ -119,6 +119,9 @@ struct desktop_t *find_desktop_by_name(const char *name) {
 
 	output_t *m;
 	wl_list_for_each(m, &mon_list, link) {
+		if (!m->enabled)
+			continue;
+
 		desktop_t *d;
 		wl_list_for_each(d, &m->desk_list, link) {
 			if (streq(d->name, name))
@@ -145,6 +148,9 @@ void workspace_sync(void) {
 
 	output_t *m;
 	wl_list_for_each(m, &mon_list, link) {
+		if (!m->enabled)
+			continue;
+
 		desktop_t *d;
 		wl_list_for_each(d, &m->desk_list, link) {
 			struct wlr_ext_workspace_handle_v1 *workspace =
@@ -159,8 +165,15 @@ void workspace_sync(void) {
 		}
 	}
 
-	if (!wl_list_empty(&mon_list)) {
-		output_t *first_mon = wl_container_of(mon_list.next, first_mon, link);
+	output_t *first_mon = NULL;
+	wl_list_for_each(m, &mon_list, link) {
+		if (m->enabled && m->desk) {
+			first_mon = m;
+			break;
+		}
+	}
+
+	if (first_mon) {
 		struct wlr_ext_workspace_handle_v1 *active = find_workspace_by_name(first_mon->desk->name);
 		if (active)
 			wlr_ext_workspace_handle_v1_set_active(active, true);
@@ -287,7 +300,7 @@ found_desktop:
 	}
 }
 
-static void update_all_toplevels_visibility(output_t *m, desktop_t *current_desktop) {
+void workspace_update_visibility(output_t *m, desktop_t *current_desktop) {
 	int window_count = 0;
 
 	view_t *view;
@@ -372,7 +385,7 @@ static void workspace_switch_animate(output_t *output, desktop_t *old_desk, desk
 	ipc_put_status(SUB_MASK_DESKTOP_FOCUS, "desktop_focus[%s]\n", new_desk->name);
 
 	// update visibility
-	update_all_toplevels_visibility(output, new_desk);
+	workspace_update_visibility(output, new_desk);
 
 	// re-enable old desktop windows for slide-out animation
 	{
@@ -502,6 +515,11 @@ void workspace_switch_to_desktop(const char *name) {
 	}
 
 	output_t *output = server.focused_output;
+	if (!output)
+		output = output_get_valid();
+	if (!output)
+		return;
+
 	desktop_t *d = NULL;
 	desktop_t *local;
 	wl_list_for_each(local, &output->desk_list, link) {
@@ -530,24 +548,28 @@ void workspace_switch_to_desktop(const char *name) {
 	}
 
 	output->desk = d;
+	output_set_focused(output);
 	ipc_put_status(SUB_MASK_REPORT, NULL);
 	ipc_put_status(SUB_MASK_DESKTOP_FOCUS, "desktop_focus[%s]\n", name);
 
 	wlr_log(WLR_DEBUG, "Switching from %s to %s", old_desktop ? old_desktop->name : "NULL", d->name);
 
-	update_all_toplevels_visibility(output, d);
+	workspace_update_visibility(output, d);
 
 	struct wlr_ext_workspace_handle_v1 *old = workspace_get_active();
 
 	if (desktop_has_toplevels(d)) {
 		arrange(output, d, true);
 
-		node_t *target = d->focus != NULL ? d->focus : desktop_fallback_focus(d, NULL);
+		node_t *target = node_focusable(d->focus) ? d->focus : desktop_fallback_focus(d, NULL);
 		if (target != NULL) {
 			d->focus = target;
 			focus_node(output, d, target);
 		}
 	} else {
+		d->focus = NULL;
+		if (server.seat)
+			wlr_seat_keyboard_notify_clear_focus(server.seat);
 		wlr_log(WLR_DEBUG, "Desktop %s has no toplevels, skipping arrange/focus", name);
 	}
 
@@ -683,6 +705,7 @@ void workspace_fini(void) {
 		wlr_ext_workspace_group_handle_v1_destroy(group);
 
 	wl_list_remove(&server.workspace_commit.link);
+	server.workspace_manager = NULL;
 }
 
 desktop_t *find_desktop_by_name_in_monitor(output_t *mon, const char *name) {

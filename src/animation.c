@@ -163,6 +163,11 @@ static animation_entry_t *find_animation(const node_t *node) {
 	return NULL;
 }
 
+static bool node_has_fade(const node_t *node) {
+	const animation_entry_t *entry = find_animation(node);
+	return entry != NULL && entry->from_opacity != entry->to_opacity;
+}
+
 bool animation_is_opacity_fading(view_t *view) {
 	if (!view)
 		return false;
@@ -326,7 +331,9 @@ void animation_cancel_node(const node_t *node) {
 		view_remove_saved_buffer(entry->view);
 	}
 
-	if (entry->from_opacity != entry->to_opacity && entry->scene_tree)
+	if (entry->node != NULL && entry->node->client && entry->scene_tree)
+		surface_set_opacity(&entry->scene_tree->node, entry->node->client->opacity);
+	else if (entry->from_opacity != entry->to_opacity && entry->scene_tree)
 		surface_set_opacity(&entry->scene_tree->node, entry->to_opacity);
 
 	wl_list_remove(&entry->link);
@@ -352,9 +359,10 @@ void animation_cancel_view(view_t *view) {
 			view_remove_saved_buffer(entry->view);
 		}
 
-		if (entry->from_opacity != entry->to_opacity && entry->scene_tree) {
+		if (entry->node != NULL && entry->node->client && entry->scene_tree)
+			surface_set_opacity(&entry->scene_tree->node, entry->node->client->opacity);
+		else if (entry->from_opacity != entry->to_opacity && entry->scene_tree)
 			surface_set_opacity(&entry->scene_tree->node, entry->to_opacity);
-		}
 
 		wl_list_remove(&entry->link);
 		free(entry);
@@ -379,6 +387,28 @@ void animation_cancel_scene_tree(const struct wlr_scene_tree *scene_tree) {
 	}
 }
 
+void animation_cancel_output(output_t *output) {
+	if (!output)
+		return;
+
+	animation_entry_t *entry, *tmp;
+	wl_list_for_each_safe(entry, tmp, &animations, link) {
+		const bool on_output = entry->output == output || (entry->node != NULL &&
+			entry->node->output == output);
+		if (!on_output)
+			continue;
+
+		if (entry->node != NULL && entry->node->client && entry->scene_tree)
+			surface_set_opacity(&entry->scene_tree->node, entry->node->client->opacity);
+
+		if (entry->saved_tree)
+			wlr_scene_node_destroy(&entry->saved_tree->node);
+
+		wl_list_remove(&entry->link);
+		free(entry);
+	}
+}
+
 bool animation_fade_in(view_t *view) {
 	if (!view || !view->node || !view->scene_tree || !settings.enable_animations)
 		return false;
@@ -390,10 +420,18 @@ bool animation_fade_in(view_t *view) {
 
 	animation_entry_t *entry = find_animation(view->node);
 	if (entry) {
+		entry->kind = ANIM_KIND_FADE_IN;
 		entry->from_opacity = 0.0f;
 		entry->to_opacity = view->node->client->opacity;
 		entry->view = view;
 		entry->node = view->node;
+		entry->scene_tree = view->scene_tree;
+		entry->output = view->node->output;
+		clock_gettime(CLOCK_MONOTONIC, &entry->start);
+		entry->duration_ms = ANIMATION_DURATION_MS;
+		entry->eased = 0.0;
+		entry->progress = 0.0;
+		apply_config_to_entry(entry, 2);
 	} else {
 		entry = create_animation_entry();
 		if (!entry)
@@ -634,6 +672,11 @@ bool animation_start_resize(view_t *view, struct wlr_box from, struct wlr_box to
 	if (max_change < 10)
 		return false;
 
+	if (node_has_fade(view->node)) {
+		wlr_scene_node_set_position(&view->scene_tree->node, to.x, to.y);
+		return false;
+	}
+
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
 
@@ -869,6 +912,11 @@ bool animation_apply_geometry_from(node_t *node, struct wlr_scene_tree *scene_tr
 		return true;
 	}
 
+	if (node_has_fade(node)) {
+		wlr_scene_node_set_position(&scene_tree->node, target.x, target.y);
+		return false;
+	}
+
 	output_t *output = node->output;
 	if (!animate || !settings.enable_animations || !output || !output->enabled || !node->client ||
 			!node->client->flags.shown) {
@@ -1090,6 +1138,7 @@ bool animation_update_output(output_t *output, const struct timespec now) {
 				wlr_scene_subsurface_tree_set_clip(&entry->view->content_tree->node, NULL);
 			if (entry->kind == ANIM_KIND_RESIZE && entry->view)
 				view_remove_saved_buffer(entry->view);
+			surface_set_opacity(&entry->scene_tree->node, entry->node->client->opacity);
 			wl_list_remove(&entry->link);
 			free(entry);
 			continue;
@@ -1132,8 +1181,7 @@ bool animation_update_output(output_t *output, const struct timespec now) {
 			}
 
 			if (is_entry_done(entry)) {
-				if (entry->from_opacity != entry->to_opacity)
-					surface_set_opacity(&entry->scene_tree->node, entry->to_opacity);
+				surface_set_opacity(&entry->scene_tree->node, entry->node->client->opacity);
 
 				if (entry->kind == ANIM_KIND_WORKSPACE_SLIDE && entry->slide_out && entry->node &&
 						entry->node->client) {
