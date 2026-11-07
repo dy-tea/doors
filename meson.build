@@ -119,6 +119,7 @@ doors_sources = [
 		'src' / 'backend.c',
 		'src' / 'bezier.c',
 		'src' / 'borders.c',
+		'src' / 'cairo_buffer.c',
 		'src' / 'client.c',
 		'src' / 'config.c',
 		'src' / 'diagnostics' / 'crash.c',

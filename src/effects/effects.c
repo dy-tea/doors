@@ -1786,15 +1786,9 @@ static bool blur_render_border(view_t *tl, struct wlr_box content) {
 	wlr_scene_buffer_set_dest_size(tl->rounded->border_shader_node, ring_w, ring_h);
 	wlr_scene_node_set_enabled(&tl->rounded->border_shader_node->node, true);
 
-	static const float transparent[4] = {
-		0.0f,
-		0.0f,
-		0.0f,
-		0.0f
-	};
 	for (int i = 0; i < 4; i++)
 		if (tl->border_rects[i])
-			wlr_scene_rect_set_color(tl->border_rects[i], transparent);
+			wlr_scene_rect_set_color(tl->border_rects[i], COLOR_TRANSPARENT);
 
 	return true;
 }

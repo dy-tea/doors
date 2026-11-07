@@ -14,6 +14,8 @@ bool ipc_parse_gradient(const char *str, float out[BORDER_GRADIENT_MAX_STOPS * 4
 	float *angle_out);
 void ipc_format_gradient(char *buf, size_t bufsz, const float *colors, int count, float angle);
 
+void ipc_json_string(ipc_buf_t *b, const char *s);
+
 node_t *ipc_focused(ipc_args_t *a, output_t **out);
 node_t *ipc_focused_nonvacant(ipc_args_t *a, output_t **out);
 desktop_t *ipc_focused_desk(ipc_args_t *a, output_t **out);

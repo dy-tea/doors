@@ -368,37 +368,6 @@ bool cfg_default_value(const char *name, char *buf, size_t bufsz) {
 #define CFG_COL_TYPE 10
 #define CFG_COL_VALUE 26
 
-static void cfg_json_string(ipc_buf_t *b, const char *s) {
-	ipc_buff(b, "\"");
-
-	for (const unsigned char *p = (const unsigned char *)s; *p; p++) {
-		switch (*p) {
-		case '"':
-			ipc_buff(b, "\\\"");
-			break;
-		case '\\':
-			ipc_buff(b, "\\\\");
-			break;
-		case '\n':
-			ipc_buff(b, "\\n");
-			break;
-		case '\r':
-			ipc_buff(b, "\\r");
-			break;
-		case '\t':
-			ipc_buff(b, "\\t");
-			break;
-		default:
-			if (*p < 0x20)
-				ipc_buff(b, "\\u%04x", *p);
-			else
-				ipc_buff(b, "%c", *p);
-		}
-	}
-
-	ipc_buff(b, "\"");
-}
-
 // right pads `s` to `width`, leaving longer values alone
 static void cfg_column(ipc_buf_t *b, const char *s, int width) {
 	ipc_buff(b, "%-*s", width, s);
@@ -447,15 +416,15 @@ static void cfg_list_json(ipc_args_t *a, bool changed) {
 		first = false;
 
 		ipc_buff(&b, "  {\"name\": ");
-		cfg_json_string(&b, in.name);
+		ipc_json_string(&b, in.name);
 		ipc_buff(&b, ", \"type\": ");
-		cfg_json_string(&b, in.type);
+		ipc_json_string(&b, in.type);
 		ipc_buff(&b, ", \"value\": ");
-		cfg_json_string(&b, value);
+		ipc_json_string(&b, value);
 		ipc_buff(&b, ", \"default\": ");
-		cfg_json_string(&b, dflt);
+		ipc_json_string(&b, dflt);
 		ipc_buff(&b, ", \"range\": ");
-		cfg_json_string(&b, range);
+		ipc_json_string(&b, range);
 		ipc_buff(&b, "}");
 	}
 

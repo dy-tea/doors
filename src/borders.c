@@ -1,7 +1,9 @@
 #include "borders.h"
 #include "client.h"
+#include "macros.h"
 #include "protocol/xwayland.h"
 #include "settings.h"
+#include "str.h"
 #include "surface.h"
 #include "tree.h"
 #include "types.h"
@@ -17,40 +19,11 @@ border_state_t get_border_state(client_t *client) {
 	return state;
 }
 
-static int hex_digit(const char c) {
-	if (c >= '0' && c <= '9')
-		return c - '0';
-	if (c >= 'a' && c <= 'f')
-		return 10 + (c - 'a');
-	if (c >= 'A' && c <= 'F')
-		return 10 + (c - 'A');
-	return 0;
-}
-
 void parse_color(const char *hex, float *color) {
-	if (!hex) {
+	if (!str_parse_color(hex, color)) {
 		color[0] = color[1] = color[2] = 0.5f;
 		color[3] = 1.0f;
-		return;
 	}
-
-	if (*hex == '#')
-		hex++;
-
-	const size_t len = strlen(hex);
-	if (len != 6 && len != 8) {
-		color[0] = color[1] = color[2] = 0.5f;
-		color[3] = 1.0f;
-		return;
-	}
-
-	color[0] = (float)(hex_digit(hex[0]) * 16 + hex_digit(hex[1])) / 255.0f;
-	color[1] = (float)(hex_digit(hex[2]) * 16 + hex_digit(hex[3])) / 255.0f;
-	color[2] = (float)(hex_digit(hex[4]) * 16 + hex_digit(hex[5])) / 255.0f;
-	if (len == 8)
-		color[3] = (float)(hex_digit(hex[6]) * 16 + hex_digit(hex[7])) / 255.0f;
-	else
-		color[3] = 1.0f;
 }
 
 static void get_border_color(client_t *client, float *color) {
@@ -106,16 +79,10 @@ void create_borders(struct wlr_scene_tree *parent, struct wlr_scene_tree **borde
 	if (!*border_tree)
 		return;
 
-	static const float transparent[4] = {
-		0.0f,
-		0.0f,
-		0.0f,
-		0.0f
-	};
-	rects[0] = wlr_scene_rect_create(*border_tree, 0, settings.border_width, transparent);
-	rects[1] = wlr_scene_rect_create(*border_tree, 0, settings.border_width, transparent);
-	rects[2] = wlr_scene_rect_create(*border_tree, settings.border_width, 0, transparent);
-	rects[3] = wlr_scene_rect_create(*border_tree, settings.border_width, 0, transparent);
+	rects[0] = wlr_scene_rect_create(*border_tree, 0, settings.border_width, COLOR_TRANSPARENT);
+	rects[1] = wlr_scene_rect_create(*border_tree, 0, settings.border_width, COLOR_TRANSPARENT);
+	rects[2] = wlr_scene_rect_create(*border_tree, settings.border_width, 0, COLOR_TRANSPARENT);
+	rects[3] = wlr_scene_rect_create(*border_tree, settings.border_width, 0, COLOR_TRANSPARENT);
 }
 
 void destroy_borders(struct wlr_scene_tree **border_tree, struct wlr_scene_rect *rects[4]) {
@@ -181,29 +148,17 @@ void update_border_colors(client_t *client) {
 			if (rounded->corner_mask_node)
 				wlr_scene_node_set_enabled(&rounded->corner_mask_node->node, false);
 			// mark dirty so the border re-renders when leaving fullscreen
-			static const float transparent[4] = {
-				0.0f,
-				0.0f,
-				0.0f,
-				0.0f
-			};
-			if (memcmp(rounded->border_color, transparent, sizeof(rounded->border_color)) != 0) {
-				memcpy(rounded->border_color, transparent, sizeof(rounded->border_color));
+			if (memcmp(rounded->border_color, COLOR_TRANSPARENT, sizeof(rounded->border_color)) != 0) {
+				memcpy(rounded->border_color, COLOR_TRANSPARENT, sizeof(rounded->border_color));
 				rounded->border_dirty = true;
 				rounded->corner_mask_dirty = true;
 			}
 		}
 		if (border_tree) {
-			static const float transparent[4] = {
-				0.0f,
-				0.0f,
-				0.0f,
-				0.0f
-			};
 			struct wlr_scene_rect **rects = client_border_rects(client);
 			for (int i = 0; i < 4; i++)
 				if (rects[i])
-					wlr_scene_rect_set_color(rects[i], transparent);
+					wlr_scene_rect_set_color(rects[i], COLOR_TRANSPARENT);
 		}
 		return;
 	}
@@ -238,15 +193,9 @@ void update_border_colors(client_t *client) {
 		if (rounded_ptr) {
 			surface_update_rounded(rounded_ptr, color, bt);
 			if (*rounded_ptr) {
-				static const float transparent[4] = {
-					0.0f,
-					0.0f,
-					0.0f,
-					0.0f
-				};
 				for (int i = 0; i < 4; i++)
 					if (rects[i])
-						wlr_scene_rect_set_color(rects[i], transparent);
+						wlr_scene_rect_set_color(rects[i], COLOR_TRANSPARENT);
 
 				return;
 			}

@@ -192,6 +192,30 @@ int str_hex_digit(const char c) {
 	return -1;
 }
 
+bool str_parse_color(const char *hex, float rgba[4]) {
+	if (!hex || !rgba)
+		return false;
+	if (*hex == '#')
+		hex++;
+
+	const size_t len = strlen(hex);
+	if (len != 6 && len != 8)
+		return false;
+
+	float parsed[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+	for (size_t i = 0; i < len / 2; i++) {
+		const int hi = str_hex_digit(hex[i * 2]);
+		const int lo = str_hex_digit(hex[i * 2 + 1]);
+		if (hi < 0 || lo < 0)
+			return false;
+
+		parsed[i] = (float)(hi * 16 + lo) / 255.0f;
+	}
+
+	memcpy(rgba, parsed, sizeof(parsed));
+	return true;
+}
+
 const str_pair_t *str_table_find(const str_pair_t *tbl, const char *name) {
 	if (!tbl || !name)
 		return NULL;

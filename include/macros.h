@@ -27,3 +27,5 @@
 #define MAX(a, b) a > b ? a : b
 #define MIN(a, b) a < b ? a : b
 #define CLAMP(val, lo, hi) MIN(MAX(val, lo), hi)
+
+#define COLOR_TRANSPARENT ((const float[4]){0.0f, 0.0f, 0.0f, 0.0f})

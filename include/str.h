@@ -38,6 +38,8 @@ int str_split(char *s, const char *delims, char *out[], int max);
 // hex digit value, -1 when c is not a hex digit
 int str_hex_digit(char c);
 
+bool str_parse_color(const char *hex, float rgba[4]);
+
 typedef struct {
 	const char *name;
 	long value;

@@ -1,3 +1,4 @@
+#include "cairo_buffer.h"
 #include "client.h"
 #include "dim.h"
 #include "layout/layout.h"
@@ -7,12 +8,9 @@
 #include "settings.h"
 #include "tree.h"
 #include "types.h"
-#include <cairo.h>
-#include <drm_fourcc.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wayland-util.h>
-#include <wlr/interfaces/wlr_buffer.h>
 #include <wlr/types/wlr_buffer.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/util/log.h>
@@ -25,37 +23,6 @@ static void dim_get_color(float out[4]) {
 		out[i] = settings.dim_color[i] * alpha;
 	out[3] = alpha;
 }
-
-typedef struct {
-	struct wlr_buffer base;
-	cairo_surface_t *surface;
-} dim_buffer_t;
-
-static void dim_buffer_destroy(struct wlr_buffer *wlr_buffer) {
-	dim_buffer_t *buffer = wl_container_of(wlr_buffer, buffer, base);
-	cairo_surface_destroy(buffer->surface);
-	free(buffer);
-}
-
-static bool dim_buffer_begin_data_ptr_access(struct wlr_buffer *wlr_buffer, uint32_t flags,
-		void **data, uint32_t *format, size_t *stride) {
-	(void)flags;
-	dim_buffer_t *buffer = wl_container_of(wlr_buffer, buffer, base);
-	*data = cairo_image_surface_get_data(buffer->surface);
-	*stride = cairo_image_surface_get_stride(buffer->surface);
-	*format = DRM_FORMAT_ARGB8888;
-	return true;
-}
-
-static void dim_buffer_end_data_ptr_access(struct wlr_buffer *wlr_buffer) {
-	(void)wlr_buffer;
-}
-
-static const struct wlr_buffer_impl dim_buffer_impl = {
-	.destroy = dim_buffer_destroy,
-	.begin_data_ptr_access = dim_buffer_begin_data_ptr_access,
-	.end_data_ptr_access = dim_buffer_end_data_ptr_access,
-};
 
 static void dim_track_path(cairo_t *cairo, double x, double y, double width, double height,
 		double radius) {
@@ -85,15 +52,13 @@ static struct wlr_buffer *dim_buffer_create(const float color[4], const int widt
 	const int buf_w = rounded ? width : 1;
 	const int buf_h = rounded ? height : 1;
 
-	cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, buf_w, buf_h);
-	if (cairo_surface_status(surface) != CAIRO_STATUS_SUCCESS) {
-		cairo_surface_destroy(surface);
+	cairo_buffer_t *buffer = cairo_buffer_create_image(buf_w, buf_h);
+	if (buffer == NULL)
 		return NULL;
-	}
 
-	cairo_t *cairo = cairo_create(surface);
+	cairo_t *cairo = cairo_buffer_cairo(buffer);
 	if (cairo == NULL) {
-		cairo_surface_destroy(surface);
+		cairo_buffer_destroy(buffer);
 		return NULL;
 	}
 
@@ -105,18 +70,9 @@ static struct wlr_buffer *dim_buffer_create(const float color[4], const int widt
 	} else {
 		cairo_paint(cairo);
 	}
-	cairo_surface_flush(surface);
-	cairo_destroy(cairo);
+	cairo_surface_flush(buffer->surface);
 
-	dim_buffer_t *buffer = calloc(1, sizeof(*buffer));
-	if (buffer == NULL) {
-		cairo_surface_destroy(surface);
-		return NULL;
-	}
-	buffer->surface = surface;
-
-	wlr_buffer_init(&buffer->base, &dim_buffer_impl, buf_w, buf_h);
-	return &buffer->base;
+	return cairo_buffer_base(buffer);
 }
 
 static struct dim_scrim_t *dim_ensure(struct dim_scrim_t **slot, struct wlr_scene_tree *parent) {

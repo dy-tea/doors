@@ -9,27 +9,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-// parse a hex-digit character, invalid ends up as 0
-static int ipc_parse_hex_digit(char c) {
-	int d = str_hex_digit(c);
-	return d < 0 ? 0 : d;
-}
-
 // parse a single RRGGBBAA or RRGGBB color into a float[4]
 bool ipc_parse_color(const char *hex, float *rgba) {
-	if (!hex)
-		return false;
-	if (*hex == '#')
-		hex++;
-	size_t len = strlen(hex);
-	if (len != 6 && len != 8)
-		return false;
-	rgba[0] = (float)(ipc_parse_hex_digit(hex[0]) * 16 + ipc_parse_hex_digit(hex[1])) / 255.0f;
-	rgba[1] = (float)(ipc_parse_hex_digit(hex[2]) * 16 + ipc_parse_hex_digit(hex[3])) / 255.0f;
-	rgba[2] = (float)(ipc_parse_hex_digit(hex[4]) * 16 + ipc_parse_hex_digit(hex[5])) / 255.0f;
-	rgba[3] = (len == 8) ? (float)(ipc_parse_hex_digit(hex[6]) * 16 + ipc_parse_hex_digit(hex[7])) /
-		255.0f : 1.0f;
-	return true;
+	return str_parse_color(hex, rgba);
 }
 
 bool ipc_parse_color_float(const char *str, float rgba[4]) {
@@ -90,6 +72,39 @@ void ipc_format_gradient(char *buf, size_t bufsz, const float *colors, int count
 		ipc_buff(&b, "%02x%02x%02x%02x ", r, g, bl, a);
 	}
 	ipc_buff(&b, "%ddeg", (int)(angle * 180.0f / 3.14159265f));
+}
+
+void ipc_json_string(ipc_buf_t *b, const char *s) {
+	ipc_buff(b, "\"");
+
+	if (s != NULL) {
+		for (const unsigned char *p = (const unsigned char *)s; *p; p++) {
+			switch (*p) {
+			case '"':
+				ipc_buff(b, "\\\"");
+				break;
+			case '\\':
+				ipc_buff(b, "\\\\");
+				break;
+			case '\n':
+				ipc_buff(b, "\\n");
+				break;
+			case '\r':
+				ipc_buff(b, "\\r");
+				break;
+			case '\t':
+				ipc_buff(b, "\\t");
+				break;
+			default:
+				if (*p < 0x20)
+					ipc_buff(b, "\\u%04x", *p);
+				else
+					ipc_buff(b, "%c", *p);
+			}
+		}
+	}
+
+	ipc_buff(b, "\"");
 }
 
 node_t *ipc_focused(ipc_args_t *a, output_t **out) {

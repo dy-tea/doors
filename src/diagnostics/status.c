@@ -5,6 +5,7 @@
 #include "diagnostics.h"
 #include "diagnostics_internal.h"
 #include "ipc/args.h"
+#include "ipc/helpers.h"
 #include "log.h"
 #include "output/output.h"
 #include "rule.h"
@@ -45,39 +46,6 @@ static struct timespec started;
 
 void diag_status_init(void) {
 	clock_gettime(CLOCK_MONOTONIC, &started);
-}
-
-static void json_str(ipc_buf_t *b, const char *s) {
-	ipc_buff(b, "\"");
-
-	if (s != NULL) {
-		for (const unsigned char *p = (const unsigned char *)s; *p; p++) {
-			switch (*p) {
-			case '"':
-				ipc_buff(b, "\\\"");
-				break;
-			case '\\':
-				ipc_buff(b, "\\\\");
-				break;
-			case '\n':
-				ipc_buff(b, "\\n");
-				break;
-			case '\r':
-				ipc_buff(b, "\\r");
-				break;
-			case '\t':
-				ipc_buff(b, "\\t");
-				break;
-			default:
-				if (*p < 0x20)
-					ipc_buff(b, "\\u%04x", *p);
-				else
-					ipc_buff(b, "%c", *p);
-			}
-		}
-	}
-
-	ipc_buff(b, "\"");
 }
 
 static const char *backend_kind(const struct wlr_backend *backend) {
@@ -201,12 +169,12 @@ static void gpu_json(ipc_buf_t *b) {
 	bool first = true;
 	if (driver[0] != '\0') {
 		ipc_buff(b, "\"driver\": ");
-		json_str(b, driver);
+		ipc_json_string(b, driver);
 		first = false;
 	}
 	if (pci[0] != '\0') {
 		ipc_buff(b, "%s\"pci\": ", first ? "" : ", ");
-		json_str(b, pci);
+		ipc_json_string(b, pci);
 	}
 	ipc_buff(b, "}");
 #else
@@ -235,24 +203,24 @@ static bool status_render(char *buf, size_t bufsz) {
 	ipc_buff(&b, "{\n");
 	ipc_buff(&b, "  \"status\": \"running\",\n");
 	ipc_buff(&b, "  \"version\": ");
-	json_str(&b, DOORS_VERSION);
+	ipc_json_string(&b, DOORS_VERSION);
 	ipc_buff(&b, ",\n  \"commit\": ");
-	json_str(&b, DOORS_COMMIT);
+	ipc_json_string(&b, DOORS_COMMIT);
 	ipc_buff(&b, ",\n  \"pid\": %d,\n", (int)getpid());
 	ipc_buff(&b, "  \"uptime_s\": %ld,\n", uptime > 0 ? uptime : 0);
 
 	char backend[128];
 	backend_name(backend, sizeof(backend));
 	ipc_buff(&b, "  \"backends\": ");
-	json_str(&b, backend[0] ? backend : "unknown");
+	ipc_json_string(&b, backend[0] ? backend : "unknown");
 
 	ipc_buff(&b, ",\n  \"renderer\": {\"api\": ");
-	json_str(&b, renderer_api());
+	ipc_json_string(&b, renderer_api());
 	gpu_json(&b);
 	ipc_buff(&b, "}");
 
 	ipc_buff(&b, ",\n  \"log\": ");
-	json_str(&b, log_get_path() ? log_get_path() : "");
+	ipc_json_string(&b, log_get_path() ? log_get_path() : "");
 	ipc_buff(&b, ",\n  \"stalls\": %zu", diag_stall_count());
 
 	ipc_buff(&b, ",\n  \"outputs\": [");
@@ -264,7 +232,7 @@ static bool status_render(char *buf, size_t bufsz) {
 		first = false;
 
 		ipc_buff(&b, "\"name\": ");
-		json_str(&b, o->name);
+		ipc_json_string(&b, o->name);
 		ipc_buff(&b, ", \"id\": %u, \"enabled\": %s", o->id, str_bool_text(o->enabled));
 
 		if (o->wlr_output != NULL) {
@@ -273,9 +241,9 @@ static bool status_render(char *buf, size_t bufsz) {
 			ipc_buff(&b, ", \"scale\": %.2f", (double)o->wlr_output->scale);
 			if (o->wlr_output->make != NULL && o->wlr_output->model != NULL) {
 				ipc_buff(&b, ", \"make\": ");
-				json_str(&b, o->wlr_output->make);
+				ipc_json_string(&b, o->wlr_output->make);
 				ipc_buff(&b, ", \"model\": ");
-				json_str(&b, o->wlr_output->model);
+				ipc_json_string(&b, o->wlr_output->model);
 			}
 		}
 
@@ -288,18 +256,18 @@ static bool status_render(char *buf, size_t bufsz) {
 	if (focused != NULL && focused->desk != NULL) {
 		desktop_t *desk = focused->desk;
 		ipc_buff(&b, "  \"focused\": {\"output\": ");
-		json_str(&b, focused->name);
+		ipc_json_string(&b, focused->name);
 		ipc_buff(&b, ", \"desktop\": ");
-		json_str(&b, desk->name);
+		ipc_json_string(&b, desk->name);
 
 		node_t *focus = desk->focus;
 		if (focus != NULL) {
 			ipc_buff(&b, ", \"node\": %u", focus->id);
 			if (focus->client != NULL) {
 				ipc_buff(&b, ", \"app_id\": ");
-				json_str(&b, focus->client->app_id);
+				ipc_json_string(&b, focus->client->app_id);
 				ipc_buff(&b, ", \"title\": ");
-				json_str(&b, focus->client->title);
+				ipc_json_string(&b, focus->client->title);
 			}
 		}
 		ipc_buff(&b, "},\n");

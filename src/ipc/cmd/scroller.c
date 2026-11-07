@@ -39,6 +39,42 @@ static bool find_focused_client(ipc_args_t *a, desktop_t *desk) {
 	return true;
 }
 
+// what a subcommand needs beyond a focused desktop
+typedef enum {
+	DESK_NEED_NONE, // the desktop alone
+	DESK_NEED_CLIENT, // the desktop must have a focused client
+	DESK_NEED_TILE, // the focused client must be part of the scroller layout
+} desk_need_t;
+
+// resolved output and desktop for a subcommand
+typedef struct {
+	output_t *mon;
+	desktop_t *desk;
+} desk_target_t;
+
+// resolve the focused desktop and whatever the subcommand needs from it
+static bool desk_target(ipc_args_t *a, desk_need_t need, desk_target_t *t) {
+	t->desk = ipc_focused_desk(a, &t->mon);
+	if (!t->desk)
+		return false;
+
+	switch (need) {
+	case DESK_NEED_NONE:
+		return true;
+	case DESK_NEED_CLIENT:
+		return find_focused_client(a, t->desk);
+	case DESK_NEED_TILE:
+		return find_focused_tile(a, t->desk, NULL);
+	}
+
+	return true;
+}
+
+static void desk_commit(ipc_args_t *a, const desk_target_t *t, const char *msg) {
+	arrange(t->mon, t->desk, true);
+	ipc_ok(a, msg);
+}
+
 static bool cfg_parse_size_arg(ipc_args_t *a, const char *what, scroller_size_t *out) {
 	const char *value;
 	if (!ipc_need(a, what, &value))
@@ -76,22 +112,16 @@ static void scr_proportion(ipc_args_t *a) {
 	if (!cfg_parse_size_arg(a, "proportion", &size))
 		return;
 
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk)
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_TILE, &t))
 		return;
 
-	int col;
-	if (!find_focused_tile(a, desk, &col))
-		return;
-
-	if (!scroller_set_column_width(desk, size)) {
+	if (!scroller_set_column_width(t.desk, size)) {
 		ipc_fail(a, "No focused tiled window\n");
 		return;
 	}
 
-	arrange(mon, desk, true);
-	ipc_ok(a, "Column width set\n");
+	desk_commit(a, &t, "Column width set\n");
 }
 
 static void scr_resize(ipc_args_t *a) {
@@ -99,62 +129,47 @@ static void scr_resize(ipc_args_t *a) {
 	if (!ipc_float(a, "delta", -1e6, 1e6, &delta))
 		return;
 
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk)
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_TILE, &t))
 		return;
 
-	int col;
-	if (!find_focused_tile(a, desk, &col))
-		return;
-
-	if (!scroller_resize_width(desk, delta)) {
+	if (!scroller_resize_width(t.desk, delta)) {
 		ipc_fail(a, "No focused tiled window\n");
 		return;
 	}
 
-	arrange(mon, desk, true);
-	ipc_ok(a, "Resized\n");
+	desk_commit(a, &t, "Resized\n");
 }
 
 static void scr_stack(ipc_args_t *a) {
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk || !find_focused_client(a, desk))
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_CLIENT, &t))
 		return;
 
-	if (!scroller_consume_into_column(desk)) {
+	if (!scroller_consume_into_column(t.desk)) {
 		ipc_fail(a, "Nothing to stack into\n");
 		return;
 	}
 
-	arrange(mon, desk, true);
-	ipc_ok(a, "Stacked\n");
+	desk_commit(a, &t, "Stacked\n");
 }
 
 static void scr_unstack(ipc_args_t *a) {
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk || !find_focused_client(a, desk))
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_CLIENT, &t))
 		return;
 
-	if (!scroller_expel_from_column(desk)) {
+	if (!scroller_expel_from_column(t.desk)) {
 		ipc_fail(a, "Nothing to unstack\n");
 		return;
 	}
 
-	arrange(mon, desk, true);
-	ipc_ok(a, "Unstacked\n");
+	desk_commit(a, &t, "Unstacked\n");
 }
 
 static void scr_cycle_preset(ipc_args_t *a, bool heights) {
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk)
-		return;
-
-	int col;
-	if (!find_focused_tile(a, desk, &col))
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_TILE, &t))
 		return;
 
 	int step = 1;
@@ -169,15 +184,14 @@ static void scr_cycle_preset(ipc_args_t *a, bool heights) {
 		ipc_take(a);
 	}
 
-	bool ok = heights ? scroller_cycle_height_preset(desk, step) : scroller_cycle_width_preset(desk,
-		step);
+	bool ok = heights ? scroller_cycle_height_preset(t.desk, step)
+		: scroller_cycle_width_preset(t.desk, step);
 	if (!ok) {
 		ipc_fail(a, "No presets configured\n");
 		return;
 	}
 
-	arrange(mon, desk, true);
-	ipc_ok(a, "Cycled to next preset\n");
+	desk_commit(a, &t, "Cycled to next preset\n");
 }
 
 static void scr_cycle_width(ipc_args_t *a) {
@@ -189,39 +203,29 @@ static void scr_cycle_height(ipc_args_t *a) {
 }
 
 static void scr_toggle_full_width(ipc_args_t *a) {
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk)
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_CLIENT, &t))
 		return;
 
-	if (!find_focused_client(a, desk))
-		return;
-
-	if (!scroller_toggle_column_full_width(desk)) {
+	if (!scroller_toggle_column_full_width(t.desk)) {
 		ipc_fail(a, "No focused tiled window\n");
 		return;
 	}
 
-	arrange(mon, desk, true);
-	ipc_ok(a, "Column width toggled\n");
+	desk_commit(a, &t, "Column width toggled\n");
 }
 
 static void scr_expand_column(ipc_args_t *a) {
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk)
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_CLIENT, &t))
 		return;
 
-	if (!find_focused_client(a, desk))
-		return;
-
-	if (!scroller_expand_column_to_available_width(desk)) {
+	if (!scroller_expand_column_to_available_width(t.desk)) {
 		ipc_fail(a, "No focused tiled window\n");
 		return;
 	}
 
-	arrange(mon, desk, true);
-	ipc_ok(a, "Column expanded\n");
+	desk_commit(a, &t, "Column expanded\n");
 }
 
 static void scr_set_height(ipc_args_t *a) {
@@ -229,64 +233,47 @@ static void scr_set_height(ipc_args_t *a) {
 	if (!cfg_parse_size_arg(a, "proportion or px size", &size))
 		return;
 
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk)
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_CLIENT, &t))
 		return;
 
-	if (!find_focused_client(a, desk))
-		return;
-
-	if (!scroller_set_window_height(desk, size)) {
+	if (!scroller_set_window_height(t.desk, size)) {
 		ipc_fail(a, "No focused tiled window\n");
 		return;
 	}
 
-	arrange(mon, desk, true);
-	ipc_ok(a, "Window height set\n");
+	desk_commit(a, &t, "Window height set\n");
 }
 
 static void scr_reset_height(ipc_args_t *a) {
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk)
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_CLIENT, &t))
 		return;
 
-	if (!find_focused_client(a, desk))
-		return;
-
-	if (!scroller_reset_window_height(desk)) {
+	if (!scroller_reset_window_height(t.desk)) {
 		ipc_fail(a, "No focused tiled window\n");
 		return;
 	}
 
-	arrange(mon, desk, true);
-	ipc_ok(a, "Window height reset\n");
+	desk_commit(a, &t, "Window height reset\n");
 }
 
 static void scr_center(ipc_args_t *a) {
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk || !find_focused_client(a, desk))
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_CLIENT, &t))
 		return;
 
-	scroller_center_window(desk, desk->focus->client);
-	arrange(mon, desk, true);
-	ipc_ok(a, "Window centered\n");
+	scroller_center_window(t.desk, t.desk->focus->client);
+	desk_commit(a, &t, "Window centered\n");
 }
 
 static void scr_center_visible(ipc_args_t *a) {
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk)
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_CLIENT, &t))
 		return;
 
-	if (!find_focused_client(a, desk))
-		return;
-
-	scroller_center_visible_columns(desk);
-	arrange(mon, desk, true);
-	ipc_ok(a, "Visible columns centered\n");
+	scroller_center_visible_columns(t.desk);
+	desk_commit(a, &t, "Visible columns centered\n");
 }
 
 typedef enum {
@@ -354,12 +341,8 @@ static void scr_action(ipc_args_t *a, int kind, bool swap) {
 		return;
 	}
 
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk)
-		return;
-
-	if (!find_focused_client(a, desk))
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_CLIENT, &t))
 		return;
 
 	bool ok;
@@ -371,17 +354,17 @@ static void scr_action(ipc_args_t *a, int kind, bool swap) {
 		}
 
 		if (streq(what, "left") || streq(what, "west") || streq(what, "focus_left"))
-			ok = scroller_swap_dir(DIR_WEST, desk);
+			ok = scroller_swap_dir(DIR_WEST, t.desk);
 		else if (streq(what, "right") || streq(what, "east") || streq(what, "focus_right"))
-			ok = scroller_swap_dir(DIR_EAST, desk);
+			ok = scroller_swap_dir(DIR_EAST, t.desk);
 		else if (streq(what, "up") || streq(what, "north") || streq(what, "focus_up"))
-			ok = scroller_swap_dir(DIR_NORTH, desk);
+			ok = scroller_swap_dir(DIR_NORTH, t.desk);
 		else if (streq(what, "down") || streq(what, "south") || streq(what, "focus_down"))
-			ok = scroller_swap_dir(DIR_SOUTH, desk);
+			ok = scroller_swap_dir(DIR_SOUTH, t.desk);
 		else
 			ok = false;
 	} else {
-		ok = match->fn(desk);
+		ok = match->fn(t.desk);
 	}
 
 	if (!ok) {
@@ -389,7 +372,7 @@ static void scr_action(ipc_args_t *a, int kind, bool swap) {
 		return;
 	}
 
-	arrange(mon, desk, true);
+	arrange(t.mon, t.desk, true);
 	ipc_okf(a, "%s\n", what);
 }
 
@@ -446,14 +429,12 @@ static const str_pair_t orientation_values[] = {
 };
 
 static void ms_cycle_orientation(ipc_args_t *a) {
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk)
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_NONE, &t))
 		return;
 
-	master_stack_cycle_orientation(desk);
-	arrange(mon, desk, true);
-	ipc_ok(a, "Orientation cycled\n");
+	master_stack_cycle_orientation(t.desk);
+	desk_commit(a, &t, "Orientation cycled\n");
 }
 
 static void ms_orientation(ipc_args_t *a) {
@@ -461,88 +442,74 @@ static void ms_orientation(ipc_args_t *a) {
 	if (!ipc_enum(a, "orientation", orientation_values, &orientation))
 		return;
 
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk)
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_NONE, &t))
 		return;
 
-	master_stack_set_orientation(desk, (master_area_orientation_t)orientation);
-	arrange(mon, desk, true);
-	ipc_ok(a, "Orientation set\n");
+	master_stack_set_orientation(t.desk, (master_area_orientation_t)orientation);
+	desk_commit(a, &t, "Orientation set\n");
 }
 
 static void ms_cycle_stack_layout(ipc_args_t *a) {
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk)
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_NONE, &t))
 		return;
 
-	master_stack_cycle_stack_layout(desk);
-	arrange(mon, desk, true);
-	ipc_ok(a, "Stack layout cycled\n");
+	master_stack_cycle_stack_layout(t.desk);
+	desk_commit(a, &t, "Stack layout cycled\n");
 }
 
 static void ms_inc(ipc_args_t *a) {
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk)
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_NONE, &t))
 		return;
 
-	master_stack_increment(desk);
-	arrange(mon, desk, true);
-	ipc_ok(a, "Master added\n");
+	master_stack_increment(t.desk);
+	desk_commit(a, &t, "Master added\n");
 }
 
 static void ms_dec(ipc_args_t *a) {
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk)
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_NONE, &t))
 		return;
 
-	master_stack_decrement(desk);
-	arrange(mon, desk, true);
-	ipc_ok(a, "master removed\n");
+	master_stack_decrement(t.desk);
+	desk_commit(a, &t, "master removed\n");
 }
 
 static void ms_flip(ipc_args_t *a) {
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk)
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_NONE, &t))
 		return;
 
-	master_stack_flip_orientation(desk);
-	arrange(mon, desk, true);
-	ipc_ok(a, "orientation flipped\n");
+	master_stack_flip_orientation(t.desk);
+	desk_commit(a, &t, "orientation flipped\n");
 }
 
 static void ms_promote(ipc_args_t *a) {
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk)
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_NONE, &t))
 		return;
 
-	if (!master_stack_promote(desk)) {
+	if (!master_stack_promote(t.desk)) {
 		ipc_fail(a, "Focus a secondary tiled window\n");
 		return;
 	}
 
-	arrange(mon, desk, true);
-	ipc_ok(a, "focused window promoted\n");
+	desk_commit(a, &t, "focused window promoted\n");
 }
 
 static void ms_demote(ipc_args_t *a) {
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk)
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_NONE, &t))
 		return;
 
-	if (!master_stack_demote(desk)) {
+	if (!master_stack_demote(t.desk)) {
 		ipc_fail(a, "Focus a master tiled window\n");
 		return;
 	}
 
-	arrange(mon, desk, true);
-	ipc_ok(a, "Focused window demoted\n");
+	desk_commit(a, &t, "Focused window demoted\n");
 }
 
 static void ms_set_count(ipc_args_t *a) {
@@ -550,14 +517,12 @@ static void ms_set_count(ipc_args_t *a) {
 	if (!ipc_int(a, "count", 0, INT_MAX, &count))
 		return;
 
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk)
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_NONE, &t))
 		return;
 
-	master_stack_set_count(desk, count);
-	arrange(mon, desk, true);
-	ipc_ok(a, "Master count set\n");
+	master_stack_set_count(t.desk, count);
+	desk_commit(a, &t, "Master count set\n");
 }
 
 static void ms_set_ratio(ipc_args_t *a) {
@@ -565,14 +530,12 @@ static void ms_set_ratio(ipc_args_t *a) {
 	if (!ipc_float(a, "ratio", 0.1f, 0.9f, &ratio))
 		return;
 
-	output_t *mon;
-	desktop_t *desk = ipc_focused_desk(a, &mon);
-	if (!desk)
+	desk_target_t t;
+	if (!desk_target(a, DESK_NEED_NONE, &t))
 		return;
 
-	desk->master_stack.ratio = ratio;
-	arrange(mon, desk, true);
-	ipc_ok(a, "Ratio set\n");
+	t.desk->master_stack.ratio = ratio;
+	desk_commit(a, &t, "Ratio set\n");
 }
 
 const ipc_sub_t master_stack_subs[] = {

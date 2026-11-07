@@ -1,8 +1,7 @@
+#include "cairo_buffer.h"
 #include "settings.h"
 #include "str.h"
 #include "text.h"
-#include <cairo.h>
-#include <drm_fourcc.h>
 #include <math.h>
 #include <pango/pangocairo.h>
 #include <stdint.h>
@@ -10,44 +9,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wayland-server-core.h>
-#include <wlr/interfaces/wlr_buffer.h>
 #include <wlr/types/wlr_buffer.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/util/log.h>
-
-typedef struct {
-	struct wlr_buffer base;
-	cairo_surface_t *surface;
-	cairo_t *cairo;
-} cairo_buffer_t;
-
-static void cairo_buffer_destroy(struct wlr_buffer *wlr_buffer) {
-	cairo_buffer_t *buffer = wl_container_of(wlr_buffer, buffer, base);
-	cairo_surface_destroy(buffer->surface);
-	cairo_destroy(buffer->cairo);
-	free(buffer);
-}
-
-static bool cairo_buffer_begin_data_ptr_access(struct wlr_buffer *wlr_buffer, uint32_t flags,
-		void **data, uint32_t *format, size_t *stride) {
-	(void)flags;
-	cairo_buffer_t *buffer = wl_container_of(wlr_buffer, buffer, base);
-	*data = cairo_image_surface_get_data(buffer->surface);
-	*stride = cairo_image_surface_get_stride(buffer->surface);
-	*format = DRM_FORMAT_ARGB8888;
-	return true;
-}
-
-static void cairo_buffer_end_data_ptr_access(struct wlr_buffer *wlr_buffer) {
-	(void)wlr_buffer;
-}
-
-static const struct wlr_buffer_impl cairo_buffer_impl = {
-	.destroy = cairo_buffer_destroy,
-	.begin_data_ptr_access = cairo_buffer_begin_data_ptr_access,
-	.end_data_ptr_access = cairo_buffer_end_data_ptr_access,
-};
 
 typedef struct {
 	struct wlr_scene_buffer *buffer_node;
@@ -146,22 +111,13 @@ static void render_backing_buffer(const text_buffer_t *buffer) {
 		return;
 	}
 
-	cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height);
-	if (cairo_surface_status(surface) != CAIRO_STATUS_SUCCESS) {
-		cairo_surface_destroy(surface);
+	cairo_buffer_t *cairo_buffer = cairo_buffer_create_image(width, height);
+	if (!cairo_buffer)
 		return;
-	}
 
-	cairo_buffer_t *cairo_buffer = calloc(1, sizeof(*cairo_buffer));
-	if (!cairo_buffer) {
-		cairo_surface_destroy(surface);
-		return;
-	}
-
-	cairo_t *cairo = cairo_create(surface);
+	cairo_t *cairo = cairo_buffer_cairo(cairo_buffer);
 	if (!cairo) {
-		cairo_surface_destroy(surface);
-		free(cairo_buffer);
+		cairo_buffer_destroy(cairo_buffer);
 		return;
 	}
 
@@ -184,14 +140,10 @@ static void render_backing_buffer(const text_buffer_t *buffer) {
 	pango_cairo_show_layout(cairo, layout);
 	g_object_unref(layout);
 
-	cairo_surface_flush(surface);
+	cairo_surface_flush(cairo_buffer->surface);
 
-	wlr_buffer_init(&cairo_buffer->base, &cairo_buffer_impl, width, height);
-	cairo_buffer->surface = surface;
-	cairo_buffer->cairo = cairo;
-
-	wlr_scene_buffer_set_buffer(buffer->buffer_node, &cairo_buffer->base);
-	wlr_buffer_drop(&cairo_buffer->base);
+	wlr_scene_buffer_set_buffer(buffer->buffer_node, cairo_buffer_base(cairo_buffer));
+	wlr_buffer_drop(cairo_buffer_base(cairo_buffer));
 }
 
 static void handle_outputs_update(struct wl_listener *listener, void *data) {
