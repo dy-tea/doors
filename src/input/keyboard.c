@@ -27,6 +27,7 @@
 #include <wlr/types/wlr_keyboard.h>
 #include <wlr/types/wlr_keyboard_group.h>
 #include <wlr/types/wlr_keyboard_shortcuts_inhibit_v1.h>
+#include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_seat.h>
 #include <wlr/types/wlr_xdg_shell.h>
@@ -1032,7 +1033,28 @@ static bool resize_master_stack_ratio(const bool horizontal, float delta) {
 	return true;
 }
 
-void resize_left(void) {
+static const char *direction_name(const enum wlr_direction dir) {
+	switch (dir) {
+	case WLR_DIRECTION_LEFT:
+		return "left";
+	case WLR_DIRECTION_RIGHT:
+		return "right";
+	case WLR_DIRECTION_UP:
+		return "up";
+	case WLR_DIRECTION_DOWN:
+		return "down";
+	}
+
+	return "unknown";
+}
+
+static void resize_along_split(const enum wlr_direction dir) {
+	const bool horizontal = (dir == WLR_DIRECTION_LEFT || dir == WLR_DIRECTION_RIGHT);
+	const double delta = (dir == WLR_DIRECTION_LEFT ||
+		dir == WLR_DIRECTION_UP) ? -RESIZE_AMOUNT : RESIZE_AMOUNT;
+	const split_type_t axis = horizontal ? TYPE_VERTICAL : TYPE_HORIZONTAL;
+	const char *name = direction_name(dir);
+
 	output_t *focused = output_focused();
 
 	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL) {
@@ -1041,187 +1063,69 @@ void resize_left(void) {
 			focused && focused->desk ? (void *)focused->desk->focus : NULL);
 		return;
 	}
-	if (resize_master_stack_ratio(true, -RESIZE_AMOUNT))
+	if (resize_master_stack_ratio(horizontal, delta))
 		return;
 	if (focused->desk->layout == LAYOUT_SCROLLER) {
-		if (scroller_resize_width(focused->desk, -RESIZE_AMOUNT)) {
+		double scroller_delta = delta;
+		if (!horizontal && focused->desk->scroller_state)
+			scroller_delta *= (float)focused->desk->scroller_state->working_area.height;
+
+		const bool resized = horizontal ? scroller_resize_width(focused->desk,
+			delta) : scroller_resize_stack(focused->desk, scroller_delta);
+		if (resized) {
 			arrange(focused, focused->desk, true);
-			wlr_log(WLR_INFO, "Resized left (scroller)");
+			wlr_log(WLR_INFO, "Resized %s (scroller)", name);
 		}
 		return;
 	}
 
 	node_t *n = focused->desk->focus;
 	if (n->parent == NULL) {
-		wlr_log(WLR_ERROR, "No parent for left resize of node %u", n->id);
+		wlr_log(WLR_ERROR, "No parent for %s resize of node %u", name, n->id);
 		return;
 	}
 
-	// walk up to find nearest ancestor with VERTICAL split
-	node_t *child = n;
+	// walk up to the nearest ancestor with a split along the resized axis
+	node_t *child = n->parent;
 	node_t *p = n->parent;
-	for (child = p; p != NULL && p->split_type != TYPE_VERTICAL; p = p->parent)
-		;
+	for (; p != NULL && p->split_type != axis; p = p->parent)
+		child = p;
 
 	wlr_log(WLR_INFO, "Node=%u ancestor=%u split_type=%d is_first=%d ratio_before=%f", n->id,
 		p ? p->id : 0, p ? (int)p->split_type : -1, p ? is_first_child(child) : -1,
 		p ? p->split_ratio : 0.0f);
 
-	if (p != NULL) {
-		double ratio = p->split_ratio - RESIZE_AMOUNT;
-		if (ratio < 0.1)
-			ratio = 0.1;
-		node_set_split_ratio(p, ratio);
-		wlr_log(WLR_INFO, "Ratio after=%f for left resize of node %u", p->split_ratio, p->id);
-		arrange(focused, focused->desk, true);
-		wlr_log(WLR_INFO, "Resized left");
-	} else {
-		wlr_log(WLR_ERROR, "No vertical ancestor for left resize of node %u", n->id);
+	if (p == NULL) {
+		wlr_log(WLR_ERROR, "No %s ancestor for %s resize of node %u",
+			horizontal ? "vertical" : "horizontal", name, n->id);
+		return;
 	}
+
+	double ratio = p->split_ratio + delta;
+	if (delta < 0 && ratio < 0.1)
+		ratio = 0.1;
+	if (delta > 0 && ratio > 0.9)
+		ratio = 0.9;
+	node_set_split_ratio(p, ratio);
+	wlr_log(WLR_INFO, "Ratio after=%f for %s resize of node %u", p->split_ratio, name, p->id);
+	arrange(focused, focused->desk, true);
+	wlr_log(WLR_INFO, "Resized %s", name);
+}
+
+void resize_left(void) {
+	resize_along_split(WLR_DIRECTION_LEFT);
 }
 
 void resize_right(void) {
-	output_t *focused = output_focused();
-
-	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL) {
-		wlr_log(WLR_ERROR, "Invalid state");
-		return;
-	}
-	if (resize_master_stack_ratio(true, RESIZE_AMOUNT))
-		return;
-	if (focused->desk->layout == LAYOUT_SCROLLER) {
-		if (scroller_resize_width(focused->desk, RESIZE_AMOUNT)) {
-			arrange(focused, focused->desk, true);
-			wlr_log(WLR_INFO, "Resized right (scroller)");
-		}
-		return;
-	}
-
-	node_t *n = focused->desk->focus;
-	if (n->parent == NULL) {
-		wlr_log(WLR_ERROR, "No parent for right resize of node %u", n->id);
-		return;
-	}
-
-	// walk up to find nearest ancestor with VERTICAL split
-	node_t *child = n;
-	node_t *p = n->parent;
-	for (child = p; p != NULL && p->split_type != TYPE_VERTICAL; p = p->parent)
-		;
-
-	wlr_log(WLR_INFO, "Node=%u ancestor=%u split_type=%d is_first=%d ratio_before=%f", n->id,
-		p ? p->id : 0, p ? (int)p->split_type : -1, p ? is_first_child(child) : -1,
-		p ? p->split_ratio : 0.0f);
-
-	if (p != NULL) {
-		double ratio = p->split_ratio + RESIZE_AMOUNT;
-		if (ratio > 0.9)
-			ratio = 0.9;
-		node_set_split_ratio(p, ratio);
-		wlr_log(WLR_INFO, "Ratio after=%f for right resize of node %u", p->split_ratio, p->id);
-		arrange(focused, focused->desk, true);
-		wlr_log(WLR_INFO, "Resized right");
-	} else {
-		wlr_log(WLR_ERROR, "No vertical ancestor for right resize of node %u", n->id);
-	}
+	resize_along_split(WLR_DIRECTION_RIGHT);
 }
 
 void resize_up(void) {
-	output_t *focused = output_focused();
-
-	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL) {
-		wlr_log(WLR_ERROR, "Invalid state");
-		return;
-	}
-	if (resize_master_stack_ratio(false, -RESIZE_AMOUNT))
-		return;
-	if (focused->desk->layout == LAYOUT_SCROLLER) {
-		float delta = -RESIZE_AMOUNT;
-		if (focused->desk->scroller_state)
-			delta *= (float)focused->desk->scroller_state->working_area.height;
-		if (scroller_resize_stack(focused->desk, delta)) {
-			arrange(focused, focused->desk, true);
-			wlr_log(WLR_INFO, "Resized up (scroller)");
-		}
-		return;
-	}
-
-	node_t *n = focused->desk->focus;
-	if (n->parent == NULL) {
-		wlr_log(WLR_ERROR, "No parent for up resize of node %u", n->id);
-		return;
-	}
-
-	// walk up to find nearest ancestor with HORIZONTAL split
-	node_t *child = n;
-	node_t *p = n->parent;
-	for (child = p; p != NULL && p->split_type != TYPE_HORIZONTAL; p = p->parent)
-		;
-
-	wlr_log(WLR_INFO, "Node=%u ancestor=%u split_type=%d is_first=%d ratio_before=%f", n->id,
-		p ? p->id : 0, p ? (int)p->split_type : -1, p ? is_first_child(child) : -1,
-		p ? p->split_ratio : 0.0f);
-
-	if (p != NULL) {
-		double ratio = p->split_ratio - RESIZE_AMOUNT;
-		if (ratio < 0.1)
-			ratio = 0.1;
-		node_set_split_ratio(p, ratio);
-		wlr_log(WLR_INFO, "Ratio after=%f for up resize of node %u", p->split_ratio, p->id);
-		arrange(focused, focused->desk, true);
-		wlr_log(WLR_INFO, "Resized up");
-	} else {
-		wlr_log(WLR_ERROR, "No horizontal ancestor for up resize of node %u", n->id);
-	}
+	resize_along_split(WLR_DIRECTION_UP);
 }
 
 void resize_down(void) {
-	output_t *focused = output_focused();
-
-	if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL) {
-		wlr_log(WLR_ERROR, "Invalid state");
-		return;
-	}
-	if (resize_master_stack_ratio(false, RESIZE_AMOUNT))
-		return;
-	if (focused->desk->layout == LAYOUT_SCROLLER) {
-		float delta = RESIZE_AMOUNT;
-		if (focused->desk->scroller_state)
-			delta *= (float)focused->desk->scroller_state->working_area.height;
-		if (scroller_resize_stack(focused->desk, delta)) {
-			arrange(focused, focused->desk, true);
-			wlr_log(WLR_INFO, "Resized down (scroller)");
-		}
-		return;
-	}
-
-	node_t *n = focused->desk->focus;
-	if (n->parent == NULL) {
-		wlr_log(WLR_ERROR, "No parent for down resize of node %u", n->id);
-		return;
-	}
-
-	// walk up to find nearest ancestor with HORIZONTAL split
-	node_t *child = n;
-	node_t *p = n->parent;
-	for (child = p; p != NULL && p->split_type != TYPE_HORIZONTAL; p = p->parent)
-		;
-
-	wlr_log(WLR_INFO, "Node=%u ancestor=%u split_type=%d is_first=%d ratio_before=%f", n->id,
-		p ? p->id : 0, p ? (int)p->split_type : -1, p ? is_first_child(child) : -1,
-		p ? p->split_ratio : 0.0f);
-
-	if (p != NULL) {
-		double ratio = p->split_ratio + RESIZE_AMOUNT;
-		if (ratio > 0.9)
-			ratio = 0.9;
-		node_set_split_ratio(p, ratio);
-		wlr_log(WLR_INFO, "Ratio after=%f for down resize of node %u", p->split_ratio, p->id);
-		arrange(focused, focused->desk, true);
-		wlr_log(WLR_INFO, "Resized down");
-	} else {
-		wlr_log(WLR_ERROR, "No horizontal ancestor for down resize of node %u", n->id);
-	}
+	resize_along_split(WLR_DIRECTION_DOWN);
 }
 
 void cancel_presel(void) {

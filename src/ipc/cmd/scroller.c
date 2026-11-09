@@ -41,9 +41,9 @@ static bool find_focused_client(ipc_args_t *a, desktop_t *desk) {
 
 // what a subcommand needs beyond a focused desktop
 typedef enum {
-	DESK_NEED_NONE, // the desktop alone
-	DESK_NEED_CLIENT, // the desktop must have a focused client
-	DESK_NEED_TILE, // the focused client must be part of the scroller layout
+	DESK_NEED_NONE,
+	DESK_NEED_CLIENT,
+	DESK_NEED_TILE,
 } desk_need_t;
 
 // resolved output and desktop for a subcommand
@@ -184,8 +184,8 @@ static void scr_cycle_preset(ipc_args_t *a, bool heights) {
 		ipc_take(a);
 	}
 
-	bool ok = heights ? scroller_cycle_height_preset(t.desk, step)
-		: scroller_cycle_width_preset(t.desk, step);
+	bool ok = heights ? scroller_cycle_height_preset(t.desk, step) : scroller_cycle_width_preset(t.desk,
+		step);
 	if (!ok) {
 		ipc_fail(a, "No presets configured\n");
 		return;

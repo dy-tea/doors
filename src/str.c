@@ -202,7 +202,12 @@ bool str_parse_color(const char *hex, float rgba[4]) {
 	if (len != 6 && len != 8)
 		return false;
 
-	float parsed[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+	float parsed[4] = {
+		0.0f,
+		0.0f,
+		0.0f,
+		1.0f
+	};
 	for (size_t i = 0; i < len / 2; i++) {
 		const int hi = str_hex_digit(hex[i * 2]);
 		const int lo = str_hex_digit(hex[i * 2 + 1]);
