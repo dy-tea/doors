@@ -218,7 +218,7 @@ static void scroller_recenter_view(scroller_state_t *s, int prev_idx) {
 	scroller_view_release(&v);
 }
 
-static bool find_tile(scroller_state_t *s, client_t *c, int *out_col_idx, int *out_tile_idx) {
+static bool find_tile(scroller_state_t *s, const client_t *c, int *out_col_idx, int *out_tile_idx) {
 	for (int i = 0; i < s->column_count; i++) {
 		for (int j = 0; j < s->columns[i].tile_count; j++) {
 			if (s->columns[i].tiles[j].client == c) {
@@ -231,6 +231,34 @@ static bool find_tile(scroller_state_t *s, client_t *c, int *out_col_idx, int *o
 		}
 	}
 	return false;
+}
+
+double scroller_scroll_amount_to_activate(const desktop_t *d, const client_t *c) {
+	if (d == NULL || d->layout != LAYOUT_SCROLLER || d->scroller_state == NULL || c == NULL)
+		return 0.0;
+
+	scroller_state_t *s = d->scroller_state;
+	if (s->column_count == 0)
+		return 0.0;
+
+	int col_idx;
+	if (!find_tile(s, c, &col_idx, NULL))
+		return 0.0;
+
+	if (col_idx == s->active_column_idx)
+		return 0.0;
+
+	scroller_view_t v;
+	if (!scroller_view_setup(s, &v))
+		return 0.0;
+
+	const int prev_idx = CLAMP(s->active_column_idx, 0, s->column_count - 1);
+	const double cur_x = v.xs[prev_idx] + s->view_offset;
+	const double new_offset = scroller_view_offset_for_column(s, &v, cur_x, col_idx, prev_idx);
+	const double amount = fabs((cur_x - v.xs[col_idx]) - new_offset) / v.view_width;
+
+	scroller_view_release(&v);
+	return amount;
 }
 
 static int create_column(scroller_state_t *s, client_t *client, bool activate) {
@@ -1544,6 +1572,7 @@ bool scroller_bind_action(desktop_t *d, const int action) {
 	case BIND_MOVE_COLUMN_LAST:
 		return scroller_move_column_to_last(d);
 	default:
+		break;
 	}
 
 	return false;

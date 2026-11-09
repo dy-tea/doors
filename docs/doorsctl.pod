@@ -286,6 +286,14 @@ C<doorsctl config focus_follows_pointer [no|yes|always]>
 
 Controls whether keyboard focus follows the pointer cursor. Defaults to C<no>.
 
+=item I<focus_follows_pointer_max_scroll>
+
+C<doorsctl config focus_follows_pointer_max_scroll [I<percent>]>
+
+Limits how far the scroller view may scroll when the pointer moves over a
+window in another column. C<0> only focuses windows that are already fully visible.
+Defaults to C<0>.
+
 =item I<initial_polarity>
 
 C<doorsctl config initial_polarity [first_child|second_child]>

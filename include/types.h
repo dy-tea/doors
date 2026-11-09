@@ -300,6 +300,7 @@ typedef struct {
 	bool focus_wrapping;
 	focus_on_activate_mode_t focus_on_activate;
 	int focus_follows_mouse;
+	int focus_follows_mouse_max_scroll;
 	bool pointer_follows_focus;
 	double split_ratio;
 

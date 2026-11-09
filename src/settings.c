@@ -47,6 +47,7 @@ doors_settings_t settings = {
 	.focus_wrapping = true,
 	.focus_on_activate = FOCUS_ON_ACTIVATE_FOCUS,
 	.focus_follows_mouse = FOLLOWS_NO,
+	.focus_follows_mouse_max_scroll = 0,
 	.pointer_follows_focus = false,
 	.split_ratio = 0.5,
 

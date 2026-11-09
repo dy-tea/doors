@@ -60,6 +60,7 @@ bool scroller_focus_up_or_left(desktop_t *d);
 bool scroller_focus_up_or_right(desktop_t *d);
 bool scroller_swap(struct output_t *m, desktop_t *d, direction_t dir);
 void scroller_center_window(desktop_t *d, client_t *client);
+double scroller_scroll_amount_to_activate(const desktop_t *d, const client_t *c);
 void scroller_center_visible_columns(const desktop_t *d);
 
 bool scroller_move_column_left(desktop_t *d);

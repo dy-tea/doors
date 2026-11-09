@@ -13,7 +13,6 @@
 #include "server.h"
 #include "str.h"
 #include "tabs.h"
-#include "text.h"
 #include "transaction.h"
 #include "tree.h"
 #include <assert.h>
@@ -207,6 +206,8 @@ const cfg_setting_t settings_table[] = {
 		NULL),
 	E("focus_follows_pointer", "focus_follows_mouse", settings.focus_follows_mouse,
 		focus_follows_pointer_values, CFG_COMMIT, NULL),
+	I("focus_follows_pointer_max_scroll", "focus_follows_mouse_max_scroll",
+		settings.focus_follows_mouse_max_scroll, 0, 100, "%d\n", 0, NULL),
 	E("initial_polarity", NULL, settings.initial_polarity, initial_polarity_values, 0, NULL),
 
 	/* animations */

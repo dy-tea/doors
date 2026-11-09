@@ -400,6 +400,7 @@ in
       (mkEnum "automatic_scheme" [ "layout" "automatic-scheme" ] [ "longest_side" "alternate" "spiral" ] "Automatic tiling scheme for new windows." "longest_side")
       (mkEnum "initial_polarity" [ "layout" "initial-polarity" ] [ "first_child" "second_child" ] "Initial insertion side for new windows." "second_child")
       (mkEnum "focus_follows_pointer" [ "layout" "focus-follows-pointer" ] [ "no" "yes" "always" ] "Whether keyboard focus follows the pointer cursor." "no")
+      (mkIntBetween 0 100 "focus_follows_pointer_max_scroll" [ "layout" "focus-follows-pointer-max-scroll" ] "Maximum scrolling, in percent of the working area width, that focus-follows-pointer may cause in the scroller layout. 0 only focuses already visible windows." 0)
       (mkIntBetween 0 2 "ignore_ewmh_fullscreen" [ "layout" "ignore-ewmh-fullscreen" ] "EWMH fullscreen handling: 0 = honor, 1 = ignore, 2 = auto." 0)
 
       # dimming

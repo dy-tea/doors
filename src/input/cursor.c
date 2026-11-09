@@ -621,8 +621,11 @@ static void process_cursor_motion(const uint32_t time, double dx, double dy, dou
 			if (!is_popup && hover && hover->node)
 				node = hover->node;
 
-			if (node && node->output && node->desktop && node->desktop == node->output->desk)
-				focus_node(node->output, node->desktop, node);
+			if (node && node->output && node->desktop && node->desktop == node->output->desk) {
+				const double max_scroll = (double)settings.focus_follows_mouse_max_scroll / 100.0;
+				if (scroller_scroll_amount_to_activate(node->desktop, node->client) <= max_scroll)
+					focus_node(node->output, node->desktop, node);
+			}
 		} else if (settings.focus_follows_mouse == FOLLOWS_ALWAYS) {
 			wlr_seat_keyboard_notify_clear_focus(seat);
 		}
