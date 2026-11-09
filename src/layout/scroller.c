@@ -580,28 +580,24 @@ void scroller_arrange(struct output_t *m, desktop_t *d, struct wlr_box available
 	free(layout_widths);
 
 	// view position (camera in world space)
-	const double active_col_x = col_xs[scroller_camera_column(s)];
+	const int camera_col = CLAMP(scroller_camera_column(s), 0, s->column_count - 1);
+	const double active_col_x = col_xs[camera_col];
 	double view_pos = active_col_x + s->view_offset;
 
 	// set pending rectangles on tree nodes.
 	const unsigned int bw = (unsigned int)effective_border_width(d);
 
 	int maximized_col = -1, maximized_tile = -1;
-	for (int i = 0; i < s->column_count && maximized_col < 0; i++) {
-		for (int j = 0; j < s->columns[i].tile_count; j++) {
-			if (!scroller_tile_shown(&s->columns[i].tiles[j]))
-				continue;
+	for (int j = 0; j < s->columns[camera_col].tile_count; j++) {
+		if (!scroller_tile_shown(&s->columns[camera_col].tiles[j]))
+			continue;
 
-			if (client_is_maximized(s->columns[i].tiles[j].client)) {
-				maximized_col = i;
-				maximized_tile = j;
-				break;
-			}
+		if (client_is_maximized(s->columns[camera_col].tiles[j].client)) {
+			maximized_col = camera_col;
+			maximized_tile = j;
+			break;
 		}
 	}
-
-	if (maximized_col >= 0)
-		view_pos = col_xs[maximized_col];
 
 	for (int i = 0; i < s->column_count; i++) {
 		scroller_column_t *col = &s->columns[i];
@@ -636,13 +632,11 @@ void scroller_arrange(struct output_t *m, desktop_t *d, struct wlr_box available
 
 			struct wlr_box outer;
 			if (is_maximized) {
-				const int mx = available.x + gap;
-				const int my = available.y + gap;
 				outer = (struct wlr_box){
-					.x = mx,
-					.y = my,
-					.width = MAX(1, available.width - (int)gap * 2),
-					.height = MAX(1, available.height - (int)gap * 2),
+					.x = area.x + gap,
+					.y = area.y + gap,
+					.width = MAX(1, area.width - (int)gap * 2),
+					.height = MAX(1, area.height - (int)gap * 2),
 				};
 			} else {
 				outer = (struct wlr_box){
@@ -684,17 +678,18 @@ void scroller_set_maximized(const desktop_t *d, const node_t *n, const bool valu
 	if (!find_tile(s, n->client, &col_idx, &tile_idx))
 		return;
 
-	if (value) {
-		int prev = s->active_column_idx;
-		s->active_column_idx = col_idx;
-		s->columns[col_idx].active_tile_idx = tile_idx;
-		s->view_offset = 0.0;
-		s->columns[col_idx].width.type = SCROLLER_SIZE_PROPORTION;
-		s->columns[col_idx].width.value = 1.0;
-		scroller_recenter_view(s, prev);
-	} else {
-		s->columns[col_idx].width = s->default_column_width;
-	}
+	if (!value)
+		return;
+
+	s->columns[col_idx].active_tile_idx = tile_idx;
+
+	if (col_idx == s->active_column_idx)
+		return;
+
+	const int prev = s->active_column_idx;
+	s->active_column_idx = col_idx;
+	s->view_offset = 0.0;
+	scroller_recenter_view(s, prev);
 }
 
 void scroller_sync_focus(scroller_state_t *s, client_t *c) {
