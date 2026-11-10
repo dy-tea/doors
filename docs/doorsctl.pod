@@ -48,7 +48,7 @@ Note that a running doors compositor is required for commands to function.
 I<command> is one of the top-level commands, which include: L</"bezier">,
 L</"commands">, L</"config">, L</"desktop">, L</"env">, L</"focus">,
 L</"globalshortcuts">, L</"hotkey">, L</"input">, L</"keyboard_grouping">,
-L</"master_stack">, L</"node">, L</"output">, L</"permission">, L</"query">,
+L</"layer_rule">, L</"master_stack">, L</"node">, L</"output">, L</"permission">, L</"query">,
 L</"quit">, L</"resize">, L</"rule">, L</"scratchpad">, L</"scroller">,
 L</"seat">, L</"send">, L</"sessions">, L</"spring">, L</"subscribe">,
 L</"swap">, L</"toggle">, L</"tree"> and L</"wm">.
@@ -901,6 +901,24 @@ C<doorsctl keyboard_grouping [none|smart|default]>
 
 Set the keyboard grouping mode.
 
+=item layer_rule
+
+C<doorsctl layer_rule -a|--add <namespace> [output=<pattern>] [options...]>
+
+C<doorsctl layer_rule -r|--remove <index>>
+
+C<doorsctl layer_rule -l|--list>
+
+Manage layer-shell surface rules. Layer surfaces are matched by their
+namespace and optionally by output (unlike toplevels they have no title).
+Patterns accept C<exact:>, C<glob:>, C<regex:> and the C<i:> caseless prefix.
+
+Consequences are C<blur=on|off>, C<opacity=0-1>, C<animations_disable=on|off>,
+C<keyboard_interactivity=none|exclusive|on_demand>,
+C<layer=background|bottom|top|overlay>, and
+C<block_out_from_screenshare=on|off>. Rules apply when a layer surface is
+created. Blur also requires blur to be enabled.
+
 =item master_stack
 
 C<doorsctl master_stack <subcommand>>
@@ -1276,9 +1294,12 @@ C<doorsctl query -D|--desktops>
 
 C<doorsctl query -N|--nodes>
 
+C<doorsctl query -L|--layers>
+
 C<doorsctl query -f|--focused>
 
-Query monitors, desktops and nodes. Supports C<-m>, C<-d>, C<-n>, C<--names>.
+Query monitors, desktops, layer surfaces and nodes. Supports C<-m>, C<-d>,
+C<-n>, C<-L> and C<--names>.
 
 =item quit
 

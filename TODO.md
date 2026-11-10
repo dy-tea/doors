@@ -19,7 +19,6 @@
 
 # Potential
 - Per desktop rules (e.g. force master_stack on a desktop)
-- Per layer-surface rules
 - Focus grab protocol
 - Overview/Expose mode from niri
 - Plugin system

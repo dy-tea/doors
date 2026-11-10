@@ -2,6 +2,9 @@
 #include "config.h"
 #include "input/input.h"
 #include "ipc/ipc.h"
+#include "layer_rule.h"
+#include "output/output.h"
+#include "protocol/layer.h"
 #include "rule.h"
 #include "settings.h"
 #include "spring.h"
@@ -107,6 +110,90 @@ static void test_dry_run_rule(void) {
 	CHECK(reply[0] == '\0');
 	CHECK(strstr(reply + 1, "would be added") != NULL);
 	CHECK(rule_count() == before);
+}
+
+static void test_dry_run_layer_rule(void) {
+	layer_rule_init();
+	size_t before = layer_rule_count();
+
+	const char msg[] = "--dry-run\0layer_rule\0-a\0waybar\0blur=on\0";
+	char reply[512];
+
+	size_t n = exchange(msg, sizeof(msg) - 1, reply, sizeof(reply));
+	CHECK(n > 1);
+	CHECK(reply[0] == '\0');
+	CHECK(strstr(reply + 1, "would be added") != NULL);
+	CHECK(layer_rule_count() == before);
+
+	const char missing_namespace[] = "--dry-run\0layer_rule\0-a\0blur=on\0";
+	n = exchange(missing_namespace, sizeof(missing_namespace) - 1, reply, sizeof(reply));
+	CHECK(n > 1);
+	CHECK(reply[0] == '\x01');
+	CHECK(strstr(reply + 1, "Must specify a namespace") != NULL);
+	CHECK(layer_rule_count() == before);
+
+	const char unknown_option[] = "--dry-run\0layer_rule\0-a\0waybar\0title=x\0";
+	n = exchange(unknown_option, sizeof(unknown_option) - 1, reply, sizeof(reply));
+	CHECK(n > 1);
+	CHECK(reply[0] == '\x01');
+	CHECK(strstr(reply + 1, "Unknown layer rule option") != NULL);
+	CHECK(layer_rule_count() == before);
+}
+
+static void test_query_layers(void) {
+	wl_list_init(&mon_list);
+
+	output_t *output = calloc(1, sizeof(*output));
+	CHECK(output != NULL);
+	if (!output)
+		return;
+
+	snprintf(output->name, sizeof(output->name), "DP-1");
+	for (int i = 0; i < 4; i++)
+		wl_list_init(&output->layers[i]);
+	wl_list_insert(&mon_list, &output->link);
+
+	struct wlr_layer_surface_v1 *wlr_layer = calloc(1, sizeof(*wlr_layer));
+	layer_surface_t *layer = calloc(1, sizeof(*layer));
+	CHECK(wlr_layer != NULL && layer != NULL);
+
+	bool linked = false;
+	if (wlr_layer && layer) {
+		wlr_layer->namespace = strdup("waybar");
+		layer->layer_surface = wlr_layer;
+		layer->layer = ZWLR_LAYER_SHELL_V1_LAYER_TOP;
+		wl_list_init(&layer->link);
+		wl_list_insert(&output->layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], &layer->link);
+		linked = true;
+
+		const char msg[] = "query\0--layers\0";
+		char reply[512];
+		size_t n = exchange(msg, sizeof(msg) - 1, reply, sizeof(reply));
+		CHECK(n > 1);
+		CHECK(reply[0] == '\0');
+		CHECK(strstr(reply + 1, "\"namespace\": \"waybar\"") != NULL);
+		CHECK(strstr(reply + 1, "\"output\": \"DP-1\"") != NULL);
+		CHECK(strstr(reply + 1, "\"layer\": \"top\"") != NULL);
+		CHECK(strstr(reply + 1, "waybar DP-1 top") == NULL);
+
+		const char names_msg[] = "query\0-L\0--names\0";
+		n = exchange(names_msg, sizeof(names_msg) - 1, reply, sizeof(reply));
+		CHECK(n > 1);
+		CHECK(reply[0] == '\0');
+		CHECK(strstr(reply + 1, "waybar") != NULL);
+		CHECK(strstr(reply + 1, "DP-1") == NULL);
+	}
+
+	if (linked)
+		wl_list_remove(&layer->link);
+	if (wlr_layer) {
+		free(wlr_layer->namespace);
+		free(wlr_layer);
+	}
+	free(layer);
+	wl_list_remove(&output->link);
+	free(output);
+	wl_list_init(&mon_list);
 }
 
 static void test_dry_run_hotkey(void) {
@@ -247,6 +334,8 @@ static void run_tests(void) {
 	test_dry_run_special_setting();
 	test_dry_run_special_value();
 	test_dry_run_rule();
+	test_dry_run_layer_rule();
+	test_query_layers();
 	test_dry_run_hotkey();
 	test_dry_run_env();
 	test_dry_run_curves();

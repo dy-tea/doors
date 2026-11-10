@@ -10,7 +10,7 @@
 
 /**
  * Collects the rectangles, in output buffer coordinates, that have to be hidden
- * from screen capture because the toplevels covering them are configured with
+ * from screen capture because the surfaces covering them are configured with
  * block_out_from_screenshare.
  *
  * Returns the number of rectangles written to rects.

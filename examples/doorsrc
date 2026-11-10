@@ -28,7 +28,12 @@ doorsctl config enable_animations true
 doorsctl config idle_timeout 300
 doorsctl config idle_dpms true
 
-# Permission policy for unsandboxed clients (see README: Permission Commands).
+# Layer-shell rules match a client's layer-shell namespace
+# doorsctl layer_rule -a waybar blur=on opacity=0.9
+# doorsctl layer_rule -a 'glob:notifications*' layer=overlay
+# doorsctl layer_rule -a swaybg block_out_from_screenshare=on
+
+# Permission policy for unsandboxed clients
 # Rules are appended and the last matching rule wins.
 # doorsctl permission 'exe:*grim' capture=allow
 # doorsctl permission 'exe:*' capture=ask

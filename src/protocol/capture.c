@@ -1,6 +1,7 @@
 #include "layout/tree.h"
 #include "output/output.h"
 #include "protocol/capture.h"
+#include "protocol/layer.h"
 #include "server.h"
 #include "types.h"
 #include <drm_fourcc.h>
@@ -55,6 +56,76 @@ static bool blocked_view_rect(const output_t *o, const view_t *view, struct wlr_
 	return true;
 }
 
+static bool blocked_layer_rect(const output_t *o, const layer_surface_t *layer,
+		struct wlr_box *logical) {
+	if (!layer || !layer->mapped || !layer->layer_surface || !layer->scene_tree)
+		return false;
+	if (!layer->scene_tree->node.enabled)
+		return false;
+	if (!(layer->rule.has & LAYER_RULE_BLOCK_OUT_FROM_SCREENSHARE) || !layer_rule_flag(&layer->rule,
+		LAYER_RULE_BLOCK_OUT_FROM_SCREENSHARE))
+		return false;
+
+	const int width = (int)layer->layer_surface->current.actual_width;
+	const int height = (int)layer->layer_surface->current.actual_height;
+	if (width <= 0 || height <= 0)
+		return false;
+
+	int x, y;
+	if (!wlr_scene_node_coords(&layer->scene_tree->node, &x, &y))
+		return false;
+
+	*logical = (struct wlr_box){
+		.x = x - o->rectangle.x,
+		.y = y - o->rectangle.y,
+		.width = width,
+		.height = height,
+	};
+	return true;
+}
+
+static bool append_block_out_rect(const struct wlr_output *output, const output_t *o,
+		const int trans_width, const int trans_height, const struct wlr_box logical, struct wlr_box *rects,
+		const size_t max, size_t *nrects) {
+	if (*nrects >= max)
+		return false;
+
+	// the surface doesn't overlap this output
+	if (logical.x + logical.width <= 0 || logical.y + logical.height <= 0 ||
+		logical.x >= o->rectangle.width || logical.y >= o->rectangle.height)
+		return true;
+
+	// output logical coordinates -> buffer coordinates
+	const double scale = output->scale;
+	const double x0 = floor((double)logical.x * scale);
+	const double y0 = floor((double)logical.y * scale);
+	const double x1 = ceil((double)(logical.x + logical.width) * scale);
+	const double y1 = ceil((double)(logical.y + logical.height) * scale);
+
+	struct wlr_box buffer_box = {
+		.x = (int)x0,
+		.y = (int)y0,
+		.width = (int)(x1 - x0),
+		.height = (int)(y1 - y0),
+	};
+	wlr_box_transform(&buffer_box, &buffer_box, output->transform, trans_width, trans_height);
+
+	const struct wlr_box bounds = {
+		.x = 0,
+		.y = 0,
+		.width = output->width,
+		.height = output->height,
+	};
+	struct wlr_box clipped;
+	if (!wlr_box_intersection(&clipped, &buffer_box, &bounds))
+		return true;
+	if (clipped.width <= 0 || clipped.height <= 0)
+		return true;
+
+	rects[(*nrects)++] = clipped;
+	return true;
+}
+
 size_t capture_block_out_rects(struct wlr_output *output, struct wlr_box *rects, const size_t max) {
 	if (!output || !output->enabled || !output->renderer || max == 0)
 		return 0;
@@ -63,14 +134,12 @@ size_t capture_block_out_rects(struct wlr_output *output, struct wlr_box *rects,
 	if (!o)
 		return 0;
 
-	const int buffer_width = output->width, buffer_height = output->height;
-	if (buffer_width <= 0 || buffer_height <= 0)
+	if (output->width <= 0 || output->height <= 0)
 		return 0;
 
 	int trans_width, trans_height;
 	wlr_output_transformed_resolution(output, &trans_width, &trans_height);
 
-	const float scale = output->scale;
 	size_t nrects = 0;
 
 	view_t *view;
@@ -81,38 +150,22 @@ size_t capture_block_out_rects(struct wlr_output *output, struct wlr_box *rects,
 		struct wlr_box logical;
 		if (!blocked_view_rect(o, view, &logical))
 			continue;
+		if (!append_block_out_rect(output, o, trans_width, trans_height, logical, rects, max, &nrects))
+			break;
+	}
 
-		// the window doesn't overlap this output
-		if (logical.x + logical.width <= 0 || logical.y + logical.height <= 0 ||
-			logical.x >= o->rectangle.width || logical.y >= o->rectangle.height)
-			continue;
+	for (int i = 0; i < 4; i++) {
+		layer_surface_t *layer;
+		wl_list_for_each(layer, &o->layers[i], link) {
+			if (nrects >= max)
+				break;
 
-		// output logical coordinates -> buffer coordinates
-		const double x0 = floor((double)logical.x * scale);
-		const double y0 = floor((double)logical.y * scale);
-		const double x1 = ceil((double)(logical.x + logical.width) * scale);
-		const double y1 = ceil((double)(logical.y + logical.height) * scale);
-
-		struct wlr_box buffer_box = {
-			.x = (int)x0,
-			.y = (int)y0,
-			.width = (int)(x1 - x0),
-			.height = (int)(y1 - y0),
-		};
-		wlr_box_transform(&buffer_box, &buffer_box, output->transform, trans_width, trans_height);
-
-		struct wlr_box bounds = {
-			0,
-			0,
-			buffer_width,
-			buffer_height
-		};
-		if (!wlr_box_intersection(&rects[nrects], &buffer_box, &bounds))
-			continue;
-		if (rects[nrects].width <= 0 || rects[nrects].height <= 0)
-			continue;
-
-		nrects++;
+			struct wlr_box logical;
+			if (!blocked_layer_rect(o, layer, &logical))
+				continue;
+			if (!append_block_out_rect(output, o, trans_width, trans_height, logical, rects, max, &nrects))
+				break;
+		}
 	}
 
 	return nrects;

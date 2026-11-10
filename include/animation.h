@@ -47,6 +47,7 @@ bool animation_fade_in_layer(layer_surface_t *layer);
 bool animation_fade_out(view_t *view);
 bool animation_fade_out_layer(layer_surface_t *layer);
 bool animation_is_opacity_fading(view_t *view);
+bool animation_is_layer_opacity_fading(layer_surface_t *layer);
 
 bool animation_workspace_switch_active(const output_t *output);
 bool animation_node_workspace_slide_out(const node_t *node);

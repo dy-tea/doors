@@ -8,6 +8,7 @@ test_programs = {
 	'config-table': 'test_config_table.c',
 	'config-validate': 'test_config_validate.c',
 	'ipc-dry-run': 'test_ipc_dry_run.c',
+	'layer-rule': 'test_layer_rule.c',
 	'permission': 'test_permission.c',
 	'subscribe': 'test_subscribe.c',
 	'config-reset': 'test_config_reset.c',

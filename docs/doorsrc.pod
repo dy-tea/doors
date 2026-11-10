@@ -119,6 +119,21 @@ may be defined at once. Rules are appended and the last matching rule wins.
 
 See L<doorsctl(1)> for the full consequence and matching syntax.
 
+=head1 LAYER RULES
+
+Layer-shell rules control panels, notifications and other layer surfaces.
+They are added with C<doorsctl layer_rule -a> and match the namespace the
+client passes to the layer-shell protocol, optionally restricted to one
+output. Rules are appended and the last matching rule wins. Run
+C<doorsctl query -L> to see the namespace, output and layer of the live
+layer surfaces as JSON, or add C<--names> to print only the namespaces.
+
+    doorsctl layer_rule -a waybar blur=on opacity=0.9
+    doorsctl layer_rule -a 'glob:notifications*' layer=overlay
+    doorsctl layer_rule -a swaybg block_out_from_screenshare=on
+
+See L<doorsctl(1)>.
+
 =head1 PERMISSIONS
 
 Permission policy for unsandboxed clients is set with C<doorsctl permission>.

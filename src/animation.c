@@ -181,6 +181,19 @@ bool animation_is_opacity_fading(view_t *view) {
 	return false;
 }
 
+bool animation_is_layer_opacity_fading(layer_surface_t *layer) {
+	if (!layer || !layer->scene_tree)
+		return false;
+
+	animation_entry_t *entry;
+	wl_list_for_each(entry, &animations, link) {
+		if (entry->scene_tree == layer->scene_tree && entry->from_opacity != entry->to_opacity)
+			return true;
+	}
+
+	return false;
+}
+
 static double elapsed_ms(const struct timespec start, const struct timespec now) {
 	return (double)(now.tv_sec - start.tv_sec) * 1000.0 + (double)(now.tv_nsec - start.tv_nsec) /
 		1000000.0;
@@ -461,7 +474,7 @@ bool animation_fade_in_layer(layer_surface_t *layer) {
 	if (!layer || !layer->scene_tree || !layer->output || !settings.enable_animations)
 		return false;
 
-	if (!anim_type_configs[4].enabled)
+	if (!anim_type_configs[4].enabled || layer->anim_disabled)
 		return false;
 
 	animation_entry_t *entry = create_animation_entry();
@@ -473,7 +486,7 @@ bool animation_fade_in_layer(layer_surface_t *layer) {
 	entry->scene_tree = layer->scene_tree;
 	entry->output = layer->output;
 	entry->from_opacity = 0.0f;
-	entry->to_opacity = 1.0f; // possibly have opacity field in future
+	entry->to_opacity = layer->opacity;
 	clock_gettime(CLOCK_MONOTONIC, &entry->start);
 	entry->duration_ms = ANIMATION_DURATION_MS;
 	apply_config_to_entry(entry, 4);
@@ -518,7 +531,7 @@ bool animation_fade_out_layer(layer_surface_t *layer) {
 	if (!layer || !layer->saved_tree || !layer->output || !settings.enable_animations)
 		return false;
 
-	if (!anim_type_configs[5].enabled)
+	if (!anim_type_configs[5].enabled || layer->anim_disabled)
 		return false;
 
 	animation_entry_t *entry = create_animation_entry();
@@ -529,9 +542,10 @@ bool animation_fade_out_layer(layer_surface_t *layer) {
 	entry->view = NULL;
 	entry->scene_tree = layer->saved_tree;
 	entry->output = layer->output;
-	entry->from_opacity = 1.0f; // possibly have opacity field in future
+	entry->from_opacity = layer->opacity;
 	entry->to_opacity = 0.0f;
 	entry->saved_tree = layer->saved_tree;
+	surface_set_opacity(&layer->saved_tree->node, layer->opacity);
 	clock_gettime(CLOCK_MONOTONIC, &entry->start);
 	entry->duration_ms = ANIMATION_DURATION_MS;
 	apply_config_to_entry(entry, 5);

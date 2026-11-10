@@ -1,8 +1,10 @@
 #include "ipc/args.h"
 #include "ipc/helpers.h"
 #include "ipc/registry.h"
+#include "layer_rule.h"
 #include "output/output.h"
 #include "parse.h"
+#include "protocol/layer.h"
 #include "protocol/workspace.h"
 #include "server.h"
 #include "tree.h"
@@ -211,6 +213,61 @@ static void q_nodes(ipc_args_t *a) {
 	ipc_buf_send(a, &b);
 }
 
+static void q_layers(ipc_args_t *a) {
+	const query_filter_t *f = a->ctx;
+	bool names_only = f->use_names;
+
+	const char *arg;
+	while ((arg = ipc_peek(a))) {
+		if (!streq(arg, "--names"))
+			break;
+		names_only = true;
+		ipc_take(a);
+	}
+
+	if (!ipc_end(a))
+		return;
+
+	IPC_REPLY(b);
+
+	if (!names_only)
+		ipc_buff(&b, "[");
+
+	bool first = true;
+	output_t *m;
+	wl_list_for_each(m, &mon_list, link) {
+		if (f->mon && m != f->mon)
+			continue;
+
+		for (int i = 0; i < 4; i++) {
+			layer_surface_t *layer;
+			wl_list_for_each(layer, &m->layers[i], link) {
+				const char *namespace = layer->layer_surface &&
+						layer->layer_surface->namespace ? layer->layer_surface->namespace : "?";
+
+				if (names_only) {
+					ipc_buff(&b, "%s\n", namespace);
+					continue;
+				}
+
+				ipc_buff(&b, "%s\n  {\"namespace\": ", first ? "" : ",");
+				ipc_json_string(&b, namespace);
+				ipc_buff(&b, ", \"output\": ");
+				ipc_json_string(&b, m->name);
+				ipc_buff(&b, ", \"layer\": ");
+				ipc_json_string(&b, layer_rule_layer_name(layer->layer));
+				ipc_buff(&b, "}");
+				first = false;
+			}
+		}
+	}
+
+	if (!names_only)
+		ipc_buff(&b, "%s]\n", first ? "" : "\n");
+
+	ipc_buf_send(a, &b);
+}
+
 static void q_focused(ipc_args_t *a) {
 	const query_filter_t *f = a->ctx;
 
@@ -265,6 +322,7 @@ const ipc_sub_t query_subs[] = {
 	IPC_SUB("-M", "--monitors", "query [-m <monitor>] -M|--monitors [--names]", q_monitors),
 	IPC_SUB("-D", "--desktops", "query [-m <monitor>] -D|--desktops [--names]", q_desktops),
 	IPC_SUB("-N", "--nodes", "query [-m|-d|-n] -N|--nodes [--names]", q_nodes),
+	IPC_SUB("-L", "--layers", "query [-m <monitor>] -L|--layers [--names]", q_layers),
 	IPC_SUB("-f", "--focused", "query -f|--focused [--names]", q_focused),
 	IPC_SUB_END,
 };

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "layer_rule.h"
 #include "surface.h"
 
 #include <pixman.h>
@@ -18,6 +19,11 @@ typedef struct layer_surface_t {
 	struct wlr_scene_tree *saved_tree;
 	output_t *output;
 	bool mapped;
+
+	enum zwlr_layer_shell_v1_layer layer;
+	float opacity;
+	bool anim_disabled, blur_from_rule;
+	layer_rule_consequence_t rule;
 
 	blur_node_pool_t blur_pool;
 	bool blur_scene_hidden, blur_region_dirty;

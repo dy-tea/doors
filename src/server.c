@@ -9,6 +9,7 @@
 #include "input/seat.h"
 #include "ipc/ipc.h"
 #include "launcher.h"
+#include "layer_rule.h"
 #include "output/config.h"
 #include "output/output.h"
 #include "permission.h"
@@ -376,6 +377,7 @@ void server_init(void) {
 	permission_init();
 	ipc_init();
 	rule_init();
+	layer_rule_init();
 	output_config_init();
 	input_init();
 	global_shortcuts_init();
@@ -446,6 +448,7 @@ void server_fini(void) {
 	ipc_fini();
 	permission_fini();
 	rule_fini();
+	layer_rule_fini();
 	output_config_fini();
 	settings_fini();
 	global_shortcuts_fini();

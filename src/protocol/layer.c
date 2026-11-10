@@ -29,6 +29,38 @@ static void layer_surface_commit(struct wl_listener *listener, void *data);
 
 struct wlr_scene_tree *output_shell_layer(output_t *output, enum zwlr_layer_shell_v1_layer layer);
 
+static bool layer_surface_rule_blur(const layer_surface_t *layer) {
+	return (layer->rule.has & LAYER_RULE_BLUR) && layer_rule_flag(&layer->rule, LAYER_RULE_BLUR);
+}
+
+static enum zwlr_layer_surface_v1_keyboard_interactivity layer_keyboard_interactivity(const
+		layer_surface_t *layer) {
+	if (layer->rule.has & LAYER_RULE_KEYBOARD_INTERACTIVITY)
+		return layer->rule.keyboard_interactivity;
+	return (enum
+		zwlr_layer_surface_v1_keyboard_interactivity)layer->layer_surface->current.keyboard_interactive;
+}
+
+static enum zwlr_layer_shell_v1_layer layer_effective_layer(const layer_surface_t *layer) {
+	if (layer->rule.has & LAYER_RULE_LAYER)
+		return layer->rule.layer;
+	return layer->layer_surface->current.layer;
+}
+
+static void layer_surface_damage_output(layer_surface_t *layer) {
+	if (!layer || !layer->output)
+		return;
+
+	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(server.scene,
+		layer->output->wlr_output);
+	if (!scene_output)
+		return;
+
+	pixman_region32_union_rect(&scene_output->damage_ring.current, &scene_output->damage_ring.current,
+		0, 0, (unsigned int)layer->output->width, (unsigned int)layer->output->height);
+	output_schedule_frame(layer->output);
+}
+
 void layer_surface_set_blur(layer_surface_t *ls, bool enabled) {
 	if (!ls || !ls->scene_tree)
 		return;
@@ -107,11 +139,12 @@ static void layer_surface_map(struct wl_listener *listener, void *data) {
 	layer->mapped = true;
 	arrange_layers(layer->output);
 
-	if (layer->layer_surface->current.layer >= ZWLR_LAYER_SHELL_V1_LAYER_TOP)
+	if (layer_effective_layer(layer) >= ZWLR_LAYER_SHELL_V1_LAYER_TOP)
 		focus_layer_surface(layer);
 
 	effects_invalidate_mica(layer->output->effects);
-	animation_fade_in_layer(layer);
+	if (!animation_fade_in_layer(layer))
+		surface_set_opacity(&layer->scene_tree->node, layer->opacity);
 }
 
 static void layer_surface_unmap(struct wl_listener *listener, void *data) {
@@ -119,7 +152,7 @@ static void layer_surface_unmap(struct wl_listener *listener, void *data) {
 	layer_surface_t *layer = wl_container_of(listener, layer, unmap);
 	layer->mapped = false;
 
-	if (!settings.enable_animations) {
+	if (!settings.enable_animations || layer->anim_disabled) {
 		animation_cancel_scene_tree(layer->scene_tree);
 		wlr_scene_node_set_enabled(&layer->scene_tree->node, false);
 	} else {
@@ -151,9 +184,13 @@ static void layer_surface_commit(struct wl_listener *listener, void *data) {
 		return;
 
 	bool needs_arrange = false;
-	if (layer_surface->current.committed & WLR_LAYER_SURFACE_V1_STATE_LAYER) {
-		struct wlr_scene_tree *new_tree = output_shell_layer(layer->output, layer_surface->current.layer);
-		wlr_scene_node_reparent(&layer->scene_layer->tree->node, new_tree);
+	const enum zwlr_layer_shell_v1_layer effective_layer = layer_effective_layer(layer);
+	if (layer->layer != effective_layer) {
+		wl_list_remove(&layer->link);
+		wl_list_insert(&layer->output->layers[effective_layer], &layer->link);
+		wlr_scene_node_reparent(&layer->scene_layer->tree->node, output_shell_layer(layer->output,
+			effective_layer));
+		layer->layer = effective_layer;
 		needs_arrange = true;
 	}
 
@@ -163,27 +200,52 @@ static void layer_surface_commit(struct wl_listener *listener, void *data) {
 		arrange_layers(layer->output);
 	}
 
-	// check ext_background_effect_v1 state, the blur region is clipped to the surface size
-	const struct wlr_ext_background_effect_surface_v1_state *fx =
-		wlr_ext_background_effect_v1_get_surface_state(layer_surface->surface);
-	pixman_region32_t blur_region;
-	pixman_region32_init(&blur_region);
-	if (fx)
-		surface_blur_region_clip(&blur_region, &fx->blur_region, (int)layer_surface->current.actual_width,
-			(int)layer_surface->current.actual_height);
+	if (layer->blur_from_rule) {
+		const bool wants_blur = layer_surface_rule_blur(layer);
+		const bool had_blur = blur_pool_count(&layer->blur_pool) > 0;
+		if (wants_blur != had_blur)
+			layer_surface_set_blur(layer, wants_blur);
 
-	bool wants_blur = fx && !pixman_region32_empty(&blur_region);
-	bool had_blur = blur_pool_count(&layer->blur_pool) > 0;
-	if (wants_blur != had_blur)
-		layer_surface_set_blur(layer, wants_blur);
+		if (wants_blur) {
+			const int width = (int)layer_surface->current.actual_width;
+			const int height = (int)layer_surface->current.actual_height;
+			if (width > 0 && height > 0) {
+				pixman_region32_t region;
+				pixman_region32_init_rect(&region, 0, 0, width, height);
+				if (!pixman_region32_equal(&layer->blur_region, &region)) {
+					pixman_region32_copy(&layer->blur_region, &region);
+					layer->blur_region_dirty = true;
+					layer_surface_damage_output(layer);
+				}
+				pixman_region32_fini(&region);
+			}
+		}
+	} else {
+		// check ext_background_effect_v1 state, the blur region is clipped to the surface size
+		const struct wlr_ext_background_effect_surface_v1_state *fx =
+			wlr_ext_background_effect_v1_get_surface_state(layer_surface->surface);
+		pixman_region32_t blur_region;
+		pixman_region32_init(&blur_region);
+		if (fx)
+			surface_blur_region_clip(&blur_region, &fx->blur_region, (int)layer_surface->current.actual_width,
+				(int)layer_surface->current.actual_height);
 
-	// update blur region if blur is enabled
-	if (blur_pool_count(&layer->blur_pool) > 0 && !pixman_region32_equal(&layer->blur_region,
-			&blur_region)) {
-		pixman_region32_copy(&layer->blur_region, &blur_region);
-		layer->blur_region_dirty = true;
+		bool wants_blur = fx && !pixman_region32_empty(&blur_region);
+		bool had_blur = blur_pool_count(&layer->blur_pool) > 0;
+		if (wants_blur != had_blur)
+			layer_surface_set_blur(layer, wants_blur);
+
+		// update blur region if blur is enabled
+		if (blur_pool_count(&layer->blur_pool) > 0 && !pixman_region32_equal(&layer->blur_region,
+				&blur_region)) {
+			pixman_region32_copy(&layer->blur_region, &blur_region);
+			layer->blur_region_dirty = true;
+		}
+		pixman_region32_fini(&blur_region);
 	}
-	pixman_region32_fini(&blur_region);
+
+	if (!animation_is_layer_opacity_fading(layer))
+		surface_set_opacity(&layer->scene_tree->node, layer->opacity);
 
 	output_schedule_frame(layer->output);
 }
@@ -226,7 +288,22 @@ void handle_new_layer_surface(struct wl_listener *listener, void *data) {
 	layer_surface->data = layer;
 	pixman_region32_init(&layer->blur_region);
 
-	struct wlr_scene_tree *layer_tree = output_shell_layer(output, layer_surface->pending.layer);
+	layer->opacity = 1.0f;
+	layer->layer = layer_surface->pending.layer;
+
+	layer_rule_consequence_t *rule = find_matching_layer_rule(layer_surface->namespace, output->name);
+	if (rule) {
+		layer->rule = *rule;
+		if (rule->has & LAYER_RULE_LAYER)
+			layer->layer = rule->layer;
+		if (rule->has & LAYER_RULE_OPACITY)
+			layer->opacity = rule->opacity;
+		layer->anim_disabled = (rule->has & LAYER_RULE_ANIMATIONS_DISABLE) && layer_rule_flag(rule,
+			LAYER_RULE_ANIMATIONS_DISABLE);
+		layer->blur_from_rule = (rule->has & LAYER_RULE_BLUR) != 0;
+	}
+
+	struct wlr_scene_tree *layer_tree = output_shell_layer(output, layer->layer);
 
 	layer->scene_layer = wlr_scene_layer_surface_v1_create(layer_tree, layer_surface);
 	layer->scene_tree = layer->scene_layer->tree;
@@ -248,7 +325,7 @@ void handle_new_layer_surface(struct wl_listener *listener, void *data) {
 	layer->surface_commit.notify = layer_surface_commit;
 	wl_signal_add(&layer_surface->surface->events.commit, &layer->surface_commit);
 
-	wl_list_insert(&output->layers[layer_surface->pending.layer], &layer->link);
+	wl_list_insert(&output->layers[layer->layer], &layer->link);
 
 	// fractional scale
 	wlr_fractional_scale_v1_notify_scale(layer_surface->surface, layer->output->wlr_output->scale);
@@ -302,7 +379,7 @@ void focus_layer_surface(layer_surface_t *layer_surface) {
 
 	struct wlr_surface *surface = layer_surface->layer_surface->surface;
 
-	if (layer_surface->layer_surface->current.keyboard_interactive ==
+	if (layer_keyboard_interactivity(layer_surface) ==
 		ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE)
 		return;
 	if (layer_surface->scene_layer == NULL)
