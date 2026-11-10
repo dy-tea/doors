@@ -28,8 +28,8 @@ void ipc_cmd_input(ipc_args_t *a) {
 		identifier = ipc_take(a);
 	}
 
-	const char *type_spec = str_skip_prefix(ipc_peek(a), "type:");
-	if (type_spec) {
+	const char *type_spec;
+	if (parse_prefixed(ipc_peek(a), "type:", &type_spec)) {
 		ipc_take(a);
 		const char *spec = str_ltrim(type_spec);
 

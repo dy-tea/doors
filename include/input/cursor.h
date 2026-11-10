@@ -1,6 +1,5 @@
 #pragma once
 
-#include "gesture.h"
 #include "server.h"
 
 #include <wlr/types/wlr_pointer.h>

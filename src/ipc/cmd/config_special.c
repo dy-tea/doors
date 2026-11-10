@@ -135,24 +135,28 @@ static bool cfg_scroller_presets_apply(const char *name, const char *value, bool
 			count++;
 	}
 
+	char **tokens = malloc((size_t)count * sizeof(*tokens));
 	scroller_size_t *presets = malloc((size_t)count * sizeof(*presets));
-	if (!presets) {
+	if (!tokens || !presets) {
+		free(tokens);
+		free(presets);
 		free(copy);
 		cfg_errf(err, errsz, "Memory allocation failed\n");
 		return false;
 	}
 
-	int parsed = 0;
-	for (char *tok = strtok(copy, ","); tok && parsed < count; tok = strtok(NULL, ",")) {
-		if (!parse_scroller_size(tok, &presets[parsed])) {
+	const int parsed = parse_split(copy, ",", tokens, count);
+	for (int i = 0; i < parsed; i++) {
+		if (!parse_scroller_size(tokens[i], &presets[i])) {
 			cfg_errf(err, errsz, "%s: invalid value \"%s\", expected a proportion in (0, 1] or "
-				"a size like \"640px\"\n", cfg_special_canonical(name), tok);
+				"a size like \"640px\"\n", cfg_special_canonical(name), tokens[i]);
+			free(tokens);
 			free(presets);
 			free(copy);
 			return false;
 		}
-		parsed++;
 	}
+	free(tokens);
 	free(copy);
 
 	if (dry_run) {
@@ -674,8 +678,8 @@ bool cfg_special_name(const char *name) {
 	if (!name || name[0] == '\0')
 		return false;
 
-	const char *tab_color = str_skip_prefix(name, "tab_color_");
-	if (tab_color)
+	const char *tab_color;
+	if (parse_prefixed(name, "tab_color_", &tab_color))
 		return cfg_find_tab_color(tab_color) != NULL;
 
 	if (cfg_find_gradient(name))
@@ -686,8 +690,8 @@ bool cfg_special_name(const char *name) {
 
 // setting with one string form can be checked without being applied
 bool cfg_special_settable(const char *name) {
-	const char *tab_color = str_skip_prefix(name, "tab_color_");
-	if (tab_color)
+	const char *tab_color;
+	if (parse_prefixed(name, "tab_color_", &tab_color))
 		return cfg_find_tab_color(tab_color) != NULL;
 
 	if (cfg_find_gradient(name))
@@ -698,8 +702,8 @@ bool cfg_special_settable(const char *name) {
 }
 
 bool cfg_special_apply(const char *name, const char *value, char *err, size_t errsz, bool dry_run) {
-	const char *tab_color = str_skip_prefix(name, "tab_color_");
-	if (tab_color)
+	const char *tab_color;
+	if (parse_prefixed(name, "tab_color_", &tab_color))
 		return cfg_tab_color_apply(tab_color, value, dry_run, err, errsz);
 
 	const cfg_gradient_t *grad = cfg_find_gradient(name);
@@ -715,8 +719,8 @@ bool cfg_special_apply(const char *name, const char *value, char *err, size_t er
 }
 
 bool cfg_special_dispatch(ipc_args_t *a, const char *name) {
-	const char *tab_color = str_skip_prefix(name, "tab_color_");
-	if (tab_color) {
+	const char *tab_color;
+	if (parse_prefixed(name, "tab_color_", &tab_color)) {
 		cfg_tab_color(a, tab_color);
 		return true;
 	}

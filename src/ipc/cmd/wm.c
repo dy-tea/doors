@@ -1,4 +1,5 @@
 #include "diagnostics.h"
+#include "fs.h"
 #include "ipc/args.h"
 #include "ipc/ipc.h"
 #include "ipc/json.h"
@@ -12,9 +13,7 @@
 #include "str.h"
 #include "transaction.h"
 #include "tree.h"
-#include <errno.h>
 #include <fcntl.h>
-#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -142,50 +141,6 @@ static monitors_status_t monitors_check_names(char **names, int count, const cha
 	return MONITORS_OK;
 }
 
-
-#define STATE_MAX_SIZE (1024 * 1024)
-
-static char *state_read_file(const char *path, char *err, size_t errsz) {
-	int fd = open(path, O_RDONLY | O_CLOEXEC);
-	if (fd == -1) {
-		snprintf(err, errsz, "cannot open \"%s\": %s\n", path, strerror(errno));
-		return NULL;
-	}
-
-	struct stat info;
-	if (fstat(fd,
-			&info) == -1 || !S_ISREG(info.st_mode) || info.st_size <= 0 || info.st_size > STATE_MAX_SIZE) {
-		snprintf(err, errsz, "\"%s\" is not a regular file of a sane size\n", path);
-		close(fd);
-		return NULL;
-	}
-
-	char *text = malloc((size_t)info.st_size + 1);
-	if (text == NULL) {
-		snprintf(err, errsz, "out of memory\n");
-		close(fd);
-		return NULL;
-	}
-
-	size_t len = 0;
-	while (len < (size_t)info.st_size) {
-		ssize_t n = read(fd, text + len, (size_t)info.st_size - len);
-		if (n == -1 && errno == EINTR)
-			continue;
-		if (n <= 0) {
-			snprintf(err, errsz, "cannot read \"%s\"\n", path);
-			free(text);
-			close(fd);
-			return NULL;
-		}
-		len += (size_t)n;
-	}
-	close(fd);
-
-	text[len] = '\0';
-	return text;
-}
-
 // a state value in the shape `config <name> <value>` takes it
 static bool state_value_arg(const json_value_t *value, char *buf, size_t bufsz) {
 	switch (value->type) {
@@ -293,12 +248,11 @@ static bool state_load_monitors(const json_value_t *monitors, ipc_args_t *a, int
 
 		snprintf(entries[i].name, sizeof(entries[i].name), "%s", name);
 
-		double x, y;
 		const json_value_t *rect = json_get(item, "rect");
-		if (rect != NULL && json_get_number(json_get(rect, "x"), &x) && json_get_number(json_get(rect,
-				"y"), &y)) {
-			entries[i].x = (int)lround(x);
-			entries[i].y = (int)lround(y);
+		int x, y;
+		if (json_get_int(json_get(rect, "x"), &x) && json_get_int(json_get(rect, "y"), &y)) {
+			entries[i].x = x;
+			entries[i].y = y;
 			entries[i].positioned = true;
 		}
 
@@ -357,7 +311,7 @@ static void wm_load_state(ipc_args_t *a) {
 		return;
 
 	char err[512];
-	char *text = state_read_file(path, err, sizeof(err));
+	char *text = fs_read_text(path, err, sizeof(err));
 	if (text == NULL) {
 		ipc_fail(a, "%s", err);
 		return;

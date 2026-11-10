@@ -38,3 +38,11 @@ const json_value_t *json_get(const json_value_t *value, const char *key);
 // NULL when the value is not of the requested type
 const char *json_get_string(const json_value_t *value);
 bool json_get_number(const json_value_t *value, double *out);
+
+// rounded int, clamped to [min, max], false if not number
+bool json_get_int_clamped(const json_value_t *value, int min, int max, int *out);
+
+// rounded int, clamped to the range an int can hold
+bool json_get_int(const json_value_t *value, int *out);
+
+bool json_get_bool(const json_value_t *value, bool *out);

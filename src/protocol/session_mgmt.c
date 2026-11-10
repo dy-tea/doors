@@ -185,46 +185,6 @@ static char *session_path(session_mgr_t *manager, const char *id) {
 	return strdup(path);
 }
 
-// reads a whole file into a NUL terminated buffer, NULL on failure
-static char *session_read_file(const char *path) {
-	FILE *f = fopen(path, "r");
-	if (!f)
-		return NULL;
-
-	size_t cap = 4096;
-	size_t len = 0;
-	char *buf = malloc(cap);
-	if (!buf) {
-		fclose(f);
-		return NULL;
-	} while (!feof(f)) {
-		if (len == cap - 1) {
-			char *grown = realloc(buf, cap * 2);
-			if (!grown) {
-				free(buf);
-				fclose(f);
-				return NULL;
-			}
-			buf = grown;
-			cap *= 2;
-		}
-
-		size_t n = fread(buf + len, 1, cap - 1 - len, f);
-		len += n;
-	}
-
-	bool failed = ferror(f) != 0;
-	fclose(f);
-
-	if (failed) {
-		free(buf);
-		return NULL;
-	}
-
-	buf[len] = '\0';
-	return buf;
-}
-
 // writes a JSON string body, escaping everything that needs it
 static void session_write_json_string(FILE *f, const char *s) {
 	for (const unsigned char *p = (const unsigned char *)s; *p != '\0'; p++) {
@@ -262,20 +222,15 @@ static void session_write_json_string(FILE *f, const char *s) {
 
 // geometry read back from disk is untrusted, keep it in a sane range
 static int session_coord_from_json(const json_value_t *value) {
-	double num;
-	if (!json_get_number(value, &num))
+	int coord;
+	if (!json_get_int_clamped(value, -SESSION_COORD_MAX, SESSION_COORD_MAX, &coord))
 		return 0;
-
-	if (num < -SESSION_COORD_MAX)
-		return -SESSION_COORD_MAX;
-	if (num > SESSION_COORD_MAX)
-		return SESSION_COORD_MAX;
-	return (int)num;
+	return coord;
 }
 
 static bool session_bool_from_json(const json_value_t *entry, const char *key) {
-	const json_value_t *value = json_get(entry, key);
-	return value != NULL && value->type == JSON_BOOL && value->value.boolean;
+	bool value;
+	return json_get_bool(json_get(entry, key), &value) && value;
 }
 
 static bool session_state_is_restorable(const session_state_t *state) {
@@ -390,12 +345,12 @@ static void session_states_load(session_t *session) {
 	if (!path)
 		return;
 
-	char *buf = session_read_file(path);
+	char err[128];
+	char *buf = fs_read_text(path, err, sizeof(err));
 	free(path);
 	if (!buf)
 		return;
 
-	char err[128];
 	json_value_t *root = json_parse(buf, err, sizeof(err));
 	free(buf);
 	if (!root) {

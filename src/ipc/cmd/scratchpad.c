@@ -1,7 +1,7 @@
 #include "ipc/args.h"
 #include "ipc/registry.h"
+#include "parse.h"
 #include "scratchpad.h"
-#include "str.h"
 #include "transaction.h"
 
 // "app_id:firefox" or "title:Untitled"
@@ -10,12 +10,12 @@ static node_t *find_entry(ipc_args_t *a, const char *what) {
 	if (!ipc_need(a, what, &spec))
 		return NULL;
 
-	const char *app_id = str_skip_prefix(spec, "app_id:");
-	if (app_id)
+	const char *app_id;
+	if (parse_prefixed(spec, "app_id:", &app_id))
 		return scratchpad_find_by_app_id(app_id);
 
-	const char *title = str_skip_prefix(spec, "title:");
-	if (title)
+	const char *title;
+	if (parse_prefixed(spec, "title:", &title))
 		return scratchpad_find_by_title(title);
 
 	ipc_fail(a, "Expected app_id:<value> or title:<value>\n");

@@ -251,6 +251,51 @@ bool parse_vec2(const char *s, float out[2], float min, float max) {
 	return *cursor == '\0';
 }
 
+bool parse_kv_sep(const char *arg, char sep, const char **value) {
+	if (!arg)
+		return false;
+
+	const char *at = strchr(arg, sep);
+	if (at == NULL || at == arg)
+		return false;
+
+	if (value)
+		*value = at + 1;
+	return true;
+}
+
+bool parse_kv(const char *arg, const char **value) {
+	return parse_kv_sep(arg, '=', value);
+}
+
+bool parse_kv_named(const char *arg, const char *name, const char **value) {
+	if (!arg || !name)
+		return false;
+
+	const size_t n = strlen(name);
+	if (strncmp(arg, name, n) != 0 || arg[n] != '=')
+		return false;
+
+	if (value)
+		*value = arg + n + 1;
+	return true;
+}
+
+bool parse_prefixed(const char *s, const char *prefix, const char **rest) {
+	if (!s || !prefix)
+		return false;
+
+	const size_t len = strlen(prefix);
+	if (strncmp(s, prefix, len) != 0)
+		return false;
+	if (s[len] == '\0')
+		return false;
+
+	if (rest)
+		*rest = s + len;
+	return true;
+}
+
 int parse_split(char *s, const char *delims, char *out[], const int max) {
 	if (!s || !out || max == 0)
 		return 0;

@@ -36,6 +36,18 @@ bool parse_scroller_size(const char *tok, scroller_size_t *out);
 // exactly two whitespace separated numbers in [min, max]
 bool parse_vec2(const char *s, float out[2], float min, float max);
 
+// "key value", (value - arg - 1) is the key length
+bool parse_kv_sep(const char *arg, char sep, const char **value);
+
+// "key=value"
+bool parse_kv(const char *arg, const char **value);
+
+// true only when arg is "name=value"
+bool parse_kv_named(const char *arg, const char *name, const char **value);
+
+// strip literal prefix
+bool parse_prefixed(const char *s, const char *prefix, const char **rest);
+
 // tokenize s in place, at most max tokens, returns the number written
 int parse_split(char *s, const char *delims, char *out[], int max);
 

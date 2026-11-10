@@ -43,21 +43,16 @@ static const str_pair_t rule_onoff_names[] = {
 	IPC_ENUM_END,
 };
 
-static size_t key_prefix_len(const char *arg, const char *name) {
-	size_t n = strlen(name);
-	return (strncmp(arg, name, n) == 0 && arg[n] == '=') ? n + 1 : 0;
-}
-
 static bool rule_apply_flag(ipc_args_t *a, rule_t *r, const char *arg, bool *ok) {
 	*ok = true;
 
 	for (const str_pair_t *e = rule_flag_names; e->name; e++) {
-		size_t len = key_prefix_len(arg, e->name);
-		if (!len)
+		const char *value;
+		if (!parse_kv_named(arg, e->name, &value))
 			continue;
 
 		long on;
-		if (!ipc_enum_names(a, e->name, arg + len, rule_onoff_names, &on)) {
+		if (!ipc_enum_names(a, e->name, value, rule_onoff_names, &on)) {
 			*ok = false;
 			return true;
 		}
@@ -74,81 +69,82 @@ static bool rule_apply_flag(ipc_args_t *a, rule_t *r, const char *arg, bool *ok)
 
 static bool rule_apply_key(ipc_args_t *a, rule_t *r, const char *arg) {
 	char errbuf[256] = {0};
+	const char *value;
 
-	if (key_prefix_len(arg, "title")) {
-		if (!rule_pattern_set(&r->match.title, arg + 6, errbuf, sizeof(errbuf))) {
+	if (parse_kv_named(arg, "title", &value)) {
+		if (!rule_pattern_set(&r->match.title, value, errbuf, sizeof(errbuf))) {
 			ipc_fail(a, "title: %s\n", errbuf);
 			return false;
 		}
 		return true;
 	}
-	if (key_prefix_len(arg, "tag")) {
-		if (!rule_pattern_set(&r->match.tag, arg + 4, errbuf, sizeof(errbuf))) {
+	if (parse_kv_named(arg, "tag", &value)) {
+		if (!rule_pattern_set(&r->match.tag, value, errbuf, sizeof(errbuf))) {
 			ipc_fail(a, "tag: %s\n", errbuf);
 			return false;
 		}
 		return true;
 	}
-	if (key_prefix_len(arg, "app_id")) {
-		if (!rule_pattern_set(&r->match.app_id, arg + 7, errbuf, sizeof(errbuf))) {
+	if (parse_kv_named(arg, "app_id", &value)) {
+		if (!rule_pattern_set(&r->match.app_id, value, errbuf, sizeof(errbuf))) {
 			ipc_fail(a, "app_id: %s\n", errbuf);
 			return false;
 		}
 		return true;
 	}
-	if (key_prefix_len(arg, "desktop")) {
-		snprintf(r->consequence.desktop, SMALEN, "%s", arg + 8);
+	if (parse_kv_named(arg, "desktop", &value)) {
+		snprintf(r->consequence.desktop, SMALEN, "%s", value);
 		r->consequence.has |= RULE_TYPE_DESKTOP;
 		return true;
 	}
-	if (key_prefix_len(arg, "state")) {
+	if (parse_kv_named(arg, "state", &value)) {
 		long state;
-		if (!ipc_enum_names(a, "state", arg + 6, rule_state_names, &state))
+		if (!ipc_enum_names(a, "state", value, rule_state_names, &state))
 			return false;
 
 		r->consequence.state = (client_state_t)state;
 		r->consequence.has |= RULE_TYPE_STATE;
 		return true;
 	}
-	if (key_prefix_len(arg, "opacity")) {
+	if (parse_kv_named(arg, "opacity", &value)) {
 		float v;
-		if (!ipc_float_str(a, arg + 8, "opacity", 0.0f, 1.0f, &v))
+		if (!ipc_float_str(a, value, "opacity", 0.0f, 1.0f, &v))
 			return false;
 
 		r->consequence.opacity = v;
 		r->consequence.has |= RULE_TYPE_OPACITY;
 		return true;
 	}
-	if (key_prefix_len(arg, "border_radius")) {
+	if (parse_kv_named(arg, "border_radius", &value)) {
 		float v;
-		if (!parse_float_range(arg + 14, 0.0f, FLT_MAX, &v))
+		if (!parse_float_range(value, 0.0f, FLT_MAX, &v))
 			return false;
 
 		r->consequence.border_radius = v;
 		r->consequence.has |= RULE_TYPE_BORDER_RADIUS;
 		return true;
 	}
-	if (key_prefix_len(arg, "render_unfocused_fps")) {
+	if (parse_kv_named(arg, "render_unfocused_fps", &value)) {
 		int v;
-		if (!ipc_int_str(a, arg + 21, "render_unfocused_fps", 0, 1000, &v))
+		if (!ipc_int_str(a, value, "render_unfocused_fps", 0, 1000, &v))
 			return false;
 
 		r->consequence.render_unfocused_fps = v;
 		r->consequence.has |= RULE_TYPE_RENDER_UNFOCUSED_FPS;
 		return true;
 	}
-	if (key_prefix_len(arg, "scroller_proportion_single")) {
+	if (parse_kv_named(arg, "scroller_proportion_single", &value)) {
 		float v;
-		if (!ipc_float_str(a, arg + 27, "scroller_proportion_single", 0.0f, 1.0f, &v))
+		if (!ipc_float_str(a, value, "scroller_proportion_single", 0.0f, 1.0f, &v))
 			return false;
 
 		r->consequence.scroller_proportion_single = v;
 		r->consequence.has |= RULE_TYPE_SCROLLER_PROPORTION_SINGLE;
 		return true;
 	}
-	if (key_prefix_len(arg, "scroller_proportion")) {
+	if (parse_kv_named(arg, "scroller_proportion", &value)) {
 		float v;
-		if (!ipc_float_str(a, arg + 20, "scroller_proportion", 0.0f, 1.0f, &v))
+		if (!ipc_float_str(a, value, "scroller_proportion", 0.0f, 1.0f, &v))
 			return false;
 
 		r->consequence.scroller_proportion = v;
@@ -212,7 +208,7 @@ static void rule_add(ipc_args_t *a) {
 			return;
 		}
 
-		if (key_prefix_len(arg, "app_id"))
+		if (parse_kv_named(arg, "app_id", NULL))
 			have_app_id = true;
 	}
 

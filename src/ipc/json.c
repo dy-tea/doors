@@ -1,6 +1,8 @@
 #include "ipc/json.h"
 #include "str.h"
 #include <ctype.h>
+#include <limits.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -528,5 +530,32 @@ bool json_get_number(const json_value_t *value, double *out) {
 	if (value == NULL || value->type != JSON_NUMBER)
 		return false;
 	*out = value->value.number;
+	return true;
+}
+
+bool json_get_int_clamped(const json_value_t *value, int min, int max, int *out) {
+	double num;
+	if (!json_get_number(value, &num) || !isfinite(num))
+		return false;
+
+	long rounded = lround(num);
+	if (rounded < min)
+		rounded = min;
+	if (rounded > max)
+		rounded = max;
+
+	*out = (int)rounded;
+	return true;
+}
+
+bool json_get_int(const json_value_t *value, int *out) {
+	return json_get_int_clamped(value, INT_MIN, INT_MAX, out);
+}
+
+bool json_get_bool(const json_value_t *value, bool *out) {
+	if (value == NULL || value->type != JSON_BOOL)
+		return false;
+
+	*out = value->value.boolean;
 	return true;
 }

@@ -1,6 +1,7 @@
 #include "ipc/args.h"
 #include "ipc/ipc.h"
 #include "ipc/registry.h"
+#include "parse.h"
 #include "permission.h"
 #include "str.h"
 #include <limits.h>
@@ -24,14 +25,14 @@ static bool parse_assignments(ipc_args_t *a, perm_assignment_t *list, size_t *co
 
 	size_t n = 0;
 	ipc_foreach(a, word) {
-		const char *eq = strchr(word, '=');
-		if (!eq || eq == word || eq[1] == '\0') {
+		const char *mode_str;
+		if (!parse_kv(word, &mode_str) || mode_str[0] == '\0') {
 			ipc_fail(a, "Expected <capability>=<mode>, got \"%s\"\n", word);
 			return false;
 		}
 
 		char name[32];
-		size_t len = (size_t)(eq - word);
+		size_t len = (size_t)(mode_str - word) - 1;
 		if (len >= sizeof(name)) {
 			ipc_fail(a, "Unknown capability \"%.*s\"\n", (int)len, word);
 			return false;
@@ -45,8 +46,8 @@ static bool parse_assignments(ipc_args_t *a, perm_assignment_t *list, size_t *co
 			ipc_fail(a, "Unknown capability \"%s\", expected capture, output or inject\n", name);
 			return false;
 		}
-		if (!permission_mode_parse(eq + 1, &mode)) {
-			ipc_fail(a, "Unknown mode \"%s\", expected allow, deny or ask\n", eq + 1);
+		if (!permission_mode_parse(mode_str, &mode)) {
+			ipc_fail(a, "Unknown mode \"%s\", expected allow, deny or ask\n", mode_str);
 			return false;
 		}
 
@@ -277,8 +278,8 @@ static void permission_answer_prompt(ipc_args_t *a) {
 	while ((opt = ipc_peek(a))) {
 		ipc_take(a);
 
-		const char *value = str_skip_prefix(opt, "--remember=");
-		if (!value) {
+		const char *value;
+		if (!parse_prefixed(opt, "--remember=", &value)) {
 			ipc_fail(a, "Unknown argument \"%s\"\n", opt);
 			return;
 		}

@@ -264,18 +264,16 @@ static void node_flag(ipc_args_t *a) {
 	if (!ipc_need(a, "flag", &arg))
 		return;
 
-	const char *eq = strchr(arg, '=');
 	char key[MAXLEN];
 	const char *val = NULL;
-	if (eq) {
-		size_t klen = (size_t)(eq - arg);
+	if (parse_kv(arg, &val)) {
+		size_t klen = (size_t)(val - arg) - 1;
 		if (klen >= sizeof(key)) {
 			ipc_fail(a, "Flag name too long\n");
 			return;
 		}
 		memcpy(key, arg, klen);
 		key[klen] = '\0';
-		val = eq + 1;
 	} else {
 		str_copy(key, sizeof(key), arg);
 	}
