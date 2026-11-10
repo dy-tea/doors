@@ -134,52 +134,12 @@ void str_chomp(char *s) {
 	}
 }
 
-static const str_pair_t bool_texts[] = {
-	{"true", 1},
-	{"on", 1},
-	{"yes", 1},
-	{"1", 1},
-	{"enable", 1},
-	{"enabled", 1},
-	{"false", 0},
-	{"off", 0},
-	{"no", 0},
-	{"0", 0},
-	{"disable", 0},
-	{"disabled", 0},
-	{NULL, 0}
-};
-
-bool str_parse_bool(const char *s, bool *out) {
-	const str_pair_t *e = str_table_find(bool_texts, s);
-	if (!e)
-		return false;
-
-	*out = e->value != 0;
-	return true;
-}
-
 const char *str_bool_text(bool value) {
 	static const char *const texts[] = {
 		"false",
 		"true"
 	};
 	return texts[value];
-}
-
-int str_split(char *s, const char *delims, char *out[], const int max) {
-	if (!s || !out || max == 0)
-		return 0;
-
-	int n = 0;
-	char *saveptr = NULL;
-	for (char *tok = strtok_r(s, delims, &saveptr); tok; tok = strtok_r(NULL, delims, &saveptr)) {
-		out[n++] = tok;
-		if (n == max)
-			break;
-	}
-
-	return n;
 }
 
 int str_hex_digit(const char c) {
@@ -190,35 +150,6 @@ int str_hex_digit(const char c) {
 	if (c >= 'A' && c <= 'F')
 		return 10 + c - 'A';
 	return -1;
-}
-
-bool str_parse_color(const char *hex, float rgba[4]) {
-	if (!hex || !rgba)
-		return false;
-	if (*hex == '#')
-		hex++;
-
-	const size_t len = strlen(hex);
-	if (len != 6 && len != 8)
-		return false;
-
-	float parsed[4] = {
-		0.0f,
-		0.0f,
-		0.0f,
-		1.0f
-	};
-	for (size_t i = 0; i < len / 2; i++) {
-		const int hi = str_hex_digit(hex[i * 2]);
-		const int lo = str_hex_digit(hex[i * 2 + 1]);
-		if (hi < 0 || lo < 0)
-			return false;
-
-		parsed[i] = (float)(hi * 16 + lo) / 255.0f;
-	}
-
-	memcpy(rgba, parsed, sizeof(parsed));
-	return true;
 }
 
 const str_pair_t *str_table_find(const str_pair_t *tbl, const char *name) {

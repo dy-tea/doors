@@ -5,6 +5,7 @@
 #include "layout/floating.h"
 #include "layout/layout.h"
 #include "output/output.h"
+#include "parse.h"
 #include "protocol/workspace.h"
 #include "server.h"
 #include "transaction.h"
@@ -355,9 +356,8 @@ void ipc_cmd_desktop(ipc_args_t *a) {
 	if (arg && arg[0] != '-') {
 		desktop_t *desk = find_desktop_by_name_in_monitor(mon, arg);
 		if (!desk) {
-			char *end;
-			long idx = strtol(arg, &end, 10);
-			if (*end == '\0' && idx >= 1 && idx <= 10) {
+			long idx;
+			if (parse_long(arg, &idx) && idx >= 1 && idx <= 10) {
 				workspace_switch_to_desktop_by_index(idx - 1);
 				ipc_ok(a, "focused\n");
 				return;

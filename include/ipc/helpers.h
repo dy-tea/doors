@@ -7,11 +7,7 @@
 
 #include <stdbool.h>
 
-bool ipc_parse_color(const char *hex, float *rgba);
-bool ipc_parse_color_float(const char *str, float rgba[4]);
 void ipc_format_color_float(char *buf, size_t bufsz, const float rgba[4]);
-bool ipc_parse_gradient(const char *str, float out[BORDER_GRADIENT_MAX_STOPS * 4], int *count,
-	float *angle_out);
 void ipc_format_gradient(char *buf, size_t bufsz, const float *colors, int count, float angle);
 
 void ipc_json_string(ipc_buf_t *b, const char *s);

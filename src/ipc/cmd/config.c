@@ -7,6 +7,7 @@
 #include "ipc/registry.h"
 #include "layout/scroller.h"
 #include "output/output.h"
+#include "parse.h"
 #include "protocol/idle_power.h"
 #include "protocol/xdg_toplevel.h"
 #include "realtime.h"
@@ -346,7 +347,7 @@ void cfg_errf(char *err, size_t errsz, const char *fmt, ...) {
 static bool cfg_set_bool(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
 		bool dry_run) {
 	bool v;
-	if (!ipc_parse_bool(arg, &v)) {
+	if (!parse_bool(arg, &v)) {
 		cfg_errf(err, errsz, "%s: expected true or false, got \"%s\"\n", s->name, arg);
 		return false;
 	}
@@ -415,10 +416,8 @@ static bool cfg_range(const cfg_setting_t *s, double val, double step, char *err
 
 static bool cfg_set_int(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
 		bool dry_run) {
-	char *end;
-	errno = 0;
-	long val = strtol(arg, &end, 10);
-	if (end == arg || *end != '\0' || errno == ERANGE) {
+	long val;
+	if (!parse_long(arg, &val)) {
 		cfg_errf(err, errsz, "%s: invalid value \"%s\"\n", s->name, arg);
 		return false;
 	}
@@ -434,9 +433,8 @@ static bool cfg_set_int(const cfg_setting_t *s, const char *arg, char *err, size
 
 static bool cfg_set_float(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
 		bool dry_run) {
-	char *end;
-	double val = strtod(arg, &end);
-	if (end == arg || *end != '\0') {
+	double val;
+	if (!parse_double(arg, &val)) {
 		cfg_errf(err, errsz, "%s: invalid value \"%s\"\n", s->name, arg);
 		return false;
 	}
@@ -452,9 +450,8 @@ static bool cfg_set_float(const cfg_setting_t *s, const char *arg, char *err, si
 
 static bool cfg_set_double(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
 		bool dry_run) {
-	char *end;
-	double val = strtod(arg, &end);
-	if (end == arg || *end != '\0') {
+	double val;
+	if (!parse_double(arg, &val)) {
 		cfg_errf(err, errsz, "%s: invalid value \"%s\"\n", s->name, arg);
 		return false;
 	}
@@ -483,7 +480,7 @@ static bool cfg_set_str(const cfg_setting_t *s, const char *arg, char *err, size
 static bool cfg_set_rgba(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
 		bool dry_run) {
 	float parsed[4];
-	if (!ipc_parse_color_float(arg, parsed)) {
+	if (!parse_color_floats(arg, parsed)) {
 		cfg_errf(err, errsz, "%s: expected \"R G B [A]\"\n", s->name);
 		return false;
 	}

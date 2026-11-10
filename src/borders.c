@@ -19,13 +19,6 @@ border_state_t get_border_state(client_t *client) {
 	return state;
 }
 
-void parse_color(const char *hex, float *color) {
-	if (!str_parse_color(hex, color)) {
-		color[0] = color[1] = color[2] = 0.5f;
-		color[3] = 1.0f;
-	}
-}
-
 static void get_border_color(client_t *client, float *color) {
 	if (!client || settings.border_width == 0) {
 		color[0] = color[1] = color[2] = 0.0f;

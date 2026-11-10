@@ -15,9 +15,6 @@ typedef struct {
 
 border_state_t get_border_state(client_t *client);
 
-// colour helpers
-void parse_color(const char *hex, float *color);
-
 // the four-rect border drawn around a client, owned by its scene tree
 void create_borders(struct wlr_scene_tree *parent, struct wlr_scene_tree **border_tree,
 	struct wlr_scene_rect *rects[4]);

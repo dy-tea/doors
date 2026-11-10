@@ -2,9 +2,11 @@
 #include "ipc/helpers.h"
 #include "ipc/registry.h"
 #include "output/output.h"
+#include "parse.h"
 #include "protocol/workspace.h"
 #include "server.h"
 #include "tree.h"
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -62,8 +64,8 @@ static bool query_parse_selectors(ipc_args_t *a, query_filter_t *f) {
 			if (!f->desk)
 				return false;
 		} else {
-			int id = atoi(value);
-			if (id <= 0) {
+			long id;
+			if (!parse_long(value, &id) || id <= 0 || id > INT_MAX) {
 				ipc_fail(a, "Invalid node id \"%s\"\n", value);
 				return false;
 			}
@@ -76,7 +78,7 @@ static bool query_parse_selectors(ipc_args_t *a, query_filter_t *f) {
 				}
 			}
 			if (!f->node) {
-				ipc_fail(a, "Node %d not found\n", id);
+				ipc_fail(a, "Node %ld not found\n", id);
 				return false;
 			}
 		}

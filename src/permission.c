@@ -1,5 +1,6 @@
 #include "fs.h"
 #include "ipc/ipc.h"
+#include "parse.h"
 #include "permission.h"
 #include "server.h"
 #include "str.h"
@@ -924,7 +925,7 @@ static void remember_load(void) {
 			continue;
 
 		char *fields[4];
-		if (str_split(line, "\t", fields, 4) != 4) {
+		if (parse_split(line, "\t", fields, 4) != 4) {
 			wlr_log(WLR_ERROR, "permission: %s:%d: malformed line", state_path, lineno);
 			continue;
 		}
@@ -941,9 +942,8 @@ static void remember_load(void) {
 			continue;
 		}
 
-		char *end;
-		long long expires = strtoll(fields[3], &end, 10);
-		if (end == fields[3] || *end != '\0' || expires < 0) {
+		long long expires;
+		if (!parse_i64(fields[3], &expires) || expires < 0) {
 			wlr_log(WLR_ERROR, "permission: %s:%d: invalid expiry", state_path, lineno);
 			continue;
 		}

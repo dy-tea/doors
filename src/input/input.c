@@ -3,10 +3,12 @@
 #include "input/pointer.h"
 #include "input/touch.h"
 #include "macros.h"
+#include "parse.h"
 #include "server.h"
 #include "str.h"
 #include <float.h>
 #include <libinput.h>
+#include <limits.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,7 +18,7 @@
 input_config_t *input_configs[MAX_INPUT_CONFIGS];
 size_t num_input_configs = 0;
 
-static int parse_bool(const char *value, int default_val);
+static int input_parse_bool(const char *value, int default_val);
 static int parse_scancode(const char *value);
 
 static enum input_config_type device_type_to_input_type(struct wlr_input_device *device) {
@@ -207,22 +209,20 @@ void input_config_merge(input_config_t *base, const input_config_t *overlay) {
 	}
 }
 
-static int parse_bool(const char *value, int default_val) {
+static int input_parse_bool(const char *value, int default_val) {
 	bool v;
-	if (!value || !str_parse_bool(value, &v))
+	if (!value || !parse_bool(value, &v))
 		return default_val;
 
 	return v ? 1 : 0;
 }
 
 static int parse_scancode(const char *value) {
-	if (!value)
+	long v;
+	if (!value || !parse_long(value, &v) || v < 0 || v > INT_MAX)
 		return -1;
 
-	if (value[0] >= '0' && value[0] <= '9')
-		return atoi(value);
-
-	return -1;
+	return (int)v;
 }
 
 static bool set_str_field(char **field, const char *value) {
@@ -251,47 +251,51 @@ bool input_config_set_value(input_config_t *config, const char *name, const char
 
 	// integer fields
 	if (streq(name, "repeat_rate")) {
-		config->repeat_rate = atoi(value);
+		long v;
+		if (parse_long(value, &v))
+			config->repeat_rate = (int)v;
 		return true;
 	}
 	if (streq(name, "repeat_delay")) {
-		config->repeat_delay = atoi(value);
+		long v;
+		if (parse_long(value, &v))
+			config->repeat_delay = (int)v;
 		return true;
 	}
 	if (streq(name, "xkb_numlock")) {
-		config->xkb_numlock = parse_bool(value, -1);
+		config->xkb_numlock = input_parse_bool(value, -1);
 		return true;
 	}
 	if (streq(name, "xkb_capslock")) {
-		config->xkb_capslock = parse_bool(value, -1);
+		config->xkb_capslock = input_parse_bool(value, -1);
 		return true;
 	}
 	if (streq(name, "natural_scroll")) {
-		config->natural_scroll = parse_bool(value, -1);
+		config->natural_scroll = input_parse_bool(value, -1);
 		return true;
 	}
 	if (streq(name, "left_handed")) {
-		config->left_handed = parse_bool(value, -1);
+		config->left_handed = input_parse_bool(value, -1);
 		return true;
 	}
 	if (streq(name, "tap")) {
-		config->tap = parse_bool(value, -1);
+		config->tap = input_parse_bool(value, -1);
 		return true;
 	}
 	if (streq(name, "drag")) {
-		config->drag = parse_bool(value, -1);
+		config->drag = input_parse_bool(value, -1);
 		return true;
 	}
 	if (streq(name, "dwt")) {
-		config->dwt = parse_bool(value, -1);
+		config->dwt = input_parse_bool(value, -1);
 		return true;
 	}
 	if (streq(name, "dwtp")) {
-		config->dwtp = parse_bool(value, -1);
+		config->dwtp = input_parse_bool(value, -1);
 		return true;
 	}
 	if (streq(name, "middle_emulation")) {
-		config->middle_emulation = parse_bool(value, -1);
+		config->middle_emulation = input_parse_bool(value, -1);
 		return true;
 	}
 	if (streq(name, "scroll_button")) {
@@ -299,21 +303,27 @@ bool input_config_set_value(input_config_t *config, const char *name, const char
 		return true;
 	}
 	if (streq(name, "scroll_button_lock")) {
-		config->scroll_button_lock = parse_bool(value, -1);
+		config->scroll_button_lock = input_parse_bool(value, -1);
 		return true;
 	}
 
 	// floating point fields
 	if (streq(name, "pointer_accel")) {
-		config->pointer_accel = atof(value);
+		double v;
+		if (parse_double(value, &v))
+			config->pointer_accel = v;
 		return true;
 	}
 	if (streq(name, "scroll_factor")) {
-		config->scroll_factor = atof(value);
+		double v;
+		if (parse_double(value, &v))
+			config->scroll_factor = v;
 		return true;
 	}
 	if (streq(name, "rotation_angle")) {
-		config->rotation_angle = atof(value);
+		double v;
+		if (parse_double(value, &v))
+			config->rotation_angle = v;
 		return true;
 	}
 
@@ -333,7 +343,7 @@ bool input_config_set_value(input_config_t *config, const char *name, const char
 		return true;
 	}
 	if (streq(name, "drag_lock")) {
-		const int lock = parse_bool(value, -1);
+		const int lock = input_parse_bool(value, -1);
 		if (lock != -1)
 			config->drag_lock = lock ? INPUT_CONFIG_DRAG_LOCK_ENABLED : INPUT_CONFIG_DRAG_LOCK_DISABLED;
 		return true;

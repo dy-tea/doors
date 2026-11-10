@@ -1,4 +1,4 @@
-#include "borders.h"
+#include "parse.h"
 #include "settings.h"
 #include <stdint.h>
 #include <stdlib.h>
@@ -206,11 +206,11 @@ doors_settings_t settings = {
 };
 
 void refresh_border_color_cache(void) {
-	parse_color(settings.normal_border_color, settings.normal_border_color_rgba);
-	parse_color(settings.active_border_color, settings.active_border_color_rgba);
-	parse_color(settings.focused_border_color, settings.focused_border_color_rgba);
-	parse_color(settings.presel_feedback_color, settings.presel_feedback_color_rgba);
-	parse_color(settings.tiling_drag_indicator_color, settings.tiling_drag_indicator_color_rgba);
+	parse_color_hex(settings.normal_border_color, settings.normal_border_color_rgba);
+	parse_color_hex(settings.active_border_color, settings.active_border_color_rgba);
+	parse_color_hex(settings.focused_border_color, settings.focused_border_color_rgba);
+	parse_color_hex(settings.presel_feedback_color, settings.presel_feedback_color_rgba);
+	parse_color_hex(settings.tiling_drag_indicator_color, settings.tiling_drag_indicator_color_rgba);
 }
 
 void settings_fini(void) {

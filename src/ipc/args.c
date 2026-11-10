@@ -1,6 +1,6 @@
 #include "ipc/args.h"
 #include "ipc/ipc.h"
-#include <errno.h>
+#include "parse.h"
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -77,49 +77,6 @@ void ipc_fail(ipc_args_t * a, const char *fmt, ...) {
 	char buf[320];
 	snprintf(buf, sizeof(buf), "%s: %s", a->cmd ? a->cmd : "ipc", msg);
 	send_failure(a->fd, buf);
-}
-
-static bool parse_long(const char *s, long *out) {
-	if (!s || !*s)
-		return false;
-
-	errno = 0;
-	char *end;
-	long v = strtol(s, &end, 10);
-	if (end == s || *end != '\0' || errno == ERANGE)
-		return false;
-
-	*out = v;
-	return true;
-}
-
-static bool parse_double(const char *s, double *out) {
-	if (!s || !*s)
-		return false;
-
-	errno = 0;
-	char *end;
-	double v = strtod(s, &end);
-	if (end == s || *end != '\0')
-		return false;
-
-	*out = v;
-	return true;
-}
-
-bool ipc_parse_float(const char *s, float min, float max, float *out) {
-	double v;
-	if (!parse_double(s, &v))
-		return false;
-	if (v < min || v > max)
-		return false;
-
-	*out = (float)v;
-	return true;
-}
-
-bool ipc_parse_bool(const char *s, bool *out) {
-	return str_parse_bool(s, out);
 }
 
 static void fail_range(ipc_args_t *a, const char *what, double min, double max) {
@@ -221,7 +178,7 @@ bool ipc_bool(ipc_args_t *a, const char *what, bool *out) {
 }
 
 bool ipc_bool_str(ipc_args_t *a, const char *arg, const char *what, bool *out) {
-	if (!ipc_parse_bool(arg, out)) {
+	if (!parse_bool(arg, out)) {
 		ipc_fail(a, "Expected true or false for %s, got \"%s\"\n", what, arg);
 		return false;
 	}
@@ -252,7 +209,7 @@ bool ipc_toggle(ipc_args_t *a, bool *cur) {
 	}
 
 	bool v;
-	if (!ipc_parse_bool(arg, &v)) {
+	if (!parse_bool(arg, &v)) {
 		ipc_fail(a, "Expected true or false, got \"%s\"\n", arg);
 		return false;
 	}

@@ -7,6 +7,7 @@
 #include "layout/scroller.h"
 #include "macros.h"
 #include "output/output.h"
+#include "parse.h"
 #include "protocol/workspace.h"
 #include "server.h"
 #include "str.h"
@@ -108,7 +109,7 @@ uint32_t parse_modifiers(const char *mod_str) {
 	}
 
 	char *out[32];
-	int nmods = str_split(tmp, "+", out, 32);
+	int nmods = parse_split(tmp, "+", out, 32);
 	for (int i = 0; i < nmods; i++) {
 		const str_pair_t *e = str_table_find(mod_map, str_trim(out[i]));
 		if (e)
@@ -176,7 +177,7 @@ bool parse_bind_flags(const char *str, uint32_t *out_flags) {
 	bool ok = true;
 	uint32_t flags = 0;
 	char *tokens[32];
-	int nflags = str_split(buf, ", \t", tokens, 32);
+	int nflags = parse_split(buf, ", \t", tokens, 32);
 	for (int i = 0; i < nflags; i++) {
 		const str_pair_t *e = str_table_find(bind_flag_names, tokens[i]);
 		if (e)
@@ -408,7 +409,7 @@ bind_action_t parse_action(const char *cmd, int *desktop_index, char *submap_nam
 	str_copy(buf, sizeof(buf), rest);
 
 	char *args[16];
-	int argc = str_split(buf, " \t", args, 16);
+	int argc = parse_split(buf, " \t", args, 16);
 
 	if (argc == 0)
 		return BIND_NONE;
@@ -421,12 +422,10 @@ bind_action_t parse_action(const char *cmd, int *desktop_index, char *submap_nam
 	// special cases that need extra logic
 	if (streq(args[0], "node") && argc >= 2) {
 		if (streq(args[1], "-d") || streq(args[1], "--to-desktop")) {
-			if (argc >= 3) {
-				const int d = atoi(args[2]);
-				if (d >= 1 && d <= 10) {
-					*desktop_index = d;
-					return BIND_SEND_TO_DESKTOP_1;
-				}
+			long d;
+			if (argc >= 3 && parse_long(args[2], &d) && d >= 1 && d <= 10) {
+				*desktop_index = (int)d;
+				return BIND_SEND_TO_DESKTOP_1;
 			}
 			return BIND_NODE_TO_DESKTOP;
 		}
@@ -436,9 +435,9 @@ bind_action_t parse_action(const char *cmd, int *desktop_index, char *submap_nam
 		if (streq(args[1], "-f") || streq(args[1], "--focus"))
 			return (argc >= 3 && streq(args[2], "last")) ? BIND_DESKTOP_LAST : BIND_DESKTOP_FOCUS;
 
-		const int d = atoi(args[1]);
-		if (d >= 1 && d <= 10) {
-			*desktop_index = d;
+		long d;
+		if (parse_long(args[1], &d) && d >= 1 && d <= 10) {
+			*desktop_index = (int)d;
 			return BIND_DESKTOP_1;
 		}
 	}

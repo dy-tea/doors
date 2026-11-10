@@ -9,55 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-// parse a single RRGGBBAA or RRGGBB color into a float[4]
-bool ipc_parse_color(const char *hex, float *rgba) {
-	return str_parse_color(hex, rgba);
-}
-
-bool ipc_parse_color_float(const char *str, float rgba[4]) {
-	if (!str)
-		return false;
-	rgba[3] = 1.0f;
-	int n = sscanf(str, "%f %f %f %f", &rgba[0], &rgba[1], &rgba[2], &rgba[3]);
-	return n >= 3;
-}
-
 void ipc_format_color_float(char *buf, size_t bufsz, const float rgba[4]) {
 	snprintf(buf, bufsz, "%.3f %.3f %.3f %.3f\n", rgba[0], rgba[1], rgba[2], rgba[3]);
-}
-
-bool ipc_parse_gradient(const char *str, float out[BORDER_GRADIENT_MAX_STOPS * 4], int *count,
-		float *angle_out) {
-	if (!str)
-		return false;
-	char buf[512];
-	strncpy(buf, str, sizeof(buf) - 1);
-	buf[sizeof(buf) - 1] = '\0';
-
-	*count = 0;
-	*angle_out = 0.0f;
-
-	char *tok = strtok(buf, " \t");
-	while (tok) {
-		if (str_ends(tok, "deg")) {
-			char tmp[16];
-			size_t tlen = str_copy(tmp, sizeof(tmp), tok);
-			if (tlen >= 3) {
-				tmp[tlen - 3] = '\0';
-				*angle_out = (float)atof(tmp) * 3.14159265f / 180.0f;
-			}
-		} else if (strlen(tok) >= 6) {
-			if (*count >= BORDER_GRADIENT_MAX_STOPS)
-				break;
-			float rgba[4];
-			if (ipc_parse_color(tok, rgba)) {
-				memcpy(out + (*count) * 4, rgba, 4 * sizeof(float));
-				(*count)++;
-			}
-		}
-		tok = strtok(NULL, " \t");
-	}
-	return (*count >= 1);
 }
 
 // serialise a gradient back to a string for IPC get queries.

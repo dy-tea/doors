@@ -7,6 +7,7 @@
 #include "layout/floating.h"
 #include "layout/layout.h"
 #include "output/output.h"
+#include "parse.h"
 #include "protocol/workspace.h"
 #include "scratchpad.h"
 #include "server.h"
@@ -15,6 +16,7 @@
 #include "tabs.h"
 #include "transaction.h"
 #include "tree.h"
+#include <limits.h>
 #include <limits.h>
 #include <math.h>
 #include <stdlib.h>
@@ -108,8 +110,8 @@ static node_t *find_node_by_id(ipc_args_t *a, desktop_t *desk, const char *what)
 	if (!ipc_need(a, what, &arg))
 		return NULL;
 
-	int id = atoi(arg);
-	if (id <= 0) {
+	long id;
+	if (!parse_long(arg, &id) || id <= 0 || id > INT_MAX) {
 		ipc_fail(a, "Invalid %s \"%s\"\n", what, arg);
 		return NULL;
 	}
@@ -119,7 +121,7 @@ static node_t *find_node_by_id(ipc_args_t *a, desktop_t *desk, const char *what)
 			return n;
 	}
 
-	ipc_fail(a, "%s %d not found\n", what, id);
+	ipc_fail(a, "%s %ld not found\n", what, id);
 	return NULL;
 }
 

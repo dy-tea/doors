@@ -1,4 +1,5 @@
 #include "input/gesture.h"
+#include "parse.h"
 #include "str.h"
 #include <math.h>
 #include <stdlib.h>
@@ -99,8 +100,8 @@ char *gesture_parse(const char *input, gesture_t *output) {
 		if (streq(token, "*")) {
 			output->fingers = GESTURE_FINGERS_ANY;
 		} else {
-			const int fingers = atoi(token);
-			if (fingers < 1 || fingers > 5) {
+			long fingers;
+			if (!parse_long(token, &fingers) || fingers < 1 || fingers > 5) {
 				enum gesture_direction dir = gesture_parse_direction(token);
 				if (dir == GESTURE_DIRECTION_NONE) {
 					free(input_copy);

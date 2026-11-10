@@ -177,6 +177,7 @@ doors_sources = [
 		'src' / 'log.c',
 		'src' / 'output' / 'config.c',
 		'src' / 'output' / 'output.c',
+		'src' / 'parse.c',
 		'src' / 'permission.c',
 		'src' / 'protocol' / 'bell.c',
 		'src' / 'protocol' / 'capture.c',

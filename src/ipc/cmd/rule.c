@@ -1,6 +1,8 @@
 #include "ipc/args.h"
 #include "ipc/registry.h"
+#include "parse.h"
 #include "rule.h"
+#include <float.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -118,7 +120,11 @@ static bool rule_apply_key(ipc_args_t *a, rule_t *r, const char *arg) {
 		return true;
 	}
 	if (key_prefix_len(arg, "border_radius")) {
-		r->consequence.border_radius = atof(arg + 14);
+		float v;
+		if (!parse_float_range(arg + 14, 0.0f, FLT_MAX, &v))
+			return false;
+
+		r->consequence.border_radius = v;
 		r->consequence.has |= RULE_TYPE_BORDER_RADIUS;
 		return true;
 	}

@@ -4,6 +4,7 @@
 #include "layout/layout.h"
 #include "layout/master_stack.h"
 #include "layout/scroller.h"
+#include "parse.h"
 #include "server.h"
 #include <limits.h>
 #include <string.h>
@@ -80,31 +81,13 @@ static bool cfg_parse_size_arg(ipc_args_t *a, const char *what, scroller_size_t 
 	if (!ipc_need(a, what, &value))
 		return false;
 
-	size_t len = strlen(value);
-	if (len > 2 && streq(value + len - 2, "px")) {
-		char *end;
-		double val = strtod(value, &end);
-		if (end != value + len - 2 || val <= 0.0 || val > 65535.0)
-			goto invalid;
-
-		out->type = SCROLLER_SIZE_FIXED;
-		out->value = val;
-		return true;
+	if (!parse_scroller_size(value, out)) {
+		ipc_fail(a, "%s: invalid value \"%s\", expected a proportion in (0, 1] or a size like \"640px\"\n",
+			what, value);
+		return false;
 	}
 
-	char *end;
-	double val = strtod(value, &end);
-	if (end == value || *end != '\0' || val <= 0.0 || val > 1.0)
-		goto invalid;
-
-	out->type = SCROLLER_SIZE_PROPORTION;
-	out->value = val;
 	return true;
-
-invalid:
-	ipc_fail(a, "%s: invalid value \"%s\", expected a proportion in (0, 1] or a size like \"640px\"\n",
-		what, value);
-	return false;
 }
 
 static void scr_proportion(ipc_args_t *a) {

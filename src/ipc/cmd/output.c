@@ -5,6 +5,7 @@
 #include "ipc/registry.h"
 #include "output/config.h"
 #include "output/output.h"
+#include "parse.h"
 #include "protocol/workspace.h"
 #include "server.h"
 #include "str.h"
@@ -173,15 +174,6 @@ static void out_mode(ipc_args_t *a) {
 
 	const char *at = strchr(spec, '@');
 	size_t res_len = at ? (size_t)(at - spec) : strlen(spec);
-	if (at) {
-		char *end;
-		double v = strtod(at + 1, &end);
-		if (end == at + 1 || *end != '\0' || v <= 0) {
-			ipc_fail(a, "Invalid refresh rate in \"%s\"\n", spec);
-			return;
-		}
-		refresh = (float)v;
-	}
 
 	char res[64];
 	if (res_len >= sizeof(res)) {
@@ -191,9 +183,18 @@ static void out_mode(ipc_args_t *a) {
 	memcpy(res, spec, res_len);
 	res[res_len] = '\0';
 
-	if (sscanf(res, "%dx%d", &width, &height) != 2 || width <= 0 || height <= 0) {
+	if (!parse_size(res, &width, &height)) {
 		ipc_fail(a, "Expected WIDTHxHEIGHT[@REFRESH], got \"%s\"\n", spec);
 		return;
+	}
+
+	if (at) {
+		double v;
+		if (!parse_double(at + 1, &v) || v <= 0) {
+			ipc_fail(a, "Invalid refresh rate in \"%s\"\n", spec);
+			return;
+		}
+		refresh = (float)v;
 	}
 
 	out_ctx_t *c = ctx_of(a);
@@ -364,9 +365,8 @@ static void out_max_render_time(ipc_args_t *a) {
 	if (streq(arg, "off")) {
 		ms = 0;
 	} else {
-		char *end;
-		long v = strtol(arg, &end, 10);
-		if (*end != '\0' || v <= 0) {
+		long v;
+		if (!parse_long(arg, &v) || v <= 0 || v > INT_MAX) {
 			ipc_fail(a, "Expected \"off\" or a positive number of milliseconds\n");
 			return;
 		}
@@ -638,26 +638,21 @@ static void out_rectangle(ipc_args_t *a) {
 		return;
 
 	output_t *mon = ctx_of(a)->mon;
-	int x = mon->rectangle.x;
-	int y = mon->rectangle.y;
-	int width, height;
+	struct wlr_box rect = {
+		.x = mon->rectangle.x,
+		.y = mon->rectangle.y,
+	};
 
-	int px, py;
-	if (sscanf(spec, "%dx%d:%d,%d", &width, &height, &px, &py) == 4) {
-		x = px;
-		y = py;
-	} else if (sscanf(spec, "%d,%d,%d,%d", &x, &y, &width, &height) != 4) {
-		if (sscanf(spec, "%dx%d", &width, &height) != 2) {
-			ipc_fail(a, "Expected WIDTHxHEIGHT[:X,Y], X,Y,WIDTH,HEIGHT, or WIDTHxHEIGHT\n");
-			return;
-		}
+	if (!parse_rect(spec, &rect)) {
+		ipc_fail(a, "Expected WIDTHxHEIGHT[:X,Y], X,Y,WIDTH,HEIGHT, or WIDTHxHEIGHT\n");
+		return;
 	}
 
 	out_ctx_t *c = ctx_of(a);
-	c->oc->x = x;
-	c->oc->y = y;
-	c->oc->width = width;
-	c->oc->height = height;
+	c->oc->x = rect.x;
+	c->oc->y = rect.y;
+	c->oc->width = rect.width;
+	c->oc->height = rect.height;
 	apply_ok(a, "Output rectangle");
 }
 

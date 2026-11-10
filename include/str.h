@@ -29,16 +29,10 @@ char *str_rtrim(char *s); // trim trailing whitespace in place
 char *str_trim(char *s); // trim both ends in place
 void str_chomp(char *s); // remove one trailing \n
 
-bool str_parse_bool(const char *s, bool *out);
 const char *str_bool_text(bool value);
-
-// tokenize s in place, at most max tokens, return number of tokens written
-int str_split(char *s, const char *delims, char *out[], int max);
 
 // hex digit value, -1 when c is not a hex digit
 int str_hex_digit(char c);
-
-bool str_parse_color(const char *hex, float rgba[4]);
 
 typedef struct {
 	const char *name;

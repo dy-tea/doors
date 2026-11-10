@@ -2,8 +2,8 @@
 #include "input/input.h"
 #include "ipc/args.h"
 #include "ipc/registry.h"
+#include "parse.h"
 #include "str.h"
-#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -47,10 +47,8 @@ void ipc_cmd_input(ipc_args_t *a) {
 	const char *value = ipc_peek(a) ? ipc_peek(a) : "";
 
 	if (streq(property, "xcursor_size")) {
-		char *end;
-		errno = 0;
-		long size = strtol(value, &end, 10);
-		if (errno || value[0] == '\0' || end[0] != '\0' || size < 1 || size > 512) {
+		long size;
+		if (!parse_long(value, &size) || size < 1 || size > 512) {
 			ipc_fail(a, "input xcursor_size: expected 1-512\n");
 			return;
 		}

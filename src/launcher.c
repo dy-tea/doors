@@ -1,6 +1,7 @@
 #include "launcher.h"
 #include "macros.h"
 #include "output/output.h"
+#include "parse.h"
 #include "server.h"
 #include "str.h"
 #include "tree.h"
@@ -26,11 +27,10 @@ static pid_t get_parent_pid(const pid_t child) {
 
 	if ((stat = fopen(file_name, "r"))) {
 		if (getline(&buffer, &buf_size, stat) != -1) {
-			strtok(buffer, sep);
-			strtok(NULL, sep);
-			strtok(NULL, sep);
-			char *token = strtok(NULL, sep);
-			parent = strtol(token, NULL, 10);
+			char *fields[4];
+			long ppid;
+			if (parse_split(buffer, sep, fields, 4) == 4 && parse_long(fields[3], &ppid))
+				parent = (pid_t)ppid;
 		}
 		free(buffer);
 		fclose(stat);

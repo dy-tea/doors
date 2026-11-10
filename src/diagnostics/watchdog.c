@@ -2,6 +2,7 @@
 
 #include "diagnostics.h"
 #include "diagnostics_internal.h"
+#include "parse.h"
 #include <pthread.h>
 #include <stdarg.h>
 #include <stdatomic.h>
@@ -128,7 +129,11 @@ static void *watchdog_main(void *data) {
 
 void diag_watchdog_start(void) {
 	const char *stall_env = getenv("DOORS_STALL_MS");
-	stall_ms = stall_env ? (uint32_t)strtoul(stall_env, NULL, 10) : STALL_DEFAULT_MS;
+	long stall = 0;
+	if (stall_env && parse_long(stall_env, &stall) && stall >= 0 && stall <= (long)UINT32_MAX)
+		stall_ms = (uint32_t)stall;
+	else
+		stall_ms = STALL_DEFAULT_MS;
 
 	atomic_store(&watchdog_stop, false);
 	if (pthread_create(&watchdog, NULL, watchdog_main, NULL) != 0) {

@@ -5,6 +5,7 @@
 #include "ipc/helpers.h"
 #include "layout/scroller.h"
 #include "output/output.h"
+#include "parse.h"
 #include "server.h"
 #include "settings.h"
 #include "spring.h"
@@ -49,7 +50,7 @@ static bool cfg_tab_color_apply(const char *suffix, const char *value, bool dry_
 	}
 
 	float parsed[4];
-	if (!ipc_parse_color_float(value, parsed)) {
+	if (!parse_color_floats(value, parsed)) {
 		cfg_errf(err, errsz, "tab_color_%s: expected \"R G B [A]\"\n", c->name);
 		return false;
 	}
@@ -86,30 +87,6 @@ static void cfg_tab_color(ipc_args_t *a, const char *suffix) {
 	}
 
 	ipc_okf(a, "tab_color_%s %s\n", c->name, a->dry_run ? "would be set" : "set");
-}
-
-static bool cfg_parse_scroller_size(const char *tok, scroller_size_t *out) {
-	size_t len = strlen(tok);
-
-	if (len > 2 && streq(tok + len - 2, "px")) {
-		char *end;
-		double val = strtod(tok, &end);
-		if (end != tok + len - 2 || !isfinite(val) || val <= 0.0 || val > 65535.0)
-			return false;
-
-		out->type = SCROLLER_SIZE_FIXED;
-		out->value = val;
-		return true;
-	}
-
-	char *end;
-	double val = strtod(tok, &end);
-	if (end == tok || *end != '\0' || !isfinite(val) || val <= 0.0 || val > 1.0)
-		return false;
-
-	out->type = SCROLLER_SIZE_PROPORTION;
-	out->value = val;
-	return true;
 }
 
 void cfg_format_scroller_size(scroller_size_t size, ipc_buf_t *b, bool last) {
@@ -167,7 +144,7 @@ static bool cfg_scroller_presets_apply(const char *name, const char *value, bool
 
 	int parsed = 0;
 	for (char *tok = strtok(copy, ","); tok && parsed < count; tok = strtok(NULL, ",")) {
-		if (!cfg_parse_scroller_size(tok, &presets[parsed])) {
+		if (!parse_scroller_size(tok, &presets[parsed])) {
 			cfg_errf(err, errsz, "%s: invalid value \"%s\", expected a proportion in (0, 1] or "
 				"a size like \"640px\"\n", cfg_special_canonical(name), tok);
 			free(presets);
@@ -237,7 +214,7 @@ static void cfg_scroller_preset_window_heights(ipc_args_t *a) {
 static bool cfg_scroller_default_width_apply(const char *value, bool dry_run, char *err,
 		size_t errsz) {
 	scroller_size_t size;
-	if (!cfg_parse_scroller_size(value, &size)) {
+	if (!parse_scroller_size(value, &size)) {
 		cfg_errf(err, errsz, "scroller_default_column_width: invalid value \"%s\", expected a "
 			"proportion in (0, 1] or a size like \"640px\"\n", value);
 		return false;
@@ -311,7 +288,7 @@ static bool cfg_gradient_apply(const cfg_gradient_t *g, const char *value, bool 
 
 	if (g->lerp) {
 		float v;
-		if (!ipc_parse_float(value, 0.0f, 1.0f, &v)) {
+		if (!parse_float_range(value, 0.0f, 1.0f, &v)) {
 			cfg_errf(err, errsz, "%s: value must be between 0 and 1\n", g->name);
 			return false;
 		}
@@ -342,7 +319,7 @@ static bool cfg_gradient_apply(const cfg_gradient_t *g, const char *value, bool 
 	float stops[BORDER_GRADIENT_MAX_STOPS * 4];
 	int count = 0;
 	float angle = 0.0f;
-	if (!ipc_parse_gradient(value, stops, &count, &angle)) {
+	if (!parse_gradient(value, stops, &count, &angle)) {
 		cfg_errf(err, errsz, "Expected one or more #RRGGBB stops and an optional angle\n");
 		return false;
 	}
@@ -394,22 +371,9 @@ static void cfg_border_gradient(ipc_args_t *a, const cfg_gradient_t *g) {
 }
 
 static bool cfg_anchor_apply(const char *value, bool dry_run, char *err, size_t errsz) {
-	const char *cursor = value;
 	float v[2];
 
-	for (int i = 0; i < 2; i++) {
-		char *end;
-		double parsed = strtod(cursor, &end);
-		if (end == cursor || !isfinite(parsed) || parsed < -1.0 || parsed > 1.0) {
-			cfg_errf(err, errsz, "acrylic_light_anchor: expected \"x y\" between -1 and 1\n");
-			return false;
-		}
-
-		v[i] = (float)parsed;
-		cursor = str_ltrim(end);
-	}
-
-	if (*cursor != '\0') {
+	if (!parse_vec2(value, v, -1.0f, 1.0f)) {
 		cfg_errf(err, errsz, "acrylic_light_anchor: expected \"x y\" between -1 and 1\n");
 		return false;
 	}
@@ -544,10 +508,8 @@ static void cfg_animation_bezier(ipc_args_t *a) {
 }
 
 static bool cfg_animation_duration_apply(const char *value, bool dry_run, char *err, size_t errsz) {
-	char *end;
-	errno = 0;
-	long ms = strtol(value, &end, 10);
-	if (end == value || *end != '\0' || errno == ERANGE || ms < 1 || ms > INT_MAX) {
+	long ms;
+	if (!parse_long(value, &ms) || ms < 1 || ms > INT_MAX) {
 		cfg_errf(err, errsz, "duration must be between 1 and %d\n", INT_MAX);
 		return false;
 	}

@@ -1,3 +1,4 @@
+#include "parse.h"
 #include "str.h"
 #include "test.h"
 
@@ -99,17 +100,17 @@ static void test_trim(void) {
 static void test_parse_bool(void) {
 	bool v = false;
 
-	CHECK(str_parse_bool("true", &v) && v);
-	CHECK(str_parse_bool("ON", &v) && v);
-	CHECK(str_parse_bool("enabled", &v) && v);
+	CHECK(parse_bool("true", &v) && v);
+	CHECK(parse_bool("ON", &v) && v);
+	CHECK(parse_bool("enabled", &v) && v);
 
-	CHECK(str_parse_bool("false", &v) && !v);
-	CHECK(str_parse_bool("NO", &v) && !v);
-	CHECK(str_parse_bool("0", &v) && !v);
+	CHECK(parse_bool("false", &v) && !v);
+	CHECK(parse_bool("NO", &v) && !v);
+	CHECK(parse_bool("0", &v) && !v);
 
-	CHECK(!str_parse_bool("maybe", &v));
-	CHECK(!str_parse_bool("", &v));
-	CHECK(!str_parse_bool(NULL, &v));
+	CHECK(!parse_bool("maybe", &v));
+	CHECK(!parse_bool("", &v));
+	CHECK(!parse_bool(NULL, &v));
 
 	CHECK_STREQ(str_bool_text(true), "true");
 	CHECK_STREQ(str_bool_text(false), "false");
@@ -121,7 +122,7 @@ static void test_split(void) {
 	int n;
 
 	str_copy(buf, sizeof(buf), "a,b,,c");
-	n = str_split(buf, ",", out, 8);
+	n = parse_split(buf, ",", out, 8);
 	CHECK(n == 3);
 	if (n == 3) {
 		CHECK_STREQ(out[0], "a");
@@ -131,11 +132,11 @@ static void test_split(void) {
 
 	// max caps the number of tokens returned
 	str_copy(buf, sizeof(buf), "1 2 3 4");
-	n = str_split(buf, " ", out, 2);
+	n = parse_split(buf, " ", out, 2);
 	CHECK(n == 2);
 
 	str_copy(buf, sizeof(buf), "   ");
-	CHECK(str_split(buf, " \t", out, 8) == 0);
+	CHECK(parse_split(buf, " \t", out, 8) == 0);
 }
 
 static void test_hex(void) {
