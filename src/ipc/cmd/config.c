@@ -17,7 +17,6 @@
 #include "transaction.h"
 #include "tree.h"
 #include <assert.h>
-#include <errno.h>
 #include <limits.h>
 #include <math.h>
 #include <stdint.h>

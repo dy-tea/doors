@@ -11,11 +11,11 @@ static float ms_ratio(const desktop_t *d) {
 }
 
 static master_area_orientation_t ms_orientation(const desktop_t *d) {
-	return d != NULL ? (master_area_orientation_t)d->master_stack.orientation : MASTER_LEFT;
+	return d != NULL ? d->master_stack.orientation : MASTER_LEFT;
 }
 
 static stack_layout_t ms_stack_layout(const desktop_t *d) {
-	return d != NULL ? (stack_layout_t)d->master_stack.stack_layout : STACK_VERTICAL;
+	return d != NULL ? d->master_stack.stack_layout : STACK_VERTICAL;
 }
 
 static int ms_count(const desktop_t *d) {
@@ -487,23 +487,8 @@ void master_stack_flip_orientation(desktop_t *d) {
 	if (d == NULL)
 		return;
 
-	switch (ms_orientation(d)) {
-	case MASTER_LEFT:
-		d->master_stack.orientation = MASTER_RIGHT;
-		break;
-	case MASTER_RIGHT:
-		d->master_stack.orientation = MASTER_LEFT;
-		break;
-	case MASTER_TOP:
-		d->master_stack.orientation = MASTER_BOTTOM;
-		break;
-	case MASTER_BOTTOM:
-		d->master_stack.orientation = MASTER_TOP;
-		break;
-	case MASTER_CENTER:
-		d->master_stack.orientation = MASTER_CENTER;
-		break;
-	}
+	master_area_orientation_t orient = ms_orientation(d);
+	d->master_stack.orientation = orient == MASTER_CENTER ? orient : (orient + 2) % MASTER_CENTER;
 }
 
 void master_stack_cycle_orientation(desktop_t *d) {

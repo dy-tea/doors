@@ -71,19 +71,14 @@ typedef enum {
 } layout_t;
 
 static inline char layout_to_char(layout_t l) {
-	switch (l) {
-	case LAYOUT_TILED:
-		return 'T';
-	case LAYOUT_MONOCLE:
-		return 'M';
-	case LAYOUT_SCROLLER:
-		return 'S';
-	case LAYOUT_MASTER_STACK:
-		return 'K';
-	case LAYOUT_FLOATING:
-		return 'F';
-	}
-	return 0;
+	const char layout_chars[] = {
+		[LAYOUT_TILED] = 'T',
+		[LAYOUT_MONOCLE] = 'M',
+		[LAYOUT_SCROLLER] = 'S',
+		[LAYOUT_MASTER_STACK] = 'K',
+		[LAYOUT_FLOATING] = 'F'
+	};
+	return layout_chars[l];
 }
 
 typedef enum {
@@ -102,6 +97,19 @@ typedef enum {
 	FLIP_HORIZONTAL,
 	FLIP_VERTICAL
 } flip_t;
+
+typedef enum {
+	MASTER_LEFT,
+	MASTER_TOP,
+	MASTER_RIGHT,
+	MASTER_BOTTOM,
+	MASTER_CENTER,
+} master_area_orientation_t;
+
+typedef enum {
+	STACK_VERTICAL,
+	STACK_HORIZONTAL,
+} stack_layout_t;
 
 typedef enum {
 	WORKSPACE_ANIM_VERTICAL,
@@ -255,8 +263,8 @@ typedef struct desktop_t {
 	pid_t fullscreen_recreate_pending_pid;
 	struct {
 		float ratio;
-		int orientation; // master_area_orientation_t
-		int stack_layout; // stack_layout_t
+		master_area_orientation_t orientation;
+		stack_layout_t stack_layout;
 		int count;
 	} master_stack;
 

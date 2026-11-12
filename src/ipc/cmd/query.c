@@ -243,7 +243,7 @@ static void q_layers(ipc_args_t *a) {
 			layer_surface_t *layer;
 			wl_list_for_each(layer, &m->layers[i], link) {
 				const char *namespace = layer->layer_surface &&
-						layer->layer_surface->namespace ? layer->layer_surface->namespace : "?";
+					layer->layer_surface->namespace ? layer->layer_surface->namespace : "?";
 
 				if (names_only) {
 					ipc_buff(&b, "%s\n", namespace);

@@ -3,7 +3,6 @@
 #include "effects/effects.h"
 #include "ipc/helpers.h"
 #include "settings.h"
-#include "tabs.h"
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -30,23 +29,16 @@ typedef struct cfg_extra {
 } cfg_extra_t;
 
 const char *cfg_type_name(cfg_type_t type) {
-	switch (type) {
-	case CFG_BOOL:
-		return "bool";
-	case CFG_INT:
-		return "int";
-	case CFG_FLOAT:
-		return "float";
-	case CFG_DOUBLE:
-		return "double";
-	case CFG_ENUM:
-		return "enum";
-	case CFG_STR:
-		return "str";
-	case CFG_RGBA:
-		return "rgba";
-	}
-	return "?";
+	const char *type_names[] = {
+		[CFG_BOOL] = "bool",
+		[CFG_INT] = "int",
+		[CFG_FLOAT] = "float",
+		[CFG_DOUBLE] = "double",
+		[CFG_ENUM] = "enum",
+		[CFG_STR] = "str",
+		[CFG_RGBA] = "rgba"
+	};
+	return type_names[type];
 }
 
 static void cfg_intro_format_setting(const void *self, char *buf, size_t bufsz) {

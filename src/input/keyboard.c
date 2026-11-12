@@ -1017,8 +1017,7 @@ static bool resize_master_stack_ratio(const bool horizontal, float delta) {
 	if (output_focused()->desk->layout != LAYOUT_MASTER_STACK)
 		return false;
 
-	const master_area_orientation_t orientation =
-		(master_area_orientation_t)output_focused()->desk->master_stack.orientation;
+	const master_area_orientation_t orientation = output_focused()->desk->master_stack.orientation;
 
 	const bool horizontal_split = orientation == MASTER_LEFT || orientation == MASTER_RIGHT ||
 		orientation == MASTER_CENTER;

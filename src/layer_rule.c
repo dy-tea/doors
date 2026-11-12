@@ -8,32 +8,23 @@
 struct wl_list layer_rule_list;
 
 const char *layer_rule_layer_name(const enum zwlr_layer_shell_v1_layer layer) {
-	switch (layer) {
-	case ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND:
-		return "background";
-	case ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM:
-		return "bottom";
-	case ZWLR_LAYER_SHELL_V1_LAYER_TOP:
-		return "top";
-	case ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY:
-		return "overlay";
-	default:
-		return "unknown";
-	}
+	const char *layer_names[] = {
+		[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND] = "background",
+		[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM] = "bottom",
+		[ZWLR_LAYER_SHELL_V1_LAYER_TOP] = "top",
+		[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY] = "overlay"
+	};
+	return layer_names[layer];
 }
 
 static const char *layer_rule_keyboard_name(const enum zwlr_layer_surface_v1_keyboard_interactivity
 		interactivity) {
-	switch (interactivity) {
-	case ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE:
-		return "none";
-	case ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE:
-		return "exclusive";
-	case ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_ON_DEMAND:
-		return "on_demand";
-	default:
-		return "unknown";
-	}
+	const char *interactivity_names[] = {
+		[ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE] = "none",
+		[ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE] = "exclusive",
+		[ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_ON_DEMAND] = "on_demand"
+	};
+	return interactivity_names[interactivity];
 }
 
 layer_rule_t *make_layer_rule(void) {
