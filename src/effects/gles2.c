@@ -716,10 +716,15 @@ static void gles2_output_resize(be_output_state_t *state, int width, int height,
 		wlr_log(WLR_ERROR, "Output resize FBO creation failed (non-fatal)");
 }
 
+static void gles2_destroy_buffer(struct wlr_buffer *buf, uint64_t native[2]);
+
 static bool gles2_ensure_buffer(struct wlr_buffer **buf, uint64_t native[2], int w, int h,
 		struct wlr_renderer *r, struct wlr_allocator *a) {
-	if (*buf)
-		return native[0] != 0;
+	if (*buf) {
+		if ((*buf)->width == w && (*buf)->height == h)
+			return native[0] != 0;
+		gles2_destroy_buffer(*buf, native);
+	}
 	if (!g->render_fmt)
 		return false;
 

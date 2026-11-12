@@ -1810,12 +1810,17 @@ static const struct wlr_buffer_impl vk_shared_buffer_impl = {
 	.get_dmabuf = vk_shared_get_dmabuf,
 };
 
+static void vk_destroy_buffer(struct wlr_buffer *buf, uint64_t native[2]);
+
 static bool vk_ensure_buffer(struct wlr_buffer **buf, uint64_t native[2], int w, int h,
 		struct wlr_renderer *r, struct wlr_allocator *a) {
 	(void)r;
 	(void)a;
-	if (*buf)
-		return native[0] != 0;
+	if (*buf) {
+		if ((*buf)->width == w && (*buf)->height == h)
+			return native[0] != 0;
+		vk_destroy_buffer(*buf, native);
+	}
 	if (!vk->vkGetMemoryFdKHR) {
 		wlr_log(WLR_ERROR, "No vkGetMemoryFdKHR for ensure_buffer");
 		return false;

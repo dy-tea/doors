@@ -460,6 +460,11 @@ static void scene_set_dest_size_guarded(struct wlr_scene_buffer *b, int w, int h
 	wlr_scene_buffer_set_dest_size(b, w, h);
 }
 
+static bool src_box_fits(const struct wlr_fbox *src, const struct wlr_buffer *buf) {
+	return src->x >= 0.0f && src->y >= 0.0f && src->x + src->width <= (float)buf->width &&
+		src->y + src->height <= (float)buf->height;
+}
+
 // capture scene with all blur/mica/acrylic toplevel scene trees hidden
 static be_effect_resource_t capture_bg_to_tex1_ex(output_t *output, effects_output_t *ctx,
 	bool mica_only, struct wlr_scene_node *hide_node, bool *hide_flag, bool hide_blur_toplevels,
@@ -947,6 +952,10 @@ static void push_blur_to_toplevels(output_t *output) {
 					struct wlr_scene_buffer *node = blur_get(tl->blur, i);
 					if (!node)
 						break;
+					if (!src_box_fits(&src, buf)) {
+						blur_set_buffer_null(tl->blur);
+						break;
+					}
 					scene_set_pos_guarded(&node->node, sox + br_x, soy + br_y);
 					scene_set_source_box_guarded(node, &src);
 					scene_set_dest_size_guarded(node, br_w, br_h);
@@ -982,6 +991,13 @@ static void push_blur_to_toplevels(output_t *output) {
 				.width = rxe - rx,
 				.height = rye - ry
 			};
+			if (!src_box_fits(&src, buf)) {
+				// stale-sized buffer (resize animation raced the rebuild):
+				// hide blur instead of sampling outside of the texture,
+				// which asserts in wlroots
+				blur_set_buffer_null(tl->blur);
+				continue;
+			}
 			blur_set_buffer(tl->blur, buf);
 			scene_set_pos_guarded(&node->node, (r.x - lx) + off_x, (r.y - ly) + off_y);
 			scene_set_source_box_guarded(node, &src);
