@@ -5,9 +5,7 @@
 #include "server.h"
 #include "settings.h"
 #include "str.h"
-#include "types.h"
 #include <stdio.h>
-#include <string.h>
 
 static void usage(const char *argv0) {
 	printf("Usage: %s [-c <config-dir>]\n", argv0);

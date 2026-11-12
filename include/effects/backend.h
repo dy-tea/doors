@@ -1,7 +1,5 @@
 #pragma once
 
-#include "types.h"
-
 #include <pixman.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -13,6 +11,15 @@ struct wlr_scene_output;
 struct wlr_output_state;
 
 #define BLUR_MAX_LEVELS 10
+
+enum blur_algorithm {
+	BLUR_ALGORITHM_NONE,
+	BLUR_ALGORITHM_KAWASE,
+	BLUR_ALGORITHM_GAUSSIAN,
+	BLUR_ALGORITHM_BOX,
+	BLUR_ALGORITHM_REFRACTION,
+	BLUR_ALGORITHM_LENS_REFRACTION,
+};
 
 enum be_resource_state {
 	BE_RESOURCE_UNINITIALIZED,

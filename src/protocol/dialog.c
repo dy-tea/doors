@@ -2,7 +2,6 @@
 #include "protocol/dialog.h"
 #include "protocol/xdg_toplevel.h"
 #include "server.h"
-#include "types.h"
 #include <wlr/types/wlr_xdg_dialog_v1.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>

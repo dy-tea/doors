@@ -1,5 +1,7 @@
 #pragma once
 
+#include "fwd.h"
+
 #include <stdbool.h>
 #include <wlr/types/wlr_ext_workspace_v1.h>
 
@@ -11,9 +13,6 @@ void workspace_switch_to_desktop(const char *name);
 void workspace_switch_to_desktop_by_index(int index);
 void workspace_switch_to_last_desktop(void);
 struct wlr_ext_workspace_handle_v1 *workspace_get_active(void);
-
-typedef struct desktop_t desktop_t;
-typedef struct output_t output_t;
 
 void workspace_update_visibility(output_t *m, desktop_t *d);
 

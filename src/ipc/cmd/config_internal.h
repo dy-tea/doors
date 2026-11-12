@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ipc/args.h"
-#include "types.h"
+#include "layout/scroller.h"
 
 #include <stdarg.h>
 #include <stdbool.h>

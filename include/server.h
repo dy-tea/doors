@@ -39,7 +39,6 @@ typedef enum {
 	STACK_COUNT,
 } scene_stack_t;
 
-typedef struct output_t output_t;
 struct ime_relay_t;
 
 typedef struct server_t {

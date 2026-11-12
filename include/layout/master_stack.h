@@ -1,12 +1,22 @@
 #pragma once
 
+#include "fwd.h"
 #include "types.h"
 #include <stdbool.h>
 #include <wlr/util/box.h>
 
-typedef struct desktop_t desktop_t;
-typedef struct output_t output_t;
-typedef struct node_t node_t;
+typedef enum {
+	MASTER_LEFT,
+	MASTER_TOP,
+	MASTER_RIGHT,
+	MASTER_BOTTOM,
+	MASTER_CENTER,
+} master_area_orientation_t;
+
+typedef enum {
+	STACK_VERTICAL,
+	STACK_HORIZONTAL,
+} stack_layout_t;
 
 void master_stack_arrange(output_t *m, desktop_t *d, struct wlr_box available);
 int master_stack_collect(desktop_t *d, node_t ***out_nodes);

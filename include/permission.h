@@ -1,7 +1,7 @@
 #pragma once
 
+#include "macros.h"
 #include "rule.h"
-#include "types.h"
 
 #include <limits.h>
 #include <stdbool.h>

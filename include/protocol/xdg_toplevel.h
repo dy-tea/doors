@@ -3,7 +3,7 @@
 #include "view.h"
 #include <wlr/types/wlr_xdg_dialog_v1.h>
 
-typedef struct xdg_toplevel_t {
+struct xdg_toplevel_t {
 	view_t view;
 
 	struct wlr_xdg_toplevel *xdg_toplevel;
@@ -29,7 +29,7 @@ typedef struct xdg_toplevel_t {
 	struct wl_listener set_title;
 	struct wl_listener set_app_id;
 	struct wl_listener new_xdg_popup;
-} xdg_toplevel_t;
+};
 
 // helper functions
 void xdg_toplevel_apply_decoration_mode(xdg_toplevel_t *tl);

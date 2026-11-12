@@ -1,7 +1,8 @@
 #pragma once
 
 #include "input/gesture.h"
-#include "types.h"
+#include "macros.h"
+#include "settings.h"
 
 #include <stdint.h>
 #include <wayland-server.h>

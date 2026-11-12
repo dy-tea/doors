@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types.h"
+#include "macros.h"
 
 #include <stdbool.h>
 #include <wayland-server-core.h>

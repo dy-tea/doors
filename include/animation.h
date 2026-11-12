@@ -1,13 +1,10 @@
 #pragma once
 
+#include "fwd.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <time.h>
 #include <wlr/util/box.h>
-
-#include "types.h"
-
-typedef struct output_t output_t;
 
 typedef struct layer_surface_t layer_surface_t;
 struct wlr_scene_tree;

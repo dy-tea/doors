@@ -1,8 +1,8 @@
 #pragma once
 
-#include <stdbool.h>
+#include "fwd.h"
 
-typedef struct node_t node_t;
+#include <stdbool.h>
 
 void scratchpad_init(void);
 void scratchpad_fini(void);

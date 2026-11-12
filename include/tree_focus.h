@@ -2,10 +2,6 @@
 
 #include "types.h"
 
-typedef struct output_t output_t;
-typedef struct desktop_t desktop_t;
-typedef struct node_t node_t;
-
 // true if the node still has a live surface behind it and can take focus
 bool node_focusable(const node_t *n);
 

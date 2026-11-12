@@ -1,6 +1,7 @@
 #include "input/cursor.h"
 #include "input/touch.h"
 #include "macros.h"
+#include "output/output.h"
 #include "protocol/idle_power.h"
 #include "protocol/layer.h"
 #include "server.h"

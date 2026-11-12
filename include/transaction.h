@@ -9,10 +9,7 @@
 #include <wlr/types/wlr_scene.h>
 #include <wlr/util/box.h>
 
-// forward declarations
-struct node_t;
-
-typedef struct transaction_inst_t {
+struct transaction_inst_t {
 	struct transaction_t *transaction;
 	struct node_t *node;
 	struct wl_list link; // transaction_t::instructions
@@ -33,7 +30,7 @@ typedef struct transaction_inst_t {
 	bool applied;
 	bool server_request;
 	bool require_geometry_match;
-} transaction_inst_t;
+};
 
 typedef struct transaction_t {
 	struct wl_event_source *timer;

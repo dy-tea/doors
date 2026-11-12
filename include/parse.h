@@ -1,6 +1,7 @@
 #pragma once
 
-#include "types.h"
+#include "borders.h"
+#include "layout/scroller.h"
 
 #include <stdbool.h>
 #include <stddef.h>

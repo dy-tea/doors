@@ -1,13 +1,9 @@
 #pragma once
 
+#include "output/output.h"
 #include "settings.h"
-#include "types.h"
 
 #include <wlr/util/box.h>
-
-typedef struct output_t output_t;
-typedef struct desktop_t desktop_t;
-typedef struct node_t node_t;
 
 #define MIN_RENDER_WIDTH 1
 #define MIN_RENDER_HEIGHT 1

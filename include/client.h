@@ -7,7 +7,6 @@
 typedef struct surface_blur_t surface_blur_t;
 typedef struct surface_rounded_t surface_rounded_t;
 typedef struct surface_shadow_t surface_shadow_t;
-typedef struct output_t output_t;
 
 struct wlr_scene_tree *client_get_scene_tree(const client_t *client);
 struct wlr_scene_tree *client_get_content_tree(const client_t *client);

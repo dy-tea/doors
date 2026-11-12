@@ -1,5 +1,7 @@
 #pragma once
 
+#include "fwd.h"
+
 #include "layer_rule.h"
 #include "surface.h"
 
@@ -8,8 +10,6 @@
 #include <wayland-server.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_scene.h>
-
-typedef struct output_t output_t;
 
 typedef struct layer_surface_t {
 	struct wl_list link;

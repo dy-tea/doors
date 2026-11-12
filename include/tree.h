@@ -8,8 +8,10 @@
 
 #include <wlr/types/wlr_scene.h>
 
-typedef struct surface_rounded_t surface_rounded_t;
-typedef struct output_t output_t;
+typedef enum {
+	FLIP_HORIZONTAL,
+	FLIP_VERTICAL
+} flip_t;
 
 #define TREE_MAX_DEPTH 64
 

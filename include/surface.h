@@ -1,7 +1,8 @@
 #pragma once
 
+#include "borders.h"
 #include "effects/backend.h"
-#include "types.h"
+#include "fwd.h"
 #include <wlr/types/wlr_scene.h>
 #include <pixman.h>
 #include <stdint.h>

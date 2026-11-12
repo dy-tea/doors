@@ -31,8 +31,6 @@ static inline size_t ipc_buf_append(char *buf, size_t size, size_t offset, const
 	return offset + written;
 }
 
-typedef struct output_t output_t;
-
 typedef enum {
 	SUB_MASK_REPORT = 1 << 0,
 	SUB_MASK_MONITOR_ADD = 1 << 1,

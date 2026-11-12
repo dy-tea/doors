@@ -1,6 +1,6 @@
 #pragma once
 
-typedef struct client_t client_t;
+#include "fwd.h"
 
 void render_unfocused_init(void);
 void render_unfocused_fini(void);

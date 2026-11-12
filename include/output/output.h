@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types.h"
+#include "fwd.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -10,7 +10,6 @@
 #include <wlr/util/box.h>
 
 typedef struct effects_output_t effects_output_t;
-typedef struct desktop_t desktop_t;
 
 struct dim_scrim_t;
 

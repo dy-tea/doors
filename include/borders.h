@@ -1,9 +1,20 @@
 #pragma once
 
-#include "output/output.h"
-#include "types.h"
+#include "fwd.h"
 
 #include <wlr/types/wlr_scene.h>
+
+// border gradient theme
+#define BORDER_GRADIENT_MAX_STOPS 10
+typedef struct {
+	float gradient[BORDER_GRADIENT_MAX_STOPS * 4];
+	int gradient_count;
+	float gradient_angle;
+	float gradient2[BORDER_GRADIENT_MAX_STOPS * 4];
+	int gradient2_count;
+	float gradient2_angle;
+	float gradient_lerp;
+} border_theme_t;
 
 // which of the three border colour/theme buckets a client currently falls into
 typedef struct {

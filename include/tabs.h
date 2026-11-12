@@ -1,12 +1,10 @@
 #pragma once
 
+#include "fwd.h"
+
 #include <stdbool.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/util/box.h>
-
-typedef struct node_t node_t;
-typedef struct desktop_t desktop_t;
-typedef struct output_t output_t;
 
 #define TAB_BAR_HEIGHT 22
 #define TAB_BAR_BORDER 1
@@ -20,14 +18,14 @@ typedef struct tab_entry_t {
 	struct wlr_box hit_box;
 } tab_entry_t;
 
-typedef struct tab_bar_t {
+struct tab_bar_t {
 	node_t *owner;
 	struct wlr_scene_tree *tree;
 	struct wlr_scene_rect *bg;
 	tab_entry_t *entries;
 	size_t entry_count;
 	struct wlr_box rect;
-} tab_bar_t;
+};
 
 size_t tabbed_leaf_count(node_t *n);
 int tab_bar_height(node_t *n);

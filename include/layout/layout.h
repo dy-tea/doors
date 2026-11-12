@@ -5,11 +5,6 @@
 #include <stdbool.h>
 #include <wlr/util/box.h>
 
-typedef struct output_t output_t;
-typedef struct desktop_t desktop_t;
-typedef struct client_t client_t;
-typedef struct node_t node_t;
-
 typedef struct layout_impl_t {
 	const char *name;
 

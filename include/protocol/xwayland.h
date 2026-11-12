@@ -30,7 +30,7 @@ typedef struct xwayland_t {
 	xcb_atom_t atoms[ATOM_LAST];
 } xwayland_t;
 
-typedef struct xwayland_toplevel_t {
+struct xwayland_toplevel_t {
 	view_t view;
 
 	struct wlr_xwayland_surface *xwayland_surface;
@@ -56,7 +56,7 @@ typedef struct xwayland_toplevel_t {
 	struct wl_listener associate;
 	struct wl_listener dissociate;
 	struct wl_listener override_redirect;
-} xwayland_toplevel_t;
+};
 
 typedef struct xwayland_unmanaged_t {
 	struct wlr_xwayland_surface *xwayland_surface;

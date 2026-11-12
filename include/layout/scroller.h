@@ -1,14 +1,37 @@
 #pragma once
 
+#include "fwd.h"
 #include "types.h"
 
 #include <stdbool.h>
 #include <wlr/util/box.h>
 
-struct output_t;
-typedef struct client_t client_t;
-typedef struct desktop_t desktop_t;
-typedef struct node_t node_t;
+typedef enum {
+	SCROLLER_SIZE_PROPORTION,
+	SCROLLER_SIZE_FIXED,
+} scroller_size_type_t;
+
+typedef struct {
+	scroller_size_type_t type;
+	double value;
+} scroller_size_t;
+
+typedef enum {
+	SCROLLER_HEIGHT_AUTO,
+	SCROLLER_HEIGHT_PROPORTION,
+	SCROLLER_HEIGHT_FIXED,
+} scroller_height_type_t;
+
+typedef struct {
+	scroller_height_type_t type;
+	double value;
+} scroller_window_height_t;
+
+typedef enum {
+	SCROLLER_CENTER_NEVER,
+	SCROLLER_CENTER_ALWAYS,
+	SCROLLER_CENTER_ON_OVERFLOW,
+} scroller_center_mode_t;
 
 #define SCROLLER_MIN_WIDTH 1
 #define SCROLLER_MIN_HEIGHT 1
@@ -27,7 +50,7 @@ typedef struct scroller_column_t {
 	double resolved_width;
 } scroller_column_t;
 
-typedef struct scroller_state_t {
+struct scroller_state_t {
 	scroller_column_t *columns;
 	int column_count, capacity, active_column_idx;
 	double view_offset;
@@ -35,7 +58,7 @@ typedef struct scroller_state_t {
 	double gap;
 	bool activate_prev_column_on_removal;
 	scroller_size_t default_column_width;
-} scroller_state_t;
+};
 
 scroller_state_t *scroller_create(void);
 void scroller_destroy(scroller_state_t *s);

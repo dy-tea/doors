@@ -1,5 +1,7 @@
 #pragma once
 
+#include "fwd.h"
+
 #include "effects/backend.h"
 #include <pixman.h>
 #include <stdbool.h>
@@ -7,7 +9,6 @@
 #include <wlr/types/wlr_output.h>
 #include <wlr/util/box.h>
 
-typedef struct output_t output_t;
 struct wlr_scene_output;
 struct wlr_buffer;
 struct wlr_backend;

@@ -12,6 +12,11 @@
 
 struct dim_scrim_t;
 
+typedef enum {
+	VIEW_XDG,
+	VIEW_XWAYLAND,
+} view_type_t;
+
 struct view_t {
 	view_type_t type;
 	const struct view_impl_t *impl;
