@@ -891,7 +891,7 @@ List or add keybinds.
 
 =item input
 
-C<doorsctl input [I<device>] [type:I<type>] I<property> I<value>>
+C<doorsctl input [I<device>] [type:I<type>] [I<property>] [I<value>]>
 
 Set an input device property. Use C<*> for all devices.
 
@@ -909,93 +909,93 @@ size (1-512) globally.
 
 =item I<xkb_layout>, I<xkb_model>, I<xkb_variant>, I<xkb_options>, I<xkb_rules>, I<xkb_file>
 
-C<doorsctl input <device> xkb_layout I<layout>>
+C<doorsctl input [I<device>] xkb_layout [I<layout>]>
 
 XKB keymap fields for keyboards. See C<xkeyboard-config(7)> for accepted
 values. C<xkb_options> is a comma-separated list of options.
 
 =item I<repeat_rate>, I<repeat_delay>
 
-C<doorsctl input <device> repeat_rate I<rate>>
+C<doorsctl input [I<device>] repeat_rate [I<rate>]>
 
 Keyboard repeat rate (characters per second) and initial delay in
 milliseconds. Defaults to C<25> and C<600>.
 
 =item I<xkb_numlock>, I<xkb_capslock>
 
-C<doorsctl input <device> xkb_numlock true|false>
+C<doorsctl input [I<device>] xkb_numlock [true|false]>
 
 Turn the Num Lock or Caps Lock LED on when the keymap is applied.
 
 =item I<pointer_accel>
 
-C<doorsctl input <device> pointer_accel I<accel>>
+C<doorsctl input [I<device>] pointer_accel [I<accel>]>
 
 Pointer acceleration speed in the libinput range C<-1> (slowest) to C<1>
 (fastest). Applies to pointers and touchpads.
 
 =item I<accel_profile>
 
-C<doorsctl input <device> accel_profile I<profile>>
+C<doorsctl input [I<device>] accel_profile [I<profile>]>
 
-Acceleration profile: C<adaptive> (acceleration dependent on pointer speed)
-or C<flat> (constant multiplier).
+C<adaptive> (acceleration dependent on pointer speed) or C<flat>
+(constant multiplier).
 
 =item I<natural_scroll>
 
-C<doorsctl input <device> natural_scroll true|false>
+C<doorsctl input [I<device>] natural_scroll [true|false]>
 
 Invert the scroll direction.
 
 =item I<left_handed>
 
-C<doorsctl input <device> left_handed true|false>
+C<doorsctl input [I<device>] left_handed [true|false]>
 
 Swap the left and right mouse buttons.
 
 =item I<scroll_factor>
 
-C<doorsctl input <device> scroll_factor I<factor>>
+C<doorsctl input [I<device>] scroll_factor [I<factor>]>
 
 Multiplier applied to scroll events. Defaults to C<1>. Applies to pointers
 and touchpads.
 
 =item I<rotation_angle>
 
-C<doorsctl input <device> rotation_angle I<degrees>>
+C<doorsctl input [I<device>] rotation_angle [I<degrees>]>
 
 Rotate the device motion by this angle in degrees. Values are normalized to
 the C<0>-C<360> range. Only applied where the device supports it.
 
 =item I<tap>, I<drag>, I<drag_lock>, I<tap_button_map>
 
-C<doorsctl input <device> tap true|false>
+C<doorsctl input [I<device>] tap [true|false]>
 
 Touchpad tap to click.
 
 =item I<dwt>, I<dwtp>
 
-C<doorsctl input <device> dwt true>
+C<doorsctl input [I<device>] dwt [true|false]>
 
 Disable the touchpad while typing on the keyboard (C<dwt>) or while the
 trackpoint is in use (C<dwtp>).
 
 =item I<click_method>
 
-C<doorsctl input <device> click_method I<method>>
+C<doorsctl input [I<device>] click_method [I<method>]>
 
 C<button_areas> (software-emulated buttons in the touchpad
 corners) or C<none>.
 
 =item I<middle_emulation>
 
-C<doorsctl input <device> middle_emulation true|false>
+C<doorsctl input [I<device>] middle_emulation [true|false]>
 
 Emulate a middle button press when both buttons are pressed.
 
 =item I<scroll_method>, I<scroll_button>, I<scroll_button_lock>
 
-C<doorsctl input <device> scroll_method I<method>>
+C<doorsctl input [I<device>] scroll_method [I<method>]>
 
 C<twofinger>, C<edge>, C<button> (scroll while holding I<scroll_button>)
 or C<none>. I<scroll_button> takes the button event code
