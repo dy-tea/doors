@@ -891,7 +891,7 @@ List or add keybinds.
 
 =item input
 
-C<doorsctl input [I<device>] [type:<type>] I<property> I<value>>
+C<doorsctl input [I<device>] [type:I<type>] I<property> I<value>>
 
 Set an input device property. Use C<*> for all devices.
 
