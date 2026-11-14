@@ -43,7 +43,6 @@ static const ipc_cmd_t commands[] = {
 	CMD("globalshortcuts", "list bound global shortcuts", ipc_cmd_globalshortcuts),
 	CMD("hotkey", "list or add keybinds", ipc_cmd_hotkey),
 	CMD("input", "set an input device property", ipc_cmd_input),
-	CMD("keyboard_grouping", "set the keyboard grouping mode", ipc_cmd_keyboard_grouping),
 	{"layer_rule", "manage layer-shell surface rules", ipc_cmd_layer_rule, layer_rule_subs},
 	{"master_stack", "drive the master_stack layout", ipc_cmd_master_stack, master_stack_subs},
 	{"node", "act on the focused window", ipc_cmd_node, node_subs},

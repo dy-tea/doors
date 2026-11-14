@@ -1,4 +1,3 @@
-#include "config.h"
 #include "input/seat.h"
 #include "ipc/args.h"
 #include "ipc/registry.h"
@@ -28,20 +27,4 @@ const ipc_sub_t seat_subs[] = {
 void ipc_cmd_seat(ipc_args_t *a) {
 	if (!ipc_sub_dispatch(a, seat_subs))
 		ipc_fail_unknown(a, seat_subs);
-}
-
-static const str_pair_t grouping_values[] = {
-	{"none", KEYBOARD_GROUP_NONE},
-	{"smart", KEYBOARD_GROUP_SMART},
-	{"default", KEYBOARD_GROUP_DEFAULT},
-	IPC_ENUM_END,
-};
-
-void ipc_cmd_keyboard_grouping(ipc_args_t *a) {
-	long mode;
-	if (!ipc_enum(a, "mode", grouping_values, &mode))
-		return;
-
-	set_keyboard_grouping((keyboard_grouping_t)mode);
-	ipc_ok(a, "keyboard_grouping set\n");
 }

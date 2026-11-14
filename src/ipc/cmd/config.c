@@ -1,7 +1,7 @@
-#include "animation.h"
 #include "config_internal.h"
 #include "dim.h"
 #include "effects/effects.h"
+#include "input/keyboard.h"
 #include "ipc/args.h"
 #include "ipc/helpers.h"
 #include "ipc/registry.h"
@@ -15,7 +15,6 @@
 #include "str.h"
 #include "tabs.h"
 #include "transaction.h"
-#include "tree.h"
 #include <assert.h>
 #include <limits.h>
 #include <math.h>
@@ -39,6 +38,10 @@ void tabs_rebuild_all(void) {
 
 static void on_border_color(void) {
 	refresh_border_colors();
+}
+
+static void on_keyboard_grouping(void) {
+	keyboard_reapply_grouping();
 }
 
 static void on_window_gap(void) {
@@ -158,6 +161,13 @@ static const str_pair_t scroller_center_mode_values[] = {
 	{"always", SCROLLER_CENTER_ALWAYS},
 	{"on-overflow", SCROLLER_CENTER_ON_OVERFLOW},
 	{"on_overflow", SCROLLER_CENTER_ON_OVERFLOW},
+	IPC_ENUM_END,
+};
+
+static const str_pair_t keyboard_grouping_values[] = {
+	{"none", KEYBOARD_GROUP_NONE},
+	{"smart", KEYBOARD_GROUP_SMART},
+	{"default", KEYBOARD_GROUP_DEFAULT},
 	IPC_ENUM_END,
 };
 
@@ -301,6 +311,10 @@ const cfg_setting_t settings_table[] = {
 	I("idle_timeout", NULL, settings.idle_timeout, 0, 86400, "%d\n", 0, on_idle),
 	B("idle_dpms", NULL, settings.idle_dpms, 0, on_idle),
 	B("realtime_scheduling", NULL, settings.realtime_scheduling, 0, on_realtime_scheduling),
+
+	/* input */
+	E("keyboard_grouping", NULL, settings.keyboard_grouping, keyboard_grouping_values, 0,
+		on_keyboard_grouping),
 
 	/* misc */
 	B("record_history", NULL, settings.record_history, 0, NULL),

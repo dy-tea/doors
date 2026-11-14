@@ -16,7 +16,6 @@ void ipc_cmd_env(ipc_args_t *a);
 void ipc_cmd_globalshortcuts(ipc_args_t *a);
 void ipc_cmd_hotkey(ipc_args_t *a);
 void ipc_cmd_input(ipc_args_t *a);
-void ipc_cmd_keyboard_grouping(ipc_args_t *a);
 void ipc_cmd_layer_rule(ipc_args_t *a);
 void ipc_cmd_master_stack(ipc_args_t *a);
 void ipc_cmd_node(ipc_args_t *a);

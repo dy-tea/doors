@@ -47,8 +47,8 @@ Note that a running doors compositor is required for commands to function.
 
 I<command> is one of the top-level commands, which include: L</"bezier">,
 L</"commands">, L</"config">, L</"desktop">, L</"env">, L</"focus">,
-L</"globalshortcuts">, L</"hotkey">, L</"input">, L</"keyboard_grouping">,
-L</"layer_rule">, L</"master_stack">, L</"node">, L</"output">, L</"permission">, L</"query">,
+L</"globalshortcuts">, L</"hotkey">, L</"input">, L</"layer_rule">,
+L</"master_stack">, L</"node">, L</"output">, L</"permission">, L</"query">,
 L</"quit">, L</"resize">, L</"rule">, L</"scratchpad">, L</"scroller">,
 L</"seat">, L</"send">, L</"sessions">, L</"spring">, L</"subscribe">,
 L</"swap">, L</"toggle">, L</"tree"> and L</"wm">.
@@ -299,6 +299,17 @@ Defaults to C<0>.
 C<doorsctl config initial_polarity [first_child|second_child]>
 
 Sets the initial insertion side for new windows. Defaults to C<first_child>.
+
+=item I<keyboard_grouping>
+
+C<doorsctl config keyboard_grouping [default|none|smart]>
+
+Controls how physical keyboards are grouped. With C<default> (the default),
+keyboards that share the same keymap and repeat rate are grouped together so
+a key released on one is not seen as stuck when pressed on another; keyboards
+that do not match any group keep their own. C<none> disables grouping and
+forwards every keyboard separately. C<smart> currently behaves like
+C<default>.
 
 =item I<enable_animations>
 
@@ -1003,12 +1014,6 @@ or C<none>. I<scroll_button> takes the button event code
 I<scroll_button_lock> makes the button a toggle.
 
 =back
-
-=item keyboard_grouping
-
-C<doorsctl keyboard_grouping [none|smart|default]>
-
-Set the keyboard grouping mode.
 
 =item layer_rule
 
