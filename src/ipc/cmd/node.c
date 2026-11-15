@@ -8,7 +8,6 @@
 #include "layout/layout.h"
 #include "output/output.h"
 #include "parse.h"
-#include "protocol/workspace.h"
 #include "scratchpad.h"
 #include "server.h"
 #include "str.h"

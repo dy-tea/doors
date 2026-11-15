@@ -1,4 +1,3 @@
-#include "animation.h"
 #include "effects/effects.h"
 #include "ipc/args.h"
 #include "ipc/helpers.h"
@@ -9,7 +8,6 @@
 #include "protocol/workspace.h"
 #include "server.h"
 #include "str.h"
-#include "tabs.h"
 #include "transaction.h"
 #include "tree.h"
 #include "tree_focus.h"

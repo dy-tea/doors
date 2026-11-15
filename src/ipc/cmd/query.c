@@ -5,7 +5,6 @@
 #include "output/output.h"
 #include "parse.h"
 #include "protocol/layer.h"
-#include "protocol/workspace.h"
 #include "server.h"
 #include "tree.h"
 #include <limits.h>

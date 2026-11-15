@@ -6,16 +6,11 @@
 #include "layout/scroller.h"
 #include "output/output.h"
 #include "parse.h"
-#include "server.h"
 #include "settings.h"
 #include "spring.h"
 #include "str.h"
-#include "tabs.h"
 #include "transaction.h"
-#include "tree.h"
-#include <errno.h>
 #include <limits.h>
-#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
