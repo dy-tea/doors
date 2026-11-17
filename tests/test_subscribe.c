@@ -1,13 +1,13 @@
 #include "ipc/ipc.h"
 #include "test.h"
 
-#define MONITOR_EVENTS                                                                               \
+#define MONITOR_EVENTS                                                                          \
 	(SUB_MASK_MONITOR_ADD | SUB_MASK_MONITOR_REMOVE | SUB_MASK_MONITOR_FOCUS |                    \
 		SUB_MASK_MONITOR_CHANGE)
-#define DESKTOP_EVENTS                                                                               \
+#define DESKTOP_EVENTS                                                                          \
 	(SUB_MASK_DESKTOP_ADD | SUB_MASK_DESKTOP_REMOVE | SUB_MASK_DESKTOP_FOCUS |                    \
 		SUB_MASK_DESKTOP_CHANGE | SUB_MASK_DESKTOP_LAYOUT)
-#define NODE_EVENTS                                                                                  \
+#define NODE_EVENTS                                                                             \
 	(SUB_MASK_NODE_ADD | SUB_MASK_NODE_REMOVE | SUB_MASK_NODE_FOCUS | SUB_MASK_NODE_CHANGE |      \
 		SUB_MASK_NODE_STATE | SUB_MASK_NODE_FLAG)
 
@@ -52,8 +52,6 @@ static void test_words(void) {
 	CHECK(mask_for("A") == SUB_MASK_ALL);
 }
 
-// the packed name lists are terminated, so a short alias cannot pick up the
-// mask of the entry that happens to sit next to it in .rodata
 static void test_no_bleed(void) {
 	CHECK(mask_for("R") == SUB_MASK_REPORT);
 	CHECK(mask_for("M") == MONITOR_EVENTS);

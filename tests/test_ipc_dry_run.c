@@ -8,7 +8,6 @@
 #include "rule.h"
 #include "settings.h"
 #include "spring.h"
-#include "tabs.h"
 #include "test.h"
 #include <stdlib.h>
 #include <string.h>

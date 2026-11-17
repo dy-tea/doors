@@ -48,10 +48,10 @@ Note that a running doors compositor is required for commands to function.
 I<command> is one of the top-level commands, which include: L</"bezier">,
 L</"commands">, L</"config">, L</"desktop">, L</"env">, L</"focus">,
 L</"globalshortcuts">, L</"hotkey">, L</"input">, L</"layer_rule">,
-L</"master_stack">, L</"node">, L</"output">, L</"permission">, L</"query">,
-L</"quit">, L</"resize">, L</"rule">, L</"scratchpad">, L</"scroller">,
-L</"seat">, L</"send">, L</"sessions">, L</"spring">, L</"subscribe">,
-L</"swap">, L</"toggle">, L</"tree"> and L</"wm">.
+L</"master_stack">, L</"node">, L</"output">, L</"permission">, L</"plugin">,
+L</"query">, L</"quit">, L</"resize">, L</"rule">, L</"scratchpad">,
+L</"scroller">, L</"seat">, L</"send">, L</"sessions">, L</"spring">,
+L</"subscribe">, L</"swap">, L</"toggle">, L</"tree"> and L</"wm">.
 
 =over 4
 
@@ -838,17 +838,18 @@ Focus a desktop.
 C<doorsctl desktop -l|--layout <tiled|monocle|scroller|master_stack|floating>
  [--all]>
 
-Set desktop layout.
+Set desktop layout. Layouts registered by plugins (see L<doors-plugins(7)>
+and C<doorsctl plugin load>) can be set by name as well.
 
 =item I<--rename>
 
-C<doorsctl desktop -n|--rename <name>>
+C<doorsctl desktop -n|--rename I<name>>
 
 Rename desktop.
 
 =item I<--swap>
 
-C<doorsctl desktop -s|--swap <desktop>>
+C<doorsctl desktop -s|--swap I<desktop>>
 
 Swap contents with another desktop.
 
@@ -860,13 +861,13 @@ Remove current empty desktop.
 
 =item I<--bubble>
 
-C<doorsctl desktop -b|--bubble <up|down>>
+C<doorsctl desktop -b|--bubble [up|down]>
 
 Reorder desktop in list.
 
 =item I<--to-monitor>
 
-C<doorsctl desktop -m|--to-monitor <monitor>>
+C<doorsctl desktop -m|--to-monitor I<monitor>>
 
 Move desktop to monitor.
 
@@ -874,15 +875,15 @@ Move desktop to monitor.
 
 =item env
 
-C<doorsctl env set <name> <value>>
+C<doorsctl env set I<name> I<value>>
 
-C<doorsctl env unset <name>>
+C<doorsctl env unset I<name>>
 
 Set or unset environment variables for launched clients.
 
 =item focus
 
-C<doorsctl focus west|east|north|south>
+C<doorsctl focus [west|east|north|south]>
 
 Move focus in a direction (aliases: w, e, n, s).
 
@@ -896,7 +897,7 @@ List bound global shortcuts.
 
 C<doorsctl hotkey list>
 
-C<doorsctl hotkey add <modifiers+key>[flags] <command>>
+C<doorsctl hotkey add I<modifiers+key>[flags] I<command>>b
 
 List or add keybinds.
 
@@ -1017,9 +1018,9 @@ I<scroll_button_lock> makes the button a toggle.
 
 =item layer_rule
 
-C<doorsctl layer_rule -a|--add <namespace> [output=<pattern>] [options...]>
+C<doorsctl layer_rule -a|--add I<namespace> [output=I<pattern>] [options...]>
 
-C<doorsctl layer_rule -r|--remove <index>>
+C<doorsctl layer_rule -r|--remove I<index>>
 
 C<doorsctl layer_rule -l|--list>
 
@@ -1035,7 +1036,7 @@ created. Blur also requires blur to be enabled.
 
 =item master_stack
 
-C<doorsctl master_stack <subcommand>>
+C<doorsctl master_stack I<subcommand>>
 
 Drive the master_stack layout.
 
@@ -1127,19 +1128,19 @@ Close focused window.
 
 =item I<--state>
 
-C<doorsctl node -t|--state <tiled|floating|fullscreen|maximized|minimized>>
+C<doorsctl node -t|--state [tiled|floating|fullscreen|maximized|minimized]>
 
 Set window state.
 
 =item I<--to-desktop>
 
-C<doorsctl node -d|--to-desktop <desktop>>
+C<doorsctl node -d|--to-desktop I<desktop>>
 
 Send window to desktop.
 
 =item I<--flag>
 
-C<doorsctl node -g|--flag <key>[=true|false]>
+C<doorsctl node -g|--flag I<key>[=true|false]>
 
 Toggle window flags and effects.
 
@@ -1151,13 +1152,13 @@ Send focused window to scratchpad.
 
 =item I<--move>
 
-C<doorsctl node -v|--move <dx> <dy>>
+C<doorsctl node -v|--move I<dx> I<dy>>
 
 Move floating window.
 
 =item I<--resize>
 
-C<doorsctl node -z|--resize <handle> <dx> <dy>>
+C<doorsctl node -z|--resize I<handle> I<dx> I<dy>>
 
 Resize floating window.
 
@@ -1175,19 +1176,19 @@ Kill focused window.
 
 =item I<--to-monitor>
 
-C<doorsctl node -m|--to-monitor <monitor> [--follow]>
+C<doorsctl node -m|--to-monitor I<monitor> [--follow]>
 
 Send window to monitor.
 
 =item I<--to-node>
 
-C<doorsctl node -n|--to-node <id>>
+C<doorsctl node -n|--to-node I<id>>
 
 Send window to node.
 
 =item I<--layer>
 
-C<doorsctl node -l|--layer <below|normal|above>>
+C<doorsctl node -l|--layer [below|normal|above]>
 
 Set window layer.
 
@@ -1199,13 +1200,13 @@ Set split type.
 
 =item I<--ratio>
 
-C<doorsctl node -r|--ratio [+|-]<ratio|px>>
+C<doorsctl node -r|--ratio [+|-]I<ratio|px>>
 
 Set split ratio.
 
 =item I<--circulate>
 
-C<doorsctl node -C|--circulate <forward|backward>>
+C<doorsctl node -C|--circulate [forward|backward]>
 
 Circulate focus.
 
@@ -1217,19 +1218,19 @@ Insert receptacle.
 
 =item I<--presel-dir>
 
-C<doorsctl node -p|--presel-dir <direction|cancel>>
+C<doorsctl node -p|--presel-dir I<direction|cancel>>
 
 Preselect direction.
 
 =item I<--presel-ratio>
 
-C<doorsctl node -o|--presel-ratio <ratio>>
+C<doorsctl node -o|--presel-ratio I<ratio>>
 
 Set preselection ratio.
 
 =item I<--swap>
 
-C<doorsctl node -s|--swap <id>>
+C<doorsctl node -s|--swap I<id>>
 
 Swap with node.
 
@@ -1241,7 +1242,7 @@ C<doorsctl output list>
 
 C<doorsctl output create>
 
-C<doorsctl output <name> <subcommand> [args]>
+C<doorsctl output I<name> I<subcommand> [args]>
 
 Configure outputs and desktops.
 
@@ -1250,133 +1251,133 @@ Configure outputs and desktops.
 
 =item I<enable>
 
-C<doorsctl output <name> enable>
+C<doorsctl output I<name> enable>
 
 Enable output.
 
 =item I<disable>
 
-C<doorsctl output <name> disable>
+C<doorsctl output I<name> disable>
 
 Disable output.
 
 =item I<mode>
 
-C<doorsctl output <name> mode <WxH[@hz]>>
+C<doorsctl output I<name> mode I<WxH[@hz]>>
 
 Set display mode.
 
 =item I<modes>
 
-C<doorsctl output <name> modes>
+C<doorsctl output I<name> modes>
 
 List modes.
 
 =item I<position>
 
-C<doorsctl output <name> position <x> <y>>
+C<doorsctl output I<name> position I<x> I<y>>
 
 Set output position.
 
 =item I<scale>
 
-C<doorsctl output <name> scale <factor>>
+C<doorsctl output I<name> scale I<factor>>
 
 Set output scale.
 
 =item I<transform>
 
-C<doorsctl output <name> transform <normal|90|180|270|flipped|...>>
+C<doorsctl output I<name> transform [normal|90|180|270|flipped|...]>
 
 Set rotation.
 
 =item I<dpms>
 
-C<doorsctl output <name> dpms <on|off>>
+C<doorsctl output I<name> dpms [on|off]>
 
 Set DPMS state.
 
 =item I<adaptive_sync>
 
-C<doorsctl output <name> adaptive_sync <on|off>>
+C<doorsctl output I<name> adaptive_sync [on|off]>
 
 Set adaptive sync.
 
 =item I<render_bit_depth>
 
-C<doorsctl output <name> render_bit_depth <8|10>>
+C<doorsctl output I<name> render_bit_depth [8|10]>
 
 Set render bit depth.
 
 =item I<color_profile>
 
-C<doorsctl output <name> color_profile <gamma22|srgb|icc <path>>>
+C<doorsctl output I<name> color_profile [gamma22|srgb|icc I<path>]>
 
 Set color profile.
 
 =item I<hdr>
 
-C<doorsctl output <name> hdr <on|off>>
+C<doorsctl output I<name> hdr [on|off]>
 
 Enable HDR.
 
 =item I<tearing>
 
-C<doorsctl output <name> tearing <on|off>>
+C<doorsctl output I<name> tearing [on|off]>
 
 Set tearing.
 
 =item I<max_render_time>
 
-C<doorsctl output <name> max_render_time <off|ms>>
+C<doorsctl output I<name> max_render_time I<off|ms>>
 
 Set max render time.
 
 =item I<focus>
 
-C<doorsctl output <name> focus>
+C<doorsctl output I<name> focus>
 
 Focus output.
 
 =item I<rename>
 
-C<doorsctl output <name> rename <newname>>
+C<doorsctl output I<name> rename I<newname>>
 
 Rename output.
 
 =item I<desktops>
 
-C<doorsctl output <name> desktops [names...]>
+C<doorsctl output I<name> desktops [names...]>
 
 List or set desktops.
 
 =item I<add-desktops>
 
-C<doorsctl output <name> add-desktops <names...>>
+C<doorsctl output I<name> add-desktops [names...]>
 
 Add desktops.
 
 =item I<reorder-desktops>
 
-C<doorsctl output <name> reorder-desktops <names...>>
+C<doorsctl output I<name> reorder-desktops [names...]>
 
 Reorder desktops.
 
 =item I<swap-desktops>
 
-C<doorsctl output <name> swap-desktops <target>>
+C<doorsctl output I<name> swap-desktops I<target>>
 
 Swap desktops with another output.
 
 =item I<remove>
 
-C<doorsctl output <name> remove>
+C<doorsctl output I<name> remove>
 
 Remove output.
 
 =item I<rectangle>
 
-C<doorsctl output <name> rectangle <WxH:X,Y>>
+C<doorsctl output I<name> rectangle I<WxH:X,Y>>
 
 Set output rectangle.
 
@@ -1384,19 +1385,28 @@ Set output rectangle.
 
 =item permission
 
-C<doorsctl permission '<subject>' <capability>=<allow|deny|ask> ...>
+C<doorsctl permission 'I<subject>' I<capability>=[allow|deny|ask] ...>
 
-C<doorsctl permission default <capability>=<allow|deny|ask> ...>
+C<doorsctl permission default I<capability>=[allow|deny|ask] ...>
 
 C<doorsctl permission -l|--list>
 
-C<doorsctl permission -r|--remove <index>>
+C<doorsctl permission -r|--remove I<index>>
 
-C<doorsctl permission --forget [<subject>]>
+C<doorsctl permission --forget [I<subject>]>
 
-C<doorsctl permission answer <token> <allow|deny> [--remember=session|always]>
+C<doorsctl permission answer I<token> [allow|deny] [--remember=session|always]>
 
 Manage capture, output and input permissions.
+
+=item plugin
+
+C<doorsctl plugin load I<path>>
+
+C<doorsctl plugin list>
+
+Load layout plugins and list the loaded ones. A plugin is only loaded once per
+name (see L<doors-plugins(7)>).
 
 =item query
 
@@ -1423,15 +1433,15 @@ Shut the compositor down.
 
 =item resize
 
-C<doorsctl resize left|right|up|down>
+C<doorsctl resize [left|right|up|down]>
 
 Resize in a direction.
 
 =item rule
 
-C<doorsctl rule -a|--add <app_id> [options...]>
+C<doorsctl rule -a|--add I<app_id> [options...]>
 
-C<doorsctl rule -r|--remove <index>>
+C<doorsctl rule -r|--remove I<index>>
 
 C<doorsctl rule -l|--list>
 
@@ -1439,9 +1449,9 @@ Manage window rules.
 
 =item scratchpad
 
-C<doorsctl scratchpad show [app_id:<id>|title:<title>]>
+C<doorsctl scratchpad show [app_id:I<id>|title:I<title>]>
 
-C<doorsctl scratchpad hide <app_id:<id>|title:<title>>>
+C<doorsctl scratchpad hide <app_id:I<id>|title:I<title>>>
 
 C<doorsctl scratchpad list>
 
@@ -1449,7 +1459,7 @@ Show, hide and list scratchpad entries.
 
 =item scroller
 
-C<doorsctl scroller <subcommand>>
+C<doorsctl scroller I<subcommand>>
 
 Drive the scroller layout.
 
@@ -1458,13 +1468,13 @@ Drive the scroller layout.
 
 =item I<proportion>
 
-C<doorsctl scroller proportion <0-1|px>>
+C<doorsctl scroller proportion [0-1|px]>
 
 Set column width.
 
 =item I<resize>
 
-C<doorsctl scroller resize <delta>>
+C<doorsctl scroller resize I<delta>>
 
 Resize column.
 
@@ -1512,7 +1522,7 @@ Expand column.
 
 =item I<set_height>
 
-C<doorsctl scroller set_height <0-1|px>>
+C<doorsctl scroller set_height [0-1|px]>
 
 Set height.
 
@@ -1536,25 +1546,25 @@ Center visible columns.
 
 =item I<action>
 
-C<doorsctl scroller action <name>>
+C<doorsctl scroller action I<name>>
 
 Perform action.
 
 =item I<focus>
 
-C<doorsctl scroller focus <name>>
+C<doorsctl scroller focus I<name>>
 
 Focus.
 
 =item I<move>
 
-C<doorsctl scroller move <name>>
+C<doorsctl scroller move I<name>>
 
 Move.
 
 =item I<swap>
 
-C<doorsctl scroller swap <name>>
+C<doorsctl scroller swap I<name>>
 
 Swap.
 
@@ -1568,7 +1578,7 @@ List seats.
 
 =item send
 
-C<doorsctl send next|prev|previous>
+C<doorsctl send [next|prev|previous]>
 
 Send focused window to another desktop.
 
@@ -1592,19 +1602,19 @@ Subscribe to events.
 
 =item swap
 
-C<doorsctl swap west|east|north|south>
+C<doorsctl swap [west|east|north|south]>
 
 Swap with neighbour in a direction (aliases: w, e, n, s).
 
 =item toggle
 
-C<doorsctl toggle floating|fullscreen|maximize|minimize|restore_minimized|pseudo_tiled|monocle|floating_layout|block_out_from_screenshare>
+C<doorsctl toggle [floating|fullscreen|maximize|minimize|restore_minimized|pseudo_tiled|monocle|floating_layout|block_out_from_screenshare]>
 
 Toggle a window state.
 
 =item tree
 
-C<doorsctl tree <subcommand>>
+C<doorsctl tree I<subcommand>>
 
 Drive the tiled (BSP) tree layout.
 
@@ -1625,31 +1635,31 @@ Split tree evenly.
 
 =item I<rotate>
 
-C<doorsctl tree rotate <clockwise|counterclockwise>>
+C<doorsctl tree rotate [clockwise|counterclockwise]>
 
 Rotate tree.
 
 =item I<flip>
 
-C<doorsctl tree flip <horizontal|vertical>>
+C<doorsctl tree flip [horizontal|vertical]>
 
 Flip tree.
 
 =item I<presel>
 
-C<doorsctl tree presel <west|east|north|south|cancel>>
+C<doorsctl tree presel [west|east|north|south|cancel]>
 
 Preselect direction.
 
 =item I<presel_ratio>
 
-C<doorsctl tree presel_ratio <ratio>>
+C<doorsctl tree presel_ratio I<ratio>>
 
 Set preselection ratio.
 
 =item I<circulate>
 
-C<doorsctl tree circulate <forward|backward>>
+C<doorsctl tree circulate [forward|backward]>
 
 Circulate focus.
 
@@ -1657,7 +1667,7 @@ Circulate focus.
 
 =item wm
 
-C<doorsctl wm <subcommand>>
+C<doorsctl wm I<subcommand>>
 
 Compositor level commands.
 

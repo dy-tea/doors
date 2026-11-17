@@ -9,6 +9,9 @@ if get_option('debug')
 	add_project_arguments('-DDEBUG', language: 'c')
 endif
 
+cc = meson.get_compiler('c')
+dl_dep = cc.find_library('dl', required: false)
+
 wayland_protos = dependency('wayland-protocols')
 
 wlroots_version = ['>=0.21.0', '<0.22.0']
@@ -36,6 +39,7 @@ libs = [
 	dependency('shaderc'),
 	dependency('libpcre2-8'),
 	dependency('threads'),
+	dl_dep,
 	wayland_protos,
 ]
 
@@ -159,6 +163,7 @@ doors_sources = [
 		'src' / 'ipc' / 'cmd' / 'node.c',
 		'src' / 'ipc' / 'cmd' / 'output.c',
 		'src' / 'ipc' / 'cmd' / 'permission.c',
+		'src' / 'ipc' / 'cmd' / 'plugin.c',
 		'src' / 'ipc' / 'cmd' / 'query.c',
 		'src' / 'ipc' / 'cmd' / 'quit.c',
 		'src' / 'ipc' / 'cmd' / 'rule.c',
@@ -181,6 +186,7 @@ doors_sources = [
 		'src' / 'output' / 'output.c',
 		'src' / 'parse.c',
 		'src' / 'permission.c',
+		'src' / 'plugin.c',
 		'src' / 'protocol' / 'bell.c',
 		'src' / 'protocol' / 'capture.c',
 		'src' / 'protocol' / 'copy_capture.c',
@@ -245,6 +251,7 @@ executable(
 	link_with: doors_core,
 	include_directories: inc,
 	dependencies: libs,
+	export_dynamic: true,
 	install: true,
 	install_dir: get_option('bindir'),
 )

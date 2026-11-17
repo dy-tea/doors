@@ -1,5 +1,4 @@
 #include "bezier.h"
-#include "str.h"
 #include "test.h"
 
 static void test_builtins(void) {

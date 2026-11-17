@@ -1,5 +1,6 @@
 #pragma once
 
+#include "str.h"
 #include "types.h"
 
 #include <stdbool.h>
@@ -47,6 +48,13 @@ typedef struct layout_impl_t {
 	// true if layout supports directional navigation (nsew)
 	bool has_directional_nav;
 } layout_impl_t;
+
+void layout_init(void);
+layout_t layout_register(const layout_impl_t *impl);
+size_t layout_count(void);
+const char *layout_name(layout_t layout);
+bool layout_find_by_name(const char *name, layout_t *out);
+const str_pair_t *layout_ipc_values(void);
 
 const layout_impl_t *layout_get_impl(layout_t layout);
 

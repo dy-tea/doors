@@ -13,6 +13,7 @@
 #include "output/config.h"
 #include "output/output.h"
 #include "permission.h"
+#include "plugin.h"
 #include "protocol/bell.h"
 #include "protocol/copy_capture.h"
 #include "protocol/cursor_shape.h"
@@ -174,6 +175,9 @@ void server_init(void) {
 
 	output_mgmt_init();
 	output_init();
+
+	layout_init();
+	plugin_init();
 
 	// scene
 	server.scene = wlr_scene_create();

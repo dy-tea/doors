@@ -1,0 +1,150 @@
+#   doors-plugins.pod - doors plugin authoring man page source
+#
+#   Copyright
+#
+#       Licensed under GPL-3.0.
+#
+#   Description
+#
+#	To learn what TOP LEVEL section to use in manual pages,
+#	see POSIX/Susv standard and "Utility Description Defaults" at
+#	http://www.opengroup.org/onlinepubs/009695399/utilities/xcu_chap01.html#tag_01_11
+#
+#	This is manual page in Perl POD format. Read more at
+#	http://perldoc.perl.org/perlpod.html or run command:
+#
+#	    perldoc perlpod | less
+#
+#	To check the syntax:
+#
+#	    podchecker *.pod
+#
+#	Create manual page with command:
+#
+#	    pod2man PAGE.N.pod > PAGE.N
+
+=pod
+
+=head1 NAME
+
+doors-plugins - writing layout plugins for the doors Wayland compositor
+
+=head1 DESCRIPTION
+
+doors can load shared libraries at runtime that register additional
+I<layouts>. A layout decides how tiled windows are arranged on a desktop
+and how focus and swaps move between them.
+
+A plugin is a shared library that exports a single global structure
+named C<doors_plugin>:
+
+	struct doors_plugin_t {
+		uint32_t api_version;                // must be DOORS_PLUGIN_API_VERSION
+		const char *name;                    // plugin name, for logging and listing
+		const layout_impl_t *const *layouts; // NULL-terminated list of layouts
+	};
+
+Every element of I<layouts> is a C<layout_impl_t>, the same abstraction
+the built-in layouts use:
+
+	typedef struct layout_impl_t {
+		const char *name; // unique layout name, e.g. "strip"
+
+		// called when an automatic arrange occurs (e.g. output size changes)
+		void (*arrange)(output_t *m, desktop_t *d, struct wlr_box available);
+
+		// called when focus_node is called
+		void (*on_focus)(output_t *m, desktop_t *d, node_t *n);
+
+		// called when the focus bind is executed (returns true if focus succeeded)
+		bool (*focus)(desktop_t *d, direction_t dir);
+
+		// called when the swap bind is executed (returns true if swap succeeded)
+		bool (*swap)(output_t *m, desktop_t *d, direction_t dir);
+
+		// called when the layout becomes active on a desktop, to adopt the toplevels
+		void (*enter)(output_t *m, desktop_t *d);
+
+		// called when the layout stops being active, so it can drop its per-desktop state
+		void (*leave)(output_t *m, desktop_t *d);
+
+		// called when a new client is mapped on a desktop using this layout
+		// (returns true if the layout took over the client)
+		bool (*init_client)(output_t *m, desktop_t *d, client_t *c);
+
+		// called after a client changes state (fullscreen, maximized, minimized,
+		// tiled/floating) and before the desktop is rearranged
+		void (*on_client_state)(output_t *m, desktop_t *d, node_t *n,
+			client_state_t old_state);
+
+		// true when this layout places floating clients itself
+		bool (*places_floating)(desktop_t *d, client_t *c);
+
+		// get a list of nodes (returns count of nodes)
+		int (*collect)(desktop_t *d, node_t ***out_nodes);
+
+		// true if the layout only shows a single toplevel at once
+		bool single_visible;
+
+		// true if the layout supports directional navigation (nsew)
+		bool has_directional_nav;
+	} layout_impl_t;
+
+All callbacks are optional (set them to C<NULL> when not needed), except
+that a layout without I<arrange> will never move windows.
+
+=head2 Loading plugins
+
+	doorsctl plugin load /path/to/plugin.so
+	doorsctl plugin list
+
+Put C<doorsctl plugin load ...> in your I<doorsrc> to load plugins at
+startup; plugins can also be loaded at any time at runtime. A plugin is
+rejected when it does not export C<doors_plugin>, when its API version
+does not match the running compositor, or when one of its layouts has a
+missing or duplicate name. Check the compositor log for details.
+
+=head2 Writing a layout
+
+The minimal useful layout implements I<arrange>, I<focus> and I<swap>.
+Windows on a desktop live in a tree (C<d->root>); for a tree-agnostic
+layout, collect the tiled leaves, compute a box for each one and write
+the geometry:
+
+	static void my_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
+		node_t **nodes = NULL;
+		const int count = collect_tiled_leaves(d, &nodes);
+		// ... divide `available` into `count` boxes ...
+		for (each node) {
+			c->tiled_rectangle = inner;      // box minus borders
+			c->arranged_rectangle = inner;
+			node_set_pending_rectangle(n, outer);
+			n->output = m;
+			node_set_dirty(n);
+		}
+		free(nodes);
+	}
+
+Per-desktop state can be stored in C<d->layout_state>: the compositor
+guarantees that I<leave> runs before another layout takes over the
+desktop, so the layout owns that slot while it is active.
+
+=head2 Building a plugin
+
+Plugins are built against the doors headers and link against nothing;
+all symbols are resolved from the running compositor at C<dlopen()>
+time. From the doors repository root:
+
+	cc -shared -fPIC -o strip.so strip.c -DWLR_USE_UNSTABLE \
+		-Iinclude -I/usr/include/pixman-1 -I/usr/include/wlroots-0.21 \
+		$(pkg-config --cflags wayland-server glib-2.0)
+
+Because plugins bind to the compositor's ABI directly, a plugin must be
+rebuilt when doors is updated; the API version in C<doors_plugin> guards
+against loading stale plugins into a newer compositor.
+
+=head1 SEE ALSO
+
+L<doorsctl(1)>, L<doorsrc(5)>, L<doorshkrc(5)>
+
+=cut

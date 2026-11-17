@@ -29,8 +29,11 @@ typedef enum {
 	LAYOUT_MONOCLE,
 	LAYOUT_SCROLLER,
 	LAYOUT_MASTER_STACK,
-	LAYOUT_FLOATING
+	LAYOUT_FLOATING,
+	LAYOUT_BUILTIN_COUNT
 } layout_t;
+
+char layout_plugin_char(layout_t l);
 
 static inline char layout_to_char(layout_t l) {
 	const char layout_chars[] = {
@@ -40,7 +43,9 @@ static inline char layout_to_char(layout_t l) {
 		[LAYOUT_MASTER_STACK] = 'K',
 		[LAYOUT_FLOATING] = 'F'
 	};
-	return layout_chars[l];
+	if (l < LAYOUT_BUILTIN_COUNT)
+		return layout_chars[l];
+	return layout_plugin_char(l);
 }
 
 typedef enum {
@@ -156,6 +161,7 @@ struct desktop_t {
 	layout_t layout, user_layout;
 	node_t *root, *focus;
 	struct scroller_state_t *scroller_state;
+	void *layout_state;
 	struct wl_list link;
 	int window_gap;
 	struct output_t *output;

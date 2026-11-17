@@ -49,15 +49,6 @@ static void swap_desktops(desktop_t *d0, desktop_t *d1) {
 	}
 }
 
-static const str_pair_t layout_values[] = {
-	{"tiled", LAYOUT_TILED},
-	{"monocle", LAYOUT_MONOCLE},
-	{"scroller", LAYOUT_SCROLLER},
-	{"master_stack", LAYOUT_MASTER_STACK},
-	{"floating", LAYOUT_FLOATING},
-	IPC_ENUM_END,
-};
-
 static const str_pair_t bubble_values[] = {
 	{"up", -1},
 	{"prev", -1},
@@ -120,7 +111,7 @@ static void desk_layout(ipc_args_t *a) {
 		ipc_take(a);
 
 	long value;
-	if (!ipc_enum(a, "layout", layout_values, &value))
+	if (!ipc_enum(a, "layout", layout_ipc_values(), &value))
 		return;
 
 	arg = ipc_peek(a);

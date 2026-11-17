@@ -2,7 +2,6 @@
 #include "ipc/ipc.h"
 #include "settings.h"
 #include "str.h"
-#include "tabs.h"
 #include "test.h"
 #include <sys/socket.h>
 #include <unistd.h>

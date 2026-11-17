@@ -19,6 +19,7 @@ _Tiling Wayland compositor_
 - Support for extra protocols such as ext-background-effect-v1, xdg-system-bell-v1, xx-hotkey-v1 and xx-session-management-v1 (and more)
 - Block out from screenshare
 - HDR support
+- Runtime-loadable layout plugins
 
 ## Screenshots
 

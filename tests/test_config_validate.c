@@ -1,8 +1,6 @@
 #include "animation.h"
 #include "settings.h"
-#include "tabs.h"
 #include "test.h"
-#include "types.h"
 #include <string.h>
 
 static void test_valid_values(void) {

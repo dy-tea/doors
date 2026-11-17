@@ -21,5 +21,4 @@
 - Per desktop rules (e.g. force master_stack on a desktop)
 - Focus grab protocol
 - Overview/Expose mode from niri
-- Plugin system
 - Move animations to fully shader-based
