@@ -1,7 +1,6 @@
 #include "cairo_buffer.h"
 #include "client.h"
 #include "dim.h"
-#include "layout/layout.h"
 #include "layout/tree.h"
 #include "output/output.h"
 #include "server.h"

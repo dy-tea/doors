@@ -2,7 +2,6 @@
 #include "macros.h"
 #include "render_unfocused.h"
 #include "server.h"
-#include "types.h"
 #include <limits.h>
 #include <stdlib.h>
 #include <time.h>

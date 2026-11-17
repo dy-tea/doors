@@ -9,7 +9,7 @@
 #include "protocol/layer.h"
 #include "protocol/popup.h"
 #include "server.h"
-#include "tree.h"
+#include "settings.h"
 #include <stdlib.h>
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_damage_ring.h>

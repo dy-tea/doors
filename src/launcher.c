@@ -4,7 +4,7 @@
 #include "parse.h"
 #include "server.h"
 #include "str.h"
-#include "tree.h"
+#include "tree_focus.h"
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>

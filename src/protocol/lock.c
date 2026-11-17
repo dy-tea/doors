@@ -2,7 +2,7 @@
 #include "output/output.h"
 #include "protocol/lock.h"
 #include "server.h"
-#include "tree.h"
+#include "tree_focus.h"
 #include <stdlib.h>
 #include <wayland-util.h>
 #include <wlr/types/wlr_output.h>
