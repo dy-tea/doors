@@ -36,40 +36,28 @@ typedef enum {
 #define SCROLLER_MIN_WIDTH 1
 #define SCROLLER_MIN_HEIGHT 1
 
-typedef struct scroller_tile_t {
-	client_t *client;
-	scroller_window_height_t height;
-	struct wlr_box rect;
-} scroller_tile_t;
-
-typedef struct scroller_column_t {
-	scroller_tile_t *tiles;
-	int tile_count, capacity, active_tile_idx;
-	scroller_size_t width;
-	scroller_size_t saved_width;
-	double resolved_width;
-} scroller_column_t;
-
-struct scroller_state_t {
-	scroller_column_t *columns;
-	int column_count, capacity, active_column_idx;
-	double view_offset;
-	struct wlr_box working_area;
-	double gap;
-	bool activate_prev_column_on_removal;
-	scroller_size_t default_column_width;
-};
-
-scroller_state_t *scroller_create(void);
-void scroller_destroy(scroller_state_t *s);
-
+// layout impl
 void scroller_leave(struct output_t *m, desktop_t *d);
 void scroller_arrange(struct output_t *m, desktop_t *d, struct wlr_box available);
 void scroller_set_maximized(const desktop_t *d, const node_t *n, bool value);
 
-bool scroller_add_tile(scroller_state_t *s, client_t *client, bool activate);
-bool scroller_add_tile_to_column(scroller_state_t *s, client_t *client, int col_idx, bool activate);
-void scroller_remove_tile(scroller_state_t *s, client_t *client, const struct output_t *m);
+// true when desktop uses the scroller layout and state exists
+bool scroller_is_active(const desktop_t *d);
+
+// true when `client` is tracked as a tile of the desktop's scroller state
+bool scroller_has_tile(const desktop_t *d, const client_t *c);
+
+// the configured width of the column holding `client`, 0 when it has none
+double scroller_column_width(const desktop_t *d, const client_t *c);
+
+// adjusts the width of the column holding `client` by drag delta. returns true when updated
+bool scroller_resize_column_drag(desktop_t *d, const client_t *c, double delta_x,
+	double initial_width_hint);
+
+// tile membership
+bool scroller_add_tile(desktop_t *d, client_t *client, bool activate);
+bool scroller_add_tile_to_column(desktop_t *d, client_t *client, int col_idx, bool activate);
+void scroller_remove_tile(desktop_t *d, client_t *client, const struct output_t *m);
 
 bool scroller_focus_next(desktop_t *d);
 bool scroller_focus_prev(desktop_t *d);
@@ -107,11 +95,16 @@ bool scroller_expand_column_to_available_width(const desktop_t *d);
 bool scroller_set_window_height(const desktop_t *d, scroller_size_t size);
 bool scroller_reset_window_height(const desktop_t *d);
 bool scroller_cycle_height_preset(const desktop_t *d, int direction);
+
+// delta is a fraction of the scroller working area height
 bool scroller_resize_stack(desktop_t *d, float delta);
 
 void scroller_apply_active_focus(desktop_t *d, struct output_t *m);
 
-void scroller_sync_focus(scroller_state_t *s, client_t *c);
+void scroller_sync_focus(desktop_t *d, client_t *c);
+
+// applies the default column width to the desktop's scroller state, if it has one
+void scroller_set_default_column_width(const desktop_t *d, scroller_size_t size);
 
 void scroller_view_offset_gesture_begin(desktop_t *d, bool is_touchpad);
 void scroller_view_offset_gesture_update(desktop_t *d, double delta_x);

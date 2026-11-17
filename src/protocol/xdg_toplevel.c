@@ -358,9 +358,7 @@ void xdg_toplevel_adopt(xdg_toplevel_t *toplevel) {
 	}
 
 	// in scroller layout, also track the toplevel in the scroller state.
-	if (target_desktop->layout == LAYOUT_SCROLLER && target_desktop->scroller_state &&
-		IS_TILED(n->client))
-		scroller_add_tile(target_desktop->scroller_state, n->client, should_focus);
+	scroller_add_tile(target_desktop, n->client, should_focus);
 
 	// notify client of scale
 	if (target_output && target_output->wlr_output) {
@@ -474,10 +472,9 @@ void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 				n->client && n->client->title[0] ? n->client->title : "?", n->id);
 		}
 		// in scroller layout, remove from scroller state first
-		if (d->layout == LAYOUT_SCROLLER && d->scroller_state && n->client) {
-			scroller_remove_tile(d->scroller_state, n->client, m);
+		scroller_remove_tile(d, n->client, m);
+		if (d->layout == LAYOUT_SCROLLER)
 			scroller_apply_active_focus(d, m);
-		}
 
 		remove_node(d, n);
 

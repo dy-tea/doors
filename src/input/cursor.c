@@ -270,20 +270,6 @@ static void set_resize_anchors(desktop_t *d, node_t *v_ancestor, node_t *h_ances
 	}
 }
 
-static int find_scroller_tile_idx(const scroller_column_t *col, const client_t *c) {
-	for (int j = 0; j < col->tile_count; j++)
-		if (col->tiles[j].client == c)
-			return j;
-	return -1;
-}
-
-static int find_scroller_column(const scroller_state_t *s, const client_t *c) {
-	for (int i = 0; i < s->column_count; i++)
-		if (find_scroller_tile_idx(&s->columns[i], c) >= 0)
-			return i;
-	return -1;
-}
-
 // process cursor motion for tiled window resizing
 static void process_cursor_tiled_resize(void) {
 	node_t *node = server.tiled_resize.node;
@@ -295,35 +281,12 @@ static void process_cursor_tiled_resize(void) {
 		return;
 
 	// Handle scroller layout
-	if (d->layout == LAYOUT_SCROLLER && d->scroller_state) {
-		scroller_state_t *s = d->scroller_state;
-		if (s->column_count == 0)
-			return;
-
-		const int col = find_scroller_column(s, node->client);
-		if (col < 0)
-			return;
-
-		const double delta_x = server.cursor->x - server.grab_x;
-
-		if (server.resize_edges & (WLR_EDGE_LEFT | WLR_EDGE_RIGHT)) {
-			const double area_w = (double)s->working_area.width > 1.0 ? (double)s->working_area.width : 1.0;
-
-			// resolve against the width the drag started from instead of
-			// adding every motion delta again
-			double initial_width = server.tiled_resize.initial_width;
-			if (!(initial_width > 0.0))
-				initial_width = s->columns[col].width.value;
-			s->columns[col].width.value = initial_width + delta_x / area_w;
-			if (s->columns[col].width.value < 0.1)
-				s->columns[col].width.value = 0.1;
-			if (s->columns[col].width.value > 1.0)
-				s->columns[col].width.value = 1.0;
-			s->columns[col].width.type = SCROLLER_SIZE_PROPORTION;
+	if (scroller_is_active(d)) {
+		if (scroller_resize_column_drag(d, node->client, server.cursor->x - server.grab_x,
+				server.tiled_resize.initial_width)) {
+			arrange(node->output, d, false);
+			apply_leaf_positions(d);
 		}
-
-		arrange(node->output, d, false);
-		apply_leaf_positions(d);
 		return;
 	}
 
@@ -680,11 +643,8 @@ void view_begin_interactive(view_t *view, enum cursor_mode mode, uint32_t edges)
 				server.tiled_resize.parent_horizontal);
 
 			const desktop_t *d = view->node->desktop;
-			if (d && d->layout == LAYOUT_SCROLLER && d->scroller_state) {
-				const int col = find_scroller_column(d->scroller_state, view->node->client);
-				if (col >= 0)
-					server.tiled_resize.initial_width = d->scroller_state->columns[col].width.value;
-			}
+			if (d && scroller_is_active(d))
+				server.tiled_resize.initial_width = scroller_column_width(d, view->node->client);
 
 			// store grab position
 			server.grab_x = server.cursor->x;

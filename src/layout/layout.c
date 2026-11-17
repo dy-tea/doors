@@ -4,7 +4,89 @@
 #include "output/output.h"
 #include "transaction.h"
 #include "types.h"
+#include <stdlib.h>
+#include <wayland-server-core.h>
 #include <wlr/util/box.h>
+
+typedef struct layout_state_t {
+	layout_t layout;
+	void *data;
+	void (*destroy)(void *data);
+	struct wl_list link;
+} layout_state_t;
+
+void *layout_state_peek(const desktop_t *d, const layout_t layout) {
+	if (d == NULL)
+		return NULL;
+
+	const layout_state_t *s;
+	wl_list_for_each(s, &d->layout_states, link) {
+		if (s->layout == layout)
+			return s->data;
+	}
+	return NULL;
+}
+
+void *layout_state_get(desktop_t *d, const layout_t layout, const size_t size,
+		void (*destroy)(void *state)) {
+	if (d == NULL || size == 0)
+		return NULL;
+
+	layout_state_t *s;
+	wl_list_for_each(s, &d->layout_states, link) {
+		if (s->layout == layout)
+			return s->data;
+	}
+
+	s = malloc(sizeof(*s));
+	if (s == NULL)
+		return NULL;
+
+	s->data = calloc(1, size);
+	if (s->data == NULL) {
+		free(s);
+		return NULL;
+	}
+
+	s->layout = layout;
+	s->destroy = destroy;
+	wl_list_insert(d->layout_states.prev, &s->link);
+	return s->data;
+}
+
+void layout_state_drop(desktop_t *d, const layout_t layout) {
+	if (d == NULL)
+		return;
+
+	layout_state_t *s, *tmp;
+	wl_list_for_each_safe(s, tmp, &d->layout_states, link) {
+		if (s->layout != layout)
+			continue;
+
+		wl_list_remove(&s->link);
+		if (s->destroy != NULL)
+			s->destroy(s->data);
+		else
+			free(s->data);
+		free(s);
+		return;
+	}
+}
+
+void layout_states_clear(desktop_t *d) {
+	if (d == NULL)
+		return;
+
+	layout_state_t *s, *tmp;
+	wl_list_for_each_safe(s, tmp, &d->layout_states, link) {
+		wl_list_remove(&s->link);
+		if (s->destroy != NULL)
+			s->destroy(s->data);
+		else
+			free(s->data);
+		free(s);
+	}
+}
 
 void arrange(output_t *m, desktop_t *d, const bool use_transaction) {
 	if (d == NULL)

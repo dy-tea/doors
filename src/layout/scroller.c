@@ -9,6 +9,61 @@
 #include <string.h>
 #include <wlr/util/log.h>
 
+typedef struct scroller_tile_t {
+	client_t *client;
+	scroller_window_height_t height;
+	struct wlr_box rect;
+} scroller_tile_t;
+
+typedef struct scroller_column_t {
+	scroller_tile_t *tiles;
+	int tile_count, capacity, active_tile_idx;
+	scroller_size_t width;
+	scroller_size_t saved_width;
+	double resolved_width;
+} scroller_column_t;
+
+typedef struct scroller_state_t {
+	scroller_column_t *columns;
+	int column_count, capacity, active_column_idx;
+	double view_offset;
+	struct wlr_box working_area;
+	double gap;
+	bool activate_prev_column_on_removal;
+	scroller_size_t default_column_width;
+} scroller_state_t;
+
+// the desktop's scroller state
+static scroller_state_t *scroller_state(const desktop_t *d) {
+	if (d == NULL)
+		return NULL;
+	return layout_state_peek(d, LAYOUT_SCROLLER);
+}
+
+static void scroller_state_destroy(void *data) {
+	scroller_state_t *s = data;
+	if (s == NULL)
+		return;
+	for (int i = 0; i < s->column_count; i++)
+		free(s->columns[i].tiles);
+	free(s->columns);
+	free(s);
+}
+
+// creates the desktop's scroller state with defaults
+static scroller_state_t *scroller_state_create(desktop_t *d) {
+	scroller_state_t *s = layout_state_get(d, LAYOUT_SCROLLER, sizeof(*s), scroller_state_destroy);
+	if (s != NULL)
+		s->default_column_width = settings.scroller_default_column_width;
+	return s;
+}
+
+// the desktop's scroller state, created with defaults when it does not exist
+static scroller_state_t *scroller_state_ensure(desktop_t *d) {
+	scroller_state_t *s = scroller_state(d);
+	return s != NULL ? s : scroller_state_create(d);
+}
+
 static scroller_tile_t *tile_grow(scroller_column_t *col) {
 	if (col->tile_count >= col->capacity) {
 		const int new_cap = col->capacity ? col->capacity * 2 : 4;
@@ -33,33 +88,12 @@ static scroller_column_t *column_grow(scroller_state_t *s) {
 	return &s->columns[s->column_count];
 }
 
-scroller_state_t *scroller_create(void) {
-	scroller_state_t *s = calloc(1, sizeof(*s));
-	if (!s)
-		return NULL;
-	s->view_offset = 0.0;
-	s->activate_prev_column_on_removal = false;
-	s->default_column_width = settings.scroller_default_column_width;
-	return s;
-}
-
-void scroller_destroy(scroller_state_t *s) {
-	if (!s)
-		return;
-	for (int i = 0; i < s->column_count; i++) {
-		free(s->columns[i].tiles);
-	}
-	free(s->columns);
-	free(s);
-}
-
 void scroller_leave(output_t *m, desktop_t *d) {
 	(void)m;
 	if (d == NULL)
 		return;
 
-	scroller_destroy(d->scroller_state);
-	d->scroller_state = NULL;
+	layout_state_drop(d, LAYOUT_SCROLLER);
 }
 
 static bool scroller_tile_shown(const scroller_tile_t *t) {
@@ -232,11 +266,62 @@ static bool find_tile(scroller_state_t *s, const client_t *c, int *out_col_idx, 
 	return false;
 }
 
-double scroller_scroll_amount_to_activate(const desktop_t *d, const client_t *c) {
-	if (d == NULL || d->layout != LAYOUT_SCROLLER || d->scroller_state == NULL || c == NULL)
+bool scroller_is_active(const desktop_t *d) {
+	return d != NULL && d->layout == LAYOUT_SCROLLER && scroller_state(d) != NULL;
+}
+
+bool scroller_has_tile(const desktop_t *d, const client_t *c) {
+	scroller_state_t *s = scroller_state(d);
+	return s != NULL && c != NULL && find_tile(s, c, NULL, NULL);
+}
+
+double scroller_column_width(const desktop_t *d, const client_t *c) {
+	scroller_state_t *s = scroller_state(d);
+	if (s == NULL || c == NULL)
 		return 0.0;
 
-	scroller_state_t *s = d->scroller_state;
+	int col;
+	if (!find_tile(s, c, &col, NULL))
+		return 0.0;
+	return s->columns[col].width.value;
+}
+
+bool scroller_resize_column_drag(desktop_t *d, const client_t *c, const double delta_x,
+		const double initial_width_hint) {
+	scroller_state_t *s = scroller_state(d);
+	if (s == NULL || s->column_count == 0 || c == NULL)
+		return false;
+
+	int col;
+	if (!find_tile(s, c, &col, NULL))
+		return false;
+
+	// resolve against the width the drag started from instead of
+	// adding every motion delta again
+	double initial_width = initial_width_hint;
+	if (!(initial_width > 0.0))
+		initial_width = s->columns[col].width.value;
+
+	const double area_w = (double)s->working_area.width > 1.0 ? (double)s->working_area.width : 1.0;
+	double prop = initial_width + delta_x / area_w;
+	prop = CLAMP(prop, 0.1, 1.0);
+
+	s->columns[col].width.type = SCROLLER_SIZE_PROPORTION;
+	s->columns[col].width.value = prop;
+	return true;
+}
+
+void scroller_set_default_column_width(const desktop_t *d, const scroller_size_t size) {
+	scroller_state_t *s = scroller_state(d);
+	if (s != NULL)
+		s->default_column_width = size;
+}
+
+double scroller_scroll_amount_to_activate(const desktop_t *d, const client_t *c) {
+	scroller_state_t *s = scroller_state(d);
+	if (s == NULL || c == NULL)
+		return 0.0;
+
 	if (s->column_count == 0)
 		return 0.0;
 
@@ -289,8 +374,9 @@ static int create_column(scroller_state_t *s, client_t *client, bool activate) {
 	return idx;
 }
 
-bool scroller_add_tile(scroller_state_t *s, client_t *client, const bool activate) {
-	if (!s || !client)
+bool scroller_add_tile(desktop_t *d, client_t *client, const bool activate) {
+	scroller_state_t *s = scroller_state(d);
+	if (s == NULL || client == NULL || !IS_TILED(client))
 		return false;
 
 	// if client is already tracked, do nothing
@@ -344,9 +430,10 @@ bool scroller_add_tile(scroller_state_t *s, client_t *client, const bool activat
 	return true;
 }
 
-bool scroller_add_tile_to_column(scroller_state_t *s, client_t *client, const int col_idx,
+bool scroller_add_tile_to_column(desktop_t *d, client_t *client, const int col_idx,
 		const bool activate) {
-	if (!s || !client)
+	scroller_state_t *s = scroller_state(d);
+	if (s == NULL || client == NULL)
 		return false;
 	if (col_idx < 0 || col_idx >= s->column_count)
 		return false;
@@ -373,9 +460,10 @@ bool scroller_add_tile_to_column(scroller_state_t *s, client_t *client, const in
 	return true;
 }
 
-void scroller_remove_tile(scroller_state_t *s, client_t *client, const output_t *m) {
+void scroller_remove_tile(desktop_t *d, client_t *client, const output_t *m) {
 	(void)m;
-	if (!s || !client)
+	scroller_state_t *s = scroller_state(d);
+	if (s == NULL || client == NULL)
 		return;
 
 	int col_idx, tile_idx;
@@ -442,7 +530,7 @@ static void populate_from_tree(scroller_state_t *s, desktop_t *d) {
 	FOR_EACH_LEAF(n, d->root) {
 		if (!n->client || !scroller_is_tiled(n->client))
 			continue;
-		scroller_add_tile(s, n->client, false);
+		scroller_add_tile(d, n->client, false);
 	}
 
 	// activate the currently focused window
@@ -460,10 +548,7 @@ void scroller_arrange(struct output_t *m, desktop_t *d, struct wlr_box available
 		return;
 
 	// lazily create scroller state
-	if (!d->scroller_state)
-		d->scroller_state = scroller_create();
-
-	scroller_state_t *s = d->scroller_state;
+	scroller_state_t *s = scroller_state_ensure(d);
 	if (!s)
 		return;
 
@@ -669,7 +754,7 @@ void scroller_arrange(struct output_t *m, desktop_t *d, struct wlr_box available
 
 // promote a tile into the camera and make it its own view while it is maximized
 void scroller_set_maximized(const desktop_t *d, const node_t *n, const bool value) {
-	scroller_state_t *s = d != NULL ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	if (s == NULL || n == NULL || n->client == NULL)
 		return;
 
@@ -691,7 +776,8 @@ void scroller_set_maximized(const desktop_t *d, const node_t *n, const bool valu
 	scroller_recenter_view(s, prev);
 }
 
-void scroller_sync_focus(scroller_state_t *s, client_t *c) {
+void scroller_sync_focus(desktop_t *d, client_t *c) {
+	scroller_state_t *s = scroller_state(d);
 	if (s == NULL || c == NULL)
 		return;
 
@@ -711,8 +797,10 @@ void scroller_sync_focus(scroller_state_t *s, client_t *c) {
 }
 
 void scroller_apply_active_focus(desktop_t *d, struct output_t *m) {
-	scroller_state_t *s = d->scroller_state;
-	if (!s || s->column_count == 0) {
+	scroller_state_t *s = scroller_state(d);
+	if (s == NULL)
+		return;
+	if (s->column_count == 0) {
 		d->focus = NULL;
 		return;
 	}
@@ -738,14 +826,14 @@ void scroller_apply_active_focus(desktop_t *d, struct output_t *m) {
 #define VIEW_GESTURE_WORKING_AREA_MOVEMENT 300.
 
 void scroller_view_offset_gesture_begin(desktop_t *d, bool is_touchpad) {
-	scroller_state_t *s = d ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	if (!s || s->column_count == 0)
 		return;
 	(void)is_touchpad;
 }
 
 void scroller_view_offset_gesture_update(desktop_t *d, double delta_x) {
-	scroller_state_t *s = d ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	if (!s || s->column_count == 0)
 		return;
 
@@ -770,7 +858,7 @@ void scroller_view_offset_gesture_update(desktop_t *d, double delta_x) {
 }
 
 bool scroller_view_offset_gesture_end(desktop_t *d) {
-	scroller_state_t *s = d ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	if (!s || s->column_count == 0)
 		return false;
 
@@ -846,7 +934,7 @@ static bool scroller_column_focusable(const scroller_column_t *col) {
 }
 
 static bool scroller_activate_column(desktop_t *d, int idx) {
-	scroller_state_t *s = d->scroller_state;
+	scroller_state_t *s = scroller_state(d);
 	if (!s || idx < 0 || idx >= s->column_count)
 		return false;
 
@@ -869,7 +957,7 @@ static int scroller_search_column(scroller_state_t *s, int from, int step) {
 }
 
 bool scroller_focus_next(desktop_t *d) {
-	scroller_state_t *s = d->scroller_state;
+	scroller_state_t *s = scroller_state(d);
 	if (!s || s->column_count == 0)
 		return false;
 
@@ -885,7 +973,7 @@ bool scroller_focus_next(desktop_t *d) {
 }
 
 bool scroller_focus_prev(desktop_t *d) {
-	scroller_state_t *s = d->scroller_state;
+	scroller_state_t *s = scroller_state(d);
 	if (!s || s->column_count == 0)
 		return false;
 
@@ -901,7 +989,7 @@ bool scroller_focus_prev(desktop_t *d) {
 }
 
 static bool scroller_focus_column_edge(desktop_t *d, const bool first) {
-	scroller_state_t *s = d->scroller_state;
+	scroller_state_t *s = scroller_state(d);
 	if (!s || s->column_count == 0)
 		return false;
 
@@ -964,7 +1052,7 @@ bool scroller_focus_up_or_right(desktop_t *d) {
 }
 
 bool scroller_focus_down(desktop_t *d) {
-	scroller_state_t *s = d->scroller_state;
+	scroller_state_t *s = scroller_state(d);
 	if (!s || s->column_count == 0)
 		return false;
 
@@ -989,7 +1077,7 @@ bool scroller_focus_down(desktop_t *d) {
 }
 
 bool scroller_swap(output_t *m, desktop_t *d, direction_t dir) {
-	scroller_state_t *s = d ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	if (!s || s->column_count == 0)
 		return false;
 	if (!d->focus || !d->focus->client)
@@ -1066,7 +1154,7 @@ bool scroller_swap(output_t *m, desktop_t *d, direction_t dir) {
 }
 
 bool scroller_focus_up(desktop_t *d) {
-	scroller_state_t *s = d->scroller_state;
+	scroller_state_t *s = scroller_state(d);
 	if (!s || s->column_count == 0)
 		return false;
 
@@ -1091,7 +1179,7 @@ bool scroller_focus_up(desktop_t *d) {
 }
 
 void scroller_center_window(desktop_t *d, client_t *client) {
-	scroller_state_t *s = d->scroller_state;
+	scroller_state_t *s = scroller_state(d);
 	if (!s || !client)
 		return;
 
@@ -1108,7 +1196,7 @@ void scroller_center_window(desktop_t *d, client_t *client) {
 }
 
 void scroller_center_visible_columns(const desktop_t *d) {
-	scroller_state_t *s = d ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	if (!s || s->column_count == 0)
 		return;
 
@@ -1145,7 +1233,7 @@ void scroller_center_visible_columns(const desktop_t *d) {
 }
 
 bool scroller_consume_into_column(desktop_t *d) {
-	scroller_state_t *s = d ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	if (!s || s->column_count < 2)
 		return false;
 
@@ -1161,20 +1249,20 @@ bool scroller_consume_into_column(desktop_t *d) {
 	if (!cl)
 		return false;
 
-	scroller_remove_tile(s, cl, NULL);
+	scroller_remove_tile(d, cl, NULL);
 
 	int target_col = col - 1;
 	if (target_col >= s->column_count)
 		return false;
 
-	bool result = scroller_add_tile_to_column(s, cl, target_col, true);
+	bool result = scroller_add_tile_to_column(d, cl, target_col, true);
 	if (result)
 		s->activate_prev_column_on_removal = true;
 	return result;
 }
 
 bool scroller_expel_from_column(desktop_t *d) {
-	scroller_state_t *s = d ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	if (!s || s->column_count == 0)
 		return false;
 
@@ -1187,8 +1275,8 @@ bool scroller_expel_from_column(desktop_t *d) {
 	if (!cl)
 		return false;
 
-	scroller_remove_tile(s, cl, NULL);
-	return scroller_add_tile(s, cl, true);
+	scroller_remove_tile(d, cl, NULL);
+	return scroller_add_tile(d, cl, true);
 }
 
 static bool scroller_move_column_to_index(scroller_state_t *s, int index) {
@@ -1226,22 +1314,22 @@ static bool scroller_move_column_sideways(scroller_state_t *s, const int dir) {
 }
 
 bool scroller_move_column_left(desktop_t *d) {
-	scroller_state_t *s = d ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	return scroller_move_column_sideways(s, -1);
 }
 
 bool scroller_move_column_right(desktop_t *d) {
-	scroller_state_t *s = d ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	return scroller_move_column_sideways(s, 1);
 }
 
 bool scroller_move_column_to_first(desktop_t *d) {
-	scroller_state_t *s = d ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	return s != NULL && scroller_move_column_to_index(s, 0);
 }
 
 bool scroller_move_column_to_last(desktop_t *d) {
-	scroller_state_t *s = d ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	return s != NULL && s->column_count > 0 && scroller_move_column_to_index(s, s->column_count - 1);
 }
 
@@ -1269,12 +1357,12 @@ static bool scroller_move_tile_vertically(scroller_state_t *s, int dir) {
 }
 
 bool scroller_move_column_up(desktop_t *d) {
-	scroller_state_t *s = d ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	return scroller_move_tile_vertically(s, -1);
 }
 
 bool scroller_move_column_down(desktop_t *d) {
-	scroller_state_t *s = d ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	return scroller_move_tile_vertically(s, 1);
 }
 
@@ -1294,7 +1382,7 @@ void scroller_apply_client_rules(client_t *c, float rule_proportion, float rule_
 }
 
 bool scroller_set_column_width(const desktop_t *d, const scroller_size_t size) {
-	scroller_state_t *s = d ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	if (!s || s->column_count == 0)
 		return false;
 
@@ -1304,7 +1392,7 @@ bool scroller_set_column_width(const desktop_t *d, const scroller_size_t size) {
 }
 
 bool scroller_resize_width(const desktop_t *d, const float delta) {
-	scroller_state_t *s = d ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	if (!s || s->column_count == 0)
 		return false;
 
@@ -1336,7 +1424,7 @@ static int scroller_next_preset(const scroller_size_t *presets, const int count,
 }
 
 bool scroller_cycle_width_preset(const desktop_t *d, int step) {
-	scroller_state_t *s = d ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	if (!s || s->column_count == 0)
 		return false;
 
@@ -1355,7 +1443,7 @@ bool scroller_cycle_width_preset(const desktop_t *d, int step) {
 }
 
 bool scroller_toggle_column_full_width(const desktop_t *d) {
-	scroller_state_t *s = d ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	if (!s || s->column_count == 0)
 		return false;
 
@@ -1376,7 +1464,7 @@ bool scroller_toggle_column_full_width(const desktop_t *d) {
 }
 
 bool scroller_expand_column_to_available_width(const desktop_t *d) {
-	scroller_state_t *s = d ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	if (!s || s->column_count == 0)
 		return false;
 
@@ -1433,7 +1521,7 @@ static scroller_column_t *scroller_active_column(scroller_state_t *s) {
 }
 
 bool scroller_set_window_height(const desktop_t *d, scroller_size_t size) {
-	const scroller_column_t *col = scroller_active_column(d ? d->scroller_state : NULL);
+	const scroller_column_t *col = scroller_active_column(scroller_state(d));
 	if (col == NULL || col->tile_count == 0)
 		return false;
 
@@ -1454,7 +1542,7 @@ bool scroller_set_window_height(const desktop_t *d, scroller_size_t size) {
 }
 
 bool scroller_reset_window_height(const desktop_t *d) {
-	const scroller_column_t *col = scroller_active_column(d ? d->scroller_state : NULL);
+	const scroller_column_t *col = scroller_active_column(scroller_state(d));
 	if (col == NULL || col->tile_count == 0)
 		return false;
 
@@ -1465,9 +1553,13 @@ bool scroller_reset_window_height(const desktop_t *d) {
 }
 
 bool scroller_resize_stack(desktop_t *d, float delta) {
-	const scroller_column_t *col = scroller_active_column(d ? d->scroller_state : NULL);
+	scroller_state_t *s = scroller_state(d);
+	const scroller_column_t *col = scroller_active_column(s);
 	if (col == NULL || col->tile_count == 0)
 		return false;
+
+	// the delta is a fraction of the working area height
+	delta *= (float)s->working_area.height;
 
 	const int tile_idx = CLAMP(col->active_tile_idx, 0, col->tile_count - 1);
 
@@ -1482,7 +1574,7 @@ bool scroller_resize_stack(desktop_t *d, float delta) {
 }
 
 bool scroller_cycle_height_preset(const desktop_t *d, int step) {
-	scroller_column_t *col = scroller_active_column(d ? d->scroller_state : NULL);
+	scroller_column_t *col = scroller_active_column(scroller_state(d));
 	if (col == NULL || col->tile_count == 0)
 		return false;
 
@@ -1515,7 +1607,7 @@ bool scroller_cycle_height_preset(const desktop_t *d, int step) {
 }
 
 bool scroller_bind_action(desktop_t *d, const int action) {
-	scroller_state_t *s = d ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	if (s == NULL || s->column_count == 0)
 		return false;
 
@@ -1573,7 +1665,7 @@ bool scroller_bind_action(desktop_t *d, const int action) {
 }
 
 int scroller_collect(desktop_t *d, node_t ***out_nodes) {
-	scroller_state_t *s = d ? d->scroller_state : NULL;
+	scroller_state_t *s = scroller_state(d);
 	if (!s || s->column_count == 0) {
 		if (out_nodes)
 			*out_nodes = NULL;
@@ -1615,15 +1707,12 @@ static void scroller_on_focus(output_t *m, desktop_t *d, node_t *n) {
 	if (!d)
 		return;
 
-	if (!d->scroller_state)
-		d->scroller_state = scroller_create();
-
-	scroller_state_t *s = d->scroller_state;
+	scroller_state_t *s = scroller_state_ensure(d);
 	if (!s)
 		return;
 
 	if (n != NULL && n->client != NULL)
-		scroller_sync_focus(s, n->client);
+		scroller_sync_focus(d, n->client);
 
 	if (s->column_count == 0 && d->root) {
 		FOR_EACH_LEAF(leaf, d->root)

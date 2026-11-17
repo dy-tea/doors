@@ -96,8 +96,7 @@ static void on_scroller_default_column_width(void) {
 	wl_list_for_each(m, &mon_list, link) {
 		desktop_t *d;
 		wl_list_for_each(d, &m->desk_list, link)
-			if (d->scroller_state)
-				d->scroller_state->default_column_width = settings.scroller_default_column_width;
+			scroller_set_default_column_width(d, settings.scroller_default_column_width);
 	}
 }
 

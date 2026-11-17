@@ -99,10 +99,9 @@ that a layout without I<arrange> will never move windows.
 	doorsctl plugin list
 
 Put C<doorsctl plugin load ...> in your I<doorsrc> to load plugins at
-startup; plugins can also be loaded at any time at runtime. A plugin is
-rejected when it does not export C<doors_plugin>, when its API version
-does not match the running compositor, or when one of its layouts has a
-missing or duplicate name. Check the compositor log for details.
+startup; plugins can also be loaded at any time at runtime. A plugin must
+export C<doors_plugin>, have the same API version as the running compositor
+and have a unique name.
 
 =head2 Writing a layout
 
@@ -125,23 +124,19 @@ the geometry:
 		free(nodes);
 	}
 
-Per-desktop state can be stored in C<d->layout_state>: the compositor
-guarantees that I<leave> runs before another layout takes over the
-desktop, so the layout owns that slot while it is active.
+Per-desktop state can be stored with C<layout_state_get()>. Every layout
+owns one state per desktop. The slot is not destroyed by I<leave> unless the
+layout drops it.
 
 =head2 Building a plugin
 
-Plugins are built against the doors headers and link against nothing;
-all symbols are resolved from the running compositor at C<dlopen()>
-time. From the doors repository root:
+Plugins are built against the doors headers, all symbols are resolved from the
+running compositor using C<dlopen()>. From the doors repository root:
 
 	cc -shared -fPIC -o strip.so strip.c -DWLR_USE_UNSTABLE \
 		-Iinclude -I/usr/include/pixman-1 -I/usr/include/wlroots-0.21 \
 		$(pkg-config --cflags wayland-server glib-2.0)
 
-Because plugins bind to the compositor's ABI directly, a plugin must be
-rebuilt when doors is updated; the API version in C<doors_plugin> guards
-against loading stale plugins into a newer compositor.
 
 =head1 SEE ALSO
 

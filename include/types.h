@@ -55,8 +55,6 @@ typedef enum {
 	DIR_EAST
 } direction_t;
 
-#include "layout/master_stack.h"
-
 typedef enum {
 	CLIENT_LAYER_NORMAL,
 	CLIENT_LAYER_BELOW,
@@ -160,19 +158,12 @@ struct desktop_t {
 	uint32_t id;
 	layout_t layout, user_layout;
 	node_t *root, *focus;
-	struct scroller_state_t *scroller_state;
-	void *layout_state;
+	struct wl_list layout_states;
 	struct wl_list link;
 	int window_gap;
 	struct output_t *output;
 	uint32_t fullscreen_recreate_pending_window_id;
 	pid_t fullscreen_recreate_pending_pid;
-	struct {
-		float ratio;
-		master_area_orientation_t orientation;
-		stack_layout_t stack_layout;
-		int count;
-	} master_stack;
 
 	// minimize history
 	struct wl_list minimized;

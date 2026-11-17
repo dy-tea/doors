@@ -58,6 +58,18 @@ const str_pair_t *layout_ipc_values(void);
 
 const layout_impl_t *layout_get_impl(layout_t layout);
 
+// per-desktop layout state
+void *layout_state_get(desktop_t *d, layout_t layout, size_t size, void (*destroy)(void *state));
+
+// state stored on the desktop or NULL
+void *layout_state_peek(const desktop_t *d, layout_t layout);
+
+// drops state stored on the desktop if any
+void layout_state_drop(desktop_t *d, layout_t layout);
+
+// drops every layout state of the desktop
+void layout_states_clear(desktop_t *d);
+
 void arrange(output_t *m, desktop_t *d, bool use_transaction);
 void layout_set(desktop_t *d, layout_t new_layout);
 void layout_toggle(desktop_t *d, layout_t target);

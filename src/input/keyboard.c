@@ -1017,7 +1017,7 @@ static bool resize_master_stack_ratio(const bool horizontal, float delta) {
 	if (output_focused()->desk->layout != LAYOUT_MASTER_STACK)
 		return false;
 
-	const master_area_orientation_t orientation = output_focused()->desk->master_stack.orientation;
+	const master_area_orientation_t orientation = master_stack_orientation(output_focused()->desk);
 
 	const bool horizontal_split = orientation == MASTER_LEFT || orientation == MASTER_RIGHT ||
 		orientation == MASTER_CENTER;
@@ -1065,12 +1065,8 @@ static void resize_along_split(const enum wlr_direction dir) {
 	if (resize_master_stack_ratio(horizontal, delta))
 		return;
 	if (focused->desk->layout == LAYOUT_SCROLLER) {
-		double scroller_delta = delta;
-		if (!horizontal && focused->desk->scroller_state)
-			scroller_delta *= (float)focused->desk->scroller_state->working_area.height;
-
 		const bool resized = horizontal ? scroller_resize_width(focused->desk,
-			delta) : scroller_resize_stack(focused->desk, scroller_delta);
+			delta) : scroller_resize_stack(focused->desk, delta);
 		if (resized) {
 			arrange(focused, focused->desk, true);
 			wlr_log(WLR_INFO, "Resized %s (scroller)", name);

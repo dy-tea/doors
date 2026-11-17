@@ -6,20 +6,51 @@
 #include <stdlib.h>
 #include <wlr/util/log.h>
 
-static float ms_ratio(const desktop_t *d) {
-	return d != NULL && d->master_stack.ratio > 0.0f ? d->master_stack.ratio : 0.5f;
+// per-desktop master-stack configuration
+typedef struct {
+	float ratio; // master area fraction, 0 = default
+	master_area_orientation_t orientation;
+	stack_layout_t stack_layout;
+	int count;
+} master_stack_state_t;
+
+// the desktop's master-stack state, created with defaults on first use
+static master_stack_state_t *ms_state(desktop_t *d) {
+	if (d == NULL)
+		return NULL;
+
+	master_stack_state_t *s = layout_state_peek(d, LAYOUT_MASTER_STACK);
+	if (s != NULL)
+		return s;
+
+	s = layout_state_get(d, LAYOUT_MASTER_STACK, sizeof(*s), NULL);
+	if (s != NULL) {
+		s->ratio = 0.5f;
+		s->orientation = MASTER_LEFT;
+		s->stack_layout = STACK_VERTICAL;
+		s->count = 1;
+	}
+	return s;
 }
 
-static master_area_orientation_t ms_orientation(const desktop_t *d) {
-	return d != NULL ? d->master_stack.orientation : MASTER_LEFT;
+static float ms_ratio(desktop_t *d) {
+	const master_stack_state_t *s = ms_state(d);
+	return s != NULL && s->ratio > 0.0f ? s->ratio : 0.5f;
 }
 
-static stack_layout_t ms_stack_layout(const desktop_t *d) {
-	return d != NULL ? d->master_stack.stack_layout : STACK_VERTICAL;
+static master_area_orientation_t ms_orientation(desktop_t *d) {
+	const master_stack_state_t *s = ms_state(d);
+	return s != NULL ? s->orientation : MASTER_LEFT;
 }
 
-static int ms_count(const desktop_t *d) {
-	return d != NULL ? d->master_stack.count : 0;
+static stack_layout_t ms_stack_layout(desktop_t *d) {
+	const master_stack_state_t *s = ms_state(d);
+	return s != NULL ? s->stack_layout : STACK_VERTICAL;
+}
+
+static int ms_count(desktop_t *d) {
+	const master_stack_state_t *s = ms_state(d);
+	return s != NULL ? s->count : 0;
 }
 
 static int compare_node_order(const void *lhs, const void *rhs) {
@@ -46,7 +77,7 @@ static int compare_master_then_order(const void *lhs, const void *rhs) {
 	return compare_node_order(lhs, rhs);
 }
 
-static int master_count_clamped(const desktop_t *d, int total_nodes) {
+static int master_count_clamped(desktop_t *d, int total_nodes) {
 	if (!d || total_nodes <= 0)
 		return 0;
 	if (ms_count(d) < 0)
@@ -187,7 +218,7 @@ static void distribute_area(const struct wlr_box area, struct wlr_box *out, cons
 	}
 }
 
-static int master_span_size(const desktop_t *d, int span, int gap_count, int gap) {
+static int master_span_size(desktop_t *d, int span, int gap_count, int gap) {
 	int usable = span - gap_count * (gap > 0 ? gap : 0);
 	if (usable < 1)
 		usable = 1;
@@ -395,7 +426,11 @@ bool master_stack_increment(desktop_t *d) {
 	const node_t *target = d->focus && d->focus->client &&
 		!d->focus->client->flags.master_stack_master && IS_TILED(d->focus->client) ? d->focus : nodes[mc];
 	target->client->flags.master_stack_master = true;
-	d->master_stack.count = mc + 1;
+
+	master_stack_state_t *s = ms_state(d);
+	if (s != NULL)
+		s->count = mc + 1;
+
 	free(nodes);
 	return true;
 }
@@ -412,7 +447,11 @@ bool master_stack_decrement(desktop_t *d) {
 	const node_t *target = d->focus && d->focus->client && d->focus->client->flags.master_stack_master &&
 		IS_TILED(d->focus->client) ? d->focus : nodes[mc - 1];
 	target->client->flags.master_stack_master = false;
-	d->master_stack.count = mc - 1;
+
+	master_stack_state_t *s = ms_state(d);
+	if (s != NULL)
+		s->count = mc - 1;
+
 	free(nodes);
 	return true;
 }
@@ -428,7 +467,11 @@ bool master_stack_promote(desktop_t *d) {
 	}
 
 	nodes[focus_index]->client->flags.master_stack_master = true;
-	d->master_stack.count = mc + 1;
+
+	master_stack_state_t *s = ms_state(d);
+	if (s != NULL)
+		s->count = mc + 1;
+
 	free(nodes);
 	return true;
 }
@@ -447,48 +490,71 @@ bool master_stack_demote(desktop_t *d) {
 	}
 
 	d->focus->client->flags.master_stack_master = false;
-	d->master_stack.count = mc - 1;
+
+	master_stack_state_t *s = ms_state(d);
+	if (s != NULL)
+		s->count = mc - 1;
+
 	free(nodes);
 	return true;
 }
 
 void master_stack_set_count(desktop_t *d, const int count) {
-	if (!d)
-		return;
-	d->master_stack.count = count < 0 ? 0 : count;
+	master_stack_state_t *s = ms_state(d);
+	if (s != NULL)
+		s->count = count < 0 ? 0 : count;
 }
 
 bool master_stack_adjust_ratio(desktop_t *d, const float delta) {
-	if (d == NULL)
+	master_stack_state_t *s = ms_state(d);
+	if (s == NULL)
 		return false;
 
-	float ratio = ms_ratio(d) + delta;
+	float ratio = (s->ratio > 0.0f ? s->ratio : 0.5f) + delta;
 	if (ratio < 0.1f)
 		ratio = 0.1f;
 	if (ratio > 0.9f)
 		ratio = 0.9f;
-	if (ratio == ms_ratio(d))
+	if (ratio == s->ratio)
 		return false;
 
-	d->master_stack.ratio = ratio;
+	s->ratio = ratio;
 	return true;
+}
+
+void master_stack_set_ratio(desktop_t *d, const float ratio) {
+	master_stack_state_t *s = ms_state(d);
+	if (s == NULL)
+		return;
+
+	s->ratio = ratio < 0.1f ? 0.1f : (ratio > 0.9f ? 0.9f : ratio);
+}
+
+master_area_orientation_t master_stack_orientation(desktop_t *d) {
+	return ms_orientation(d);
 }
 
 void master_stack_set_orientation(desktop_t *d, const master_area_orientation_t orientation) {
 	if (d == NULL || orientation < MASTER_LEFT || orientation > MASTER_CENTER)
 		return;
 
-	d->master_stack.orientation = orientation;
-	d->master_stack.stack_layout = orientation == MASTER_TOP ||
+	master_stack_state_t *s = ms_state(d);
+	if (s == NULL)
+		return;
+
+	s->orientation = orientation;
+	s->stack_layout = orientation == MASTER_TOP ||
 		orientation == MASTER_BOTTOM ? STACK_HORIZONTAL : STACK_VERTICAL;
 }
 
 void master_stack_flip_orientation(desktop_t *d) {
-	if (d == NULL)
+	master_stack_state_t *s = ms_state(d);
+	if (s == NULL)
 		return;
 
-	master_area_orientation_t orient = ms_orientation(d);
-	d->master_stack.orientation = orient == MASTER_CENTER ? orient : (orient + 2) % MASTER_CENTER;
+	const master_area_orientation_t orient = s->orientation;
+	s->orientation = orient == MASTER_CENTER ? orient : (master_area_orientation_t)((orient + 2) %
+		MASTER_CENTER);
 }
 
 void master_stack_cycle_orientation(desktop_t *d) {
@@ -498,9 +564,9 @@ void master_stack_cycle_orientation(desktop_t *d) {
 }
 
 void master_stack_cycle_stack_layout(desktop_t *d) {
-	if (d == NULL)
-		return;
-	d->master_stack.stack_layout = (ms_stack_layout(d) + 1) % 2;
+	master_stack_state_t *s = ms_state(d);
+	if (s != NULL)
+		s->stack_layout = (ms_stack_layout(d) + 1) % 2;
 }
 
 int master_stack_collect(desktop_t *d, node_t ***out_nodes) {

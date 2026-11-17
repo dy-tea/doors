@@ -9,27 +9,13 @@
 #include <limits.h>
 #include <string.h>
 
-// find column and tile index for a focused client in the scroller state
-static bool find_focused_tile(ipc_args_t *a, desktop_t *desk, int *out_col) {
-	if (!desk->focus || !desk->focus->client || !desk->scroller_state) {
+static bool find_focused_tile(ipc_args_t *a, desktop_t *desk) {
+	if (!desk->focus || !desk->focus->client || !scroller_has_tile(desk, desk->focus->client)) {
 		ipc_fail(a, "No focused tiled window\n");
 		return false;
 	}
 
-	scroller_state_t *s = desk->scroller_state;
-	for (int i = 0; i < s->column_count; i++) {
-		for (int j = 0; j < s->columns[i].tile_count; j++) {
-			if (s->columns[i].tiles[j].client != desk->focus->client)
-				continue;
-
-			if (out_col)
-				*out_col = i;
-			return true;
-		}
-	}
-
-	ipc_fail(a, "No focused tiled window\n");
-	return false;
+	return true;
 }
 
 static bool find_focused_client(ipc_args_t *a, desktop_t *desk) {
@@ -65,7 +51,7 @@ static bool desk_target(ipc_args_t *a, desk_need_t need, desk_target_t *t) {
 	case DESK_NEED_CLIENT:
 		return find_focused_client(a, t->desk);
 	case DESK_NEED_TILE:
-		return find_focused_tile(a, t->desk, NULL);
+		return find_focused_tile(a, t->desk);
 	}
 
 	return true;
@@ -517,7 +503,7 @@ static void ms_set_ratio(ipc_args_t *a) {
 	if (!desk_target(a, DESK_NEED_NONE, &t))
 		return;
 
-	t.desk->master_stack.ratio = ratio;
+	master_stack_set_ratio(t.desk, ratio);
 	desk_commit(a, &t, "Ratio set\n");
 }
 

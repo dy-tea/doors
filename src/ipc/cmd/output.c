@@ -2,6 +2,7 @@
 #include "ipc/args.h"
 #include "ipc/helpers.h"
 #include "ipc/registry.h"
+#include "layout/layout.h"
 #include "output/config.h"
 #include "output/output.h"
 #include "parse.h"
@@ -500,6 +501,7 @@ static void out_desktops(ipc_args_t *a) {
 			mon->desk = next;
 		wl_list_remove(&d->link);
 		desktop_minimized_clear(d);
+		layout_states_clear(d);
 		free(d);
 		d = next;
 	}

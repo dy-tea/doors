@@ -230,6 +230,7 @@ static void desk_remove(ipc_args_t *a) {
 
 	ipc_put_status(SUB_MASK_DESKTOP_REMOVE, "desktop_remove[%s]\n", desk->name);
 	desktop_minimized_clear(desk);
+	layout_states_clear(desk);
 	free(desk);
 	transaction_commit_dirty();
 	ipc_ok(a, "removed\n");
