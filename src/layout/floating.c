@@ -663,3 +663,19 @@ int floating_collect(desktop_t *d, node_t ***out_nodes) {
 	*out_nodes = nodes;
 	return floating;
 }
+
+const layout_impl_t floating_impl = {
+	.name = "floating",
+	.arrange = floating_arrange,
+	.on_focus = floating_on_focus,
+	.focus = floating_focus,
+	.swap = NULL,
+	.enter = floating_enter,
+	.leave = NULL,
+	.init_client = floating_init_client,
+	.on_client_state = NULL,
+	.places_floating = floating_places_floating,
+	.collect = floating_collect,
+	.single_visible = false,
+	.has_directional_nav = true,
+};

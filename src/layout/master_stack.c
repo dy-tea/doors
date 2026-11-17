@@ -686,3 +686,19 @@ bool master_stack_swap(output_t *m, desktop_t *d, const direction_t direction) {
 	arrange(m, d, true);
 	return true;
 }
+
+const layout_impl_t master_stack_impl = {
+	.name = "master_stack",
+	.arrange = master_stack_arrange,
+	.on_focus = NULL,
+	.focus = master_stack_focus,
+	.swap = master_stack_swap,
+	.enter = NULL,
+	.leave = NULL,
+	.init_client = NULL,
+	.on_client_state = NULL,
+	.places_floating = NULL,
+	.collect = master_stack_collect,
+	.single_visible = false,
+	.has_directional_nav = true,
+};

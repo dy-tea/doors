@@ -1610,3 +1610,79 @@ int scroller_collect(desktop_t *d, node_t ***out_nodes) {
 	*out_nodes = nodes;
 	return idx;
 }
+
+static void scroller_on_focus(output_t *m, desktop_t *d, node_t *n) {
+	if (!d)
+		return;
+
+	if (!d->scroller_state)
+		d->scroller_state = scroller_create();
+
+	scroller_state_t *s = d->scroller_state;
+	if (!s)
+		return;
+
+	if (n != NULL && n->client != NULL)
+		scroller_sync_focus(s, n->client);
+
+	if (s->column_count == 0 && d->root) {
+		FOR_EACH_LEAF(leaf, d->root)
+			if (leaf->client && !node_is_minimized(leaf))
+				leaf->client->flags.shown = true;
+	} else {
+		for (int i = 0; i < s->column_count; i++) {
+			for (int j = 0; j < s->columns[i].tile_count; j++) {
+				client_t *c = s->columns[i].tiles[j].client;
+				if (c && !c->flags.minimized)
+					c->flags.shown = true;
+			}
+		}
+	}
+
+	if (n != NULL && n->client && n->client->view && n->client->view->configured) {
+		wlr_log(WLR_DEBUG, "Triggering arrange");
+		arrange(m, d, true);
+	} else {
+		wlr_log(WLR_DEBUG, "Skipping arrange (initial map)");
+	}
+}
+
+static void scroller_on_client_state(output_t *m, desktop_t *d, node_t *n, client_state_t old) {
+	(void)m;
+	(void)old;
+
+	if (n == NULL || n->client == NULL)
+		return;
+
+	scroller_set_maximized(d, n, client_is_maximized(n->client));
+}
+
+static bool scroller_focus(desktop_t *d, direction_t dir) {
+	switch (dir) {
+	case DIR_WEST:
+		return scroller_focus_prev(d);
+	case DIR_EAST:
+		return scroller_focus_next(d);
+	case DIR_NORTH:
+		return scroller_focus_up(d);
+	case DIR_SOUTH:
+		return scroller_focus_down(d);
+	}
+	return false;
+}
+
+const layout_impl_t scroller_impl = {
+	.name = "scroller",
+	.arrange = scroller_arrange,
+	.on_focus = scroller_on_focus,
+	.focus = scroller_focus,
+	.swap = scroller_swap,
+	.enter = NULL,
+	.leave = scroller_leave,
+	.init_client = NULL,
+	.on_client_state = scroller_on_client_state,
+	.places_floating = NULL,
+	.collect = scroller_collect,
+	.single_visible = false,
+	.has_directional_nav = true,
+};
