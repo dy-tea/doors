@@ -71,10 +71,11 @@
 
             postInstall = ''
               # Convert POD documentation to man pages and install them.
-              install -d $out/share/man/man1 $out/share/man/man5
+              install -d $out/share/man/man1 $out/share/man/man5 $out/share/man/man7
               ${pkgs.perl}/bin/pod2man -s 1 -c "doors" -r "doors" "$src/docs/doorsctl.pod" > $out/share/man/man1/doorsctl.1
               ${pkgs.perl}/bin/pod2man -s 5 -c "doors" -r "doors" "$src/docs/doorsrc.pod" > $out/share/man/man5/doorsrc.5
               ${pkgs.perl}/bin/pod2man -s 5 -c "doors" -r "doors" "$src/docs/doorshkrc.pod" > $out/share/man/man5/doorshkrc.5
+              ${pkgs.perl}/bin/pod2man -s 7 -c "doors" -r "doors" "$src/docs/doors-plugins.pod" > $out/share/man/man7/doors-plugins.7
             '';
 
             passthru.providedSessions = [ "doors" ];
