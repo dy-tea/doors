@@ -1178,10 +1178,11 @@ bool animation_update_output(output_t *output, const struct timespec now) {
 				active = true;
 			}
 		} else {
-			// interpolate position only
-			const int x = (int)(entry->from.x + (entry->to.x - entry->from.x) * entry->eased);
-			const int y = (int)(entry->from.y + (entry->to.y - entry->from.y) * entry->eased);
-			wlr_scene_node_set_position(&entry->scene_tree->node, x, y);
+			if (entry->from.x != entry->to.x || entry->from.y != entry->to.y) {
+				const int x = (int)(entry->from.x + (entry->to.x - entry->from.x) * entry->eased);
+				const int y = (int)(entry->from.y + (entry->to.y - entry->from.y) * entry->eased);
+				wlr_scene_node_set_position(&entry->scene_tree->node, x, y);
+			}
 
 			if (entry->kind == ANIM_KIND_WORKSPACE_SLIDE) {
 				update_blur_for_slide_animation(output, entry);
