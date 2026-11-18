@@ -71,7 +71,7 @@ static void test_unknown(void) {
 }
 
 static void test_name_out_of_range(void) {
-	CHECK_STREQ(bind_action_name((bind_action_t) - 1), "unknown");
+	CHECK_STREQ(bind_action_name((bind_action_t)-1), "unknown");
 	CHECK_STREQ(bind_action_name((bind_action_t)BIND_ACTION_COUNT), "unknown");
 }
 

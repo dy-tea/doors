@@ -53,10 +53,10 @@ char layout_plugin_char(layout_t l) {
 
 layout_t layout_register(const layout_impl_t *impl) {
 	if (impl == NULL || impl->name == NULL || impl->name[0] == '\0')
-		return (layout_t) - 1;
+		return (layout_t)-1;
 
 	if (layout_find_by_name(impl->name, NULL))
-		return (layout_t) - 1;
+		return (layout_t)-1;
 
 	const char builtin_chars[] = "TMSKF";
 	char status_char = '?';
@@ -81,7 +81,7 @@ layout_t layout_register(const layout_impl_t *impl) {
 	dynamic_layout_t *entry = malloc(sizeof(dynamic_layout_t));
 	if (entry == NULL) {
 		wlr_log(WLR_ERROR, "failed to allocate registry entry for layout \"%s\"", impl->name);
-		return (layout_t) - 1;
+		return (layout_t)-1;
 	}
 
 	entry->impl = impl;

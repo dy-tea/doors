@@ -43,7 +43,7 @@ static void test_builtin_registry(void) {
 
 static void test_plugin_registration(void) {
 	layout_t a = layout_register(&test_layout_a);
-	CHECK(a != (layout_t) - 1);
+	CHECK(a != (layout_t)-1);
 	CHECK((size_t)a == LAYOUT_BUILTIN_COUNT);
 	CHECK(layout_count() == LAYOUT_BUILTIN_COUNT + 1);
 	CHECK_STREQ(layout_name(a), "registry_test_a");
@@ -67,14 +67,14 @@ static void test_plugin_registration(void) {
 
 static void test_duplicate_and_invalid(void) {
 	// duplicate name must be rejected
-	CHECK(layout_register(&test_layout_a) == (layout_t) - 1);
+	CHECK(layout_register(&test_layout_a) == (layout_t)-1);
 
 	// missing/empty name must be rejected
-	CHECK(layout_register(NULL) == (layout_t) - 1);
+	CHECK(layout_register(NULL) == (layout_t)-1);
 	const layout_impl_t unnamed = {
 		.name = ""
 	};
-	CHECK(layout_register(&unnamed) == (layout_t) - 1);
+	CHECK(layout_register(&unnamed) == (layout_t)-1);
 }
 
 static void test_ipc_values(void) {

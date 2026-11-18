@@ -25,7 +25,7 @@ static void test_load(void) {
 	CHECK(plugin_is_loaded("strip"));
 	CHECK(layout_count() == LAYOUT_BUILTIN_COUNT + 1);
 
-	layout_t id = (layout_t) - 1;
+	layout_t id = (layout_t)-1;
 	CHECK(layout_find_by_name("strip", &id));
 	CHECK((size_t)id == LAYOUT_BUILTIN_COUNT);
 	CHECK_STREQ(layout_name(id), "strip");

@@ -74,7 +74,7 @@ bool plugin_load(const char *path) {
 	size_t registered = 0;
 	for (size_t i = 0; plugin->layouts[i] != NULL; i++) {
 		const layout_t id = layout_register(plugin->layouts[i]);
-		if (id != (layout_t) - 1)
+		if (id != (layout_t)-1)
 			registered++;
 		else
 			wlr_log(WLR_ERROR, "plugin \"%s\": failed to register layout \"%s\"", name,
