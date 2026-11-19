@@ -1,11 +1,13 @@
-#include "config.h"
+#include "input/keyboard.h"
 #include "ipc/args.h"
 #include "ipc/helpers.h"
 #include "ipc/registry.h"
+#include "layout/layout.h"
 #include "output/output.h"
 #include "server.h"
 #include "transaction.h"
 #include "tree.h"
+#include "types.h"
 
 static void tree_balance(ipc_args_t *a) {
 	output_t *m = server.focused_output;
@@ -39,60 +41,79 @@ static void tree_equalize(ipc_args_t *a) {
 	ipc_ok(a, "equalized\n");
 }
 
+static const str_pair_t rotate_dirs[] = {
+	{"clockwise", 1},
+	{"cw", 1},
+	{"counterclockwise", -1},
+	{"ccw", -1},
+	IPC_ENUM_END,
+};
+
 static void tree_rotate(ipc_args_t *a) {
-	const char *arg;
-	if (!ipc_need(a, "direction", &arg))
+	long dir;
+	if (!ipc_enum(a, "direction", rotate_dirs, &dir))
 		return;
 
-	bind_action_t action = bind_action_from_alias(arg);
-	if (action != BIND_ROTATE_CW && action != BIND_ROTATE_CCW) {
-		ipc_fail(a, "Unknown direction \"%s\", expected clockwise|counterclockwise\n", arg);
-		return;
-	}
+	if (dir > 0)
+		rotate_clockwise();
+	else
+		rotate_counterclockwise();
 
-	execute_bind_action(action);
 	ipc_ok(a, "rotated\n");
 }
 
+static const str_pair_t flip_axes[] = {
+	{"horizontal", FLIP_HORIZONTAL},
+	{"h", FLIP_HORIZONTAL},
+	{"vertical", FLIP_VERTICAL},
+	{"v", FLIP_VERTICAL},
+	IPC_ENUM_END,
+};
+
 static void tree_flip(ipc_args_t *a) {
-	const char *arg;
-	if (!ipc_need(a, "axis", &arg))
+	long axis;
+	if (!ipc_enum(a, "axis", flip_axes, &axis))
 		return;
 
-	bind_action_t action = bind_action_from_alias(arg);
-	if (action != BIND_FLIP_HORIZONTAL && action != BIND_FLIP_VERTICAL) {
-		ipc_fail(a, "Unknown axis \"%s\", expected horizontal|vertical\n", arg);
+	output_t *m = server.focused_output;
+	if (!m || !m->desk || !m->desk->root) {
+		ipc_fail(a, "No tree\n");
 		return;
 	}
 
-	execute_bind_action(action);
+	flip_tree(m->desk->root, (flip_t)axis);
+	arrange(m, m->desk, true);
 	ipc_ok(a, "flipped\n");
 }
 
 static const str_pair_t presel_dirs[] = {
-	{"west", BIND_PRESEL_WEST},
-	{"east", BIND_PRESEL_EAST},
-	{"north", BIND_PRESEL_NORTH},
-	{"south", BIND_PRESEL_SOUTH},
-	{"cancel", BIND_PRESEL_CANCEL},
+	{"west", DIR_WEST},
+	{"east", DIR_EAST},
+	{"north", DIR_NORTH},
+	{"south", DIR_SOUTH},
+	{"cancel", -1},
 	IPC_ENUM_END,
 };
 
 static void tree_presel(ipc_args_t *a) {
-	const char *arg;
-	if (!ipc_need(a, "direction", &arg))
+	long dir;
+	if (!ipc_enum(a, "direction", presel_dirs, &dir))
 		return;
 
-	bind_action_t action = bind_action_from_alias(arg);
-	if (action < BIND_PRESEL_NORTH || action > BIND_PRESEL_CANCEL) {
-		long dir;
-		if (!ipc_enum_names(a, "direction", arg, presel_dirs, &dir))
-			return;
-		action = (bind_action_t)dir;
+	if (dir < 0) {
+		cancel_presel();
+		ipc_ok(a, "Presel cancelled\n");
+		return;
 	}
 
-	execute_bind_action(action);
-	ipc_okf(a, "%s\n", action == BIND_PRESEL_CANCEL ? "Presel cancelled" : "Presel set");
+	output_t *m = server.focused_output;
+	if (!m || !m->desk || !m->desk->focus) {
+		ipc_fail(a, "No focused node\n");
+		return;
+	}
+
+	presel_dir(m->desk->focus, (direction_t)dir);
+	ipc_ok(a, "Presel set\n");
 }
 
 const ipc_sub_t tree_subs[] = {

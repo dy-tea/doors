@@ -743,6 +743,72 @@ static uint32_t edges_from_cursor(const struct wlr_box *rect, uint32_t allowed_e
 	return nearest;
 }
 
+static view_t *view_under_cursor(void) {
+	double sx, sy;
+	struct wlr_surface *surface = NULL;
+	if (desktop_type_at(server.cursor->x, server.cursor->y, &surface, &sx, &sy) == NULL)
+		return NULL;
+
+	view_t *view = view_from_wlr_surface(surface);
+	if (view == NULL || view->node == NULL || view->node->client == NULL)
+		return NULL;
+
+	return view;
+}
+
+bool cursor_interactive_move(void) {
+	view_t *view = view_under_cursor();
+	if (view == NULL)
+		return false;
+
+	if (view->node->client->state == STATE_FLOATING)
+		view_begin_interactive(view, CURSOR_MOVE, 0);
+	else if (IS_TILED(view->node->client))
+		tiling_drag_begin(view->node);
+	else
+		return false;
+
+	return true;
+}
+
+bool cursor_interactive_resize(void) {
+	view_t *view = view_under_cursor();
+	if (view == NULL)
+		return false;
+
+	const client_t *c = view->node->client;
+	const desktop_t *d = view->node->desktop;
+	uint32_t edges = 0;
+
+	if (c->state == STATE_FLOATING) {
+		// floating resize
+		const struct wlr_box rect = c->floating_rectangle;
+		edges = edges_from_cursor(&rect, WLR_EDGE_LEFT | WLR_EDGE_RIGHT | WLR_EDGE_TOP | WLR_EDGE_BOTTOM);
+	} else if (IS_TILED(c)) {
+		// for scroller layouts, only allow horizontal edges (column width resize)
+		const struct wlr_box rect = c->tiled_rectangle;
+		if (d && d->layout == LAYOUT_SCROLLER)
+			edges = edges_from_cursor(&rect, WLR_EDGE_LEFT | WLR_EDGE_RIGHT);
+		else
+			edges = edges_from_cursor(&rect, get_tiled_resizable_edges(view->node));
+	}
+
+	if (edges == 0)
+		return false;
+
+	view_begin_interactive(view, CURSOR_RESIZE, edges);
+	return true;
+}
+
+bool cursor_tiling_drag(void) {
+	view_t *view = view_under_cursor();
+	if (view == NULL || !IS_TILED(view->node->client))
+		return false;
+
+	tiling_drag_begin(view->node);
+	return true;
+}
+
 void cursor_button(struct wl_listener *listener, void *data) {
 	(void)listener;
 	struct wlr_pointer_button_event *event = data;
@@ -870,46 +936,6 @@ void cursor_button(struct wl_listener *listener, void *data) {
 			bind_result = handle_keybind_raw(modifiers, mouse_button_to_keycode(button_index), true,
 				XKB_KEY_NoSymbol);
 			claimed = bind_result.consumed;
-
-			if (bind_result.bind) {
-				view_t *view = NULL;
-				if (type && ((view_t *)type)->node)
-					view = type;
-
-				if (view && view->node && view->node->client) {
-					if (bind_result.bind->action == BIND_TILING_DRAG) {
-						if (IS_TILED(view->node->client))
-							tiling_drag_begin(view->node);
-					} else if (bind_result.bind->action == BIND_INTERACTIVE_MOVE) {
-						if (view->node->client->state == STATE_FLOATING)
-							view_begin_interactive(view, CURSOR_MOVE, 0);
-						else if (IS_TILED(view->node->client))
-							tiling_drag_begin(view->node);
-					} else if (bind_result.bind->action == BIND_INTERACTIVE_RESIZE) {
-						const client_t *c = view->node->client;
-						const desktop_t *d = view->node->desktop;
-						uint32_t edges = 0;
-
-						if (c->state == STATE_FLOATING) {
-							// floating resize
-							const struct wlr_box rect = c->floating_rectangle;
-							edges = edges_from_cursor(&rect,
-								WLR_EDGE_LEFT | WLR_EDGE_RIGHT | WLR_EDGE_TOP | WLR_EDGE_BOTTOM);
-						} else if (IS_TILED(c)) {
-							// for scroller layouts, only allow horizontal edges (column width resize)
-							const struct wlr_box rect = c->tiled_rectangle;
-							if (d && d->layout == LAYOUT_SCROLLER) {
-								edges = edges_from_cursor(&rect, WLR_EDGE_LEFT | WLR_EDGE_RIGHT);
-							} else {
-								edges = edges_from_cursor(&rect, get_tiled_resizable_edges(view->node));
-							}
-						}
-
-						if (edges != 0)
-							view_begin_interactive(view, CURSOR_RESIZE, edges);
-					}
-				}
-			}
 
 			if (claimed)
 				return;

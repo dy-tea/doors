@@ -52,6 +52,10 @@ bool parse_prefixed(const char *s, const char *prefix, const char **rest);
 // tokenize s in place, at most max tokens, returns the number written
 int parse_split(char *s, const char *delims, char *out[], int max);
 
+// as parse_split on whitespace, but single and double quotes group text and are
+// removed, and a backslash outside single quotes escapes the next character
+int parse_split_quoted(char *s, char *out[], int max);
+
 // WIDTHxHEIGHT
 bool parse_size(const char *spec, int *width, int *height);
 

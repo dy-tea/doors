@@ -28,17 +28,11 @@ static void hotkey_list(ipc_args_t *a) {
 		else
 			xkb_keysym_get_name(kb->keysym, key_name, sizeof(key_name));
 
-		const char *action_label;
 		char action_buf[MAXLEN * 2 + 32];
-		if (kb->action == BIND_EXTERNAL)
-			action_label = kb->external_cmd;
-		else
-			action_label = bind_action_name(kb->action);
-
 		if (kb->submap_name[0])
-			snprintf(action_buf, sizeof(action_buf), "%s [submap: %s]", action_label, kb->submap_name);
+			snprintf(action_buf, sizeof(action_buf), "%s [submap: %s]", kb->cmd, kb->submap_name);
 		else
-			snprintf(action_buf, sizeof(action_buf), "%s", action_label);
+			snprintf(action_buf, sizeof(action_buf), "%s", kb->cmd);
 
 		char flags_buf[64];
 		bind_flags_text(kb->flags, flags_buf, sizeof(flags_buf));
@@ -52,6 +46,26 @@ static void hotkey_list(ipc_args_t *a) {
 	}
 	ipc_buff(&b, "Total: %zu keybinds\n", num_keybinds);
 	ipc_buf_send(a, &b);
+}
+
+// appends an argument to a command line, quoting it when it needs to survive
+// being parsed back into arguments
+static bool append_cmd_arg(char *cmd, size_t size, const char *arg) {
+	if (!strpbrk(arg, " \t\"'\\"))
+		return str_append_sep(cmd, size, " ", arg);
+
+	char quoted[MAXLEN];
+	size_t len = 0;
+	quoted[len++] = '"';
+	for (const char *p = arg; *p && len + 2 < sizeof(quoted); p++) {
+		if (*p == '"' || *p == '\\')
+			quoted[len++] = '\\';
+		quoted[len++] = *p;
+	}
+	quoted[len++] = '"';
+	quoted[len] = '\0';
+
+	return str_append_sep(cmd, size, " ", quoted);
 }
 
 static void hotkey_add(ipc_args_t *a) {
@@ -84,22 +98,20 @@ static void hotkey_add(ipc_args_t *a) {
 	char cmd[MAXLEN] = {0};
 	str_copy(cmd, sizeof(cmd), command);
 	ipc_foreach(a, rest) {
-		if (!str_append_sep(cmd, sizeof(cmd), " ", rest))
+		if (!append_cmd_arg(cmd, sizeof(cmd), rest))
 			break;
 	}
 
-	int desktop_index = 0;
 	char submap_name[MAXLEN];
-	submap_name[0] = '\0';
-	bind_action_t action = parse_action(cmd, &desktop_index, submap_name);
+	const bind_kind_t kind = parse_bind_kind(cmd, submap_name);
 
 	if (a->dry_run) {
 		ipc_ok(a, "hotkey would be added\n");
 		return;
 	}
 
-	add_keybind(modifiers, keysym, keycode, use_keycode, flags, action, desktop_index,
-		(action == BIND_EXTERNAL) ? cmd : NULL, submap_name[0] ? submap_name : NULL);
+	add_keybind(modifiers, keysym, keycode, use_keycode, flags, kind,
+		submap_name[0] ? submap_name : NULL, cmd);
 
 	ipc_ok(a, "Hotkey added\n");
 }

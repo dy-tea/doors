@@ -139,6 +139,52 @@ static void test_split(void) {
 	CHECK(parse_split(buf, " \t", out, 8) == 0);
 }
 
+static void test_split_quoted(void) {
+	char buf[64];
+	char *out[8];
+
+	str_copy(buf, sizeof(buf), "node -y title 'a b' \"c d\"");
+	int n = parse_split_quoted(buf, out, 8);
+	CHECK(n == 5);
+	if (n == 5) {
+		CHECK_STREQ(out[0], "node");
+		CHECK_STREQ(out[1], "-y");
+		CHECK_STREQ(out[2], "title");
+		CHECK_STREQ(out[3], "a b");
+		CHECK_STREQ(out[4], "c d");
+	}
+
+	// quotes are removed, empty quotes still make a token
+	str_copy(buf, sizeof(buf), "'' \"\"");
+	n = parse_split_quoted(buf, out, 8);
+	CHECK(n == 2);
+	if (n == 2) {
+		CHECK_STREQ(out[0], "");
+		CHECK_STREQ(out[1], "");
+	}
+
+	// a backslash escapes outside single quotes
+	str_copy(buf, sizeof(buf), "a\\ b 'c\\d' \"e\\\"f\"");
+	n = parse_split_quoted(buf, out, 8);
+	CHECK(n == 3);
+	if (n == 3) {
+		CHECK_STREQ(out[0], "a b");
+		CHECK_STREQ(out[1], "c\\d");
+		CHECK_STREQ(out[2], "e\"f");
+	}
+
+	// an unterminated quote runs to the end of the line
+	str_copy(buf, sizeof(buf), "x 'y z");
+	n = parse_split_quoted(buf, out, 8);
+	CHECK(n == 2);
+	if (n == 2)
+		CHECK_STREQ(out[1], "y z");
+
+	// max caps the number of tokens returned
+	str_copy(buf, sizeof(buf), "1 2 3");
+	CHECK(parse_split_quoted(buf, out, 2) == 2);
+}
+
 static void test_hex(void) {
 	CHECK(str_hex_digit('0') == 0);
 	CHECK(str_hex_digit('9') == 9);
@@ -173,6 +219,7 @@ static void run_tests(void) {
 	test_trim();
 	test_parse_bool();
 	test_split();
+	test_split_quoted();
 	test_hex();
 	test_tables();
 }

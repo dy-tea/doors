@@ -2,17 +2,9 @@
 #include "input/keyboard.h"
 #include "ipc/ipc.h"
 #include "launcher.h"
-#include "layout/layout.h"
-#include "layout/master_stack.h"
-#include "layout/scroller.h"
 #include "macros.h"
-#include "output/output.h"
 #include "parse.h"
-#include "protocol/workspace.h"
-#include "server.h"
 #include "str.h"
-#include "tree.h"
-#include "types.h"
 #include <ctype.h>
 #include <limits.h>
 #include <stdio.h>
@@ -22,6 +14,7 @@
 #include <unistd.h>
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_keyboard.h>
+#include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
 
 #define DOORS_CONFIG_DIR "/.config/doors"
@@ -177,7 +170,7 @@ bool parse_bind_flags(const char *str, uint32_t *out_flags) {
 	bool ok = true;
 	uint32_t flags = 0;
 	char *tokens[32];
-	int nflags = parse_split(buf, ", \t", tokens, 32);
+	int nflags = parse_split(buf, ", 	", tokens, 32);
 	for (int i = 0; i < nflags; i++) {
 		const str_pair_t *e = str_table_find(bind_flag_names, tokens[i]);
 		if (e)
@@ -295,154 +288,20 @@ const char *parse_hotkey_spec(const char *spec, uint32_t *modifiers, xkb_keysym_
 	return NULL;
 }
 
-typedef struct {
-	const char *cmd;
-	const char *subcmd;
-	const char *subsubcmd;
-	bind_action_t action;
-} action_entry_t;
-
-#define ENTRY(c, s, ss, a) { c, s, ss, a }
-#define ENTRY2(c, s, a)    { c, s, NULL, a }
-#define ENTRY1(c, a)       { c, NULL, NULL, a }
-
-static const action_entry_t action_table[] = {
-	ENTRY2("focus", "west", BIND_FOCUS_WEST),
-	ENTRY2("focus", "south", BIND_FOCUS_SOUTH),
-	ENTRY2("focus", "north", BIND_FOCUS_NORTH),
-	ENTRY2("focus", "east", BIND_FOCUS_EAST),
-	ENTRY2("swap", "west", BIND_SWAP_WEST),
-	ENTRY2("swap", "south", BIND_SWAP_SOUTH),
-	ENTRY2("swap", "north", BIND_SWAP_NORTH),
-	ENTRY2("swap", "east", BIND_SWAP_EAST),
-	ENTRY2("presel", "west", BIND_PRESEL_WEST),
-	ENTRY2("presel", "south", BIND_PRESEL_SOUTH),
-	ENTRY2("presel", "north", BIND_PRESEL_NORTH),
-	ENTRY2("presel", "east", BIND_PRESEL_EAST),
-	ENTRY2("presel", "cancel", BIND_PRESEL_CANCEL),
-	ENTRY2("resize", "left", BIND_RESIZE_LEFT),
-	ENTRY2("resize", "right", BIND_RESIZE_RIGHT),
-	ENTRY2("resize", "up", BIND_RESIZE_UP),
-	ENTRY2("resize", "down", BIND_RESIZE_DOWN),
-	ENTRY2("toggle", "floating", BIND_TOGGLE_FLOATING),
-	ENTRY2("toggle", "fullscreen", BIND_TOGGLE_FULLSCREEN),
-	ENTRY2("toggle", "maximize", BIND_TOGGLE_MAXIMIZE),
-	ENTRY2("toggle", "minimize", BIND_TOGGLE_MINIMIZE),
-	ENTRY2("toggle", "restore_minimized", BIND_RESTORE_MINIMIZED),
-	ENTRY2("toggle", "pseudo_tiled", BIND_TOGGLE_PSEUDO_TILED),
-	ENTRY2("toggle", "monocle", BIND_TOGGLE_MONOCLE),
-	ENTRY2("toggle", "floating_layout", BIND_TOGGLE_FLOATING_LAYOUT),
-	ENTRY2("node", "-c", BIND_NODE_CLOSE),
-	ENTRY2("node", "--close", BIND_NODE_CLOSE),
-	ENTRY2("node", "-f", BIND_NODE_FOCUS),
-	ENTRY2("node", "--focus", BIND_NODE_FOCUS),
-	ENTRY2("node", "interactive_move", BIND_INTERACTIVE_MOVE),
-	ENTRY2("node", "interactive_resize", BIND_INTERACTIVE_RESIZE),
-	ENTRY2("node", "tiling_drag", BIND_TILING_DRAG),
-	ENTRY("node", "-t", "tiled", BIND_NODE_STATE_TILED),
-	ENTRY("node", "-t", "floating", BIND_NODE_STATE_FLOATING),
-	ENTRY("node", "-t", "fullscreen", BIND_NODE_STATE_FULLSCREEN),
-	ENTRY("node", "-t", "maximized", BIND_NODE_STATE_MAXIMIZED),
-	ENTRY("node", "-t", "minimized", BIND_NODE_STATE_MINIMIZED),
-	ENTRY("node", "-t", "pseudo_tiled", BIND_TOGGLE_PSEUDO_TILED),
-	ENTRY("node", "--state", "tiled", BIND_NODE_STATE_TILED),
-	ENTRY("node", "--state", "floating", BIND_NODE_STATE_FLOATING),
-	ENTRY("node", "--state", "fullscreen", BIND_NODE_STATE_FULLSCREEN),
-	ENTRY("node", "--state", "maximized", BIND_NODE_STATE_MAXIMIZED),
-	ENTRY("node", "--state", "minimized", BIND_NODE_STATE_MINIMIZED),
-	ENTRY("node", "--state", "pseudo_tiled", BIND_TOGGLE_PSEUDO_TILED),
-	ENTRY("desktop", "-l", "tiled", BIND_DESKTOP_LAYOUT_TILED),
-	ENTRY("desktop", "-l", "monocle", BIND_DESKTOP_LAYOUT_MONOCLE),
-	ENTRY("desktop", "-l", "master_stack", BIND_DESKTOP_LAYOUT_MASTER_STACK),
-	ENTRY("desktop", "-l", "floating", BIND_DESKTOP_LAYOUT_FLOATING),
-	ENTRY("desktop", "--layout", "tiled", BIND_DESKTOP_LAYOUT_TILED),
-	ENTRY("desktop", "--layout", "monocle", BIND_DESKTOP_LAYOUT_MONOCLE),
-	ENTRY("desktop", "--layout", "master_stack", BIND_DESKTOP_LAYOUT_MASTER_STACK),
-	ENTRY("desktop", "--layout", "floating", BIND_DESKTOP_LAYOUT_FLOATING),
-	ENTRY2("desktop", "last", BIND_DESKTOP_LAST),
-	ENTRY1("quit", BIND_QUIT),
-};
-
-
-#undef ENTRY
-#undef ENTRY2
-#undef ENTRY1
-
-static bind_action_t lookup_action(const char *args[3], int argc) {
-	for (size_t i = 0; i < sizeof(action_table) / sizeof(action_table[0]); i++) {
-		const action_entry_t *e = &action_table[i];
-		if (!streq(args[0], e->cmd))
-			continue;
-		if (e->subcmd == NULL)
-			return e->action;
-		if (argc < 2 || !streq(args[1], e->subcmd))
-			continue;
-		if (e->subsubcmd == NULL)
-			return e->action;
-		if (argc >= 3 && streq(args[2], e->subsubcmd))
-			return e->action;
-	}
-	return BIND_NONE;
-}
-
-bind_action_t parse_action(const char *cmd, int *desktop_index, char *submap_name) {
-	*desktop_index = 0;
+bind_kind_t parse_bind_kind(const char *cmd, char *submap_name) {
 	if (submap_name)
 		submap_name[0] = '\0';
 
-	if (!cmd || cmd[0] == '\0')
-		return BIND_NONE;
+	if (streq(cmd, "@exit"))
+		return BIND_KIND_EXIT_SUBMAP;
 
 	if (cmd[0] == '@') {
-		if (streq(cmd, "@exit"))
-			return BIND_EXIT_SUBMAP;
 		if (submap_name)
 			str_copy(submap_name, MAXLEN, cmd + 1);
-		return BIND_ENTER_SUBMAP;
+		return BIND_KIND_ENTER_SUBMAP;
 	}
 
-	const char *rest = str_skip_prefix(cmd, "doorsctl ");
-	if (!rest)
-		return BIND_EXTERNAL;
-
-	char buf[MAXLEN];
-	str_copy(buf, sizeof(buf), rest);
-
-	char *args[16];
-	int argc = parse_split(buf, " \t", args, 16);
-
-	if (argc == 0)
-		return BIND_NONE;
-
-	// dispatch table lookup first
-	bind_action_t action = lookup_action((const char **)args, argc);
-	if (action != BIND_NONE)
-		return action;
-
-	// special cases that need extra logic
-	if (streq(args[0], "node") && argc >= 2) {
-		if (streq(args[1], "-d") || streq(args[1], "--to-desktop")) {
-			long d;
-			if (argc >= 3 && parse_long(args[2], &d) && d >= 1 && d <= 10) {
-				*desktop_index = (int)d;
-				return BIND_SEND_TO_DESKTOP_1;
-			}
-			return BIND_NODE_TO_DESKTOP;
-		}
-	}
-
-	if (streq(args[0], "desktop") && argc >= 2) {
-		if (streq(args[1], "-f") || streq(args[1], "--focus"))
-			return (argc >= 3 && streq(args[2], "last")) ? BIND_DESKTOP_LAST : BIND_DESKTOP_FOCUS;
-
-		long d;
-		if (parse_long(args[1], &d) && d >= 1 && d <= 10) {
-			*desktop_index = (int)d;
-			return BIND_DESKTOP_1;
-		}
-	}
-
-	return BIND_EXTERNAL;
+	return BIND_KIND_COMMAND;
 }
 
 // expansions
@@ -606,7 +465,7 @@ static char *expand_sequence(const char *input, char *output, size_t out_size) {
 	return output;
 }
 
-static bool bind_flags_valid(const keybind_t *kb, bind_action_t action) {
+static bool bind_flags_valid(const keybind_t *kb) {
 	if ((kb->flags & BINDF_REPEAT) && (kb->flags & BINDF_RELEASE)) {
 		wlr_log(WLR_ERROR, "A bind cannot be both repeat and release");
 		return false;
@@ -623,18 +482,12 @@ static bool bind_flags_valid(const keybind_t *kb, bind_action_t action) {
 		}
 	}
 
-	if ((kb->flags & BINDF_RELEASE) && (action == BIND_INTERACTIVE_MOVE ||
-			action == BIND_INTERACTIVE_RESIZE || action == BIND_TILING_DRAG)) {
-		wlr_log(WLR_ERROR, "Interactive binds are driven by the press, not release");
-		return false;
-	}
-
 	return true;
 }
 
 void add_keybind(const uint32_t modifiers, const xkb_keysym_t keysym, const uint32_t keycode,
-		const bool use_keycode, const uint32_t flags, const bind_action_t action, const int desktop_index,
-		const char *external_cmd, const char *submap_name) {
+		const bool use_keycode, const uint32_t flags, const bind_kind_t kind, const char *submap_name,
+		const char *cmd) {
 	size_t *num_ptr;
 	keybind_t *kb_array;
 
@@ -660,9 +513,10 @@ void add_keybind(const uint32_t modifiers, const xkb_keysym_t keysym, const uint
 		.keysym = keysym,
 		.keycode = keycode,
 		.use_keycode = use_keycode,
+		.kind = kind,
 		.flags = flags,
 	};
-	if (!bind_flags_valid(&preview, action))
+	if (!bind_flags_valid(&preview))
 		return;
 
 	keybind_t *kb = &kb_array[(*num_ptr)++];
@@ -670,28 +524,25 @@ void add_keybind(const uint32_t modifiers, const xkb_keysym_t keysym, const uint
 	kb->keysym = keysym;
 	kb->keycode = keycode;
 	kb->use_keycode = use_keycode;
-	kb->action = action;
-	kb->desktop_index = desktop_index;
+	kb->kind = kind;
 	kb->flags = flags;
 	if (submap_name)
 		str_copy(kb->submap_name, sizeof(kb->submap_name), submap_name);
 	else
 		kb->submap_name[0] = '\0';
-	if (external_cmd)
-		str_copy(kb->external_cmd, sizeof(kb->external_cmd), external_cmd);
+	if (cmd)
+		str_copy(kb->cmd, sizeof(kb->cmd), cmd);
 	else
-		kb->external_cmd[0] = '\0';
+		kb->cmd[0] = '\0';
 
 	char flag_text[128];
 	bind_flags_text(flags, flag_text, sizeof(flag_text));
-	wlr_log(WLR_DEBUG,
-		"Added keybind: mod=%u keysym=%u keycode=%u action=%d index=%d flags=%s submap=%s", modifiers,
-		keysym, keycode, action, desktop_index, flag_text, submap_name ? submap_name : "global");
+	wlr_log(WLR_DEBUG, "Added keybind: mod=%u keysym=%u keycode=%u kind=%d flags=%s cmd='%s' submap=%s",
+		modifiers, keysym, keycode, kind, flag_text, kb->cmd, submap_name ? submap_name : "global");
 }
 
 static void add_gesturebind(const enum gesture_type type, const uint8_t fingers,
-		const uint32_t directions, const char *input, const bind_action_t action, const int desktop_index,
-		const char *external_cmd) {
+		const uint32_t directions, const char *input, const char *cmd) {
 	if (num_gesturebinds >= MAX_GESTUREBINDS) {
 		wlr_log(WLR_ERROR, "Maximum number of gesture binds reached");
 		return;
@@ -702,16 +553,13 @@ static void add_gesturebind(const enum gesture_type type, const uint8_t fingers,
 	gb->fingers = fingers;
 	gb->directions = directions;
 	gb->input = input ? strdup(input) : NULL;
-	gb->action = action;
-	gb->desktop_index = desktop_index;
-	if (external_cmd) {
-		str_copy(gb->external_cmd, sizeof(gb->external_cmd), external_cmd);
-	} else {
-		gb->external_cmd[0] = '\0';
-	}
+	if (cmd)
+		str_copy(gb->cmd, sizeof(gb->cmd), cmd);
+	else
+		gb->cmd[0] = '\0';
 
-	wlr_log(WLR_DEBUG, "Added gesturebind: type=%d fingers=%d dirs=%u action=%d", type, fingers,
-		directions, action);
+	wlr_log(WLR_DEBUG, "Added gesturebind: type=%d fingers=%d dirs=%u cmd='%s'", type, fingers,
+		directions, gb->cmd);
 }
 
 static void parse_gesture_hotkey_line(const char *gesture_str, const char *command_str) {
@@ -731,21 +579,15 @@ static void parse_gesture_hotkey_line(const char *gesture_str, const char *comma
 		return;
 	}
 
-	int desktop_index = 0;
-	char submap_name[MAXLEN];
-	submap_name[0] = '\0';
-	bind_action_t action = parse_action(expanded_cmd, &desktop_index, submap_name);
-
-	if (action != BIND_EXTERNAL) {
-		add_gesturebind(gest.type, gest.fingers, gest.directions, NULL, action, desktop_index, NULL);
-	} else {
-		add_gesturebind(gest.type, gest.fingers, gest.directions, NULL, action, desktop_index,
-			expanded_cmd);
+	if (parse_bind_kind(expanded_cmd, NULL) != BIND_KIND_COMMAND) {
+		wlr_log(WLR_ERROR, "Gesture binds cannot enter or exit a submap");
+		return;
 	}
+
+	add_gesturebind(gest.type, gest.fingers, gest.directions, NULL, expanded_cmd);
 }
 
-static void add_hotcornerbind(const int corner_x, const int corner_y, const bind_action_t action,
-		const int desktop_index, const char *external_cmd) {
+static void add_hotcornerbind(const int corner_x, const int corner_y, const char *cmd) {
 	if (num_hotcornerbinds >= MAX_HOTCORNERBINDS) {
 		wlr_log(WLR_ERROR, "Maximum number of hotcorner binds reached");
 		return;
@@ -764,15 +606,13 @@ static void add_hotcornerbind(const int corner_x, const int corner_y, const bind
 		hc->corner = HOTCORNER_BOTTOMRIGHT;
 	else
 		hc->corner = HOTCORNER_NONE;
-	hc->action = action;
-	hc->desktop_index = desktop_index;
-	if (external_cmd)
-		str_copy(hc->external_cmd, sizeof(hc->external_cmd), external_cmd);
+	if (cmd)
+		str_copy(hc->cmd, sizeof(hc->cmd), cmd);
 	else
-		hc->external_cmd[0] = '\0';
+		hc->cmd[0] = '\0';
 
-	wlr_log(WLR_DEBUG, "Added hotcornerbind: corner=%d (%d,%d) action=%d", hc->corner, corner_x,
-		corner_y, action);
+	wlr_log(WLR_DEBUG, "Added hotcornerbind: corner=%d (%d,%d) cmd='%s'", hc->corner, corner_x,
+		corner_y, hc->cmd);
 }
 
 static void parse_hotcorner_hotkey_line(const char *hotcorner_str, const char *command_str) {
@@ -795,15 +635,12 @@ static void parse_hotcorner_hotkey_line(const char *hotcorner_str, const char *c
 		return;
 	}
 
-	int desktop_index = 0;
-	char submap_name[MAXLEN];
-	submap_name[0] = '\0';
-	const bind_action_t action = parse_action(command_str, &desktop_index, submap_name);
+	if (parse_bind_kind(command_str, NULL) != BIND_KIND_COMMAND) {
+		wlr_log(WLR_ERROR, "Hotcorner binds cannot enter or exit a submap");
+		return;
+	}
 
-	if (action != BIND_EXTERNAL)
-		add_hotcornerbind(corner_x, corner_y, action, desktop_index, NULL);
-	else
-		add_hotcornerbind(corner_x, corner_y, action, desktop_index, command_str);
+	add_hotcornerbind(corner_x, corner_y, command_str);
 }
 
 static void parse_hotkey_line(const char *hotkey_str, const char *command_str) {
@@ -820,20 +657,14 @@ static void parse_hotkey_line(const char *hotkey_str, const char *command_str) {
 	}
 
 	if (streq(hotkey_str, "bell")) {
-		int desktop_index = 0;
 		char submap_name[MAXLEN];
-		submap_name[0] = '\0';
-		const bind_action_t action = parse_action(command_str, &desktop_index, submap_name);
-		if (action != BIND_EXTERNAL) {
-			bell_bind = (keybind_t){
-				.action = action,
-				.desktop_index = desktop_index,
-			};
-		} else {
-			str_copy(bell_bind.external_cmd, sizeof(bell_bind.external_cmd), command_str);
-			bell_bind.action = action;
-		}
-		wlr_log(WLR_DEBUG, "Parsed bell bind: action=%d cmd='%s'", action, command_str);
+		bell_bind = (keybind_t){
+			.kind = parse_bind_kind(command_str, submap_name),
+		};
+		str_copy(bell_bind.cmd, sizeof(bell_bind.cmd), command_str);
+		if (submap_name[0] != '\0')
+			str_copy(bell_bind.submap_name, sizeof(bell_bind.submap_name), submap_name);
+		wlr_log(WLR_DEBUG, "Parsed bell bind: kind=%d cmd='%s'", bell_bind.kind, command_str);
 		return;
 	}
 
@@ -891,18 +722,11 @@ static void parse_hotkey_line(const char *hotkey_str, const char *command_str) {
 			continue;
 		}
 
-		int desktop_index = 0;
 		char submap_name[MAXLEN];
-		submap_name[0] = '\0';
-		bind_action_t action = parse_action(single_cmd, &desktop_index, submap_name);
-		wlr_log(WLR_DEBUG, "Parsed action: %d for cmd: '%s' submap: '%s'", action, single_cmd,
-			submap_name);
-		if (action != BIND_EXTERNAL)
-			add_keybind(modifiers, keysym, keycode, use_keycode, flags, action, desktop_index, NULL,
-				submap_name[0] ? submap_name : NULL);
-		else
-			add_keybind(modifiers, keysym, keycode, use_keycode, flags, action, desktop_index, single_cmd,
-				submap_name[0] ? submap_name : NULL);
+		const bind_kind_t kind = parse_bind_kind(single_cmd, submap_name);
+		wlr_log(WLR_DEBUG, "Parsed kind: %d for cmd: '%s' submap: '%s'", kind, single_cmd, submap_name);
+		add_keybind(modifiers, keysym, keycode, use_keycode, flags, kind,
+			submap_name[0] ? submap_name : NULL, single_cmd);
 	}
 }
 
@@ -1002,12 +826,12 @@ void load_hotkeys(const char *path) {
 		str_chomp(line);
 
 		size_t indent = 0;
-		while (line[indent] == ' ' || line[indent] == '\t')
+		while (line[indent] == ' ' || line[indent] == '	')
 			indent++;
 
 		char *ptr = line + indent;
 		char *content_start = ptr;
-		while (*content_start == ' ' || *content_start == '\t')
+		while (*content_start == ' ' || *content_start == '	')
 			content_start++;
 		const char first_char = *content_start;
 
@@ -1361,265 +1185,34 @@ keybind_t *find_release_bind(const uint32_t modifiers, const xkb_keysym_t keysym
 	return NULL;
 }
 
-bool is_interactive_bind(const keybind_t *kb) {
-	return kb && (kb->action == BIND_INTERACTIVE_MOVE || kb->action == BIND_INTERACTIVE_RESIZE ||
-		kb->action == BIND_TILING_DRAG);
-}
-
-void execute_bind(bind_t b) {
-	output_t *focused = output_focused();
-
-	switch (b.action) {
-	case BIND_QUIT:
-		wl_display_terminate(server.wl_display);
-		break;
-	case BIND_NODE_FOCUS:
-		break;
-	case BIND_NODE_CLOSE:
-		close_focused();
-		break;
-	case BIND_NODE_STATE_TILED:
-		tile_focused();
-		break;
-	case BIND_NODE_STATE_FLOATING:
-		toggle_floating();
-		break;
-	case BIND_NODE_STATE_FULLSCREEN:
-		toggle_fullscreen();
-		break;
-	case BIND_NODE_STATE_MAXIMIZED:
-		toggle_maximize();
-		break;
-	case BIND_NODE_STATE_MINIMIZED:
-		toggle_minimize();
-		break;
-	case BIND_NODE_TO_DESKTOP:
-		if (b.desktop_index > 0) {
-			send_to_desktop(b.desktop_index - 1);
-		}
-		break;
-	case BIND_DESKTOP_FOCUS:
-		if (b.desktop_index > 0) {
-			workspace_switch_to_desktop_by_index(b.desktop_index - 1);
-		}
-		break;
-	case BIND_DESKTOP_LAYOUT_TILED:
-		set_tiled_layout();
-		break;
-	case BIND_DESKTOP_LAYOUT_MONOCLE:
-		toggle_monocle();
-		break;
-	case BIND_FOCUS_NORTH:
-	case BIND_FOCUS_WEST:
-	case BIND_FOCUS_SOUTH:
-	case BIND_FOCUS_EAST:
-		focus_dir(b.action - BIND_FOCUS_NORTH);
-		break;
-	case BIND_SWAP_NORTH:
-	case BIND_SWAP_WEST:
-	case BIND_SWAP_SOUTH:
-	case BIND_SWAP_EAST:
-		swap_dir(b.action - BIND_SWAP_NORTH);
-		break;
-	case BIND_PRESEL_NORTH:
-	case BIND_PRESEL_WEST:
-	case BIND_PRESEL_SOUTH:
-	case BIND_PRESEL_EAST:
-		if (focused == NULL || focused->desk == NULL || focused->desk->focus == NULL)
-			return;
-
-		presel_dir(focused->desk->focus, b.action - BIND_PRESEL_NORTH);
-		break;
-	case BIND_PRESEL_CANCEL:
-		cancel_presel();
-		break;
-	case BIND_TOGGLE_FLOATING:
-		toggle_floating();
-		break;
-	case BIND_TOGGLE_FULLSCREEN:
-		toggle_fullscreen();
-		break;
-	case BIND_TOGGLE_MAXIMIZE:
-		toggle_maximize();
-		break;
-	case BIND_TOGGLE_MINIMIZE:
-		toggle_minimize();
-		break;
-	case BIND_RESTORE_MINIMIZED:
-		restore_minimized();
-		break;
-	case BIND_TOGGLE_PSEUDO_TILED:
-		toggle_pseudo_tiled();
-		break;
-	case BIND_TOGGLE_MONOCLE:
-		toggle_monocle();
-		break;
-	case BIND_TOGGLE_MASTER_STACK:
-	case BIND_DESKTOP_LAYOUT_MASTER_STACK:
-		toggle_master_stack();
-		break;
-	case BIND_TOGGLE_FLOATING_LAYOUT:
-	case BIND_DESKTOP_LAYOUT_FLOATING:
-		toggle_floating_layout();
-		break;
-	case BIND_MASTER_STACK_INC:
-		if (focused && focused->desk) {
-			master_stack_increment(focused->desk);
-			if (focused->desk->layout == LAYOUT_MASTER_STACK)
-				arrange(focused, focused->desk, true);
-		}
-		break;
-	case BIND_MASTER_STACK_DEC:
-		if (focused && focused->desk) {
-			master_stack_decrement(focused->desk);
-			if (focused->desk->layout == LAYOUT_MASTER_STACK)
-				arrange(focused, focused->desk, true);
-		}
-		break;
-	case BIND_MASTER_STACK_FLIP:
-		if (focused && focused->desk) {
-			master_stack_flip_orientation(focused->desk);
-			if (focused->desk->layout == LAYOUT_MASTER_STACK)
-				arrange(focused, focused->desk, true);
-		}
-		break;
-	case BIND_MASTER_STACK_CYCLE_ORIENTATION:
-		if (focused && focused->desk) {
-			master_stack_cycle_orientation(focused->desk);
-			if (focused->desk->layout == LAYOUT_MASTER_STACK)
-				arrange(focused, focused->desk, true);
-		}
-		break;
-	case BIND_MASTER_STACK_CYCLE_STACK_LAYOUT:
-		if (focused && focused->desk) {
-			master_stack_cycle_stack_layout(focused->desk);
-			if (focused->desk->layout == LAYOUT_MASTER_STACK)
-				arrange(focused, focused->desk, true);
-		}
-		break;
-	case BIND_SCROLLER_CYCLE_PRESET:
-	case BIND_SCROLLER_CYCLE_PRESET_BACK:
-	case BIND_SCROLLER_CYCLE_HEIGHT:
-	case BIND_SCROLLER_CYCLE_HEIGHT_BACK:
-	case BIND_SCROLLER_TOGGLE_FULL_WIDTH:
-	case BIND_SCROLLER_EXPAND_COLUMN:
-	case BIND_SCROLLER_CENTER:
-	case BIND_SCROLLER_CENTER_VISIBLE:
-	case BIND_FOCUS_COLUMN_FIRST:
-	case BIND_FOCUS_COLUMN_LAST:
-	case BIND_FOCUS_DOWN_OR_LEFT:
-	case BIND_FOCUS_DOWN_OR_RIGHT:
-	case BIND_FOCUS_UP_OR_LEFT:
-	case BIND_FOCUS_UP_OR_RIGHT:
-	case BIND_MOVE_COLUMN_LEFT:
-	case BIND_MOVE_COLUMN_RIGHT:
-	case BIND_MOVE_COLUMN_UP:
-	case BIND_MOVE_COLUMN_DOWN:
-	case BIND_MOVE_COLUMN_FIRST:
-	case BIND_MOVE_COLUMN_LAST: {
-		if (focused == NULL || focused->desk == NULL || focused->desk->layout != LAYOUT_SCROLLER)
-			return;
-
-		if (scroller_bind_action(focused->desk, b.action))
-			arrange(focused, focused->desk, true);
-		break;
-	}
-	case BIND_ROTATE_CW:
-		rotate_clockwise();
-		break;
-	case BIND_ROTATE_CCW:
-		rotate_counterclockwise();
-		break;
-	case BIND_FLIP_HORIZONTAL:
-	case BIND_FLIP_VERTICAL:
-		if (focused == NULL || focused->desk == NULL || focused->desk->root == NULL)
-			return;
-
-		flip_tree(focused->desk->root, b.action - BIND_FLIP_HORIZONTAL);
-		arrange(focused, focused->desk, true);
-		break;
-	case BIND_RESIZE_LEFT:
-		resize_left();
-		break;
-	case BIND_RESIZE_RIGHT:
-		resize_right();
-		break;
-	case BIND_RESIZE_UP:
-		resize_up();
-		break;
-	case BIND_RESIZE_DOWN:
-		resize_down();
-		break;
-	case BIND_DESKTOP_NEXT:
-		focus_next_desktop();
-		break;
-	case BIND_DESKTOP_PREV:
-		focus_prev_desktop();
-		break;
-	case BIND_DESKTOP_LAST:
-		focus_last_desktop();
-		break;
-	case BIND_SEND_TO_DESKTOP_NEXT:
-		send_to_next_desktop();
-		break;
-	case BIND_SEND_TO_DESKTOP_PREV:
-		send_to_prev_desktop();
-		break;
-	case BIND_DESKTOP_1:
-	case BIND_DESKTOP_2:
-	case BIND_DESKTOP_3:
-	case BIND_DESKTOP_4:
-	case BIND_DESKTOP_5:
-	case BIND_DESKTOP_6:
-	case BIND_DESKTOP_7:
-	case BIND_DESKTOP_8:
-	case BIND_DESKTOP_9:
-	case BIND_DESKTOP_10:
-		workspace_switch_to_desktop_by_index(b.desktop_index - 1);
-		break;
-	case BIND_SEND_TO_DESKTOP_1:
-	case BIND_SEND_TO_DESKTOP_2:
-	case BIND_SEND_TO_DESKTOP_3:
-	case BIND_SEND_TO_DESKTOP_4:
-	case BIND_SEND_TO_DESKTOP_5:
-	case BIND_SEND_TO_DESKTOP_6:
-	case BIND_SEND_TO_DESKTOP_7:
-	case BIND_SEND_TO_DESKTOP_8:
-	case BIND_SEND_TO_DESKTOP_9:
-	case BIND_SEND_TO_DESKTOP_10:
-		send_to_desktop(b.desktop_index - 1);
-		break;
-	case BIND_EXTERNAL:
-	case BIND_NONE:
-		launcher_exec(b.external_cmd);
-		break;
-	case BIND_ENTER_SUBMAP:
-		enter_submap(b.submap_name);
-		break;
-	case BIND_EXIT_SUBMAP:
-		exit_submap();
-		break;
-	case BIND_INTERACTIVE_MOVE:
-	case BIND_INTERACTIVE_RESIZE:
-	case BIND_TILING_DRAG:
-		break;
-	}
+// doorsctl commands run through ipc, everything else is a shell command
+static void execute_bind_command(const char *cmd) {
+	const char *ipc_cmd = str_skip_prefix(cmd, "doorsctl ");
+	if (ipc_cmd)
+		ipc_run_line(ipc_cmd);
+	else
+		launcher_exec(cmd);
 }
 
 void execute_keybind(const keybind_t *kb) {
 	if (!kb)
 		return;
-	const bind_t bind = {
-		.action = kb->action,
-		.desktop_index = kb->desktop_index,
-		.submap_name = kb->submap_name,
-		.external_cmd = kb->external_cmd,
-	};
-	execute_bind(bind);
+
+	switch (kb->kind) {
+	case BIND_KIND_COMMAND:
+		execute_bind_command(kb->cmd);
+		break;
+	case BIND_KIND_ENTER_SUBMAP:
+		enter_submap(kb->submap_name);
+		break;
+	case BIND_KIND_EXIT_SUBMAP:
+		exit_submap();
+		break;
+	}
 }
 
 void execute_bell_bind(void) {
-	if (bell_bind.action != BIND_NONE || bell_bind.external_cmd[0] != '\0')
+	if (bell_bind.kind != BIND_KIND_COMMAND || bell_bind.cmd[0] != '\0')
 		execute_keybind(&bell_bind);
 }
 
@@ -1667,14 +1260,6 @@ keyboard_grouping_t get_keyboard_grouping(void) {
 	return settings.keyboard_grouping;
 }
 
-void set_keyboard_grouping(keyboard_grouping_t grouping) {
-	if (settings.keyboard_grouping != grouping) {
-		settings.keyboard_grouping = grouping;
-		wlr_log(WLR_INFO, "Keyboard grouping set to %d", (int)grouping);
-		keyboard_reapply_grouping();
-	}
-}
-
 bool gesturebind_matches(const gesturebind_t *gb, const enum gesture_type type,
 		const uint8_t fingers) {
 	return !(!gb || gb->type != type || (gb->fingers != GESTURE_FINGERS_ANY &&
@@ -1682,15 +1267,8 @@ bool gesturebind_matches(const gesturebind_t *gb, const enum gesture_type type,
 }
 
 void execute_gesturebind(const gesturebind_t *gb) {
-	if (!gb || gb->action == BIND_ENTER_SUBMAP)
-		return;
-	const bind_t bind = {
-		.action = gb->action,
-		.desktop_index = gb->desktop_index,
-		.external_cmd = gb->external_cmd,
-		.submap_name = NULL
-	};
-	execute_bind(bind);
+	if (gb && gb->cmd[0] != '\0')
+		execute_bind_command(gb->cmd);
 }
 
 bool hotcornerbind_matches(const hotcornerbind_t *hc, const int corner_x, const int corner_y) {
@@ -1708,174 +1286,6 @@ hotcornerbind_t *hotcorner_bind_match(int corner_x, int corner_y) {
 }
 
 void execute_hotcornerbind(const hotcornerbind_t *hc) {
-	if (!hc || hc->action == BIND_ENTER_SUBMAP)
-		return;
-	const bind_t bind = {
-		.action = hc->action,
-		.desktop_index = hc->desktop_index,
-		.external_cmd = hc->external_cmd,
-		.submap_name = NULL
-	};
-	execute_bind(bind);
-}
-
-static const char *const bind_action_names[] = {
-	"none",
-	"quit",
-	"enter_submap",
-	"exit_submap",
-	"node_focus",
-	"node_close",
-	"node_state_tiled",
-	"node_state_floating",
-	"node_state_fullscreen",
-	"node_state_maximized",
-	"node_state_minimized",
-	"node_to_desktop",
-	"desktop_focus",
-	"desktop_layout_tiled",
-	"desktop_layout_monocle",
-	"focus_north",
-	"focus_west",
-	"focus_south",
-	"focus_east",
-	"swap_north",
-	"swap_west",
-	"swap_south",
-	"swap_east",
-	"presel_north",
-	"presel_west",
-	"presel_south",
-	"presel_east",
-	"presel_cancel",
-	"toggle_floating",
-	"toggle_fullscreen",
-	"toggle_maximize",
-	"toggle_minimize",
-	"toggle_pseudo_tiled",
-	"toggle_monocle",
-	"toggle_master_stack",
-	"toggle_floating_layout",
-	"desktop_layout_master_stack",
-	"desktop_layout_floating",
-	"master_stack_inc",
-	"master_stack_dec",
-	"master_stack_flip",
-	"master_stack_cycle_orientation",
-	"master_stack_cycle_stack_layout",
-	"rotate_cw",
-	"rotate_ccw",
-	"flip_horizontal",
-	"flip_vertical",
-	"desktop_next",
-	"desktop_prev",
-	"desktop_last",
-	"send_to_desktop_next",
-	"send_to_desktop_prev",
-	"send_to_desktop_1",
-	"send_to_desktop_2",
-	"send_to_desktop_3",
-	"send_to_desktop_4",
-	"send_to_desktop_5",
-	"send_to_desktop_6",
-	"send_to_desktop_7",
-	"send_to_desktop_8",
-	"send_to_desktop_9",
-	"send_to_desktop_10",
-	"desktop_1",
-	"desktop_2",
-	"desktop_3",
-	"desktop_4",
-	"desktop_5",
-	"desktop_6",
-	"desktop_7",
-	"desktop_8",
-	"desktop_9",
-	"desktop_10",
-	"resize_left",
-	"resize_right",
-	"resize_up",
-	"resize_down",
-	"interactive_move",
-	"interactive_resize",
-	"tiling_drag",
-	"external",
-	"restore_minimized",
-	"scroller_cycle_preset",
-	"scroller_cycle_preset_back",
-	"scroller_cycle_height",
-	"scroller_cycle_height_back",
-	"scroller_toggle_full_width",
-	"scroller_expand_column",
-	"scroller_center",
-	"scroller_center_visible",
-	"focus_column_first",
-	"focus_column_last",
-	"focus_down_or_left",
-	"focus_down_or_right",
-	"focus_up_or_left",
-	"focus_up_or_right",
-	"move_column_left",
-	"move_column_right",
-	"move_column_up",
-	"move_column_down",
-	"move_column_to_first",
-	"move_column_to_last",
-};
-
-_Static_assert(sizeof(bind_action_names) / sizeof(bind_action_names[0]) == BIND_ACTION_COUNT,
-	"bind_action_name() must have exactly one name per bind_action_t value");
-
-const char *bind_action_name(const bind_action_t action) {
-	if (action >= 0 && action < BIND_ACTION_COUNT)
-		return bind_action_names[action];
-
-	return "unknown";
-}
-
-void execute_bind_action(const bind_action_t action) {
-	const bind_t b = {
-		.action = action,
-		.desktop_index = 0
-	};
-	execute_bind(b);
-}
-
-typedef struct {
-	const char *name;
-	bind_action_t action;
-} bind_alias_t;
-
-static const bind_alias_t bind_aliases[] = {
-	{"floating_layout", BIND_TOGGLE_FLOATING_LAYOUT},
-	{"next", BIND_DESKTOP_NEXT},
-	{"send", BIND_SEND_TO_DESKTOP_NEXT},
-	{"send_next", BIND_SEND_TO_DESKTOP_NEXT},
-	{"send_prev", BIND_SEND_TO_DESKTOP_PREV},
-	{"clockwise", BIND_ROTATE_CW},
-	{"cw", BIND_ROTATE_CW},
-	{"counterclockwise", BIND_ROTATE_CCW},
-	{"ccw", BIND_ROTATE_CCW},
-	{"horizontal", BIND_FLIP_HORIZONTAL},
-	{"h", BIND_FLIP_HORIZONTAL},
-	{"vertical", BIND_FLIP_VERTICAL},
-	{"v", BIND_FLIP_VERTICAL},
-};
-
-// resolve a shorthand alias or a canonical action name (as returned by bind_action_name())
-bind_action_t bind_action_from_alias(const char *name) {
-	if (!name)
-		return BIND_NONE;
-
-	for (size_t i = 0; i < sizeof(bind_aliases) / sizeof(bind_aliases[0]); i++) {
-		if (streq(name, bind_aliases[i].name))
-			return bind_aliases[i].action;
-	}
-
-	for (size_t i = 0; i < sizeof(bind_action_names) / sizeof(bind_action_names[0]); i++) {
-		if (streq(name, bind_action_names[i]))
-			return (bind_action_t)i;
-	}
-
-	return BIND_NONE;
+	if (hc && hc->cmd[0] != '\0')
+		execute_bind_command(hc->cmd);
 }

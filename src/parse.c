@@ -311,6 +311,48 @@ int parse_split(char *s, const char *delims, char *out[], const int max) {
 	return n;
 }
 
+int parse_split_quoted(char *s, char *out[], const int max) {
+	if (!s || !out || max == 0)
+		return 0;
+
+	int n = 0;
+	char *r = s, *w = s;
+
+	while (*r && n < max) {
+		while (*r == ' ' || *r == '\t')
+			r++;
+		if (!*r)
+			break;
+
+		char *start = w;
+		char quote = '\0';
+		while (*r) {
+			if (quote == '\0' && (*r == ' ' || *r == '\t'))
+				break;
+			if (quote == '\0' && (*r == '\'' || *r == '"')) {
+				quote = *r++;
+				continue;
+			}
+			if (quote != '\0' && *r == quote) {
+				quote = '\0';
+				r++;
+				continue;
+			}
+			if (*r == '\\' && quote != '\'' && r[1]) {
+				r++;
+				*w++ = *r++;
+				continue;
+			}
+			*w++ = *r++;
+		} while (*r == ' ' || *r == '\t')r++;
+
+		*w++ = '\0';
+		out[n++] = start;
+	}
+
+	return n;
+}
+
 bool parse_size(const char *spec, int *width, int *height) {
 	if (!spec || !width || !height)
 		return false;

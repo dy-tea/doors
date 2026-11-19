@@ -375,13 +375,6 @@ static bind_event_result_t dispatch_bind_press(const uint32_t modifiers, const x
 	if (!kb)
 		return result;
 
-	if (is_interactive_bind(kb)) {
-		// executed by the pointer machinery which has the view under the cursor
-		result.consumed = true;
-		result.bind = kb;
-		return result;
-	}
-
 	if (!bind_may_execute(kb)) {
 		result.consumed = true;
 		return result;

@@ -1,4 +1,3 @@
-#include "config.h"
 #include "layout/layout.h"
 #include "layout/scroller.h"
 #include "layout/scroller_view.h"
@@ -1604,64 +1603,6 @@ bool scroller_cycle_height_preset(const desktop_t *d, int step) {
 		next = step > 0 ? 0 : count - 1;
 
 	return scroller_set_window_height(d, presets[next]);
-}
-
-bool scroller_bind_action(desktop_t *d, const int action) {
-	scroller_state_t *s = scroller_state(d);
-	if (s == NULL || s->column_count == 0)
-		return false;
-
-	switch (action) {
-	case BIND_SCROLLER_CYCLE_PRESET:
-		return scroller_cycle_width_preset(d, 1);
-	case BIND_SCROLLER_CYCLE_PRESET_BACK:
-		return scroller_cycle_width_preset(d, -1);
-	case BIND_SCROLLER_CYCLE_HEIGHT:
-		return scroller_cycle_height_preset(d, 1);
-	case BIND_SCROLLER_CYCLE_HEIGHT_BACK:
-		return scroller_cycle_height_preset(d, -1);
-	case BIND_SCROLLER_TOGGLE_FULL_WIDTH:
-		return scroller_toggle_column_full_width(d);
-	case BIND_SCROLLER_EXPAND_COLUMN:
-		return scroller_expand_column_to_available_width(d);
-	case BIND_SCROLLER_CENTER:
-		if (!d->focus || !d->focus->client)
-			return false;
-
-		scroller_center_window(d, d->focus->client);
-		return true;
-	case BIND_SCROLLER_CENTER_VISIBLE:
-		scroller_center_visible_columns(d);
-		return true;
-	case BIND_FOCUS_COLUMN_FIRST:
-		return scroller_focus_column_first(d);
-	case BIND_FOCUS_COLUMN_LAST:
-		return scroller_focus_column_last(d);
-	case BIND_FOCUS_DOWN_OR_LEFT:
-		return scroller_focus_down_or_left(d);
-	case BIND_FOCUS_DOWN_OR_RIGHT:
-		return scroller_focus_down_or_right(d);
-	case BIND_FOCUS_UP_OR_LEFT:
-		return scroller_focus_up_or_left(d);
-	case BIND_FOCUS_UP_OR_RIGHT:
-		return scroller_focus_up_or_right(d);
-	case BIND_MOVE_COLUMN_LEFT:
-		return scroller_move_column_left(d);
-	case BIND_MOVE_COLUMN_RIGHT:
-		return scroller_move_column_right(d);
-	case BIND_MOVE_COLUMN_UP:
-		return scroller_move_column_up(d);
-	case BIND_MOVE_COLUMN_DOWN:
-		return scroller_move_column_down(d);
-	case BIND_MOVE_COLUMN_FIRST:
-		return scroller_move_column_to_first(d);
-	case BIND_MOVE_COLUMN_LAST:
-		return scroller_move_column_to_last(d);
-	default:
-		break;
-	}
-
-	return false;
 }
 
 int scroller_collect(desktop_t *d, node_t ***out_nodes) {

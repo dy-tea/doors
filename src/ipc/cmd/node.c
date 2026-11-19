@@ -1,6 +1,7 @@
 #include "animation.h"
 #include "dim.h"
 #include "effects/effects.h"
+#include "input/cursor.h"
 #include "input/keyboard.h"
 #include "ipc/args.h"
 #include "ipc/helpers.h"
@@ -8,6 +9,7 @@
 #include "layout/layout.h"
 #include "output/output.h"
 #include "parse.h"
+#include "protocol/workspace.h"
 #include "scratchpad.h"
 #include "server.h"
 #include "str.h"
@@ -151,6 +153,7 @@ static void node_state(ipc_args_t *a) {
 	} states[] = {
 		{"tiled", tile_focused},
 		{"floating", toggle_floating},
+		{"pseudo_tiled", toggle_pseudo_tiled},
 		{"fullscreen", toggle_fullscreen},
 		{"maximized", toggle_maximize},
 		{"minimized", toggle_minimize},
@@ -186,9 +189,17 @@ static void node_to_desktop(ipc_args_t *a) {
 	if (!ipc_need(a, "desktop", &name))
 		return;
 
-	desktop_t *target = ipc_desktop_by_name(a, name);
-	if (!target)
+	desktop_t *target = find_desktop_by_name(name);
+	if (!target) {
+		long idx;
+		if (parse_long(name, &idx) && idx >= 1 && idx <= 10) {
+			send_to_desktop((int)(idx - 1));
+			ipc_ok(a, "sent\n");
+			return;
+		}
+		ipc_fail(a, "Desktop \"%s\" not found\n", name);
 		return;
+	}
 
 	output_t *m = server.focused_output;
 	if (!m || !m->desk || !m->desk->focus) {
@@ -876,12 +887,39 @@ static void node_swap(ipc_args_t *a) {
 	ipc_ok(a, "Swapped\n");
 }
 
+static void node_interactive_move(ipc_args_t *a) {
+	if (!cursor_interactive_move()) {
+		ipc_fail(a, "No movable window under the cursor\n");
+		return;
+	}
+	ipc_ok(a, "moving\n");
+}
+
+static void node_interactive_resize(ipc_args_t *a) {
+	if (!cursor_interactive_resize()) {
+		ipc_fail(a, "No resizable window under the cursor\n");
+		return;
+	}
+	ipc_ok(a, "resizing\n");
+}
+
+static void node_tiling_drag(ipc_args_t *a) {
+	if (!cursor_tiling_drag()) {
+		ipc_fail(a, "No tiled window under the cursor\n");
+		return;
+	}
+	ipc_ok(a, "dragging\n");
+}
+
 const ipc_sub_t node_subs[] = {
 	IPC_SUB("-f", "--focus", "node -f | --focus", node_focus),
 	IPC_SUB("-c", "--close", "node -c | --close", node_close),
 	IPC_SUB("-t", "--state", "node -t | --state <tiled|floating|fullscreen|maximized|minimized>",
 		node_state),
 	IPC_SUB("-d", "--to-desktop", "node -d | --to-desktop <desktop>", node_to_desktop),
+	IPC_SUB("interactive_move", NULL, "node interactive_move", node_interactive_move),
+	IPC_SUB("interactive_resize", NULL, "node interactive_resize", node_interactive_resize),
+	IPC_SUB("tiling_drag", NULL, "node tiling_drag", node_tiling_drag),
 	IPC_SUBM("-g", "--flag", "node -g | --flag <key>[=true|false]", node_flag, node_flag_key_matches),
 	IPC_SUB("-S", "--scratchpad", "node -S | --scratchpad", node_scratchpad),
 	IPC_SUB("-v", "--move", "node -v | --move <dx> <dy>", node_move),

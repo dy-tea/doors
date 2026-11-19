@@ -15,111 +15,10 @@
 typedef struct submap submap_t;
 
 typedef enum {
-	BIND_NONE = 0,
-	BIND_QUIT,
-	BIND_ENTER_SUBMAP,
-	BIND_EXIT_SUBMAP,
-	BIND_NODE_FOCUS,
-	BIND_NODE_CLOSE,
-	BIND_NODE_STATE_TILED,
-	BIND_NODE_STATE_FLOATING,
-	BIND_NODE_STATE_FULLSCREEN,
-	BIND_NODE_STATE_MAXIMIZED,
-	BIND_NODE_STATE_MINIMIZED,
-	BIND_NODE_TO_DESKTOP,
-	BIND_DESKTOP_FOCUS,
-	BIND_DESKTOP_LAYOUT_TILED,
-	BIND_DESKTOP_LAYOUT_MONOCLE,
-	BIND_FOCUS_NORTH,
-	BIND_FOCUS_WEST,
-	BIND_FOCUS_SOUTH,
-	BIND_FOCUS_EAST,
-	BIND_SWAP_NORTH,
-	BIND_SWAP_WEST,
-	BIND_SWAP_SOUTH,
-	BIND_SWAP_EAST,
-	BIND_PRESEL_NORTH,
-	BIND_PRESEL_WEST,
-	BIND_PRESEL_SOUTH,
-	BIND_PRESEL_EAST,
-	BIND_PRESEL_CANCEL,
-	BIND_TOGGLE_FLOATING,
-	BIND_TOGGLE_FULLSCREEN,
-	BIND_TOGGLE_MAXIMIZE,
-	BIND_TOGGLE_MINIMIZE,
-	BIND_TOGGLE_PSEUDO_TILED,
-	BIND_TOGGLE_MONOCLE,
-	BIND_TOGGLE_MASTER_STACK,
-	BIND_TOGGLE_FLOATING_LAYOUT,
-	BIND_DESKTOP_LAYOUT_MASTER_STACK,
-	BIND_DESKTOP_LAYOUT_FLOATING,
-	BIND_MASTER_STACK_INC,
-	BIND_MASTER_STACK_DEC,
-	BIND_MASTER_STACK_FLIP,
-	BIND_MASTER_STACK_CYCLE_ORIENTATION,
-	BIND_MASTER_STACK_CYCLE_STACK_LAYOUT,
-	BIND_ROTATE_CW,
-	BIND_ROTATE_CCW,
-	BIND_FLIP_HORIZONTAL,
-	BIND_FLIP_VERTICAL,
-	BIND_DESKTOP_NEXT,
-	BIND_DESKTOP_PREV,
-	BIND_DESKTOP_LAST,
-	BIND_SEND_TO_DESKTOP_NEXT,
-	BIND_SEND_TO_DESKTOP_PREV,
-	BIND_SEND_TO_DESKTOP_1,
-	BIND_SEND_TO_DESKTOP_2,
-	BIND_SEND_TO_DESKTOP_3,
-	BIND_SEND_TO_DESKTOP_4,
-	BIND_SEND_TO_DESKTOP_5,
-	BIND_SEND_TO_DESKTOP_6,
-	BIND_SEND_TO_DESKTOP_7,
-	BIND_SEND_TO_DESKTOP_8,
-	BIND_SEND_TO_DESKTOP_9,
-	BIND_SEND_TO_DESKTOP_10,
-	BIND_DESKTOP_1,
-	BIND_DESKTOP_2,
-	BIND_DESKTOP_3,
-	BIND_DESKTOP_4,
-	BIND_DESKTOP_5,
-	BIND_DESKTOP_6,
-	BIND_DESKTOP_7,
-	BIND_DESKTOP_8,
-	BIND_DESKTOP_9,
-	BIND_DESKTOP_10,
-	BIND_RESIZE_LEFT,
-	BIND_RESIZE_RIGHT,
-	BIND_RESIZE_UP,
-	BIND_RESIZE_DOWN,
-	BIND_INTERACTIVE_MOVE,
-	BIND_INTERACTIVE_RESIZE,
-	BIND_TILING_DRAG,
-	BIND_EXTERNAL,
-	BIND_RESTORE_MINIMIZED,
-	BIND_SCROLLER_CYCLE_PRESET,
-	BIND_SCROLLER_CYCLE_PRESET_BACK,
-	BIND_SCROLLER_CYCLE_HEIGHT,
-	BIND_SCROLLER_CYCLE_HEIGHT_BACK,
-	BIND_SCROLLER_TOGGLE_FULL_WIDTH,
-	BIND_SCROLLER_EXPAND_COLUMN,
-	BIND_SCROLLER_CENTER,
-	BIND_SCROLLER_CENTER_VISIBLE,
-	BIND_FOCUS_COLUMN_FIRST,
-	BIND_FOCUS_COLUMN_LAST,
-	BIND_FOCUS_DOWN_OR_LEFT,
-	BIND_FOCUS_DOWN_OR_RIGHT,
-	BIND_FOCUS_UP_OR_LEFT,
-	BIND_FOCUS_UP_OR_RIGHT,
-	BIND_MOVE_COLUMN_LEFT,
-	BIND_MOVE_COLUMN_RIGHT,
-	BIND_MOVE_COLUMN_UP,
-	BIND_MOVE_COLUMN_DOWN,
-	BIND_MOVE_COLUMN_FIRST,
-	BIND_MOVE_COLUMN_LAST,
-} bind_action_t;
-
-// sync with names table in bind_action_name()
-#define BIND_ACTION_COUNT (BIND_MOVE_COLUMN_LAST + 1)
+	BIND_KIND_COMMAND = 0,
+	BIND_KIND_ENTER_SUBMAP,
+	BIND_KIND_EXIT_SUBMAP,
+} bind_kind_t;
 
 typedef enum {
 	BINDF_NONE = 0,
@@ -131,12 +30,6 @@ typedef enum {
 	BINDF_SUBMAP_UNIVERSAL = 1 << 5,
 	BINDF_CATCH_ALL = 1 << 6,
 } bind_flag_t;
-
-typedef struct {
-	bind_action_t action;
-	int desktop_index;
-	const char *submap_name, *external_cmd;
-} bind_t;
 
 #define MOUSE_BUTTON_SYNTH_KEYCODE_BASE 0x20000000
 #define MOUSE_BUTTON_KEYCODE_OFFSET 272
@@ -150,11 +43,10 @@ typedef struct {
 	xkb_keysym_t keysym;
 	uint32_t keycode;
 	bool use_keycode;
-	bind_action_t action;
-	int desktop_index;
+	bind_kind_t kind;
 	uint32_t flags; // bind_flag_t bitmask
 	char submap_name[MAXLEN];
-	char external_cmd[MAXLEN];
+	char cmd[MAXLEN];
 } keybind_t;
 
 #define bind_keycode_is_mouse(keycode) ((keycode) >= MOUSE_BUTTON_SYNTH_KEYCODE_BASE)
@@ -169,17 +61,13 @@ typedef struct {
 	uint8_t fingers;
 	uint32_t directions;
 	char *input;
-	bind_action_t action;
-	int desktop_index;
-	char external_cmd[MAXLEN];
+	char cmd[MAXLEN];
 } gesturebind_t;
 
 typedef struct {
 	enum hotcorner corner;
 	int corner_x, corner_y;
-	bind_action_t action;
-	int desktop_index;
-	char external_cmd[MAXLEN];
+	char cmd[MAXLEN];
 } hotcornerbind_t;
 
 struct submap {
@@ -209,7 +97,6 @@ bool keybind_matches(const keybind_t *kb, uint32_t modifiers, xkb_keysym_t keysy
 	uint32_t keycode);
 keybind_t *find_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode,
 	bool prefer_keycode, bool fallback_to_global);
-bool is_interactive_bind(const keybind_t *kb);
 void execute_keybind(const keybind_t *kb);
 void execute_bell_bind(void);
 void setup_hotkey_event_listener(struct wl_event_loop *event_loop);
@@ -217,7 +104,6 @@ void enter_submap(const char *name);
 void exit_submap(void);
 
 keyboard_grouping_t get_keyboard_grouping(void);
-void set_keyboard_grouping(keyboard_grouping_t grouping);
 
 bool gesturebind_matches(const gesturebind_t *gb, enum gesture_type type, uint8_t fingers);
 void execute_gesturebind(const gesturebind_t *gb);
@@ -226,12 +112,6 @@ bool hotcornerbind_matches(const hotcornerbind_t *hc, int corner_x, int corner_y
 hotcornerbind_t *hotcorner_bind_match(int corner_x, int corner_y);
 void execute_hotcornerbind(const hotcornerbind_t *hc);
 
-void execute_bind(bind_t b);
-void execute_bind_action(bind_action_t action);
-
-bind_action_t bind_action_from_alias(const char *name);
-const char *bind_action_name(bind_action_t action);
-
 bool parse_bind_flags(const char *str, uint32_t *out_flags);
 char *bind_flags_text(uint32_t flags, char *buf, size_t size);
 
@@ -239,13 +119,14 @@ char *bind_flags_text(uint32_t flags, char *buf, size_t size);
 const char *parse_hotkey_spec(const char *spec, uint32_t *modifiers, xkb_keysym_t *keysym,
 	uint32_t *keycode, bool *use_keycode, uint32_t *flags);
 
+// classifies a hotkey command, filling submap_name for BIND_KIND_ENTER_SUBMAP
+bind_kind_t parse_bind_kind(const char *cmd, char *submap_name);
+
 uint32_t parse_modifiers(const char *mod_str);
 xkb_keysym_t parse_keysym(const char *name);
 uint32_t parse_keycode(const char *name);
-bind_action_t parse_action(const char *cmd, int *desktop_index, char *submap_name);
 void add_keybind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode, bool use_keycode,
-	uint32_t flags, bind_action_t action, int desktop_index, const char *external_cmd,
-	const char *submap_name);
+	uint32_t flags, bind_kind_t kind, const char *submap_name, const char *cmd);
 submap_t *find_submap_by_name(const char *name);
 keybind_t *find_release_bind(uint32_t modifiers, xkb_keysym_t keysym, uint32_t keycode,
 	const char *submap_at_press);

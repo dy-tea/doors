@@ -2,6 +2,7 @@
 #include "ipc/args.h"
 #include "ipc/ipc.h"
 #include "ipc/registry.h"
+#include "parse.h"
 #include "str.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -97,6 +98,55 @@ static void ipc_cmd_commands(ipc_args_t *a) {
 	free(msg);
 }
 
+// dispatch command through the ipc socket
+static bool ipc_dispatch(ipc_args_t *a, bool *owns_client_fd) {
+	*owns_client_fd = false;
+
+	if (streq("subscribe", a->cmd)) {
+		*owns_client_fd = ipc_cmd_subscribe(a);
+		return true;
+	}
+
+	for (size_t i = 0; i < IPC_ARRAY_LEN(commands); i++) {
+		if (!streq(commands[i].name, a->cmd))
+			continue;
+		commands[i].run(a);
+		return true;
+	}
+
+	ipc_fail(a, "Unknown command \"%s\"\n", a->cmd);
+	return false;
+}
+
+// runs a command line without a client, used by hotkey binds. replies are discarded
+bool ipc_run_line(const char *line) {
+	char buf[DOORS_BUFSIZ];
+	str_copy(buf, sizeof(buf), line);
+
+	char *args[32];
+	int argc = parse_split_quoted(buf, args, 32);
+
+	int first = 0;
+	if (argc > 0 && streq(args[0], "doorsctl"))
+		first = 1;
+	if (first >= argc)
+		return false;
+
+	// subscribing needs a socket to attach to
+	if (streq(args[first], "subscribe"))
+		return false;
+
+	ipc_args_t a;
+	ipc_args_init(&a, args + first + 1, argc - first - 1, -1, args[first]);
+
+	diag_stage_enter(DIAG_STAGE_IPC);
+	bool owns_client_fd = false;
+	const bool found = ipc_dispatch(&a, &owns_client_fd);
+	diag_stage_leave();
+
+	return found;
+}
+
 bool process_ipc_message(char *msg, int msg_len, int client_fd) {
 	wlr_log(WLR_DEBUG, "Processing message: %.*s", msg_len, msg);
 
@@ -167,25 +217,9 @@ bool process_ipc_message(char *msg, int msg_len, int client_fd) {
 
 	bool owns_client_fd = false;
 	diag_stage_enter(DIAG_STAGE_IPC);
-
-	if (streq("subscribe", name)) {
-		owns_client_fd = ipc_cmd_subscribe(&a);
-	} else {
-		const ipc_cmd_t *cmd = NULL;
-		for (size_t i = 0; i < IPC_ARRAY_LEN(commands); i++) {
-			if (streq(commands[i].name, name)) {
-				cmd = &commands[i];
-				break;
-			}
-		}
-
-		if (cmd)
-			cmd->run(&a);
-		else
-			ipc_fail(&a, "Unknown command \"%s\"\n", name);
-	}
-
+	ipc_dispatch(&a, &owns_client_fd);
 	diag_stage_leave();
+
 	free(args);
 	return owns_client_fd;
 }

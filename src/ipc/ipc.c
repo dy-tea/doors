@@ -1,9 +1,10 @@
+#include "client.h"
 #include "ipc/ipc.h"
 #include "layout/floating.h"
 #include "macros.h"
 #include "output/output.h"
 #include "server.h"
-#include "tree.h"
+#include "settings.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -64,6 +65,12 @@ int ipc_get_socket_fd(void) {
 }
 
 static void send_response(int client_fd, bool success, const char *msg) {
+	if (client_fd < 0) {
+		if (!success)
+			wlr_log(WLR_ERROR, "%s", msg ? msg : "");
+		return;
+	}
+
 	char status = success ? '\0' : '\x01';
 	wlr_log(WLR_DEBUG, "Sending response: %s", msg ? msg : "");
 	ipc_write_all(client_fd, &status, 1);

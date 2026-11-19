@@ -18,7 +18,6 @@ test_programs = {
 	'bezier': 'test_bezier.c',
 	'spring': 'test_spring.c',
 	'layout-registry': 'test_layout_registry.c',
-	'bind-action': 'test_bind_action.c',
 	'config-table': 'test_config_table.c',
 	'config-validate': 'test_config_validate.c',
 	'ipc-dry-run': 'test_ipc_dry_run.c',

@@ -1234,6 +1234,24 @@ C<doorsctl node -s|--swap I<id>>
 
 Swap with node.
 
+=item I<interactive_move>
+
+C<doorsctl node interactive_move>
+
+Start moving the window under the cursor.
+
+=item I<interactive_resize>
+
+C<doorsctl node interactive_resize>
+
+Start resizing the window under the cursor; the grabbed edge follows the cursor.
+
+=item I<tiling_drag>
+
+C<doorsctl node tiling_drag>
+
+Start dragging the tiled window under the cursor.
+
 =back
 
 =item output

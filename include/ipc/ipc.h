@@ -81,3 +81,6 @@ bool subscribe_mask_for(const char *word, subscriber_mask_t *mask);
 
 // returns true when the command takes ownership of client_fd
 bool process_ipc_message(char *msg, int msg_len, int client_fd);
+
+// runs a command line in-process, discarding replies
+bool ipc_run_line(const char *line);

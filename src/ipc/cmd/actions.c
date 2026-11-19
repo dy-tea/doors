@@ -4,80 +4,55 @@
 #include "ipc/registry.h"
 #include "spring.h"
 #include "str.h"
+#include "types.h"
 #include <stdlib.h>
 #include <string.h>
 
-static const str_pair_t focus_dirs[] = {
-	{"west", BIND_FOCUS_WEST},
-	{"w", BIND_FOCUS_WEST},
-	{"east", BIND_FOCUS_EAST},
-	{"e", BIND_FOCUS_EAST},
-	{"north", BIND_FOCUS_NORTH},
-	{"n", BIND_FOCUS_NORTH},
-	{"south", BIND_FOCUS_SOUTH},
-	{"s", BIND_FOCUS_SOUTH},
+static const str_pair_t directions[] = {
+	{"west", DIR_WEST},
+	{"w", DIR_WEST},
+	{"east", DIR_EAST},
+	{"e", DIR_EAST},
+	{"north", DIR_NORTH},
+	{"n", DIR_NORTH},
+	{"south", DIR_SOUTH},
+	{"s", DIR_SOUTH},
 	IPC_ENUM_END,
 };
 
-static const str_pair_t swap_dirs[] = {
-	{"west", BIND_SWAP_WEST},
-	{"w", BIND_SWAP_WEST},
-	{"east", BIND_SWAP_EAST},
-	{"e", BIND_SWAP_EAST},
-	{"north", BIND_SWAP_NORTH},
-	{"n", BIND_SWAP_NORTH},
-	{"south", BIND_SWAP_SOUTH},
-	{"s", BIND_SWAP_SOUTH},
-	IPC_ENUM_END,
-};
-
-static const str_pair_t resize_dirs[] = {
-	{"left", BIND_RESIZE_LEFT},
-	{"right", BIND_RESIZE_RIGHT},
-	{"up", BIND_RESIZE_UP},
-	{"down", BIND_RESIZE_DOWN},
-	IPC_ENUM_END,
-};
-
-// names resolve across all bind actions, so each command only accepts its own range
-static bool is_focus_action(bind_action_t a) {
-	return a >= BIND_FOCUS_NORTH && a <= BIND_FOCUS_EAST;
+static void resize_dir(const direction_t dir) {
+	switch (dir) {
+	case DIR_WEST:
+		resize_left();
+		break;
+	case DIR_EAST:
+		resize_right();
+		break;
+	case DIR_NORTH:
+		resize_up();
+		break;
+	case DIR_SOUTH:
+		resize_down();
+		break;
+	}
 }
 
-static bool is_swap_action(bind_action_t a) {
-	return a >= BIND_SWAP_NORTH && a <= BIND_SWAP_EAST;
-}
-
-static bool is_resize_action(bind_action_t a) {
-	return a >= BIND_RESIZE_LEFT && a <= BIND_RESIZE_DOWN;
-}
-
-static void action_direction(ipc_args_t *a, const char *success, const str_pair_t *dirs,
-		size_t dir_count, bool (*in_range)(bind_action_t)) {
+static void action_direction(ipc_args_t *a, const char *success, void (*run)(direction_t)) {
 	const char *dir;
 	if (!ipc_need(a, "direction", &dir))
 		return;
 
-	bind_action_t action = BIND_NONE;
-	const str_pair_t *match = str_table_find(dirs, dir);
-	if (match) {
-		action = (bind_action_t)match->value;
-	} else {
-		bind_action_t full = bind_action_from_alias(dir);
-		if (full != BIND_NONE && in_range(full))
-			action = full;
-	}
-
-	if (action == BIND_NONE) {
+	const str_pair_t *match = str_table_find(directions, dir);
+	if (!match) {
 		ipc_buf_t b;
 		char list[128];
 		ipc_buf_init(&b, list, sizeof(list));
-		IPC_FORMAT_NAMES(&b, dirs, dir_count);
+		IPC_FORMAT_NAMES(&b, directions, IPC_ARRAY_LEN(directions) - 1);
 		ipc_fail(a, "Unknown direction \"%s\", expected one of: %s\n", dir, list);
 		return;
 	}
 
-	execute_bind_action(action);
+	run((direction_t)match->value);
 	ipc_okf(a, "%s\n", success);
 }
 
@@ -193,11 +168,11 @@ void ipc_cmd_actions(ipc_args_t *a) {
 	const char *cmd = a->cmd;
 
 	if (streq(cmd, "focus")) {
-		action_direction(a, "focused", focus_dirs, IPC_ARRAY_LEN(focus_dirs) - 1, is_focus_action);
+		action_direction(a, "focused", focus_dir);
 	} else if (streq(cmd, "swap")) {
-		action_direction(a, "swapped", swap_dirs, IPC_ARRAY_LEN(swap_dirs) - 1, is_swap_action);
+		action_direction(a, "swapped", swap_dir);
 	} else if (streq(cmd, "resize")) {
-		action_direction(a, "resized", resize_dirs, IPC_ARRAY_LEN(resize_dirs) - 1, is_resize_action);
+		action_direction(a, "resized", resize_dir);
 	} else if (streq(cmd, "toggle")) {
 		act_toggle(a);
 	} else if (streq(cmd, "send")) {
