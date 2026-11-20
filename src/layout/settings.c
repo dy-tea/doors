@@ -89,6 +89,24 @@ size_t setting_storage_size(const setting_t *s) {
 	return 0;
 }
 
+static size_t setting_storage_align(const setting_t *s) {
+	switch (s->type) {
+	case SETTING_BOOL:
+		return _Alignof(bool);
+	case SETTING_INT:
+	case SETTING_ENUM:
+		return _Alignof(int);
+	case SETTING_FLOAT:
+	case SETTING_RGBA:
+		return _Alignof(float);
+	case SETTING_DOUBLE:
+		return _Alignof(double);
+	case SETTING_STR:
+		return 1;
+	}
+	return 1;
+}
+
 static void defaults_entry_free(layout_defaults_t *entry) {
 	free(entry->data);
 	free(entry->offset);
@@ -142,6 +160,9 @@ void layout_defaults_capture(const layout_t layout) {
 
 	size_t total = 0;
 	for (size_t i = 0; i < entry->count; i++) {
+		const size_t align = setting_storage_align(&impl->settings[i]);
+		total = (total + align - 1) & ~(align - 1);
+
 		entry->offset[i] = total;
 		entry->size[i] = setting_storage_size(&impl->settings[i]);
 		total += entry->size[i];
