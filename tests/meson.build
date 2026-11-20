@@ -14,6 +14,7 @@ strip_plugin = shared_module(
 )
 
 test_programs = {
+	'actions': 'test_actions.c',
 	'str': 'test_str.c',
 	'bezier': 'test_bezier.c',
 	'spring': 'test_spring.c',

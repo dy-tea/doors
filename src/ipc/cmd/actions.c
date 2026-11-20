@@ -20,6 +20,14 @@ static const str_pair_t directions[] = {
 	IPC_ENUM_END,
 };
 
+static const str_pair_t resize_directions[] = {
+	{"left", DIR_WEST},
+	{"right", DIR_EAST},
+	{"up", DIR_NORTH},
+	{"down", DIR_SOUTH},
+	IPC_ENUM_END,
+};
+
 static void resize_dir(const direction_t dir) {
 	switch (dir) {
 	case DIR_WEST:
@@ -37,17 +45,18 @@ static void resize_dir(const direction_t dir) {
 	}
 }
 
-static void action_direction(ipc_args_t *a, const char *success, void (*run)(direction_t)) {
+static void action_direction(ipc_args_t *a, const char *success, const str_pair_t *table,
+		size_t table_len, void (*run)(direction_t)) {
 	const char *dir;
 	if (!ipc_need(a, "direction", &dir))
 		return;
 
-	const str_pair_t *match = str_table_find(directions, dir);
+	const str_pair_t *match = str_table_find(table, dir);
 	if (!match) {
 		ipc_buf_t b;
 		char list[128];
 		ipc_buf_init(&b, list, sizeof(list));
-		IPC_FORMAT_NAMES(&b, directions, IPC_ARRAY_LEN(directions) - 1);
+		IPC_FORMAT_NAMES(&b, table, table_len);
 		ipc_fail(a, "Unknown direction \"%s\", expected one of: %s\n", dir, list);
 		return;
 	}
@@ -168,11 +177,12 @@ void ipc_cmd_actions(ipc_args_t *a) {
 	const char *cmd = a->cmd;
 
 	if (streq(cmd, "focus")) {
-		action_direction(a, "focused", focus_dir);
+		action_direction(a, "focused", directions, IPC_ARRAY_LEN(directions) - 1, focus_dir);
 	} else if (streq(cmd, "swap")) {
-		action_direction(a, "swapped", swap_dir);
+		action_direction(a, "swapped", directions, IPC_ARRAY_LEN(directions) - 1, swap_dir);
 	} else if (streq(cmd, "resize")) {
-		action_direction(a, "resized", resize_dir);
+		action_direction(a, "resized", resize_directions, IPC_ARRAY_LEN(resize_directions) - 1,
+			resize_dir);
 	} else if (streq(cmd, "toggle")) {
 		act_toggle(a);
 	} else if (streq(cmd, "send")) {

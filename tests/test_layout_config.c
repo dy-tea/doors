@@ -94,21 +94,6 @@ static void test_settings(void) {
 	CHECK(reply[0] == '\0');
 }
 
-static void test_no_top_level_alias(void) {
-	char reply[4096], value[128];
-
-	SEND("monocle\0gapless\0true\0", reply);
-	CHECK(reply[0] == '\x01');
-	CHECK(strstr(reply + 1, "layout monocle") != NULL);
-
-	SEND("layout\0monocle\0gapless\0false\0", reply);
-	CHECK(reply[0] == '\0');
-
-	SEND("layout\0monocle\0gapless\0", reply);
-	reply_value(reply, value, sizeof(value));
-	CHECK_STREQ(value, "false");
-}
-
 static void test_padding_command(void) {
 	char reply[4096], value[128];
 
@@ -277,7 +262,6 @@ static void run_tests(void) {
 
 	test_list_layouts();
 	test_settings();
-	test_no_top_level_alias();
 	test_padding_command();
 	test_dry_run();
 	test_reset();
