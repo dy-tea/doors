@@ -30,4 +30,4 @@ void session_mgmt_handle_state_changed(struct wlr_xdg_toplevel *xdg_toplevel);
 void session_mgmt_handle_destroy(struct wlr_xdg_toplevel *xdg_toplevel);
 
 // appends a description of every live session and what it remembers
-size_t session_mgmt_write_list(char *buf, size_t buf_size);
+bool session_mgmt_write_list(char *buf, size_t buf_size);

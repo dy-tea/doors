@@ -1,20 +1,11 @@
 #include "config_internal.h"
+#include "settings.h"
 #include "str.h"
 #include "test.h"
 #include <stddef.h>
 
-static bool type_is_known(cfg_type_t type) {
-	switch (type) {
-	case CFG_BOOL:
-	case CFG_INT:
-	case CFG_FLOAT:
-	case CFG_DOUBLE:
-	case CFG_ENUM:
-	case CFG_STR:
-	case CFG_RGBA:
-		return true;
-	}
-	return false;
+static bool type_is_known(setting_type_t type) {
+	return type >= SETTING_BOOL && type <= SETTING_RGBA;
 }
 
 static size_t enum_entry_count(const str_pair_t *values) {
@@ -35,7 +26,7 @@ static void test_count(void) {
 
 static void test_entries(void) {
 	for (size_t i = 0; i < CFG_SETTINGS_COUNT; i++) {
-		const cfg_setting_t *s = &settings_table[i];
+		const setting_t *s = &settings_table[i];
 
 		CHECK(s->name != NULL);
 		if (!s->name)
@@ -45,13 +36,13 @@ static void test_entries(void) {
 		CHECK(s->ptr != NULL);
 		CHECK(type_is_known(s->type));
 
-		if (s->type == CFG_INT || s->type == CFG_FLOAT || s->type == CFG_DOUBLE)
+		if (s->type == SETTING_INT || s->type == SETTING_FLOAT || s->type == SETTING_DOUBLE)
 			CHECK(s->fmt != NULL);
 
-		if (s->type == CFG_STR)
+		if (s->type == SETTING_STR)
 			CHECK(s->size > 0);
 
-		if (s->type == CFG_ENUM) {
+		if (s->type == SETTING_ENUM) {
 			CHECK(s->values != NULL);
 			if (!s->values)
 				continue;
@@ -77,7 +68,7 @@ static void test_entries(void) {
 
 static void test_unique_names(void) {
 	for (size_t i = 0; i < CFG_SETTINGS_COUNT; i++) {
-		const cfg_setting_t *s = &settings_table[i];
+		const setting_t *s = &settings_table[i];
 
 		if (s->alias) {
 			CHECK(s->alias[0] != '\0');
@@ -85,7 +76,7 @@ static void test_unique_names(void) {
 		}
 
 		for (size_t j = i + 1; j < CFG_SETTINGS_COUNT; j++) {
-			const cfg_setting_t *other = &settings_table[j];
+			const setting_t *other = &settings_table[j];
 
 			CHECK(!streq(s->name, other->name));
 			if (other->alias)
@@ -101,7 +92,7 @@ static void test_unique_names(void) {
 static void test_format(void) {
 	for (size_t i = 0; i < CFG_SETTINGS_COUNT; i++) {
 		char buf[256] = {0};
-		cfg_format_value(&settings_table[i], buf, sizeof(buf));
+		setting_format(&settings_table[i], buf, sizeof(buf));
 
 		CHECK(buf[0] != '\0');
 		CHECK(strlen(buf) < sizeof(buf) - 1);

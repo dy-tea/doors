@@ -57,5 +57,5 @@ void remove_layer_rule(layer_rule_t *r);
 void free_layer_rule(layer_rule_t *r);
 bool remove_layer_rule_by_index(int idx);
 size_t layer_rule_count(void);
-void list_layer_rules(char *buf, size_t buf_size);
+bool list_layer_rules(char *buf, size_t buf_size);
 layer_rule_consequence_t *find_matching_layer_rule(const char *namespace, const char *output_name);

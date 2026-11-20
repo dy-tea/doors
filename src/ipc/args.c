@@ -54,29 +54,35 @@ bool ipc_end(ipc_args_t *a) {
 	return false;
 }
 
+static void ipc_buffv(ipc_buf_t *b, const char *fmt, va_list ap);
+
 void ipc_ok(ipc_args_t *a, const char *msg) {
 	send_success(a->fd, msg);
 }
 
 void ipc_okf(ipc_args_t * a, const char *fmt, ...) {
-	char buf[512];
+	IPC_REPLY_GROWING(b);
+
 	va_list ap;
 	va_start(ap, fmt);
-	vsnprintf(buf, sizeof(buf), fmt, ap);
+	ipc_buffv(&b, fmt, ap);
 	va_end(ap);
-	send_success(a->fd, buf);
+
+	send_success(a->fd, b.buf != NULL ? b.buf : "");
+	ipc_buf_free(&b);
 }
 
 void ipc_fail(ipc_args_t * a, const char *fmt, ...) {
-	char msg[256];
+	IPC_REPLY_GROWING(b);
+	ipc_buff(&b, "%s: ", a->cmd ? a->cmd : "ipc");
+
 	va_list ap;
 	va_start(ap, fmt);
-	vsnprintf(msg, sizeof(msg), fmt, ap);
+	ipc_buffv(&b, fmt, ap);
 	va_end(ap);
 
-	char buf[320];
-	snprintf(buf, sizeof(buf), "%s: %s", a->cmd ? a->cmd : "ipc", msg);
-	send_failure(a->fd, buf);
+	send_failure(a->fd, b.buf != NULL ? b.buf : "");
+	ipc_buf_free(&b);
 }
 
 static void fail_range(ipc_args_t *a, const char *what, double min, double max) {
@@ -235,13 +241,12 @@ bool ipc_enum_names(ipc_args_t *a, const char *what, const char *arg, const str_
 		return true;
 	}
 
-	ipc_buf_t b;
-	char list[512];
-	ipc_buf_init(&b, list, sizeof(list));
+	IPC_REPLY_GROWING(b);
 	for (e = tbl; e->name; e++)
 		ipc_buff_sep(&b, ", ", "\"%s\"", e->name);
 
-	ipc_fail(a, "Expected %s to be one of: %s\n", what, list);
+	ipc_fail(a, "Expected %s to be one of: %s\n", what, b.buf != NULL ? b.buf : "");
+	ipc_buf_free(&b);
 	return false;
 }
 
@@ -262,14 +267,68 @@ void ipc_buf_init(ipc_buf_t *b, char *buf, size_t cap) {
 	b->cap = cap;
 	b->len = 0;
 	b->truncated = false;
+	b->owned = false;
 
 	if (cap > 0)
 		buf[0] = '\0';
 }
 
+void ipc_buf_growable(ipc_buf_t *b) {
+	b->buf = NULL;
+	b->cap = 0;
+	b->len = 0;
+	b->truncated = false;
+	b->owned = true;
+}
+
+void ipc_buf_free(ipc_buf_t *b) {
+	if (b->owned)
+		free(b->buf);
+
+	b->buf = NULL;
+	b->cap = 0;
+	b->len = 0;
+	b->truncated = false;
+	b->owned = false;
+}
+
+static bool ipc_buf_reserve(ipc_buf_t *b, const size_t extra) {
+	const size_t need = b->len + extra + 1;
+	if (need <= b->cap)
+		return true;
+
+	size_t cap = b->cap > 0 ? b->cap : 256;
+	while (cap < need)
+		cap *= 2;
+
+	char *grown = realloc(b->buf, cap);
+	if (grown == NULL)
+		return false;
+
+	b->buf = grown;
+	b->cap = cap;
+	return true;
+}
+
 static void ipc_buffv(ipc_buf_t *b, const char *fmt, va_list ap) {
-	if (b->cap == 0)
+	if (b->cap == 0 && !b->owned)
 		return;
+
+	if (b->owned) {
+		va_list probe;
+		va_copy(probe, ap);
+		const int need = vsnprintf(NULL, 0, fmt, probe);
+		va_end(probe);
+
+		if (need < 0 || !ipc_buf_reserve(b, (size_t)need)) {
+			b->truncated = true;
+			return;
+		}
+
+		vsnprintf(b->buf + b->len, b->cap - b->len, fmt, ap);
+		b->len += (size_t)need;
+		return;
+	}
 
 	// one byte is reserved for the terminator
 	size_t room = b->cap - b->len - 1;
@@ -309,8 +368,38 @@ void ipc_buff_sep(ipc_buf_t * b, const char *sep, const char *fmt, ...) {
 	va_end(ap);
 }
 
-void ipc_buf_send(ipc_args_t *a, const ipc_buf_t *b) {
-	send_success(a->fd, b->buf);
+void ipc_buf_send(ipc_args_t *a, ipc_buf_t *b) {
+	if (b->truncated) {
+		ipc_fail(a, "Reply did not fit in memory\n");
+		ipc_buf_free(b);
+		return;
+	}
+
+	send_success(a->fd, b->buf != NULL ? b->buf : "");
+	ipc_buf_free(b);
+}
+
+void ipc_list_send(ipc_args_t *a, ipc_list_fn write) {
+	size_t cap = DOORS_BUFSIZ;
+
+	while (cap <= 64 * 1024 * 1024) {
+		char *buf = malloc(cap);
+		if (buf == NULL) {
+			ipc_fail(a, "Memory allocation failed\n");
+			return;
+		}
+
+		if (write(buf, cap)) {
+			send_success(a->fd, buf);
+			free(buf);
+			return;
+		}
+
+		free(buf);
+		cap *= 2;
+	}
+
+	ipc_fail(a, "Listing is too large to send\n");
 }
 
 static bool sub_matches(const ipc_sub_t *sub, const char *arg) {
@@ -337,9 +426,7 @@ void ipc_sub_usage(ipc_buf_t *b, const ipc_sub_t *subs) {
 }
 
 void ipc_fail_unknown(ipc_args_t *a, const ipc_sub_t *subs) {
-	char buf[1024];
-	ipc_buf_t b;
-	ipc_buf_init(&b, buf, sizeof(buf));
+	IPC_REPLY_GROWING(b);
 
 	const char *arg = ipc_peek(a);
 	if (arg)
@@ -348,7 +435,8 @@ void ipc_fail_unknown(ipc_args_t *a, const ipc_sub_t *subs) {
 		ipc_buff(&b, "%s: missing command, expected one of:", a->cmd ? a->cmd : "ipc");
 	ipc_sub_usage(&b, subs);
 	ipc_buff(&b, "\n");
-	send_failure(a->fd, b.buf);
+	send_failure(a->fd, b.buf != NULL ? b.buf : "");
+	ipc_buf_free(&b);
 }
 
 bool ipc_sub_dispatch(ipc_args_t *a, const ipc_sub_t *subs) {

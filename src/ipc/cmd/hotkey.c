@@ -8,7 +8,7 @@
 #include <xkbcommon/xkbcommon.h>
 
 static void hotkey_list(ipc_args_t *a) {
-	IPC_REPLY(b);
+	IPC_REPLY_GROWING(b);
 	for (size_t i = 0; i < num_keybinds; i++) {
 		keybind_t *kb = &keybinds[i];
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "config.h"
+#include "types.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <wlr/types/wlr_input_device.h>

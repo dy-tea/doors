@@ -32,6 +32,30 @@ static void test_load(void) {
 	CHECK(layout_get_impl(id) != NULL);
 	CHECK_STREQ(layout_get_impl(id)->name, "strip");
 
+	// a plugin layout carries its own settings and commands
+	char err[128] = {0};
+	CHECK(layout_setting_set(id, "gap", "20", err, sizeof(err), false));
+	CHECK(err[0] == '\0');
+
+	char value[64] = {0};
+	CHECK(layout_setting_format(id, "gap", value, sizeof(value)));
+	CHECK_STREQ(value, "20\n");
+
+	// registration records the plugin's defaults for `layout strip reset`
+	memset(value, 0, sizeof(value));
+	CHECK(layout_setting_default(id, "gap", value, sizeof(value)));
+	CHECK_STREQ(value, "0\n");
+	CHECK(layout_setting_reset(id, "gap", err, sizeof(err), false));
+	memset(value, 0, sizeof(value));
+	CHECK(layout_setting_format(id, "gap", value, sizeof(value)));
+	CHECK_STREQ(value, "0\n");
+	CHECK(layout_setting_find(id, "nope") == NULL);
+
+	const command_t *command = layout_command_find(id, "focus_first");
+	CHECK(command != NULL);
+	CHECK_STREQ(command->usage, "layout strip focus_first");
+	CHECK(layout_command_find(id, "nope") == NULL);
+
 	CHECK(!plugin_load(STRIP_PLUGIN_PATH));
 	CHECK(layout_count() == LAYOUT_BUILTIN_COUNT + 1);
 

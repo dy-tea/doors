@@ -240,9 +240,7 @@ static void rule_remove(ipc_args_t *a) {
 }
 
 static void rule_show_list(ipc_args_t *a) {
-	char buf[DOORS_BUFSIZ];
-	list_rules(buf, sizeof(buf));
-	ipc_ok(a, buf);
+	ipc_list_send(a, list_rules);
 }
 
 const ipc_sub_t rule_subs[] = {

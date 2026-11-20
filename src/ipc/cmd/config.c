@@ -3,21 +3,17 @@
 #include "effects/effects.h"
 #include "input/keyboard.h"
 #include "ipc/args.h"
-#include "ipc/helpers.h"
 #include "ipc/registry.h"
-#include "layout/scroller.h"
+#include "layout/layout.h"
 #include "output/output.h"
-#include "parse.h"
 #include "protocol/idle_power.h"
 #include "protocol/xdg_toplevel.h"
 #include "realtime.h"
 #include "server.h"
+#include "settings.h"
 #include "str.h"
 #include "tabs.h"
-#include "transaction.h"
-#include <assert.h>
 #include <limits.h>
-#include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -156,14 +152,6 @@ static const str_pair_t initial_polarity_values[] = {
 	IPC_ENUM_END,
 };
 
-static const str_pair_t scroller_center_mode_values[] = {
-	{"never", SCROLLER_CENTER_NEVER},
-	{"always", SCROLLER_CENTER_ALWAYS},
-	{"on-overflow", SCROLLER_CENTER_ON_OVERFLOW},
-	{"on_overflow", SCROLLER_CENTER_ON_OVERFLOW},
-	IPC_ENUM_END,
-};
-
 static const str_pair_t keyboard_grouping_values[] = {
 	{"none", KEYBOARD_GROUP_NONE},
 	{"smart", KEYBOARD_GROUP_SMART},
@@ -171,51 +159,45 @@ static const str_pair_t keyboard_grouping_values[] = {
 	IPC_ENUM_END,
 };
 
-#define B(n, a, p, fl, on) {n, a, CFG_BOOL, &(p), 0, 0, 0, NULL, NULL, fl, on}
+#define B(n, a, p, fl, on) {n, a, SETTING_BOOL, &(p), 0, 0, 0, NULL, NULL, fl, on}
 #define I(n, a, p, lo, hi, f, fl, on) \
-	{n, a, CFG_INT, &(p), 0, lo, hi, f, NULL, fl, on}
+	{n, a, SETTING_INT, &(p), 0, lo, hi, f, NULL, fl, on}
 #define F(n, a, p, lo, hi, f, fl, on) \
-	{n, a, CFG_FLOAT, &(p), 0, lo, hi, f, NULL, fl, on}
+	{n, a, SETTING_FLOAT, &(p), 0, lo, hi, f, NULL, fl, on}
 #define D(n, a, p, lo, hi, f, fl, on) \
-	{n, a, CFG_DOUBLE, &(p), 0, lo, hi, f, NULL, fl, on}
-#define E(n, a, p, vals, fl, on) {n, a, CFG_ENUM, &(p), 0, 0, 0, NULL, vals, fl, on}
-#define S(n, a, p, sz, fl, on) {n, a, CFG_STR, (p), sz, 0, 0, NULL, NULL, fl, on}
-#define C(n, a, p, fl, on) {n, a, CFG_RGBA, (p), 0, 0, 0, NULL, NULL, fl, on}
+	{n, a, SETTING_DOUBLE, &(p), 0, lo, hi, f, NULL, fl, on}
+#define E(n, a, p, vals, fl, on) {n, a, SETTING_ENUM, &(p), 0, 0, 0, NULL, vals, fl, on}
+#define S(n, a, p, sz, fl, on) {n, a, SETTING_STR, (p), sz, 0, 0, NULL, NULL, fl, on}
+#define C(n, a, p, fl, on) {n, a, SETTING_RGBA, (p), 0, 0, 0, NULL, NULL, fl, on}
 
-const cfg_setting_t settings_table[] = {
+const setting_t settings_table[] = {
 	/* geometry */
-	I("border_width", NULL, settings.border_width, INT_MIN, INT_MAX, "%d\n", CFG_COMMIT, NULL),
-	I("window_gap", NULL, settings.window_gap, INT_MIN, INT_MAX, "%d\n", CFG_COMMIT, on_window_gap),
+	I("border_width", NULL, settings.border_width, INT_MIN, INT_MAX, "%d\n", SETTING_COMMIT, NULL),
+	I("window_gap", NULL, settings.window_gap, INT_MIN, INT_MAX, "%d\n", SETTING_COMMIT,
+		on_window_gap),
 
 	/* layout behaviour */
-	E("automatic_scheme", NULL, settings.automatic_scheme, automatic_scheme_values, CFG_COMMIT, NULL),
-	B("borderless_monocle", NULL, settings.borderless_monocle, CFG_COMMIT, NULL),
-	B("borderless_singleton", NULL, settings.borderless_singleton, CFG_COMMIT, NULL),
-	B("smart_gaps", NULL, settings.smart_gaps, CFG_COMMIT, NULL),
-	B("smart_borders", NULL, settings.smart_borders, CFG_COMMIT, NULL),
-	B("respect_tiled_min_size", NULL, settings.respect_tiled_min_size, CFG_COMMIT, NULL),
-	B("focus_wrapping", NULL, settings.focus_wrapping, CFG_COMMIT, NULL),
-	B("hide_lone_tab", NULL, settings.hide_lone_tab, CFG_COMMIT, NULL),
-	B("gapless_monocle", NULL, settings.gapless_monocle, CFG_COMMIT, NULL),
-	I("monocle_top_padding", NULL, settings.monocle_padding.top, 0, INT_MAX, "%d\n", CFG_COMMIT, NULL),
-	I("monocle_right_padding", NULL, settings.monocle_padding.right, 0, INT_MAX, "%d\n", CFG_COMMIT,
+	E("automatic_scheme", NULL, settings.automatic_scheme, automatic_scheme_values, SETTING_COMMIT,
 		NULL),
-	I("monocle_bottom_padding", NULL, settings.monocle_padding.bottom, 0, INT_MAX, "%d\n", CFG_COMMIT,
-		NULL),
-	I("monocle_left_padding", NULL, settings.monocle_padding.left, 0, INT_MAX, "%d\n", CFG_COMMIT,
-		NULL),
-	B("pointer_follows_focus", NULL, settings.pointer_follows_focus, CFG_COMMIT, NULL),
+	B("borderless_singleton", NULL, settings.borderless_singleton, SETTING_COMMIT, NULL),
+	B("smart_gaps", NULL, settings.smart_gaps, SETTING_COMMIT, NULL),
+	B("smart_borders", NULL, settings.smart_borders, SETTING_COMMIT, NULL),
+	B("respect_tiled_min_size", NULL, settings.respect_tiled_min_size, SETTING_COMMIT, NULL),
+	B("focus_wrapping", NULL, settings.focus_wrapping, SETTING_COMMIT, NULL),
+	B("hide_lone_tab", NULL, settings.hide_lone_tab, SETTING_COMMIT, NULL),
+	B("pointer_follows_focus", NULL, settings.pointer_follows_focus, SETTING_COMMIT, NULL),
 	B("auto_float_dialogs", NULL, settings.auto_float_dialogs, 0, NULL),
 	B("enable_minimize", NULL, settings.enable_minimize, 0, on_enable_minimize),
 	B("enable_maximize", NULL, settings.enable_maximize, 0, on_enable_maximize),
 	B("minimize_to_scratchpad", NULL, settings.minimize_to_scratchpad, 0, NULL),
 	B("scratchpad_restore_to_origin", NULL, settings.scratchpad_restore_to_origin, 0, NULL),
 	I("ignore_ewmh_fullscreen", NULL, settings.ignore_ewmh_fullscreen, 0, 2, "%d\n", 0, NULL),
-	D("split_ratio", NULL, settings.split_ratio, 0, 1, "%f\n", CFG_COMMIT | CFG_EXCLUSIVE, NULL),
-	E("focus_on_activate", NULL, settings.focus_on_activate, focus_on_activate_values, CFG_COMMIT,
+	D("split_ratio", NULL, settings.split_ratio, 0, 1, "%f\n", SETTING_COMMIT | SETTING_EXCLUSIVE,
+		NULL),
+	E("focus_on_activate", NULL, settings.focus_on_activate, focus_on_activate_values, SETTING_COMMIT,
 		NULL),
 	E("focus_follows_pointer", "focus_follows_mouse", settings.focus_follows_mouse,
-		focus_follows_pointer_values, CFG_COMMIT, NULL),
+		focus_follows_pointer_values, SETTING_COMMIT, NULL),
 	I("focus_follows_pointer_max_scroll", "focus_follows_mouse_max_scroll",
 		settings.focus_follows_mouse_max_scroll, 0, 100, "%d\n", 0, NULL),
 	E("initial_polarity", NULL, settings.initial_polarity, initial_polarity_values, 0, NULL),
@@ -234,38 +216,23 @@ const cfg_setting_t settings_table[] = {
 
 	/* borders */
 	S("normal_border_color", NULL, settings.normal_border_color, sizeof(settings.normal_border_color),
-		CFG_COMMIT, on_border_color),
+		SETTING_COMMIT, on_border_color),
 	S("active_border_color", NULL, settings.active_border_color, sizeof(settings.active_border_color),
-		CFG_COMMIT, on_border_color),
+		SETTING_COMMIT, on_border_color),
 	S("focused_border_color", NULL, settings.focused_border_color,
-		sizeof(settings.focused_border_color), CFG_COMMIT, on_border_color),
+		sizeof(settings.focused_border_color), SETTING_COMMIT, on_border_color),
 	S("presel_feedback_color", NULL, settings.presel_feedback_color,
-		sizeof(settings.presel_feedback_color), CFG_COMMIT, on_border_color),
+		sizeof(settings.presel_feedback_color), SETTING_COMMIT, on_border_color),
 	S("tiling_drag_indicator_color", NULL, settings.tiling_drag_indicator_color,
 		sizeof(settings.tiling_drag_indicator_color), 0, NULL),
 
 	/* text */
 	S("text_font", NULL, settings.text_font, sizeof(settings.text_font), 0, on_text),
-	I("text_height", NULL, settings.text_height, 0, 0, "%d\n", CFG_POSITIVE, on_text),
-
-	/* scroller */
-	B("scroller_always_center_single_column", NULL, settings.scroller_always_center_single_column, 0,
-		NULL),
-	E("scroller_center_focused_column", NULL, settings.scroller_center_focused_column,
-		scroller_center_mode_values, 0, NULL),
-	I("scroller_left_strut", NULL, settings.scroller_struts.left, 0, INT_MAX, "%d\n", CFG_COMMIT,
-		NULL),
-	I("scroller_right_strut", NULL, settings.scroller_struts.right, 0, INT_MAX, "%d\n", CFG_COMMIT,
-		NULL),
-	I("scroller_top_strut", NULL, settings.scroller_struts.top, 0, INT_MAX, "%d\n", CFG_COMMIT, NULL),
-	I("scroller_bottom_strut", NULL, settings.scroller_struts.bottom, 0, INT_MAX, "%d\n", CFG_COMMIT,
-		NULL),
-	I("scroller_pan_fingers", NULL, settings.scroller_pan_fingers, 2, 5, "%d\n", 0, NULL),
-	I("scroller_snap_percent", NULL, settings.scroller_snap_percent, 2, 5, "%d\n", 0, NULL),
+	I("text_height", NULL, settings.text_height, 0, 0, "%d\n", SETTING_POSITIVE, on_text),
 
 	/* blur */
 	B("blur_enabled", NULL, settings.blur_enabled, 0, NULL),
-	F("blur_radius", NULL, settings.blur_radius, 0, 0, "%.2f\n", CFG_POSITIVE, NULL),
+	F("blur_radius", NULL, settings.blur_radius, 0, 0, "%.2f\n", SETTING_POSITIVE, NULL),
 	B("blur_full_res", NULL, settings.blur_full_res, 0, NULL),
 	I("blur_passes", NULL, settings.blur_passes, 1, 10, "%d\n", 0, NULL),
 	I("blur_downsample", NULL, settings.blur_downsample, 1, 8, "%d\n", 0, on_blur_downsample),
@@ -318,9 +285,9 @@ const cfg_setting_t settings_table[] = {
 
 	/* misc */
 	B("record_history", NULL, settings.record_history, 0, NULL),
-	B("allow_tearing", NULL, settings.allow_tearing, CFG_COMMIT, NULL),
+	B("allow_tearing", NULL, settings.allow_tearing, SETTING_COMMIT, NULL),
 	B("direct_scanout", NULL, settings.direct_scanout, 0, NULL),
-	E("decoration_mode", NULL, settings.decoration_mode, decoration_mode_values, CFG_COMMIT,
+	E("decoration_mode", NULL, settings.decoration_mode, decoration_mode_values, SETTING_COMMIT,
 		on_decoration_mode),
 };
 
@@ -336,7 +303,7 @@ _Static_assert(IPC_ARRAY_LEN(settings_table) == CFG_SETTINGS_COUNT,
 #undef S
 #undef C
 
-static const cfg_setting_t *find_setting(const char *name) {
+static const setting_t *find_setting(const char *name) {
 	for (size_t i = 0; i < IPC_ARRAY_LEN(settings_table); i++) {
 		if (streq(name, settings_table[i].name))
 			return &settings_table[i];
@@ -347,196 +314,10 @@ static const cfg_setting_t *find_setting(const char *name) {
 	return NULL;
 }
 
-void cfg_errf(char *err, size_t errsz, const char *fmt, ...) {
-	if (err == NULL || errsz == 0)
-		return;
-
-	va_list ap;
-	va_start(ap, fmt);
-	vsnprintf(err, errsz, fmt, ap);
-	va_end(ap);
-}
-
-static bool cfg_set_bool(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
-		bool dry_run) {
-	bool v;
-	if (!parse_bool(arg, &v)) {
-		cfg_errf(err, errsz, "%s: expected true or false, got \"%s\"\n", s->name, arg);
-		return false;
-	}
-
-	if (!dry_run)
-		*(bool *)s->ptr = v;
-	return true;
-}
-
-static void cfg_store_enum(const cfg_setting_t *s, long value) {
-	assert(sizeof(int) == 4);
-	int v = (int)value;
-	memcpy(s->ptr, &v, sizeof(v));
-}
-
-static bool cfg_set_enum(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
-		bool dry_run) {
-	const str_pair_t *e = str_table_find(s->values, arg);
-	if (e) {
-		if (!dry_run)
-			cfg_store_enum(s, e->value);
-		return true;
-	}
-
-	ipc_buf_t b;
-	char list[256];
-	ipc_buf_init(&b, list, sizeof(list));
-	for (e = s->values; e->name; e++)
-		ipc_buff_sep(&b, ", ", "\"%s\"", e->name);
-
-	cfg_errf(err, errsz, "%s: expected value to be one of: %s\n", s->name, list);
-	return false;
-}
-
-static bool cfg_range(const cfg_setting_t *s, double val, double step, char *err, size_t errsz,
-		double *out) {
-	if (!isfinite(val)) {
-		cfg_errf(err, errsz, "%s: value must be a finite number\n", s->name);
-		return false;
-	}
-
-	bool positive = (s->flags & CFG_POSITIVE) != 0;
-	bool lo_excl = (s->flags & (CFG_POSITIVE | CFG_EXCLUSIVE)) != 0;
-	bool hi_excl = (s->flags & CFG_EXCLUSIVE) != 0;
-
-	bool below = lo_excl ? val <= s->min : val < s->min;
-	bool above = !positive && (hi_excl ? val >= s->max : val > s->max);
-
-	if (!below && !above) {
-		*out = val;
-		return true;
-	}
-
-	if (!(s->flags & CFG_CLAMP)) {
-		if (below)
-			cfg_errf(err, errsz, "%s: value must be greater than %g\n", s->name, s->min);
-		else
-			cfg_errf(err, errsz, "%s: value must be less than %g\n", s->name, s->max);
-		return false;
-	}
-
-	// an exclusive bound clamps to the nearest value inside the range
-	*out = below ? (lo_excl ? s->min + step : s->min) : (hi_excl ? s->max - step : s->max);
-	return true;
-}
-
-static bool cfg_set_int(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
-		bool dry_run) {
-	long val;
-	if (!parse_long(arg, &val)) {
-		cfg_errf(err, errsz, "%s: invalid value \"%s\"\n", s->name, arg);
-		return false;
-	}
-
-	double out;
-	if (!cfg_range(s, (double)val, 1.0, err, errsz, &out))
-		return false;
-
-	if (!dry_run)
-		*((int *)s->ptr) = (int)out;
-	return true;
-}
-
-static bool cfg_set_float(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
-		bool dry_run) {
-	double val;
-	if (!parse_double(arg, &val)) {
-		cfg_errf(err, errsz, "%s: invalid value \"%s\"\n", s->name, arg);
-		return false;
-	}
-
-	double out;
-	if (!cfg_range(s, val, 0.0, err, errsz, &out))
-		return false;
-
-	if (!dry_run)
-		*((float *)s->ptr) = (float)out;
-	return true;
-}
-
-static bool cfg_set_double(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
-		bool dry_run) {
-	double val;
-	if (!parse_double(arg, &val)) {
-		cfg_errf(err, errsz, "%s: invalid value \"%s\"\n", s->name, arg);
-		return false;
-	}
-
-	double out;
-	if (!cfg_range(s, val, 0.0, err, errsz, &out))
-		return false;
-
-	if (!dry_run)
-		*((double *)s->ptr) = out;
-	return true;
-}
-
-static bool cfg_set_str(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
-		bool dry_run) {
-	if (strlen(arg) >= s->size) {
-		cfg_errf(err, errsz, "%s: value is too long\n", s->name);
-		return false;
-	}
-
-	if (!dry_run)
-		snprintf(s->ptr, s->size, "%s", arg);
-	return true;
-}
-
-static bool cfg_set_rgba(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
-		bool dry_run) {
-	float parsed[4];
-	if (!parse_color_floats(arg, parsed)) {
-		cfg_errf(err, errsz, "%s: expected \"R G B [A]\"\n", s->name);
-		return false;
-	}
-
-	if (!dry_run)
-		memcpy(s->ptr, parsed, sizeof(parsed));
-	return true;
-}
-
-void cfg_format_value(const cfg_setting_t *s, char *buf, size_t bufsz) {
-	switch (s->type) {
-	case CFG_BOOL:
-		snprintf(buf, bufsz, "%s", str_bool_text(*(bool *)s->ptr));
-		break;
-	case CFG_INT:
-		snprintf(buf, bufsz, s->fmt, *(int *)s->ptr);
-		break;
-	case CFG_FLOAT:
-		snprintf(buf, bufsz, s->fmt, *(float *)s->ptr);
-		break;
-	case CFG_DOUBLE:
-		snprintf(buf, bufsz, s->fmt, *(double *)s->ptr);
-		break;
-	case CFG_ENUM: {
-		int v;
-		memcpy(&v, s->ptr, sizeof(v));
-		const char *value = ipc_enum_name(s->values, v);
-		snprintf(buf, bufsz, "%s", value ? value : "?");
-		break;
-	}
-	case CFG_STR:
-		snprintf(buf, bufsz, "%s", (char *)s->ptr);
-		break;
-	case CFG_RGBA:
-		ipc_format_color_float(buf, bufsz, s->ptr);
-		break;
-	}
-}
-
-static void cfg_get(ipc_args_t *a, const cfg_setting_t *s) {
+static void cfg_get(ipc_args_t *a, const setting_t *s) {
 	char buf[512];
 
-	cfg_format_value(s, buf, sizeof(buf));
+	setting_format(s, buf, sizeof(buf));
 	size_t len = strlen(buf);
 	if (len > 0 && buf[len - 1] != '\n' && len + 2 < sizeof(buf)) {
 		buf[len] = '\n';
@@ -546,86 +327,58 @@ static void cfg_get(ipc_args_t *a, const cfg_setting_t *s) {
 	ipc_ok(a, buf);
 }
 
-// writes a setting, running its side effects and committing when it asks for it.
-// with dry_run the value is parsed and range-checked but nothing is stored and no
-// side effects run, which is what `doorsctl config <name> <value> --dry-run`
-// reports to a config author.
-static bool cfg_apply(const cfg_setting_t *s, const char *arg, char *err, size_t errsz,
-		bool dry_run) {
-	bool ok = true;
-
-	switch (s->type) {
-	case CFG_BOOL:
-		ok = cfg_set_bool(s, arg, err, errsz, dry_run);
-		break;
-	case CFG_INT:
-		ok = cfg_set_int(s, arg, err, errsz, dry_run);
-		break;
-	case CFG_FLOAT:
-		ok = cfg_set_float(s, arg, err, errsz, dry_run);
-		break;
-	case CFG_DOUBLE:
-		ok = cfg_set_double(s, arg, err, errsz, dry_run);
-		break;
-	case CFG_ENUM:
-		ok = cfg_set_enum(s, arg, err, errsz, dry_run);
-		break;
-	case CFG_STR:
-		ok = cfg_set_str(s, arg, err, errsz, dry_run);
-		break;
-	case CFG_RGBA:
-		ok = cfg_set_rgba(s, arg, err, errsz, dry_run);
-		break;
-	}
-
-	if (!ok)
+// a legacy layout option can be written through its old `config` name
+static bool config_apply_legacy(const char *name, const char *value, char *err, size_t errsz,
+		const bool dry_run) {
+	const char *layout_name, *option;
+	if (!layout_legacy_lookup(name, &layout_name, &option))
 		return false;
 
-	if (dry_run)
-		return true;
+	layout_t id;
+	if (layout_find_by_name(layout_name, &id) && layout_setting_find(id, option) != NULL)
+		return layout_setting_set(id, option, value, err, errsz, dry_run);
 
-	if (s->on_set)
-		s->on_set();
-	if (s->flags & CFG_COMMIT)
-		transaction_commit_dirty();
-
-	return true;
+	setting_err(err, errsz, "%s: moved to \"layout %s %s\"\n", name, layout_name, option);
+	return false;
 }
 
 bool config_apply_value(const char *name, const char *value, char *err, size_t errsz) {
-	const cfg_setting_t *s = find_setting(name);
+	if (layout_legacy_lookup(name, NULL, NULL))
+		return config_apply_legacy(name, value, err, errsz, false);
+
+	const setting_t *s = find_setting(name);
 	if (s == NULL) {
-		cfg_errf(err, errsz, "unknown setting \"%s\"\n", name);
+		setting_err(err, errsz, "unknown setting \"%s\"\n", name);
 		return false;
 	}
 
-	return cfg_apply(s, value, err, errsz, false);
+	return setting_apply(s, value, err, errsz, false);
 }
 
 bool config_validate_value(const char *name, const char *value, char *err, size_t errsz) {
+	if (layout_legacy_lookup(name, NULL, NULL))
+		return config_apply_legacy(name, value, err, errsz, true);
+
 	if (cfg_special_name(name)) {
 		if (!cfg_special_settable(name)) {
-			cfg_errf(err, errsz, "%s: no dry-run validation available\n", name);
+			setting_err(err, errsz, "%s: no dry-run validation available\n", name);
 			return false;
 		}
 
 		return cfg_special_apply(name, value, err, errsz, true);
 	}
 
-	const cfg_setting_t *s = find_setting(name);
+	const setting_t *s = find_setting(name);
 	if (s == NULL) {
-		cfg_errf(err, errsz, "unknown setting \"%s\"\n", name);
+		setting_err(err, errsz, "unknown setting \"%s\"\n", name);
 		return false;
 	}
 
-	return cfg_apply(s, value, err, errsz, true);
+	return setting_apply(s, value, err, errsz, true);
 }
 
-
-#define CFG_RESET_LISTED 16
-
 typedef struct {
-	const cfg_setting_t *setting;
+	const setting_t *setting;
 	const char *name;
 } cfg_reset_target_t;
 
@@ -645,7 +398,7 @@ static void cfg_reset(ipc_args_t *a) {
 
 	if (named) {
 		ipc_foreach(a, arg) {
-			const cfg_setting_t *s = find_setting(arg);
+			const setting_t *s = find_setting(arg);
 
 			if (s == NULL && !cfg_special_settable(arg)) {
 				if (cfg_special_name(arg))
@@ -661,7 +414,7 @@ static void cfg_reset(ipc_args_t *a) {
 			}
 
 			targets[total].setting = s;
-			targets[total].name = s ? s->name : cfg_special_canonical(arg);
+			targets[total].name = s ? s->name : arg;
 			total++;
 		}
 	} else {
@@ -678,15 +431,12 @@ static void cfg_reset(ipc_args_t *a) {
 		}
 	}
 
-	IPC_REPLY(b);
-	char detail_storage[2048] = {0};
-	ipc_buf_t detail;
-	ipc_buf_init(&detail, detail_storage, sizeof(detail_storage));
+	IPC_REPLY_GROWING(detail);
 
-	size_t changed = 0, listed = 0, hidden = 0, missing = 0;
+	size_t changed = 0, missing = 0;
 
 	for (size_t i = 0; i < total; i++) {
-		const cfg_setting_t *s = targets[i].setting;
+		const setting_t *s = targets[i].setting;
 		const char *name = targets[i].name;
 
 		char dflt[CFG_VALUE_MAX];
@@ -697,7 +447,7 @@ static void cfg_reset(ipc_args_t *a) {
 
 		char before[CFG_VALUE_MAX];
 		if (s)
-			cfg_format_value(s, before, sizeof(before));
+			setting_format(s, before, sizeof(before));
 		else if (!cfg_special_format_value(name, before, sizeof(before)))
 			snprintf(before, sizeof(before), "?");
 		str_rtrim(before);
@@ -711,9 +461,10 @@ static void cfg_reset(ipc_args_t *a) {
 			const char *value = cfg_reset_value(name, dflt, arg_storage, sizeof(arg_storage));
 
 			char err[256];
-			bool ok = s ? cfg_apply(s, value, err, sizeof(err), a->dry_run) : cfg_special_apply(name, value,
-				err, sizeof(err), a->dry_run);
+			bool ok = s ? setting_apply(s, value, err, sizeof(err), a->dry_run) : cfg_special_apply(name,
+				value, err, sizeof(err), a->dry_run);
 			if (!ok) {
+				ipc_buf_free(&detail);
 				ipc_fail(a, "%s", err);
 				return;
 			}
@@ -725,18 +476,13 @@ static void cfg_reset(ipc_args_t *a) {
 		if (!named && same)
 			continue;
 
-		if (listed == CFG_RESET_LISTED || detail.truncated) {
-			hidden++;
-			continue;
-		}
-
-		listed++;
-
 		if (same)
 			ipc_buff(&detail, "  %s %s (unchanged)\n", name, dflt);
 		else
 			ipc_buff(&detail, "  %s %s -> %s\n", name, before, dflt);
 	}
+
+	IPC_REPLY_GROWING(b);
 
 	if (changed == 0) {
 		ipc_buff(&b, "no change: %zu %s already at %s default\n", total,
@@ -746,9 +492,8 @@ static void cfg_reset(ipc_args_t *a) {
 			total == 1 ? "setting" : "settings", total == 1 ? "its default" : "their defaults");
 	}
 
-	ipc_buff(&b, "%s", detail.buf);
-	if (hidden)
-		ipc_buff(&b, "  (+%zu more)\n", hidden);
+	ipc_buff(&b, "%s", detail.buf != NULL ? detail.buf : "");
+	ipc_buf_free(&detail);
 
 	if (missing)
 		ipc_buff(&b, "%zu %s had no recorded default\n", missing, missing == 1 ? "setting" : "settings");
@@ -788,10 +533,14 @@ void ipc_cmd_config(ipc_args_t *a) {
 		return;
 	}
 
+	// old layout options
+	if (ipc_cmd_layout_legacy(a, name))
+		return;
+
 	if (cfg_special_dispatch(a, name))
 		return;
 
-	const cfg_setting_t *s = find_setting(name);
+	const setting_t *s = find_setting(name);
 	if (!s) {
 		ipc_fail(a, "Unknown setting \"%s\"\n", name);
 		return;
@@ -805,7 +554,7 @@ void ipc_cmd_config(ipc_args_t *a) {
 	const char *arg = ipc_take(a);
 
 	char err[256];
-	if (!cfg_apply(s, arg, err, sizeof(err), a->dry_run)) {
+	if (!setting_apply(s, arg, err, sizeof(err), a->dry_run)) {
 		ipc_fail(a, "%s", err);
 		return;
 	}

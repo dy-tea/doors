@@ -21,7 +21,7 @@ static void plugin_load_cmd(ipc_args_t *a) {
 		return;
 	}
 
-	IPC_REPLY(reply);
+	IPC_REPLY_GROWING(reply);
 	for (size_t i = before; i < layout_count(); i++) {
 		const layout_t id = (layout_t)i;
 		ipc_buff_sep(&reply, ", ", "\"%s\" (layout '%c')", layout_name(id), layout_to_char(id));
@@ -49,7 +49,7 @@ static void plugin_list_cmd(ipc_args_t *a) {
 	if (!ipc_end(a))
 		return;
 
-	IPC_REPLY(reply);
+	IPC_REPLY_GROWING(reply);
 	plugin_iter(list_plugin, &reply);
 	if (reply.len == 0)
 		ipc_buff(&reply, "no plugins loaded\n");

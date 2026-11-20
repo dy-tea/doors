@@ -5,7 +5,6 @@
 #include "settings.h"
 #include <limits.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <string.h>
 
 #define CFG_DEFAULTS_ARENA (32 * 1024)
@@ -28,70 +27,9 @@ typedef struct cfg_extra {
 	const void *ref; // what format reads, NULL when unused
 } cfg_extra_t;
 
-const char *cfg_type_name(cfg_type_t type) {
-	const char *type_names[] = {
-		[CFG_BOOL] = "bool",
-		[CFG_INT] = "int",
-		[CFG_FLOAT] = "float",
-		[CFG_DOUBLE] = "double",
-		[CFG_ENUM] = "enum",
-		[CFG_STR] = "str",
-		[CFG_RGBA] = "rgba"
-	};
-	return type_names[type];
-}
-
 static void cfg_intro_format_setting(const void *self, char *buf, size_t bufsz) {
-	cfg_format_value(self, buf, bufsz);
+	setting_format(self, buf, bufsz);
 	str_rtrim(buf);
-}
-
-// describes what a numeric setting accepts, e.g. "[0.5, 2]", "(0, 1)", ">0"
-void cfg_format_range(const cfg_setting_t *s, char *buf, size_t bufsz) {
-	// integer bounds print exactly, floating ones keep their significant digits
-	const char *num = s->type == CFG_INT ? "%.0f" : "%g";
-
-	if (s->type == CFG_BOOL) {
-		snprintf(buf, bufsz, "true|false");
-		return;
-	}
-
-	if (s->type == CFG_ENUM) {
-		ipc_buf_t b;
-		ipc_buf_init(&b, buf, bufsz);
-		for (const str_pair_t *e = s->values; e->name; e++)
-			ipc_buff_sep(&b, "|", "%s", e->name);
-		return;
-	}
-
-	if (s->type == CFG_STR) {
-		snprintf(buf, bufsz, "string");
-		return;
-	}
-
-	if (s->type == CFG_RGBA) {
-		snprintf(buf, bufsz, "\"r g b [a]\"");
-		return;
-	}
-
-	if (s->flags & CFG_POSITIVE) {
-		snprintf(buf, bufsz, ">%g", s->min);
-		return;
-	}
-
-	// the sentinel bounds used by unbounded integer settings
-	if (s->type == CFG_INT && s->min == INT_MIN && s->max == INT_MAX) {
-		snprintf(buf, bufsz, "any");
-		return;
-	}
-
-	bool lo_excl = (s->flags & CFG_EXCLUSIVE) != 0;
-	bool hi_excl = (s->flags & CFG_EXCLUSIVE) != 0;
-	char lo[32], hi[32];
-
-	snprintf(lo, sizeof(lo), num, s->min);
-	snprintf(hi, sizeof(hi), num, s->max);
-	snprintf(buf, bufsz, "%c%s, %s%c", lo_excl ? '(' : '[', lo, hi, hi_excl ? ')' : ']');
 }
 
 static void cfg_extra_gradient(const cfg_extra_t *e, char *buf, size_t bufsz) {
@@ -136,34 +74,6 @@ static void cfg_extra_screen_shader(const cfg_extra_t *e, char *buf, size_t bufs
 	snprintf(buf, bufsz, "%s", screen_shader_get_name());
 }
 
-static void cfg_extra_scroller_widths(const cfg_extra_t *e, char *buf, size_t bufsz) {
-	(void)e;
-
-	ipc_buf_t b;
-	ipc_buf_init(&b, buf, bufsz);
-	int count = settings.scroller_preset_column_widths_count;
-	for (int i = 0; i < count; i++)
-		cfg_format_scroller_size(settings.scroller_preset_column_widths[i], &b, i == count - 1);
-}
-
-static void cfg_extra_scroller_heights(const cfg_extra_t *e, char *buf, size_t bufsz) {
-	(void)e;
-
-	ipc_buf_t b;
-	ipc_buf_init(&b, buf, bufsz);
-	int count = settings.scroller_preset_window_heights_count;
-	for (int i = 0; i < count; i++)
-		cfg_format_scroller_size(settings.scroller_preset_window_heights[i], &b, i == count - 1);
-}
-
-static void cfg_extra_scroller_default_width(const cfg_extra_t *e, char *buf, size_t bufsz) {
-	(void)e;
-
-	ipc_buf_t b;
-	ipc_buf_init(&b, buf, bufsz);
-	cfg_format_scroller_size(settings.scroller_default_column_width, &b, true);
-}
-
 static void cfg_extra_animation_bezier(const cfg_extra_t *e, char *buf, size_t bufsz) {
 	(void)e;
 
@@ -200,13 +110,6 @@ static const cfg_extra_t cfg_extras[] = {
 	CFG_GRADIENT_LERP_ENTRY("normal_border_gradient_lerp"),
 	CFG_GRADIENT_LERP_ENTRY("active_border_gradient_lerp"),
 	CFG_GRADIENT_LERP_ENTRY("focused_border_gradient_lerp"),
-
-	// scroller presets
-	{
-		"scroller_preset_column_widths", "list", "proportion|px, ...", cfg_extra_scroller_widths, NULL
-	},
-	{"scroller_preset_window_heights", "list", "proportion|px, ...", cfg_extra_scroller_heights, NULL},
-	{"scroller_default_column_width", "size", "proportion|px", cfg_extra_scroller_default_width, NULL},
 
 	// materials and effects
 	{
@@ -267,9 +170,9 @@ static size_t cfg_intro_count(void) {
 
 static void cfg_intro_get(size_t i, cfg_intro_t *out) {
 	if (i < CFG_SETTINGS_COUNT) {
-		const cfg_setting_t *s = &settings_table[i];
+		const setting_t *s = &settings_table[i];
 		out->name = s->name;
-		out->type = cfg_type_name(s->type);
+		out->type = setting_type_name(s->type);
 		out->range = NULL;
 		out->format = cfg_intro_format_setting;
 		out->self = s;
@@ -323,7 +226,7 @@ static const char *cfg_intro_default(size_t i) {
 
 static const char *cfg_canonical_name(const char *name) {
 	for (size_t i = 0; i < CFG_SETTINGS_COUNT; i++) {
-		const cfg_setting_t *s = &settings_table[i];
+		const setting_t *s = &settings_table[i];
 		if (streq(name, s->name) || (s->alias && streq(name, s->alias)))
 			return s->name;
 	}
@@ -366,16 +269,7 @@ static void cfg_column(ipc_buf_t *b, const char *s, int width) {
 }
 
 static void cfg_list_json(ipc_args_t *a, bool changed) {
-	size_t cap = 64 * 1024;
-	char *storage = malloc(cap);
-
-	if (!storage) {
-		ipc_fail(a, "Memory allocation failed\n");
-		return;
-	}
-
-	ipc_buf_t b;
-	ipc_buf_init(&b, storage, cap);
+	IPC_REPLY_GROWING(b);
 	ipc_buff(&b, "[\n");
 
 	bool first = true;
@@ -394,9 +288,9 @@ static void cfg_list_json(ipc_args_t *a, bool changed) {
 
 		char range[256] = {0};
 		if (!in.range) {
-			cfg_setting_t *s = (cfg_setting_t *)in.self;
+			setting_t *s = (setting_t *)in.self;
 			if (i < CFG_SETTINGS_COUNT)
-				cfg_format_range(s, range, sizeof(range));
+				setting_range(s, range, sizeof(range));
 			else
 				range[0] = '\0';
 		} else {
@@ -421,26 +315,11 @@ static void cfg_list_json(ipc_args_t *a, bool changed) {
 	}
 
 	ipc_buff(&b, "%s]\n", first ? "" : "\n");
-
-	if (b.truncated)
-		ipc_fail(a, "Listing did not fit in the reply buffer\n");
-	else
-		ipc_buf_send(a, &b);
-
-	free(storage);
+	ipc_buf_send(a, &b);
 }
 
 static void cfg_list_text(ipc_args_t *a, bool changed, bool header) {
-	size_t cap = 64 * 1024;
-	char *storage = malloc(cap);
-
-	if (!storage) {
-		ipc_fail(a, "Memory allocation failed\n");
-		return;
-	}
-
-	ipc_buf_t b;
-	ipc_buf_init(&b, storage, cap);
+	IPC_REPLY_GROWING(b);
 
 	if (header) {
 		cfg_column(&b, "NAME", CFG_COL_NAME);
@@ -466,7 +345,7 @@ static void cfg_list_text(ipc_args_t *a, bool changed, bool header) {
 		char range[256] = {0};
 		if (!in.range) {
 			if (i < CFG_SETTINGS_COUNT)
-				cfg_format_range((cfg_setting_t *)in.self, range, sizeof(range));
+				setting_range((setting_t *)in.self, range, sizeof(range));
 		} else {
 			snprintf(range, sizeof(range), "%s", in.range);
 		}
@@ -478,12 +357,7 @@ static void cfg_list_text(ipc_args_t *a, bool changed, bool header) {
 		ipc_buff(&b, "%s\n", range);
 	}
 
-	if (b.truncated)
-		ipc_fail(a, "Listing did not fit in the reply buffer\n");
-	else
-		ipc_buf_send(a, &b);
-
-	free(storage);
+	ipc_buf_send(a, &b);
 }
 
 // doorsctl config --list [--json] [--changed] [--no-header]

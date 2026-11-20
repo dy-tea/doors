@@ -1,4 +1,5 @@
 #include "input/seat.h"
+#include "ipc/args.h"
 #include "macros.h"
 #include "protocol/global_shortcuts.h"
 #include "server.h"
@@ -717,11 +718,10 @@ static void gs_format_trigger(const gs_hotkey_t *h, char *out, size_t size) {
 		out[size - 1] = '\0';
 }
 
-void global_shortcuts_list(char *buf, size_t buf_size) {
-	size_t off = 0;
-	off += snprintf(buf + off, buf_size - off, "global shortcuts (xx-hotkey-v1):\n");
-	if (off >= buf_size)
-		return;
+bool global_shortcuts_list(char *buf, size_t buf_size) {
+	ipc_buf_t b;
+	ipc_buf_init(&b, buf, buf_size);
+	ipc_buff(&b, "global shortcuts (xx-hotkey-v1):\n");
 
 	gs_hotkey_t *h;
 	wl_list_for_each(h, &gs.hotkeys, link) {
@@ -731,8 +731,8 @@ void global_shortcuts_list(char *buf, size_t buf_size) {
 		gs_format_trigger(h, trig, sizeof(trig));
 		const char *app = (h->app_id && h->app_id[0]) ? h->app_id : "(unidentified)";
 		const char *desc = (h->active_desc && h->active_desc[0]) ? h->active_desc : "(none)";
-		off += snprintf(buf + off, buf_size - off, "\t%s\t%s\tdesc: %s\n", app, trig, desc);
-		if (off >= buf_size)
-			return;
+		ipc_buff(&b, "\t%s\t%s\tdesc: %s\n", app, trig, desc);
 	}
+
+	return !b.truncated;
 }

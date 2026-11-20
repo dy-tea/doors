@@ -1,23 +1,32 @@
 #include "client.h"
+#include "ipc/args.h"
 #include "layout/layout.h"
 #include "layout/tiled.h"
 #include "layout/tree.h"
 #include "output/output.h"
 #include "settings.h"
+#include "transaction.h"
 #include "tree.h"
 #include "types.h"
 #include "view.h"
+#include <limits.h>
 #include <wlr/util/log.h>
 
+static struct {
+	bool borderless;
+	bool gapless;
+	int padding_top, padding_right, padding_bottom, padding_left;
+} monocle_config;
+
 static int monocle_window_gap(const desktop_t *d) {
-	return settings.gapless_monocle ? 0 : compute_window_gap(d);
+	return monocle_config.gapless ? 0 : compute_window_gap(d);
 }
 
 static void monocle_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
-	available.x += settings.monocle_padding.left;
-	available.y += settings.monocle_padding.top;
-	available.width -= settings.monocle_padding.left + settings.monocle_padding.right;
-	available.height -= settings.monocle_padding.top + settings.monocle_padding.bottom;
+	available.x += monocle_config.padding_left;
+	available.y += monocle_config.padding_top;
+	available.width -= monocle_config.padding_left + monocle_config.padding_right;
+	available.height -= monocle_config.padding_top + monocle_config.padding_bottom;
 
 	const int wg = monocle_window_gap(d);
 	if (wg > 0) {
@@ -72,13 +81,92 @@ static bool monocle_wants_visible(const desktop_t *d, const node_t *n) {
 
 static bool monocle_borderless(const desktop_t *d, const client_t *c) {
 	(void)d;
-	return settings.borderless_monocle && IS_TILED(c);
+	return monocle_config.borderless && IS_TILED(c);
 }
 
 // the focused toplevel fills the screen, so it is reported as maximized
 static bool monocle_reports_maximized(const desktop_t *d, const client_t *c) {
 	return d->focus != NULL && d->focus->client == c;
 }
+
+// `layout monocle padding [<px>]` reads or sets every side at once
+static void monocle_padding_command(ipc_args_t *a) {
+	if (ipc_peek(a) == NULL) {
+		ipc_okf(a, "%d %d %d %d\n", monocle_config.padding_top, monocle_config.padding_right,
+			monocle_config.padding_bottom, monocle_config.padding_left);
+		return;
+	}
+
+	int padding;
+	if (!ipc_int(a, "padding", 0, INT_MAX, &padding))
+		return;
+
+	if (!a->dry_run) {
+		monocle_config.padding_top = padding;
+		monocle_config.padding_right = padding;
+		monocle_config.padding_bottom = padding;
+		monocle_config.padding_left = padding;
+		transaction_commit_dirty();
+	}
+
+	ipc_okf(a, "padding %s\n", a->dry_run ? "would be set" : "set");
+}
+
+static const setting_t monocle_settings[] = {
+	{
+		.name = "borderless",
+		.type = SETTING_BOOL,
+		.ptr = &monocle_config.borderless,
+		.flags = SETTING_COMMIT,
+	},
+	{
+		.name = "gapless",
+		.type = SETTING_BOOL,
+		.ptr = &monocle_config.gapless,
+		.flags = SETTING_COMMIT,
+	},
+	{
+		.name = "top_padding",
+		.type = SETTING_INT,
+		.ptr = &monocle_config.padding_top,
+		.min = 0,
+		.max = INT_MAX,
+		.fmt = "%d\n",
+		.flags = SETTING_COMMIT,
+	},
+	{
+		.name = "right_padding",
+		.type = SETTING_INT,
+		.ptr = &monocle_config.padding_right,
+		.min = 0,
+		.max = INT_MAX,
+		.fmt = "%d\n",
+		.flags = SETTING_COMMIT,
+	},
+	{
+		.name = "bottom_padding",
+		.type = SETTING_INT,
+		.ptr = &monocle_config.padding_bottom,
+		.min = 0,
+		.max = INT_MAX,
+		.fmt = "%d\n",
+		.flags = SETTING_COMMIT,
+	},
+	{
+		.name = "left_padding",
+		.type = SETTING_INT,
+		.ptr = &monocle_config.padding_left,
+		.min = 0,
+		.max = INT_MAX,
+		.fmt = "%d\n",
+		.flags = SETTING_COMMIT,
+	},
+};
+
+static const command_t monocle_commands[] = {
+	{"padding", "layout monocle padding [<px>]", monocle_padding_command},
+	{NULL, NULL, NULL},
+};
 
 const layout_impl_t monocle_impl = {
 	.name = "monocle",
@@ -107,6 +195,9 @@ const layout_impl_t monocle_impl = {
 	.pan_update = NULL,
 	.pan_end = NULL,
 	.collect = tiled_collect,
+	.settings = monocle_settings,
+	.settings_count = IPC_ARRAY_LEN(monocle_settings),
+	.commands = monocle_commands,
 	.single_visible = true,
 	.has_directional_nav = false,
 };

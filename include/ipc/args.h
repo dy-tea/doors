@@ -7,7 +7,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-typedef struct {
+typedef struct ipc_args {
 	char **v; // next unconsumed argument
 	int n; // number of unconsumed arguments
 	int fd; // client socket the reply is written to
@@ -62,18 +62,33 @@ typedef struct {
 	size_t cap;
 	size_t len;
 	bool truncated;
+	bool owned;
 } ipc_buf_t;
 
+// writes into the caller's buffer, setting `truncated` when something did not fit
 void ipc_buf_init(ipc_buf_t *b, char *buf, size_t cap);
+
+// starts a heap backed buffer that grows to fit whatever is written
+void ipc_buf_growable(ipc_buf_t *b);
+void ipc_buf_free(ipc_buf_t *b);
+
 void ipc_buff(ipc_buf_t * b, const char *fmt, ...);
 // appends the separator first when the buffer is not empty, then formats in
 void ipc_buff_sep(ipc_buf_t * b, const char *sep, const char *fmt, ...);
-void ipc_buf_send(ipc_args_t *a, const ipc_buf_t *b);
+// sends the reply and releases it; a reply that could not be built in full is
+// reported as an error instead of being sent cut short
+void ipc_buf_send(ipc_args_t *a, ipc_buf_t *b);
 
-// declares a reply buffer and its writer, ready to be sent with ipc_buf_send
-#define IPC_REPLY(name) \
-	char name##_storage[DOORS_BUFSIZ] = {0}; \
-	ipc_buf_t name = {.buf = name##_storage, .cap = sizeof(name##_storage)}
+// writes a whole listing into `buf`, returning false when it did not fit
+typedef bool (*ipc_list_fn)(char *buf, size_t size);
+
+// sends a listing that may outgrow one reply buffer, growing until it fits
+void ipc_list_send(ipc_args_t *a, ipc_list_fn write);
+
+// declares a reply buffer that grows to fit whatever is written to it
+#define IPC_REPLY_GROWING(name) \
+	ipc_buf_t name; \
+	ipc_buf_growable(&name)
 
 // appends `"a", "b", "c"` for a fixed-length array whose first member is `name`
 #define IPC_FORMAT_NAMES(b, arr, n) \

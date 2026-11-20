@@ -11,9 +11,9 @@ static void test_valid_values(void) {
 	CHECK(err[0] == '\0');
 	CHECK(settings.border_width == before);
 
-	bool before_bool = settings.borderless_monocle;
-	CHECK(config_validate_value("borderless_monocle", "true", err, sizeof(err)));
-	CHECK(settings.borderless_monocle == before_bool);
+	bool before_bool = settings.smart_borders;
+	CHECK(config_validate_value("smart_borders", "true", err, sizeof(err)));
+	CHECK(settings.smart_borders == before_bool);
 
 	focus_on_activate_mode_t before_enum = settings.focus_on_activate;
 	CHECK(config_validate_value("focus_on_activate", "smart", err, sizeof(err)));
@@ -34,7 +34,7 @@ static void test_invalid_values(void) {
 	CHECK(settings.border_width == before);
 
 	err[0] = '\0';
-	CHECK(!config_validate_value("borderless_monocle", "maybe", err, sizeof(err)));
+	CHECK(!config_validate_value("smart_borders", "maybe", err, sizeof(err)));
 	CHECK(strstr(err, "expected true or false") != NULL);
 
 	err[0] = '\0';

@@ -16,10 +16,10 @@ doorsctl config border_width 2
 doorsctl config window_gap 12
 
 # Set borderless monocle
-doorsctl config borderless_monocle true
+doorsctl layout monocle borderless true
 
 # Set gapless monocle
-doorsctl config gapless_monocle true
+doorsctl layout monocle gapless true
 
 # Enable animations
 doorsctl config enable_animations true

@@ -22,4 +22,4 @@ bool global_shortcuts_handle_button(struct wlr_seat *wlr_seat, uint32_t modifier
 	uint32_t state, uint32_t time_msec);
 
 // render a human-readable summary of the bound global shortcuts into buf
-void global_shortcuts_list(char *buf, size_t buf_size);
+bool global_shortcuts_list(char *buf, size_t buf_size);

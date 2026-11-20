@@ -1,10 +1,12 @@
 #pragma once
 
+#include "settings.h"
 #include "str.h"
 #include "types.h"
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 #include <wlr/util/box.h>
 
 typedef struct layout_impl_t {
@@ -93,6 +95,17 @@ typedef struct layout_impl_t {
 	// get a list of nodes (returns count of nodes)
 	int (*collect)(desktop_t *d, node_t ***out_nodes);
 
+	// settings this layout exposes through `doorsctl layout <name> <setting>`
+	const setting_t *settings;
+	size_t settings_count;
+
+	// commands this layout exposes through `doorsctl layout <name> <command>`, terminated by a
+	// NULL name
+	const command_t *commands;
+
+	// called by `doorsctl layout <name> reset` to restore state not described by a setting
+	void (*reset)(void);
+
 	// true if layout only shows a single toplevel at once
 	bool single_visible;
 
@@ -108,6 +121,30 @@ bool layout_find_by_name(const char *name, layout_t *out);
 const str_pair_t *layout_ipc_values(void);
 
 const layout_impl_t *layout_get_impl(layout_t layout);
+
+// get setting or command
+const setting_t *layout_setting_find(layout_t layout, const char *name);
+const command_t *layout_command_find(layout_t layout, const char *name);
+
+// read or write a setting
+bool layout_setting_format(layout_t layout, const char *name, char *buf, size_t bufsz);
+bool layout_setting_set(layout_t layout, const char *name, const char *value, char *err,
+	size_t errsz, bool dry_run);
+
+void layout_defaults_init(void);
+void layout_defaults_capture(layout_t layout);
+
+bool layout_setting_default(layout_t layout, const char *name, char *buf, size_t bufsz);
+bool layout_setting_reset(layout_t layout, const char *name, char *err, size_t errsz, bool dry_run);
+
+// TODO: remove legacy settings
+bool layout_legacy_lookup(const char *name, const char **layout, const char **option);
+
+// resolve focused desktop for a layout command
+bool layout_command_target(ipc_args_t *a, bool need_client, output_t **mon, desktop_t **desk);
+
+// arrange desktop and send command's reply
+void layout_command_commit(ipc_args_t *a, output_t *mon, desktop_t *desk, const char *msg);
 
 // per-desktop layout state
 void *layout_state_get(desktop_t *d, layout_t layout, size_t size, void (*destroy)(void *state));

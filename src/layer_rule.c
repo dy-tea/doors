@@ -1,7 +1,6 @@
-#include "ipc/ipc.h"
+#include "ipc/args.h"
 #include "layer_rule.h"
 #include "macros.h"
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -79,49 +78,50 @@ bool remove_layer_rule_by_index(const int idx) {
 	return false;
 }
 
-void list_layer_rules(char *buf, size_t buf_size) {
-	size_t offset = 0;
+bool list_layer_rules(char *buf, size_t buf_size) {
+	ipc_buf_t b;
+	ipc_buf_init(&b, buf, buf_size);
 	int idx = 0;
 
 	layer_rule_t *r;
 	wl_list_for_each(r, &layer_rule_list, link) {
 		char spec[RULE_RE_MAX + 16];
-		offset = ipc_buf_append(buf, buf_size, offset, "%d: ", idx);
+		ipc_buff(&b, "%d: ", idx);
 
 		rule_pattern_spec(&r->match.namespace, spec, sizeof(spec));
-		offset = ipc_buf_append(buf, buf_size, offset, "namespace=%s ", spec);
+		ipc_buff(&b, "namespace=%s ", spec);
 
 		if (r->match.output.pattern[0] != '\0') {
 			rule_pattern_spec(&r->match.output, spec, sizeof(spec));
-			offset = ipc_buf_append(buf, buf_size, offset, "output=%s ", spec);
+			ipc_buff(&b, "output=%s ", spec);
 		}
 
-		offset = ipc_buf_append(buf, buf_size, offset, "-> ");
+		ipc_buff(&b, "-> ");
 
 		if (r->consequence.has & LAYER_RULE_BLUR)
-			offset = ipc_buf_append(buf, buf_size, offset, "blur=%s ", layer_rule_flag(&r->consequence,
-				LAYER_RULE_BLUR) ? "on" : "off");
+			ipc_buff(&b, "blur=%s ", layer_rule_flag(&r->consequence, LAYER_RULE_BLUR) ? "on" : "off");
 		if (r->consequence.has & LAYER_RULE_OPACITY)
-			offset = ipc_buf_append(buf, buf_size, offset, "opacity=%.2f ", r->consequence.opacity);
+			ipc_buff(&b, "opacity=%.2f ", r->consequence.opacity);
 		if (r->consequence.has & LAYER_RULE_ANIMATIONS_DISABLE)
-			offset = ipc_buf_append(buf, buf_size, offset, "animations_disable=%s ",
-				layer_rule_flag(&r->consequence, LAYER_RULE_ANIMATIONS_DISABLE) ? "on" : "off");
+			ipc_buff(&b, "animations_disable=%s ", layer_rule_flag(&r->consequence,
+				LAYER_RULE_ANIMATIONS_DISABLE) ? "on" : "off");
 		if (r->consequence.has & LAYER_RULE_KEYBOARD_INTERACTIVITY)
-			offset = ipc_buf_append(buf, buf_size, offset, "keyboard_interactivity=%s ",
+			ipc_buff(&b, "keyboard_interactivity=%s ",
 				layer_rule_keyboard_name(r->consequence.keyboard_interactivity));
 		if (r->consequence.has & LAYER_RULE_LAYER)
-			offset = ipc_buf_append(buf, buf_size, offset, "layer=%s ",
-				layer_rule_layer_name(r->consequence.layer));
+			ipc_buff(&b, "layer=%s ", layer_rule_layer_name(r->consequence.layer));
 		if (r->consequence.has & LAYER_RULE_BLOCK_OUT_FROM_SCREENSHARE)
-			offset = ipc_buf_append(buf, buf_size, offset, "block_out_from_screenshare=%s ",
-				layer_rule_flag(&r->consequence, LAYER_RULE_BLOCK_OUT_FROM_SCREENSHARE) ? "on" : "off");
+			ipc_buff(&b, "block_out_from_screenshare=%s ", layer_rule_flag(&r->consequence,
+				LAYER_RULE_BLOCK_OUT_FROM_SCREENSHARE) ? "on" : "off");
 
-		offset = ipc_buf_append(buf, buf_size, offset, "\n");
+		ipc_buff(&b, "\n");
 		idx++;
 	}
 
 	if (idx == 0)
-		snprintf(buf, buf_size, "No layer rules defined\n");
+		ipc_buff(&b, "No layer rules defined\n");
+
+	return !b.truncated;
 }
 
 layer_rule_consequence_t *find_matching_layer_rule(const char *namespace, const char *output_name) {

@@ -176,9 +176,7 @@ static void layer_rule_remove(ipc_args_t *a) {
 }
 
 static void layer_rule_show_list(ipc_args_t *a) {
-	char buf[DOORS_BUFSIZ];
-	list_layer_rules(buf, sizeof(buf));
-	ipc_ok(a, buf);
+	ipc_list_send(a, list_layer_rules);
 }
 
 const ipc_sub_t layer_rule_subs[] = {

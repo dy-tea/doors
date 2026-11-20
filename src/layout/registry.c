@@ -31,6 +31,11 @@ static bool build_ipc_values(void);
 
 void layout_init(void) {
 	wl_list_init(&dynamic_layouts);
+	layout_defaults_init();
+	for (size_t i = 0; i < REGISTRY_LEN(registry); i++) {
+		if (registry[i] != NULL)
+			layout_defaults_capture((layout_t)i);
+	}
 }
 
 static const dynamic_layout_t *dynamic_layout_for(layout_t layout) {
@@ -89,6 +94,7 @@ layout_t layout_register(const layout_impl_t *impl) {
 	entry->id = (layout_t)(LAYOUT_BUILTIN_COUNT + dynamic_layout_count);
 	wl_list_insert(dynamic_layouts.prev, &entry->link);
 	dynamic_layout_count++;
+	layout_defaults_capture(entry->id);
 
 	if (!build_ipc_values())
 		wlr_log(WLR_ERROR, "failed to rebuild layout IPC table");

@@ -454,7 +454,7 @@ void server_fini(void) {
 	rule_fini();
 	layer_rule_fini();
 	output_config_fini();
-	settings_fini();
+
 	global_shortcuts_fini();
 	security_ctx_fini();
 	config_fini();

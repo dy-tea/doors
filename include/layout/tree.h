@@ -2,6 +2,7 @@
 
 #include "output/output.h"
 #include "settings.h"
+#include "types.h"
 
 #include <wlr/util/box.h>
 

@@ -3,8 +3,6 @@
 #include "config_internal.h"
 #include "effects/effects.h"
 #include "ipc/helpers.h"
-#include "layout/scroller.h"
-#include "output/output.h"
 #include "parse.h"
 #include "settings.h"
 #include "spring.h"
@@ -40,13 +38,13 @@ static bool cfg_tab_color_apply(const char *suffix, const char *value, bool dry_
 		size_t errsz) {
 	const cfg_tab_color_t *c = cfg_find_tab_color(suffix);
 	if (c == NULL) {
-		cfg_errf(err, errsz, "Unknown tab color \"%s\"\n", suffix);
+		setting_err(err, errsz, "Unknown tab color \"%s\"\n", suffix);
 		return false;
 	}
 
 	float parsed[4];
 	if (!parse_color_floats(value, parsed)) {
-		cfg_errf(err, errsz, "tab_color_%s: expected \"R G B [A]\"\n", c->name);
+		setting_err(err, errsz, "tab_color_%s: expected \"R G B [A]\"\n", c->name);
 		return false;
 	}
 
@@ -82,171 +80,6 @@ static void cfg_tab_color(ipc_args_t *a, const char *suffix) {
 	}
 
 	ipc_okf(a, "tab_color_%s %s\n", c->name, a->dry_run ? "would be set" : "set");
-}
-
-void cfg_format_scroller_size(scroller_size_t size, ipc_buf_t *b, bool last) {
-	if (size.type == SCROLLER_SIZE_FIXED)
-		ipc_buff(b, "%.0fpx%s", size.value, last ? "\n" : ",");
-	else
-		ipc_buff(b, "%.2f%s", size.value, last ? "\n" : ",");
-}
-
-static void on_scroller_default_column_width(void) {
-	output_t *m;
-	wl_list_for_each(m, &mon_list, link) {
-		desktop_t *d;
-		wl_list_for_each(d, &m->desk_list, link)
-			scroller_set_default_column_width(d, settings.scroller_default_column_width);
-	}
-}
-
-// the names a setting with its own syntax is listed and stored under
-const char *cfg_special_canonical(const char *name) {
-	if (streq(name, "scroller_proportion_preset"))
-		return "scroller_preset_column_widths";
-	if (streq(name, "scroller_default_proportion"))
-		return "scroller_default_column_width";
-	return name;
-}
-
-static bool cfg_scroller_presets_apply(const char *name, const char *value, bool dry_run, char *err,
-		size_t errsz) {
-	char *copy = strdup(value);
-	if (!copy) {
-		cfg_errf(err, errsz, "Memory allocation failed\n");
-		return false;
-	}
-
-	size_t len = strlen(copy);
-	if (len >= 2 && copy[0] == '[' && copy[len - 1] == ']') {
-		memmove(copy, copy + 1, len - 2);
-		copy[len - 2] = '\0';
-	}
-
-	int count = 1;
-	for (char *p = copy; *p; p++) {
-		if (*p == ',')
-			count++;
-	}
-
-	char **tokens = malloc((size_t)count * sizeof(*tokens));
-	scroller_size_t *presets = malloc((size_t)count * sizeof(*presets));
-	if (!tokens || !presets) {
-		free(tokens);
-		free(presets);
-		free(copy);
-		cfg_errf(err, errsz, "Memory allocation failed\n");
-		return false;
-	}
-
-	const int parsed = parse_split(copy, ",", tokens, count);
-	for (int i = 0; i < parsed; i++) {
-		if (!parse_scroller_size(tokens[i], &presets[i])) {
-			cfg_errf(err, errsz, "%s: invalid value \"%s\", expected a proportion in (0, 1] or "
-				"a size like \"640px\"\n", cfg_special_canonical(name), tokens[i]);
-			free(tokens);
-			free(presets);
-			free(copy);
-			return false;
-		}
-	}
-	free(tokens);
-	free(copy);
-
-	if (dry_run) {
-		free(presets);
-		return true;
-	}
-
-	if (streq(cfg_special_canonical(name), "scroller_preset_window_heights"))
-		settings_set_scroller_preset_window_heights(presets, parsed);
-	else
-		settings_set_scroller_preset_column_widths(presets, parsed);
-
-	return true;
-}
-
-static bool cfg_scroller_widths_apply(const char *value, bool dry_run, char *err, size_t errsz) {
-	return cfg_scroller_presets_apply("scroller_preset_column_widths", value, dry_run, err, errsz);
-}
-
-static bool cfg_scroller_heights_apply(const char *value, bool dry_run, char *err, size_t errsz) {
-	return cfg_scroller_presets_apply("scroller_preset_window_heights", value, dry_run, err, errsz);
-}
-
-static void cfg_scroller_preset_list(ipc_args_t *a, const char *name, const scroller_size_t *slot,
-		int count_slot) {
-	if (!ipc_peek(a)) {
-		char buf[512];
-		ipc_buf_t b;
-		ipc_buf_init(&b, buf, sizeof(buf));
-		for (int i = 0; i < count_slot; i++)
-			cfg_format_scroller_size(slot[i], &b, i == count_slot - 1);
-		ipc_buf_send(a, &b);
-		return;
-	}
-
-	const char *value;
-	if (!ipc_need(a, "comma separated values", &value))
-		return;
-
-	char err[256];
-	if (!cfg_scroller_presets_apply(name, value, a->dry_run, err, sizeof(err))) {
-		ipc_fail(a, "%s", err);
-		return;
-	}
-
-	ipc_okf(a, "%s %s\n", cfg_special_canonical(name), a->dry_run ? "would be set" : "set");
-}
-
-static void cfg_scroller_preset_column_widths(ipc_args_t *a) {
-	cfg_scroller_preset_list(a, "scroller_preset_column_widths", settings.scroller_preset_column_widths,
-		settings.scroller_preset_column_widths_count);
-}
-
-static void cfg_scroller_preset_window_heights(ipc_args_t *a) {
-	cfg_scroller_preset_list(a, "scroller_preset_window_heights",
-		settings.scroller_preset_window_heights, settings.scroller_preset_window_heights_count);
-}
-
-static bool cfg_scroller_default_width_apply(const char *value, bool dry_run, char *err,
-		size_t errsz) {
-	scroller_size_t size;
-	if (!parse_scroller_size(value, &size)) {
-		cfg_errf(err, errsz, "scroller_default_column_width: invalid value \"%s\", expected a "
-			"proportion in (0, 1] or a size like \"640px\"\n", value);
-		return false;
-	}
-
-	if (!dry_run) {
-		settings.scroller_default_column_width = size;
-		on_scroller_default_column_width();
-	}
-	return true;
-}
-
-// scroller_default_column_width accepts either a proportion or a "Npx" fixed size.
-static void cfg_scroller_default_column_width(ipc_args_t *a) {
-	if (!ipc_peek(a)) {
-		char buf[64];
-		ipc_buf_t b;
-		ipc_buf_init(&b, buf, sizeof(buf));
-		cfg_format_scroller_size(settings.scroller_default_column_width, &b, true);
-		ipc_buf_send(a, &b);
-		return;
-	}
-
-	const char *value;
-	if (!ipc_need(a, "proportion or px size", &value))
-		return;
-
-	char err[256];
-	if (!cfg_scroller_default_width_apply(value, a->dry_run, err, sizeof(err))) {
-		ipc_fail(a, "%s", err);
-		return;
-	}
-
-	ipc_okf(a, "scroller_default_column_width %s\n", a->dry_run ? "would be set" : "set");
 }
 
 // the gradient table backs both the border gradient settings and their entries
@@ -287,7 +120,7 @@ static bool cfg_gradient_apply(const cfg_gradient_t *g, const char *value, bool 
 	if (g->lerp) {
 		float v;
 		if (!parse_float_range(value, 0.0f, 1.0f, &v)) {
-			cfg_errf(err, errsz, "%s: value must be between 0 and 1\n", g->name);
+			setting_err(err, errsz, "%s: value must be between 0 and 1\n", g->name);
 			return false;
 		}
 
@@ -318,7 +151,7 @@ static bool cfg_gradient_apply(const cfg_gradient_t *g, const char *value, bool 
 	int count = 0;
 	float angle = 0.0f;
 	if (!parse_gradient(value, stops, &count, &angle)) {
-		cfg_errf(err, errsz, "Expected one or more #RRGGBB stops and an optional angle\n");
+		setting_err(err, errsz, "Expected one or more #RRGGBB stops and an optional angle\n");
 		return false;
 	}
 
@@ -372,7 +205,7 @@ static bool cfg_anchor_apply(const char *value, bool dry_run, char *err, size_t 
 	float v[2];
 
 	if (!parse_vec2(value, v, -1.0f, 1.0f)) {
-		cfg_errf(err, errsz, "acrylic_light_anchor: expected \"x y\" between -1 and 1\n");
+		setting_err(err, errsz, "acrylic_light_anchor: expected \"x y\" between -1 and 1\n");
 		return false;
 	}
 
@@ -406,7 +239,7 @@ static void cfg_acrylic_light_anchor(ipc_args_t *a) {
 static bool cfg_blur_algorithm_apply(const char *value, bool dry_run, char *err, size_t errsz) {
 	enum blur_algorithm algo = blur_algorithm_from_str(value);
 	if (algo == BLUR_ALGORITHM_NONE && !streq(value, "none")) {
-		cfg_errf(err, errsz, "Unknown algorithm\n");
+		setting_err(err, errsz, "Unknown algorithm\n");
 		return false;
 	}
 
@@ -437,7 +270,7 @@ static void cfg_blur_algorithm(ipc_args_t *a) {
 static bool cfg_screen_shader_apply(const char *value, bool dry_run, char *err, size_t errsz) {
 	bool ok = dry_run ? screen_shader_valid(value) : screen_shader_set(value);
 	if (!ok) {
-		cfg_errf(err, errsz, "Unknown shader (builtin: none grayscale invert sepia nightlight)\n");
+		setting_err(err, errsz, "Unknown shader (builtin: none grayscale invert sepia nightlight)\n");
 		return false;
 	}
 	return true;
@@ -477,7 +310,7 @@ static void cfg_screen_shader_file(ipc_args_t *a) {
 
 static bool cfg_animation_bezier_apply(const char *value, bool dry_run, char *err, size_t errsz) {
 	if (!bezier_exists(value)) {
-		cfg_errf(err, errsz, "No such bezier curve\n");
+		setting_err(err, errsz, "No such bezier curve\n");
 		return false;
 	}
 
@@ -508,7 +341,7 @@ static void cfg_animation_bezier(ipc_args_t *a) {
 static bool cfg_animation_duration_apply(const char *value, bool dry_run, char *err, size_t errsz) {
 	long ms;
 	if (!parse_long(value, &ms) || ms < 1 || ms > INT_MAX) {
-		cfg_errf(err, errsz, "duration must be between 1 and %d\n", INT_MAX);
+		setting_err(err, errsz, "duration must be between 1 and %d\n", INT_MAX);
 		return false;
 	}
 
@@ -642,13 +475,6 @@ typedef struct {
 } cfg_named_handler_t;
 
 static const cfg_named_handler_t special_settings[] = {
-	{"scroller_preset_column_widths", cfg_scroller_preset_column_widths, cfg_scroller_widths_apply},
-	{"scroller_proportion_preset", cfg_scroller_preset_column_widths, cfg_scroller_widths_apply},
-	{"scroller_preset_window_heights", cfg_scroller_preset_window_heights, cfg_scroller_heights_apply},
-	{"scroller_default_column_width", cfg_scroller_default_column_width,
-		cfg_scroller_default_width_apply},
-	{"scroller_default_proportion", cfg_scroller_default_column_width,
-		cfg_scroller_default_width_apply},
 	{"acrylic_light_anchor", cfg_acrylic_light_anchor, cfg_anchor_apply},
 	{"blur_algorithm", cfg_blur_algorithm, cfg_blur_algorithm_apply},
 	{"screen_shader", cfg_screen_shader, cfg_screen_shader_apply},
@@ -708,7 +534,7 @@ bool cfg_special_apply(const char *name, const char *value, char *err, size_t er
 	if (sp != NULL && sp->apply != NULL)
 		return sp->apply(value, dry_run, err, errsz);
 
-	cfg_errf(err, errsz, "%s: no single value to set\n", name);
+	setting_err(err, errsz, "%s: no single value to set\n", name);
 	return false;
 }
 

@@ -141,6 +141,18 @@ the built-in layouts use:
 		// get a list of nodes (returns count of nodes)
 		int (*collect)(desktop_t *d, node_t ***out_nodes);
 
+		// settings exposed through `doorsctl layout <name> <setting>`
+		const setting_t *settings;
+		size_t settings_count;
+
+		// commands exposed through `doorsctl layout <name> <command>`,
+		// terminated by a NULL name
+		const command_t *commands;
+
+		// restores values the settings do not describe, on
+		// `doorsctl layout <name> reset`
+		void (*reset)(void);
+
 		// true if the layout only shows a single toplevel at once
 		bool single_visible;
 
@@ -150,6 +162,52 @@ the built-in layouts use:
 
 All callbacks are optional (set them to C<NULL> when not needed), except
 that a layout without I<arrange> will never move windows.
+
+=head2 Layout settings and commands
+
+A layout can expose configuration and subcommands of its own, and doors
+publishes both through C<doorsctl layout>:
+
+	doorsctl layout -l                 # list layouts
+	doorsctl layout strip -l           # list one layout's options
+	doorsctl layout strip gap 20       # write a setting
+	doorsctl layout strip gap          # read it back
+	doorsctl layout strip focus_first  # run a command
+
+I<settings> is an array of C<setting_t> with I<settings_count>
+entries, and I<commands> is a NULL-terminated array of
+C<command_t>; both are described in C<include/settings.h>.
+A setting points at storage the layout owns, so it is read and written
+in place:
+
+	static int strip_gap;
+
+	static const setting_t strip_settings[] = {
+		{
+			.name = "gap",
+			.type = SETTING_INT,
+			.ptr = &strip_gap,
+			.min = 0,
+			.max = 200,
+			.fmt = "%d\n",
+			.flags = SETTING_COMMIT,
+		},
+	};
+
+	static const command_t strip_commands[] = {
+		{"focus_first", "layout strip focus_first", strip_focus_first},
+		{NULL, NULL, NULL},
+	};
+
+A command receives the remaining C<ipc_args_t> arguments and answers with
+C<ipc_ok>, C<ipc_okf> or C<ipc_fail>. Setting and command names have to
+be unique within a layout, and a layout that reuses a name is refused at
+registration.
+
+The values of the settings table are recorded when the layout is
+registered, so C<doorsctl layout strip reset> puts them back. Implement
+C<reset> for any state the table does not describe; it is called by the
+unnamed form of the command.
 
 =head2 Loading plugins
 

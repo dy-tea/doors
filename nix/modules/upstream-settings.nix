@@ -360,11 +360,103 @@ in
   # as separate options, so the parity check ignores them.
   aliases = [
     "focus_follows_mouse"
-    "scroller_default_proportion"
-    "scroller_proportion_preset"
   ];
 
   inherit animationTypes;
+
+
+  # layout-owned options are reached through `doorsctl layout <layout> <name>`
+  mkLayoutBool =
+    layout: key: path: description: example:
+    mk {
+      inherit
+        key
+        path
+        description
+        example
+        ;
+      type = types.bool;
+      argv = v: [
+        "layout"
+        layout
+        key
+        (bool v)
+      ];
+    };
+
+  mkLayoutIntBetween =
+    layout: lo: hi: key: path: description: example:
+    mk {
+      inherit
+        key
+        path
+        description
+        example
+        ;
+      type = types.addCheck types.int (x: x >= lo && x <= hi) // {
+        description = "an integer ${num lo}-${num hi}";
+      };
+      argv = v: [
+        "layout"
+        layout
+        key
+        (num v)
+      ];
+    };
+
+  mkLayoutEnum =
+    layout: key: path: values: description: example:
+    mk {
+      inherit
+        key
+        path
+        description
+        example
+        ;
+      type = types.enum values;
+      argv = v: [
+        "layout"
+        layout
+        key
+        v
+      ];
+    };
+
+  mkLayoutScrollerSize =
+    layout: key: path: description: example:
+    mk {
+      inherit
+        key
+        path
+        description
+        example
+        ;
+      type = scrollerSize;
+      argv = v: [
+        "layout"
+        layout
+        key
+        (formatScrollerSize v)
+      ];
+    };
+
+  mkLayoutScrollerSizes =
+    layout: key: path: description: example:
+    mk {
+      inherit
+        key
+        path
+        description
+        example
+        ;
+      type = scrollerSizes;
+      argv = v: [
+        "layout"
+        layout
+        key
+        (formatScrollerSizes v)
+      ];
+    };
 
   entries =
     [
@@ -373,18 +465,18 @@ in
       (mkInt "window_gap" [ "layout" "window-gap" ] "Gap between tiled windows, in pixels." 10)
 
       # layout behaviour
-      (mkBool "borderless_monocle" [ "layout" "borderless-monocle" ] "Remove borders in monocle layout." false)
+      (mkLayoutBool "monocle" "borderless" [ "layout" "borderless-monocle" ] "Remove borders in monocle layout." false)
       (mkBool "borderless_singleton" [ "layout" "borderless-singleton" ] "Remove borders from singleton windows." false)
       (mkBool "smart_gaps" [ "layout" "smart-gaps" ] "Disable window gaps when only one tiled window is on the desktop." false)
       (mkBool "smart_borders" [ "layout" "smart-borders" ] "Hide window borders when only one tiled window is on the desktop." false)
       (mkBool "respect_tiled_min_size" [ "layout" "respect-tiled-min-size" ] "Never shrink tiled windows below their configured minimum size." true)
       (mkBool "focus_wrapping" [ "layout" "focus-wrapping" ] "Wrap directional focus around when there is no window in the target direction." false)
       (mkBool "hide_lone_tab" [ "layout" "hide-lone-tab" ] "Hide the tab bar when a tabbed container holds only one window." false)
-      (mkBool "gapless_monocle" [ "layout" "gapless-monocle" ] "Rearrange monocle windows to fill gaps when windows are closed." false)
-      (mkIntBetween 0 2147483647 "monocle_top_padding" [ "layout" "monocle-padding" "top" ] "Top padding for monocle layout, in pixels." 0)
-      (mkIntBetween 0 2147483647 "monocle_right_padding" [ "layout" "monocle-padding" "right" ] "Right padding for monocle layout, in pixels." 0)
-      (mkIntBetween 0 2147483647 "monocle_bottom_padding" [ "layout" "monocle-padding" "bottom" ] "Bottom padding for monocle layout, in pixels." 0)
-      (mkIntBetween 0 2147483647 "monocle_left_padding" [ "layout" "monocle-padding" "left" ] "Left padding for monocle layout, in pixels." 0)
+      (mkLayoutBool "monocle" "gapless" [ "layout" "gapless-monocle" ] "Rearrange monocle windows to fill gaps when windows are closed." false)
+      (mkLayoutIntBetween "monocle" 0 2147483647 "top_padding" [ "layout" "monocle-padding" "top" ] "Top padding for monocle layout, in pixels." 0)
+      (mkLayoutIntBetween "monocle" 0 2147483647 "right_padding" [ "layout" "monocle-padding" "right" ] "Right padding for monocle layout, in pixels." 0)
+      (mkLayoutIntBetween "monocle" 0 2147483647 "bottom_padding" [ "layout" "monocle-padding" "bottom" ] "Bottom padding for monocle layout, in pixels." 0)
+      (mkLayoutIntBetween "monocle" 0 2147483647 "left_padding" [ "layout" "monocle-padding" "left" ] "Left padding for monocle layout, in pixels." 0)
       (mkBool "pointer_follows_focus" [ "layout" "pointer-follows-focus" ] "Warp the pointer to follow window focus changes." false)
       (mkBool "record_history" [ "layout" "record-history" ] "Record focus history for cycling through previous windows." true)
       (mkBool "allow_tearing" [ "layout" "allow-tearing" ] "Allow eligible windows to use tearing page flips." false)
@@ -436,67 +528,34 @@ in
       (mkRgba "tab_color_sep" [ "text" "tab-color" "sep" ] "Colour of the tab separator." [ 0.4 0.4 0.4 1.0 ])
 
       # scroller
-      (mkBool "scroller_always_center_single_column" [ "scroller" "always-center-single-column" ] "Centre a single column in the scroller layout." false)
-      (mkEnum "scroller_center_focused_column" [ "scroller" "center-focused-column" ] [ "never" "always" "on-overflow" ] "Whether the scroller layout keeps the focused column centred." "never")
-      (mkIntBetween 0 2147483647 "scroller_left_strut" [ "scroller" "struts" "left" ] "Left strut in the scroller layout, in pixels." 0)
-      (mkIntBetween 0 2147483647 "scroller_right_strut" [ "scroller" "struts" "right" ] "Right strut in the scroller layout, in pixels." 0)
-      (mkIntBetween 0 2147483647 "scroller_top_strut" [ "scroller" "struts" "top" ] "Top strut in the scroller layout, in pixels." 0)
-      (mkIntBetween 0 2147483647 "scroller_bottom_strut" [ "scroller" "struts" "bottom" ] "Bottom strut in the scroller layout, in pixels." 0)
-			(mkIntBetween 2 5 "scroller_pan_fingers" [ "scroller" "pan-fingers" ] "Number of fingers that pan the scroller view." 3)
-			(mkIntBetween 0 100 "scroller_snap_percent" [ "scroller" "snap-percent" ] "Sets the minimum percent needed to pan before the scroller prefers the next neighbor." 30)
-      (mk {
-        key = "scroller_default_column_width";
-        path = [
-          "scroller"
-          "default-column-width"
-        ];
-        type = scrollerSize;
-        example = 0.5;
-        description = "Width new scroller columns get, as a proportion of the working area or a fixed size.";
-        argv = v: [
-          "config"
-          "scroller_default_column_width"
-          (formatScrollerSize v)
-        ];
-      })
-      (mk {
-        key = "scroller_preset_column_widths";
-        path = [
-          "scroller"
-          "preset-column-widths"
-        ];
-        type = scrollerSizes;
-        example = [
-          0.33
-          0.5
-          0.67
-        ];
-        description = "Preset column widths cycled by the scroller layout.";
-        argv = v: [
-          "config"
-          "scroller_preset_column_widths"
-          (formatScrollerSizes v)
-        ];
-      })
-      (mk {
-        key = "scroller_preset_window_heights";
-        path = [
-          "scroller"
-          "preset-window-heights"
-        ];
-        type = scrollerSizes;
-        example = [
-          0.33
-          0.5
-          0.67
-        ];
-        description = "Preset window heights cycled within a scroller column.";
-        argv = v: [
-          "config"
-          "scroller_preset_window_heights"
-          (formatScrollerSizes v)
-        ];
-      })
+      (mkLayoutBool "scroller" "always_center_single_column" [ "scroller" "always-center-single-column" ] "Centre a single column in the scroller layout." false)
+      (mkLayoutEnum "scroller" "center_focused_column" [ "scroller" "center-focused-column" ] [ "never" "always" "on-overflow" ] "Whether the scroller layout keeps the focused column centred." "never")
+      (mkLayoutIntBetween "scroller" 0 2147483647 "left_strut" [ "scroller" "struts" "left" ] "Left strut in the scroller layout, in pixels." 0)
+      (mkLayoutIntBetween "scroller" 0 2147483647 "right_strut" [ "scroller" "struts" "right" ] "Right strut in the scroller layout, in pixels." 0)
+      (mkLayoutIntBetween "scroller" 0 2147483647 "top_strut" [ "scroller" "struts" "top" ] "Top strut in the scroller layout, in pixels." 0)
+      (mkLayoutIntBetween "scroller" 0 2147483647 "bottom_strut" [ "scroller" "struts" "bottom" ] "Bottom strut in the scroller layout, in pixels." 0)
+			(mkLayoutIntBetween "scroller" 2 5 "pan_fingers" [ "scroller" "pan-fingers" ] "Number of fingers that pan the scroller view." 3)
+			(mkLayoutIntBetween "scroller" 0 100 "snap_percent" [ "scroller" "snap-percent" ] "Sets the minimum percent needed to pan before the scroller prefers the next neighbor." 30)
+      (mkLayoutScrollerSize "scroller" "default_column_width" [
+        "scroller"
+        "default-column-width"
+      ] "Width new scroller columns get, as a proportion of the working area or a fixed size." 0.5)
+      (mkLayoutScrollerSizes "scroller" "preset_column_widths" [
+        "scroller"
+        "preset-column-widths"
+      ] "Preset column widths cycled by the scroller layout." [
+        0.33
+        0.5
+        0.67
+      ])
+      (mkLayoutScrollerSizes "scroller" "preset_window_heights" [
+        "scroller"
+        "preset-window-heights"
+      ] "Preset window heights cycled within a scroller column." [
+        0.33
+        0.5
+        0.67
+      ])
 
       # blur
       (mkBool "blur_enabled" [ "blur" "enabled" ] "Enable background blur." true)

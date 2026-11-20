@@ -43,7 +43,7 @@ static void wm_dump_state(ipc_args_t *a) {
 		IPC_ENUM_END,
 	};
 
-	IPC_REPLY(b);
+	IPC_REPLY_GROWING(b);
 
 	ipc_buff(&b, "{\n  \"monitors\": [\n");
 
@@ -423,26 +423,20 @@ static void wm_get_status(ipc_args_t *a) {
 		return;
 	}
 
-	if (!diag_status_refresh()) {
-		ipc_fail(a, "Status document did not fit in the reply buffer\n");
-		return;
-	}
-
 	if (json) {
+		if (!diag_status_refresh()) {
+			ipc_fail(a, "Status document is too large\n");
+			return;
+		}
+
 		send_success(a->fd, diag_status_snapshot(NULL));
 		return;
 	}
 
-	IPC_REPLY(b);
+	IPC_REPLY_GROWING(b);
+	ipc_buff(&b, "Status: running\nmonitors: %d\n", wl_list_length(&mon_list));
 
-	int output_count = 0;
-	output_t *m;
-	wl_list_for_each(m, &mon_list, link)
-		output_count++;
-
-	ipc_buff(&b, "Status: running\nmonitors: %d\n", output_count);
-
-	m = server.focused_output;
+	output_t *m = server.focused_output;
 	if (m && m->desk) {
 		ipc_buff(&b, "focused_monitor: %s\nfocused_desktop: %s\n", m->name, m->desk->name);
 		if (m->desk->focus)

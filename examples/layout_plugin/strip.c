@@ -9,8 +9,12 @@
 // Load and use:
 //   doorsctl plugin load /path/to/strip.so
 //   doorsctl desktop --layout strip
+//   doorsctl layout strip gap 20
+//   doorsctl layout strip focus_first
 
 #include "client.h"
+#include "ipc/args.h"
+#include "ipc/helpers.h"
 #include "layout/layout.h"
 #include "layout/tree.h"
 #include "output/output.h"
@@ -21,6 +25,9 @@
 #include "types.h"
 #include <stdlib.h>
 #include <wlr/util/box.h>
+
+// extra space between the columns, set through `doorsctl layout strip gap`
+static int strip_gap = 0;
 
 // leaves of the desktop tree, ordered left to right along the strip
 static int strip_nodes(desktop_t *d, node_t ***out_nodes) {
@@ -66,7 +73,7 @@ static void strip_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 		return;
 	}
 
-	const int gap = compute_window_gap(d) > 0 ? compute_window_gap(d) : 0;
+	const int gap = (compute_window_gap(d) > 0 ? compute_window_gap(d) : 0) + strip_gap;
 	const int bw = (int)effective_border_width(d);
 
 	// split the strip into equal columns
@@ -183,6 +190,45 @@ static bool strip_swap(output_t *m, desktop_t *d, const direction_t dir) {
 	return target >= 0;
 }
 
+// `doorsctl layout strip focus_first`
+static void strip_focus_first(ipc_args_t *a) {
+	desktop_t *desk = ipc_focused_desk(a, NULL);
+	if (desk == NULL)
+		return;
+
+	node_t **nodes = NULL;
+	const int count = strip_nodes(desk, &nodes);
+	if (count <= 0) {
+		free(nodes);
+		ipc_fail(a, "No windows\n");
+		return;
+	}
+
+	output_t *m = output_focused();
+	focus_node(m, desk, nodes[0]);
+	arrange(m, desk, true);
+	free(nodes);
+
+	ipc_ok(a, "Focused first\n");
+}
+
+static const setting_t strip_settings[] = {
+	{
+		.name = "gap",
+		.type = SETTING_INT,
+		.ptr = &strip_gap,
+		.min = 0,
+		.max = 200,
+		.fmt = "%d\n",
+		.flags = SETTING_COMMIT,
+	},
+};
+
+static const command_t strip_commands[] = {
+	{"focus_first", "layout strip focus_first", strip_focus_first},
+	{NULL, NULL, NULL},
+};
+
 static const layout_impl_t strip_impl = {
 	.name = "strip",
 	.arrange = strip_arrange,
@@ -210,6 +256,9 @@ static const layout_impl_t strip_impl = {
 	.pan_update = NULL,
 	.pan_end = NULL,
 	.collect = NULL,
+	.settings = strip_settings,
+	.settings_count = IPC_ARRAY_LEN(strip_settings),
+	.commands = strip_commands,
 	.single_visible = false,
 	.has_directional_nav = true,
 };

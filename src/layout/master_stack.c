@@ -1,7 +1,9 @@
+#include "ipc/args.h"
 #include "layout/layout.h"
 #include "layout/master_stack.h"
 #include "output/output.h"
 #include "tree.h"
+#include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <wlr/util/log.h>
@@ -775,6 +777,155 @@ static bool master_stack_resize(output_t *m, desktop_t *d, const direction_t dir
 	return true;
 }
 
+static const str_pair_t orientation_values[] = {
+	{"left", MASTER_LEFT},
+	{"right", MASTER_RIGHT},
+	{"top", MASTER_TOP},
+	{"bottom", MASTER_BOTTOM},
+	{"down", MASTER_BOTTOM},
+	{"center", MASTER_CENTER},
+	IPC_ENUM_END,
+};
+
+static bool ms_target(ipc_args_t *a, output_t **mon, desktop_t **desk) {
+	return layout_command_target(a, false, mon, desk);
+}
+
+static void ms_cycle_orientation(ipc_args_t *a) {
+	output_t *m;
+	desktop_t *d;
+	if (!ms_target(a, &m, &d))
+		return;
+
+	master_stack_cycle_orientation(d);
+	layout_command_commit(a, m, d, "Orientation cycled\n");
+}
+
+static void ms_cmd_orientation(ipc_args_t *a) {
+	long orientation;
+	if (!ipc_enum(a, "orientation", orientation_values, &orientation))
+		return;
+
+	output_t *m;
+	desktop_t *d;
+	if (!ms_target(a, &m, &d))
+		return;
+
+	master_stack_set_orientation(d, (master_area_orientation_t)orientation);
+	layout_command_commit(a, m, d, "Orientation set\n");
+}
+
+static void ms_cycle_stack_layout(ipc_args_t *a) {
+	output_t *m;
+	desktop_t *d;
+	if (!ms_target(a, &m, &d))
+		return;
+
+	master_stack_cycle_stack_layout(d);
+	layout_command_commit(a, m, d, "Stack layout cycled\n");
+}
+
+static void ms_inc(ipc_args_t *a) {
+	output_t *m;
+	desktop_t *d;
+	if (!ms_target(a, &m, &d))
+		return;
+
+	master_stack_increment(d);
+	layout_command_commit(a, m, d, "Master added\n");
+}
+
+static void ms_dec(ipc_args_t *a) {
+	output_t *m;
+	desktop_t *d;
+	if (!ms_target(a, &m, &d))
+		return;
+
+	master_stack_decrement(d);
+	layout_command_commit(a, m, d, "master removed\n");
+}
+
+static void ms_flip(ipc_args_t *a) {
+	output_t *m;
+	desktop_t *d;
+	if (!ms_target(a, &m, &d))
+		return;
+
+	master_stack_flip_orientation(d);
+	layout_command_commit(a, m, d, "orientation flipped\n");
+}
+
+static void ms_promote(ipc_args_t *a) {
+	output_t *m;
+	desktop_t *d;
+	if (!ms_target(a, &m, &d))
+		return;
+
+	if (!master_stack_promote(d)) {
+		ipc_fail(a, "Focus a secondary tiled window\n");
+		return;
+	}
+
+	layout_command_commit(a, m, d, "focused window promoted\n");
+}
+
+static void ms_demote(ipc_args_t *a) {
+	output_t *m;
+	desktop_t *d;
+	if (!ms_target(a, &m, &d))
+		return;
+
+	if (!master_stack_demote(d)) {
+		ipc_fail(a, "Focus a master tiled window\n");
+		return;
+	}
+
+	layout_command_commit(a, m, d, "Focused window demoted\n");
+}
+
+static void ms_set_count(ipc_args_t *a) {
+	int count;
+	if (!ipc_int(a, "count", 0, INT_MAX, &count))
+		return;
+
+	output_t *m;
+	desktop_t *d;
+	if (!ms_target(a, &m, &d))
+		return;
+
+	master_stack_set_count(d, count);
+	layout_command_commit(a, m, d, "Master count set\n");
+}
+
+static void ms_set_ratio(ipc_args_t *a) {
+	float ratio;
+	if (!ipc_float(a, "ratio", 0.1f, 0.9f, &ratio))
+		return;
+
+	output_t *m;
+	desktop_t *d;
+	if (!ms_target(a, &m, &d))
+		return;
+
+	master_stack_set_ratio(d, ratio);
+	layout_command_commit(a, m, d, "Ratio set\n");
+}
+
+static const command_t master_stack_commands[] = {
+	{"cycle_orientation", "layout master_stack cycle_orientation", ms_cycle_orientation},
+	{"orientation", "layout master_stack orientation <left|right|top|bottom|center>",
+		ms_cmd_orientation},
+	{"cycle_stack_layout", "layout master_stack cycle_stack_layout", ms_cycle_stack_layout},
+	{"inc", "layout master_stack inc", ms_inc},
+	{"dec", "layout master_stack dec", ms_dec},
+	{"flip", "layout master_stack flip", ms_flip},
+	{"promote", "layout master_stack promote", ms_promote},
+	{"demote", "layout master_stack demote", ms_demote},
+	{"set_count", "layout master_stack set_count <count>", ms_set_count},
+	{"set_ratio", "layout master_stack set_ratio <0.1-0.9>", ms_set_ratio},
+	{NULL, NULL, NULL},
+};
+
 const layout_impl_t master_stack_impl = {
 	.name = "master_stack",
 	.arrange = master_stack_arrange,
@@ -802,6 +953,7 @@ const layout_impl_t master_stack_impl = {
 	.pan_update = NULL,
 	.pan_end = NULL,
 	.collect = master_stack_collect,
+	.commands = master_stack_commands,
 	.single_visible = false,
 	.has_directional_nav = true,
 };

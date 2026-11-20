@@ -1,4 +1,5 @@
 #include "dim.h"
+#include "ipc/helpers.h"
 #include "layout/layout.h"
 #include "layout/tree.h"
 #include "output/output.h"
@@ -7,6 +8,26 @@
 #include <stdlib.h>
 #include <wayland-server-core.h>
 #include <wlr/util/box.h>
+
+bool layout_command_target(ipc_args_t *a, const bool need_client, output_t **mon,
+		desktop_t **desk) {
+	desktop_t *d = ipc_focused_desk(a, mon);
+	if (d == NULL)
+		return false;
+
+	if (need_client && (d->focus == NULL || d->focus->client == NULL)) {
+		ipc_fail(a, "No focused client\n");
+		return false;
+	}
+
+	*desk = d;
+	return true;
+}
+
+void layout_command_commit(ipc_args_t *a, output_t *mon, desktop_t *desk, const char *msg) {
+	arrange(mon, desk, true);
+	ipc_ok(a, msg);
+}
 
 typedef struct layout_state_t {
 	layout_t layout;

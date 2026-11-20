@@ -147,23 +147,20 @@ static void test_reset_gradient(void) {
 }
 
 // an alias resets the setting it stands for
-static void test_reset_special_alias(void) {
+static void test_reset_alias(void) {
 	char dflt[128];
-	CHECK(cfg_default_value("scroller_default_column_width", dflt, sizeof(dflt)));
+	CHECK(cfg_default_value("focus_follows_pointer", dflt, sizeof(dflt)));
+
+	settings.focus_follows_mouse = FOLLOWS_ALWAYS;
 
 	char reply[4096];
-	size_t n = SEND("config\0scroller_default_proportion\0" "0.25\0", reply);
-	CHECK(n > 1);
-	CHECK(reply[0] == '\0');
-
-	n = SEND("config\0reset\0scroller_default_proportion\0", reply);
+	size_t n = SEND("config\0reset\0focus_follows_mouse\0", reply);
 	CHECK(n > 1);
 	CHECK(reply[0] == '\0');
 	CHECK(strstr(reply + 1, "reset 1 of 1 setting") != NULL);
-	CHECK(strstr(reply + 1, "scroller_default_column_width") != NULL);
+	CHECK(strstr(reply + 1, "focus_follows_pointer") != NULL);
 
-	memset(reply, 0, sizeof(reply));
-	n = SEND("config\0scroller_default_column_width\0", reply);
+	n = SEND("config\0focus_follows_pointer\0", reply);
 	CHECK(n > 1);
 	CHECK(reply[0] == '\0');
 
@@ -223,7 +220,7 @@ static void run_tests(void) {
 	test_reset_special_name();
 	test_reset_special_setting();
 	test_reset_gradient();
-	test_reset_special_alias();
+	test_reset_alias();
 	test_reset_all();
 	test_reset_dry_run();
 }

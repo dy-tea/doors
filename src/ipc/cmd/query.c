@@ -101,7 +101,7 @@ static bool view_selected(const view_t *view, const query_filter_t *f) {
 static void q_tree(ipc_args_t *a) {
 	const query_filter_t *f = a->ctx;
 
-	IPC_REPLY(b);
+	IPC_REPLY_GROWING(b);
 
 	ipc_buff(&b, "{\n");
 
@@ -145,7 +145,7 @@ static void q_tree(ipc_args_t *a) {
 static void q_monitors(ipc_args_t *a) {
 	const query_filter_t *f = a->ctx;
 
-	IPC_REPLY(b);
+	IPC_REPLY_GROWING(b);
 
 	output_t *m;
 	wl_list_for_each(m, &mon_list, link) {
@@ -164,7 +164,7 @@ static void q_monitors(ipc_args_t *a) {
 static void q_desktops(ipc_args_t *a) {
 	const query_filter_t *f = a->ctx;
 
-	IPC_REPLY(b);
+	IPC_REPLY_GROWING(b);
 
 	output_t *m;
 	wl_list_for_each(m, &mon_list, link) {
@@ -189,7 +189,7 @@ static void q_desktops(ipc_args_t *a) {
 static void q_nodes(ipc_args_t *a) {
 	const query_filter_t *f = a->ctx;
 
-	IPC_REPLY(b);
+	IPC_REPLY_GROWING(b);
 
 	view_t *view;
 	wl_list_for_each(view, &server.views, link) {
@@ -227,7 +227,7 @@ static void q_layers(ipc_args_t *a) {
 	if (!ipc_end(a))
 		return;
 
-	IPC_REPLY(b);
+	IPC_REPLY_GROWING(b);
 
 	if (!names_only)
 		ipc_buff(&b, "[");
@@ -292,7 +292,7 @@ static void q_focused(ipc_args_t *a) {
 		break;
 	}
 
-	IPC_REPLY(b);
+	IPC_REPLY_GROWING(b);
 
 	const char *title = n->client ? n->client->title : "";
 	const char *label = "?";

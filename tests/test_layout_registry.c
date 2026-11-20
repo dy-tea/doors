@@ -78,14 +78,15 @@ static void test_layout_queries(void) {
 	CHECK(layout_wants_visible(&d, &n));
 	CHECK(layout_reports_maximized(&d, &c));
 
-	settings.borderless_monocle = true;
+	char err[128];
+	CHECK(layout_setting_set(LAYOUT_MONOCLE, "borderless", "true", err, sizeof(err), false));
 	CHECK(layout_borderless(&d, &c));
-	settings.borderless_monocle = false;
+	CHECK(layout_setting_set(LAYOUT_MONOCLE, "borderless", "false", err, sizeof(err), false));
 	CHECK(!layout_borderless(&d, &c));
 
-	settings.gapless_monocle = true;
+	CHECK(layout_setting_set(LAYOUT_MONOCLE, "gapless", "true", err, sizeof(err), false));
 	CHECK(layout_window_gap(&d) == 0);
-	settings.gapless_monocle = false;
+	CHECK(layout_setting_set(LAYOUT_MONOCLE, "gapless", "false", err, sizeof(err), false));
 	settings.smart_gaps = false;
 	d.window_gap = 7;
 	CHECK(layout_window_gap(&d) == 7);
@@ -96,12 +97,45 @@ static void test_layout_queries(void) {
 
 	// scroller owns its resizes and pans whenever it is the active layout
 	d.layout = LAYOUT_SCROLLER;
-	settings.scroller_pan_fingers = 3;
+	CHECK(layout_setting_set(LAYOUT_SCROLLER, "pan_fingers", "3", err, sizeof(err), false));
 	CHECK(layout_pan_fingers(&d) == 3);
 	CHECK(layout_resize_edges(&d, &n, &edges));
 	CHECK(edges == (WLR_EDGE_LEFT | WLR_EDGE_RIGHT));
 	CHECK(layout_resize(NULL, &d, DIR_EAST, 0.05));
 	CHECK(layout_resize(NULL, &d, DIR_SOUTH, 0.05));
+}
+
+// every declared setting is well formed, and no name is claimed twice
+static void test_layout_settings(void) {
+	for (size_t l = 0; l < layout_count(); l++) {
+		const layout_impl_t *impl = layout_get_impl((layout_t)l);
+		CHECK(impl != NULL);
+		if (impl == NULL)
+			continue;
+
+		for (size_t i = 0; i < impl->settings_count; i++) {
+			const setting_t *s = &impl->settings[i];
+
+			CHECK(s->name != NULL && s->name[0] != '\0');
+			CHECK(s->ptr != NULL);
+			CHECK(layout_setting_find((layout_t)l, s->name) == s);
+
+			if (s->type == SETTING_ENUM)
+				CHECK(s->values != NULL);
+			if (s->type == SETTING_INT || s->type == SETTING_FLOAT || s->type == SETTING_DOUBLE)
+				CHECK(s->fmt != NULL);
+
+			for (size_t j = i + 1; j < impl->settings_count; j++)
+				CHECK(!streq(s->name, impl->settings[j].name));
+
+			CHECK(layout_command_find((layout_t)l, s->name) == NULL);
+		}
+
+		if (impl->commands != NULL) {
+			for (const command_t *c = impl->commands; c->name != NULL; c++)
+				CHECK(layout_command_find((layout_t)l, c->name) == c);
+		}
+	}
 }
 
 static void test_plugin_registration(void) {
@@ -164,6 +198,7 @@ int main(void) {
 	layout_init();
 	test_builtin_registry();
 	test_layout_queries();
+	test_layout_settings();
 	test_plugin_registration();
 	test_duplicate_and_invalid();
 	test_ipc_values();

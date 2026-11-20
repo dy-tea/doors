@@ -54,7 +54,7 @@ static void sp_hide(ipc_args_t *a) {
 }
 
 static void sp_list(ipc_args_t *a) {
-	IPC_REPLY(b);
+	IPC_REPLY_GROWING(b);
 
 	int count = scratchpad_count();
 	ipc_buff(&b, "%d\n", count);

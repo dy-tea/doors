@@ -2,10 +2,74 @@
 
 #include "borders.h"
 #include "effects/backend.h"
-#include "layout/scroller.h"
+#include "str.h"
 
 #include <stdbool.h>
 #include <stddef.h>
+
+typedef struct ipc_args ipc_args_t;
+
+typedef enum {
+	SETTING_BOOL,
+	SETTING_INT,
+	SETTING_FLOAT,
+	SETTING_DOUBLE,
+	SETTING_ENUM,
+	SETTING_STR,
+	SETTING_RGBA,
+} setting_type_t;
+
+// transaction_commit_dirty() after a successful write
+#define SETTING_COMMIT (1 << 0)
+
+// clamp out-of-range values instead of rejecting them
+#define SETTING_CLAMP (1 << 1)
+
+// value must be greater than min, with no upper bound
+#define SETTING_POSITIVE (1 << 2)
+
+// both bounds are exclusive
+#define SETTING_EXCLUSIVE (1 << 3)
+
+typedef struct setting_t {
+	const char *name;
+	const char *alias;
+	setting_type_t type;
+	void *ptr;
+	size_t size; // capacity for SETTING_STR
+	double min, max;
+	const char *fmt; // get format for the numeric types
+	const str_pair_t *values; // SETTING_ENUM
+	unsigned flags;
+	void (*on_set)(void); // side effects of a successful write
+} setting_t;
+
+// subcommand `doorsctl layout <name> <command>`
+typedef struct command_t {
+	const char *name;
+	const char *usage;
+	void (*run)(ipc_args_t *a);
+} command_t;
+
+const char *setting_type_name(setting_type_t type);
+
+// value as `<something> <name> <setting>` prints it
+void setting_format(const setting_t *s, char *buf, size_t bufsz);
+
+// format `value`, which need not be the setting's current storage
+void setting_format_value(const setting_t *s, const void *value, char *buf, size_t bufsz);
+
+// range accepted by setting
+void setting_range(const setting_t *s, char *buf, size_t bufsz);
+
+// number of bytes to store a setting
+size_t setting_storage_size(const setting_t *s);
+
+// parse, range-check, store value, run side effects
+bool setting_apply(const setting_t *s, const char *value, char *err, size_t errsz, bool dry_run);
+
+// format message into error buffer of setting or command
+void setting_err(char *err, size_t errsz, const char *fmt, ...);
 
 // layout behaviour
 typedef enum {
@@ -74,12 +138,9 @@ typedef struct {
 	// gaps, borders and decoration
 	int border_width;
 	int window_gap;
-	padding_t monocle_padding;
 	bool smart_gaps;
 	bool smart_borders;
-	bool borderless_monocle;
 	bool borderless_singleton;
-	bool gapless_monocle;
 	bool respect_tiled_min_size;
 	bool hide_lone_tab;
 	decoration_mode_t decoration_mode;
@@ -117,18 +178,6 @@ typedef struct {
 	bool enable_animations;
 	workspace_anim_direction_t workspace_anim_direction;
 	bool workspace_anim_slide_up;
-
-	// scroller layout
-	scroller_size_t scroller_default_column_width;
-	scroller_size_t *scroller_preset_column_widths;
-	int scroller_preset_column_widths_count;
-	scroller_size_t *scroller_preset_window_heights;
-	int scroller_preset_window_heights_count;
-	scroller_center_mode_t scroller_center_focused_column;
-	bool scroller_always_center_single_column;
-	padding_t scroller_struts;
-	uint32_t scroller_pan_fingers;
-	int scroller_snap_percent;
 
 	// blur
 	enum blur_algorithm blur_algorithm;
@@ -206,16 +255,12 @@ typedef struct {
 	bool direct_scanout;
 	bool auto_float_dialogs;
 	int ignore_ewmh_fullscreen;
-} doors_settings_t;
+} settings_t;
 
-extern doors_settings_t settings;
+extern settings_t settings;
 
 void settings_init(void);
 void refresh_border_color_cache(void);
-void settings_fini(void);
-
-void settings_set_scroller_preset_column_widths(scroller_size_t *list, int count);
-void settings_set_scroller_preset_window_heights(scroller_size_t *list, int count);
 
 bool config_apply_value(const char *name, const char *value, char *err, size_t errsz);
 

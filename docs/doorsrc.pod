@@ -95,8 +95,8 @@ Common examples:
 
     doorsctl config border_width 2
     doorsctl config window_gap 12
-    doorsctl config borderless_monocle true
-    doorsctl config gapless_monocle true
+    doorsctl layout monocle borderless true
+    doorsctl layout monocle gapless true
     doorsctl config enable_animations true
 
 =head1 DESKTOPS AND OUTPUTS
@@ -154,8 +154,8 @@ A minimal I<doorsrc>:
 
     doorsctl config border_width 2
     doorsctl config window_gap 12
-    doorsctl config borderless_monocle true
-    doorsctl config gapless_monocle true
+    doorsctl layout monocle borderless true
+    doorsctl layout monocle gapless true
     doorsctl config enable_animations true
 
 =head1 FILES

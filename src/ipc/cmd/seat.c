@@ -4,7 +4,7 @@
 #include "server.h"
 
 static void seat_list(ipc_args_t *a) {
-	IPC_REPLY(b);
+	IPC_REPLY_GROWING(b);
 
 	seat_t *s;
 	wl_list_for_each(s, &server.seats, link) {

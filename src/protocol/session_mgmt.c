@@ -1,4 +1,5 @@
 #include "fs.h"
+#include "ipc/args.h"
 #include "ipc/json.h"
 #include "layout/floating.h"
 #include "layout/layout.h"
@@ -1121,48 +1122,41 @@ void session_mgmt_handle_destroy(struct wlr_xdg_toplevel *xdg_toplevel) {
 		session_toplevel_detach(tl);
 }
 
-size_t session_mgmt_write_list(char *buf, size_t buf_size) {
+bool session_mgmt_write_list(char *buf, size_t buf_size) {
 	if (buf_size == 0)
-		return 0;
+		return false;
 
-	size_t off = 0;
-#define WRITE(...) do { \
-		int _n = snprintf(buf + off, buf_size - off, __VA_ARGS__); \
-		if (_n < 0) \
-			return off; \
-		off += (size_t)_n; \
-		if (off >= buf_size) \
-			return buf_size - 1; \
-	} while (0)
+	ipc_buf_t b;
+	ipc_buf_init(&b, buf, buf_size);
 
 	if (!session_manager) {
-		WRITE("sessions: not initialized\n");
-		return off;
+		ipc_buff(&b, "sessions: not initialized\n");
+		return !b.truncated;
 	}
 
 	const char *dir = session_storage_dir(session_manager);
-	WRITE("sessions: %s\n", dir ? dir : "(storage unavailable)");
+	ipc_buff(&b, "sessions: %s\n", dir ? dir : "(storage unavailable)");
 
 	if (wl_list_empty(&session_manager->sessions)) {
-		WRITE("  no active sessions\n");
-		return off;
+		ipc_buff(&b, "  no active sessions\n");
+		return !b.truncated;
 	}
 
 	session_t *session;
 	wl_list_for_each(session, &session_manager->sessions, link) {
-		WRITE("  %s reason=%u toplevels=%d\n", session->id, session->reason,
+		ipc_buff(&b, "  %s reason=%u toplevels=%d\n", session->id, session->reason,
 			wl_list_length(&session->toplevels));
 
 		session_toplevel_t *tl;
 		wl_list_for_each(tl, &session->toplevels, link) {
 			const session_state_t *state = session_states_find(&session->states, tl->name);
 			if (!state) {
-				WRITE("    %s (nothing recorded yet)%s%s\n", tl->name,
+				ipc_buff(&b, "    %s (nothing recorded yet)%s%s\n", tl->name,
 					tl->restore_pending ? " (awaiting commit)" : "", tl->resource ? "" : " (inert)");
 				continue;
 			}
 
-			WRITE("    %s [%s%s%s%s] %dx%d at %d,%d on %s/%s%s%s\n", tl->name,
+			ipc_buff(&b, "    %s [%s%s%s%s] %dx%d at %d,%d on %s/%s%s%s\n", tl->name,
 				state->floating ? "floating " : "", state->maximized ? "maximized " : "",
 				state->fullscreen ? "fullscreen " : "", state->minimized ? "minimized " : "", state->rect.width,
 				state->rect.height, state->rect.x, state->rect.y, state->output, state->desktop,
@@ -1175,9 +1169,8 @@ size_t session_mgmt_write_list(char *buf, size_t buf_size) {
 				known++;
 		}
 		if (known > 0)
-			WRITE("    (%zu remembered toplevel%s not open)\n", known, known == 1 ? "" : "s");
+			ipc_buff(&b, "    (%zu remembered toplevel%s not open)\n", known, known == 1 ? "" : "s");
 	}
 
-#undef WRITE
-	return off;
+	return !b.truncated;
 }

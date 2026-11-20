@@ -44,7 +44,16 @@ pkgs.runCommand "doors-config-parity" {
   sed -n '/special_settings\[\] = {/,/^};/p' ${src}/src/ipc/cmd/config_special.c \
     | grep -oE '\{"[a-z0-9_]+"' | sed -E 's/^\{"//; s/"$//' > "$work/specials.txt"
 
-  cat "$work/settings.txt" "$work/extras.txt" "$work/specials.txt" | sort -u > "$work/upstream-all.txt"
+  # settings a layout declares, e.g. .name = "pan_fingers"
+  sed -n '/const setting_t [a-z_]*\[\] = {/,/^};/p' ${src}/src/layout/*.c \
+    | grep -oE '\.name = "[a-z0-9_]+"' | sed -E 's/^\.name = "//; s/"$//' > "$work/layout-settings.txt"
+
+  # scroller options the layout exposes as commands rather than table entries
+  printf '%s\n' default_column_width preset_column_widths preset_window_heights \
+    > "$work/layout-commands.txt"
+
+  cat "$work/settings.txt" "$work/extras.txt" "$work/specials.txt" \
+    "$work/layout-settings.txt" "$work/layout-commands.txt" | sort -u > "$work/upstream-all.txt"
   jq -r '.[]' ${aliases} | sort -u > "$work/aliases.txt"
 
   comm -23 "$work/upstream-all.txt" "$work/aliases.txt" > "$work/upstream.txt"

@@ -48,19 +48,19 @@ alt + shift + v
 
 # master-stack: increment/decrement master count
 alt + ctrl + {i,o}
-	doorsctl master_stack {inc,dec}
+	doorsctl layout master_stack {inc,dec}
 
 # master-stack: flip master side
 alt + ctrl + period
-	doorsctl master_stack flip
+	doorsctl layout master_stack flip
 
 # master-stack: cycle orientation (left, right, top, bottom)
 alt + ctrl + comma
-	doorsctl master_stack cycle_orientation
+	doorsctl layout master_stack cycle_orientation
 
 # master-stack: cycle stack layout (vertical, horizontal)
 alt + ctrl + slash
-	doorsctl master_stack cycle_stack_layout
+	doorsctl layout master_stack cycle_stack_layout
 
 # window navigation (using brace expansion)
 alt + {h,j,k,l}

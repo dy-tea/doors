@@ -1,4 +1,4 @@
-#include "ipc/ipc.h"
+#include "ipc/args.h"
 #include "layout/scroller.h"
 #include "macros.h"
 #include "rule.h"
@@ -96,37 +96,38 @@ void rule_pattern_spec(const rule_pattern_t *p, char *out, size_t outsz) {
 	snprintf(out, outsz, "%s%s%s", mode, p->caseless ? "i:" : "", p->pattern);
 }
 
-void list_rules(char *buf, size_t buf_size) {
-	size_t offset = 0;
+bool list_rules(char *buf, size_t buf_size) {
+	ipc_buf_t b;
+	ipc_buf_init(&b, buf, buf_size);
 	int idx = 0;
 
 	rule_t *r;
 	wl_list_for_each(r, &rule_list, link) {
-		offset = ipc_buf_append(buf, buf_size, offset, "%d: ", idx);
+		ipc_buff(&b, "%d: ", idx);
 
 		char spec[RULE_RE_MAX + 16];
 		if (r->match.app_id.pattern[0] != '\0') {
 			rule_pattern_spec(&r->match.app_id, spec, sizeof(spec));
-			offset = ipc_buf_append(buf, buf_size, offset, "app_id=%s ", spec);
+			ipc_buff(&b, "app_id=%s ", spec);
 		}
 		if (r->match.title.pattern[0] != '\0') {
 			rule_pattern_spec(&r->match.title, spec, sizeof(spec));
-			offset = ipc_buf_append(buf, buf_size, offset, "title=%s ", spec);
+			ipc_buff(&b, "title=%s ", spec);
 		}
 		if (r->match.tag.pattern[0] != '\0') {
 			rule_pattern_spec(&r->match.tag, spec, sizeof(spec));
-			offset = ipc_buf_append(buf, buf_size, offset, "tag=%s ", spec);
+			ipc_buff(&b, "tag=%s ", spec);
 		}
 
 		if (r->match.one_shot)
-			offset = ipc_buf_append(buf, buf_size, offset, "one_shot ");
+			ipc_buff(&b, "one_shot ");
 
-		offset = ipc_buf_append(buf, buf_size, offset, "-> ");
+		ipc_buff(&b, "-> ");
 
 		if (r->consequence.has & RULE_TYPE_DESKTOP)
-			offset = ipc_buf_append(buf, buf_size, offset, "desktop=%s ", r->consequence.desktop);
+			ipc_buff(&b, "desktop=%s ", r->consequence.desktop);
 		if (r->consequence.has & RULE_TYPE_MONITOR)
-			offset = ipc_buf_append(buf, buf_size, offset, "monitor=%s ", r->consequence.monitor);
+			ipc_buff(&b, "monitor=%s ", r->consequence.monitor);
 		if (r->consequence.has & RULE_TYPE_STATE) {
 			const char *state_str = "unknown";
 			switch (r->consequence.state) {
@@ -143,82 +144,65 @@ void list_rules(char *buf, size_t buf_size) {
 				state_str = "pseudo_tiled";
 				break;
 			}
-			offset = ipc_buf_append(buf, buf_size, offset, "state=%s ", state_str);
+			ipc_buff(&b, "state=%s ", state_str);
 		}
 		if (r->consequence.has & RULE_TYPE_FOLLOW)
-			offset = ipc_buf_append(buf, buf_size, offset, "follow=%s ",
-				r->consequence.flags & RULE_TYPE_FOLLOW ? "on" : "off");
+			ipc_buff(&b, "follow=%s ", r->consequence.flags & RULE_TYPE_FOLLOW ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_FOCUS)
-			offset = ipc_buf_append(buf, buf_size, offset, "focus=%s ",
-				r->consequence.flags & RULE_TYPE_FOCUS ? "on" : "off");
+			ipc_buff(&b, "focus=%s ", r->consequence.flags & RULE_TYPE_FOCUS ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_MANAGE)
-			offset = ipc_buf_append(buf, buf_size, offset, "manage=%s ",
-				r->consequence.flags & RULE_TYPE_MANAGE ? "on" : "off");
+			ipc_buff(&b, "manage=%s ", r->consequence.flags & RULE_TYPE_MANAGE ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_LOCKED)
-			offset = ipc_buf_append(buf, buf_size, offset, "locked=%s ",
-				r->consequence.flags & RULE_TYPE_LOCKED ? "on" : "off");
+			ipc_buff(&b, "locked=%s ", r->consequence.flags & RULE_TYPE_LOCKED ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_HIDDEN)
-			offset = ipc_buf_append(buf, buf_size, offset, "hidden=%s ",
-				r->consequence.flags & RULE_TYPE_HIDDEN ? "on" : "off");
+			ipc_buff(&b, "hidden=%s ", r->consequence.flags & RULE_TYPE_HIDDEN ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_MAXIMIZED)
-			offset = ipc_buf_append(buf, buf_size, offset, "maximized=%s ",
-				r->consequence.flags & RULE_TYPE_MAXIMIZED ? "on" : "off");
+			ipc_buff(&b, "maximized=%s ", r->consequence.flags & RULE_TYPE_MAXIMIZED ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_MINIMIZED)
-			offset = ipc_buf_append(buf, buf_size, offset, "minimized=%s ",
-				r->consequence.flags & RULE_TYPE_MINIMIZED ? "on" : "off");
+			ipc_buff(&b, "minimized=%s ", r->consequence.flags & RULE_TYPE_MINIMIZED ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_STICKY)
-			offset = ipc_buf_append(buf, buf_size, offset, "sticky=%s ",
-				r->consequence.flags & RULE_TYPE_STICKY ? "on" : "off");
+			ipc_buff(&b, "sticky=%s ", r->consequence.flags & RULE_TYPE_STICKY ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_SCROLLER_PROPORTION)
-			offset = ipc_buf_append(buf, buf_size, offset, "scroller_proportion=%.2f ",
-				r->consequence.scroller_proportion);
+			ipc_buff(&b, "scroller_proportion=%.2f ", r->consequence.scroller_proportion);
 		if (r->consequence.has & RULE_TYPE_SCROLLER_PROPORTION_SINGLE)
-			offset = ipc_buf_append(buf, buf_size, offset, "scroller_proportion_single=%.2f ",
-				r->consequence.scroller_proportion_single);
+			ipc_buff(&b, "scroller_proportion_single=%.2f ", r->consequence.scroller_proportion_single);
 		if (r->consequence.has & RULE_TYPE_BLUR)
-			offset = ipc_buf_append(buf, buf_size, offset, "blur=%s ",
-				r->consequence.flags & RULE_TYPE_BLUR ? "on" : "off");
+			ipc_buff(&b, "blur=%s ", r->consequence.flags & RULE_TYPE_BLUR ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_MICA)
-			offset = ipc_buf_append(buf, buf_size, offset, "mica=%s ",
-				r->consequence.flags & RULE_TYPE_MICA ? "on" : "off");
+			ipc_buff(&b, "mica=%s ", r->consequence.flags & RULE_TYPE_MICA ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_ACRYLIC)
-			offset = ipc_buf_append(buf, buf_size, offset, "acrylic=%s ",
-				r->consequence.flags & RULE_TYPE_ACRYLIC ? "on" : "off");
+			ipc_buff(&b, "acrylic=%s ", r->consequence.flags & RULE_TYPE_ACRYLIC ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_BORDER_RADIUS)
-			offset = ipc_buf_append(buf, buf_size, offset, "border_radius=%.1f ",
-				r->consequence.border_radius);
+			ipc_buff(&b, "border_radius=%.1f ", r->consequence.border_radius);
 		if (r->consequence.has & RULE_TYPE_SHADOW)
-			offset = ipc_buf_append(buf, buf_size, offset, "shadow=%s ",
-				r->consequence.flags & RULE_TYPE_SHADOW ? "on" : "off");
+			ipc_buff(&b, "shadow=%s ", r->consequence.flags & RULE_TYPE_SHADOW ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_ANIM_DISABLE)
-			offset = ipc_buf_append(buf, buf_size, offset, "animations_disable=%s ",
+			ipc_buff(&b, "animations_disable=%s ",
 				r->consequence.flags & RULE_TYPE_ANIM_DISABLE ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_NO_DIM)
-			offset = ipc_buf_append(buf, buf_size, offset, "no_dim=%s ",
-				r->consequence.flags & RULE_TYPE_NO_DIM ? "on" : "off");
+			ipc_buff(&b, "no_dim=%s ", r->consequence.flags & RULE_TYPE_NO_DIM ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_BLOCK_OUT_FROM_SCREENSHARE)
-			offset = ipc_buf_append(buf, buf_size, offset, "block_out_from_screenshare=%s ",
+			ipc_buff(&b, "block_out_from_screenshare=%s ",
 				r->consequence.flags & RULE_TYPE_BLOCK_OUT_FROM_SCREENSHARE ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_ALLOW_TEARING)
-			offset = ipc_buf_append(buf, buf_size, offset, "allow_tearing=%s ",
-				r->consequence.flags & RULE_TYPE_ALLOW_TEARING ? "on" : "off");
+			ipc_buff(&b, "allow_tearing=%s ", r->consequence.flags & RULE_TYPE_ALLOW_TEARING ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_SHORTCUTS_INHIBITOR)
-			offset = ipc_buf_append(buf, buf_size, offset, "shortcuts_inhibitor=%s ",
+			ipc_buff(&b, "shortcuts_inhibitor=%s ",
 				r->consequence.flags & RULE_TYPE_SHORTCUTS_INHIBITOR ? "on" : "off");
 		if (r->consequence.has & RULE_TYPE_RENDER_UNFOCUSED_FPS)
-			offset = ipc_buf_append(buf, buf_size, offset, "render_unfocused_fps=%d ",
-				r->consequence.render_unfocused_fps);
+			ipc_buff(&b, "render_unfocused_fps=%d ", r->consequence.render_unfocused_fps);
 		if (r->consequence.has & RULE_TYPE_OPACITY)
-			offset = ipc_buf_append(buf, buf_size, offset, "opacity=%.1f ", r->consequence.opacity);
+			ipc_buff(&b, "opacity=%.1f ", r->consequence.opacity);
 
-		offset = ipc_buf_append(buf, buf_size, offset, "\n");
+		ipc_buff(&b, "\n");
 
 		idx++;
 	}
 
-	if (idx == 0) {
-		snprintf(buf, buf_size, "No rules defined\n");
-	}
+	if (idx == 0)
+		ipc_buff(&b, "No rules defined\n");
+
+	return !b.truncated;
 }
 
 static bool glob_to_regex(const char *glob, char *out, size_t outsz) {

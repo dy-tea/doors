@@ -66,7 +66,7 @@ static bool parse_assignments(ipc_args_t *a, perm_assignment_t *list, size_t *co
 }
 
 static void permission_list(ipc_args_t *a) {
-	IPC_REPLY(b);
+	IPC_REPLY_GROWING(b);
 
 	ipc_buff(&b, "default");
 	for (int cap = 0; cap < PERM_CAP_COUNT; cap++) {
@@ -313,12 +313,13 @@ const ipc_sub_t permission_subs[] = {
 };
 
 static void permission_usage(ipc_args_t *a) {
-	IPC_REPLY(b);
+	IPC_REPLY_GROWING(b);
 	ipc_buff(&b, "Usage:\n  permission <subject> <capability>=<mode> ...\n");
 	ipc_buff(&b, "  permission answer <token> <allow|deny> [--remember=session|always]\n");
 	ipc_sub_usage(&b, permission_subs);
 	ipc_buff(&b, "\n");
-	send_failure(a->fd, b.buf);
+	send_failure(a->fd, b.buf != NULL ? b.buf : "");
+	ipc_buf_free(&b);
 }
 
 void ipc_cmd_permission(ipc_args_t *a) {

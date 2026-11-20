@@ -85,7 +85,7 @@ static const str_pair_t bit_depth_values[] = {
 };
 
 static void out_list(ipc_args_t *a) {
-	IPC_REPLY(b);
+	IPC_REPLY_GROWING(b);
 
 	ipc_buff(&b, "[");
 	output_t *o;
@@ -380,7 +380,7 @@ static void out_modes(ipc_args_t *a) {
 	if (!need_output(a))
 		return;
 
-	IPC_REPLY(b);
+	IPC_REPLY_GROWING(b);
 
 	ipc_buff(&b, "[");
 	struct wlr_output *wo = ctx_of(a)->mon->wlr_output;
@@ -464,7 +464,7 @@ static void out_desktops(ipc_args_t *a) {
 
 	output_t *mon = ctx_of(a)->mon;
 	if (!ipc_peek(a)) {
-		IPC_REPLY(b);
+		IPC_REPLY_GROWING(b);
 
 		desktop_t *d;
 		wl_list_for_each(d, &mon->desk_list, link)
