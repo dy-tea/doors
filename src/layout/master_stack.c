@@ -753,6 +753,28 @@ bool master_stack_swap(output_t *m, desktop_t *d, const direction_t direction) {
 	return true;
 }
 
+// a drag along the master/stack split resizes the master area instead of a tree split
+static bool master_stack_resize(output_t *m, desktop_t *d, const direction_t dir,
+		const double delta) {
+	if (d == NULL)
+		return false;
+
+	const bool horizontal = dir == DIR_WEST || dir == DIR_EAST;
+	const master_area_orientation_t orientation = ms_orientation(d);
+	const bool horizontal_split = orientation == MASTER_LEFT || orientation == MASTER_RIGHT ||
+		orientation == MASTER_CENTER;
+
+	// the other axis still resizes the split tree
+	if (horizontal != horizontal_split)
+		return true;
+
+	const double amount = orientation == MASTER_RIGHT || orientation == MASTER_BOTTOM ? -delta : delta;
+	if (master_stack_adjust_ratio(d, (float)amount))
+		arrange(m, d, true);
+
+	return true;
+}
+
 const layout_impl_t master_stack_impl = {
 	.name = "master_stack",
 	.arrange = master_stack_arrange,
@@ -762,8 +784,23 @@ const layout_impl_t master_stack_impl = {
 	.enter = NULL,
 	.leave = NULL,
 	.init_client = NULL,
+	.client_mapped = NULL,
+	.client_unmapped = NULL,
+	.focus_after_unmap = NULL,
 	.on_client_state = NULL,
+	.resize = master_stack_resize,
 	.places_floating = NULL,
+	.wants_visible = NULL,
+	.borderless = NULL,
+	.reports_maximized = NULL,
+	.window_gap = NULL,
+	.resize_edges = NULL,
+	.pointer_resize_begin = NULL,
+	.pointer_resize_update = NULL,
+	.focus_scroll_distance = NULL,
+	.pan_fingers = NULL,
+	.pan_update = NULL,
+	.pan_end = NULL,
 	.collect = master_stack_collect,
 	.single_visible = false,
 	.has_directional_nav = true,

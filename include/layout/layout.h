@@ -4,6 +4,7 @@
 #include "types.h"
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <wlr/util/box.h>
 
 typedef struct layout_impl_t {
@@ -31,13 +32,63 @@ typedef struct layout_impl_t {
 	// over client)
 	bool (*init_client)(output_t *m, desktop_t *d, client_t *c);
 
+	// called after a new client has been placed on the desktop and before it is focused
+	void (*client_mapped)(output_t *m, desktop_t *d, client_t *c, bool focused);
+
+	// called before a client is removed from the desktop
+	void (*client_unmapped)(output_t *m, desktop_t *d, client_t *c);
+
+	// called after a client was removed from the desktop and the desktop was rearranged; return
+	// true when the layout picked the next focus itself
+	bool (*focus_after_unmap)(output_t *m, desktop_t *d, node_t *removed);
+
 	// called after a client changes state (fullscreen, maximized, minimized, tiled/floating)
 	// and before the desktop is rearranged
 	void (*on_client_state)(output_t *m, desktop_t *d, node_t *n, client_state_t old_state);
 
+	// called when the resize bind is executed; return true if the layout resized the focused
+	// toplevel itself, false to resize the split tree
+	bool (*resize)(output_t *m, desktop_t *d, direction_t dir, double delta);
+
 	// true when this layout places floating clients itself, so a floating client that gets
 	// maximized stays floating instead of being pulled into the split tree
 	bool (*places_floating)(desktop_t *d, client_t *c);
+
+	// true when the layout wants node `n` shown while its desktop is visible (NULL shows every
+	// node)
+	bool (*wants_visible)(const desktop_t *d, const node_t *n);
+
+	// true when `c` should be drawn without a border
+	bool (*borderless)(const desktop_t *d, const client_t *c);
+
+	// true when `c` counts as maximized even though the client does not report it
+	bool (*reports_maximized)(const desktop_t *d, const client_t *c);
+
+	// window gap around the layout's tiled leaves; NULL uses the global window gap
+	int (*window_gap)(const desktop_t *d);
+
+	// allowed edges for a pointer resize of `n`; return false to use the split tree's edges
+	bool (*resize_edges)(const desktop_t *d, const node_t *n, uint32_t *edges);
+
+	// called when a pointer resize of `n` starts; return true when the layout owns the drag and
+	// write the size the drag starts from to `initial`
+	bool (*pointer_resize_begin)(output_t *m, desktop_t *d, node_t *n, double *initial);
+
+	// called with the pointer delta since the grab started; return true when the layout handled it
+	bool (*pointer_resize_update)(output_t *m, desktop_t *d, node_t *n, double delta);
+
+	// fraction of the viewport that has to be scrolled to bring `n` into view, so focus follows
+	// mouse does not jump to a toplevel that is still off screen
+	double (*focus_scroll_distance)(const desktop_t *d, const node_t *n);
+
+	// number of fingers the layout consumes for panning its view, 0 when it does not pan
+	uint32_t (*pan_fingers)(const desktop_t *d);
+
+	// pan the layout's view by `delta`; return true when the layout handled it
+	bool (*pan_update)(output_t *m, desktop_t *d, double delta);
+
+	// finish a pan, snapping the layout's view; return true when the layout handled it
+	bool (*pan_end)(output_t *m, desktop_t *d);
 
 	// get a list of nodes (returns count of nodes)
 	int (*collect)(desktop_t *d, node_t ***out_nodes);
@@ -80,3 +131,45 @@ void layout_client_state_changed(output_t *m, desktop_t *d, node_t *n, client_st
 
 // reconciles every client on the desktop with the layout that is now active
 void layout_desktop_changed(output_t *m, desktop_t *d);
+
+// tells the active layout that a client was placed on the desktop
+void layout_client_mapped(output_t *m, desktop_t *d, client_t *c, bool focused);
+
+// tells the active layout that a client is about to be removed from the desktop
+void layout_client_unmapped(output_t *m, desktop_t *d, client_t *c);
+
+// lets the active layout pick the next focus after a removal (true when it did)
+bool layout_focus_after_unmap(output_t *m, desktop_t *d, node_t *removed);
+
+// lets the active layout resize the focused toplevel (true when it did)
+bool layout_resize(output_t *m, desktop_t *d, direction_t dir, double delta);
+
+// true unless the active layout hides `n` from a visible desktop
+bool layout_wants_visible(const desktop_t *d, const node_t *n);
+
+// true when the active layout draws `c` without a border
+bool layout_borderless(const desktop_t *d, const client_t *c);
+
+// true when the active layout reports `c` as maximized
+bool layout_reports_maximized(const desktop_t *d, const client_t *c);
+
+// window gap the active layout wants around tiled leaves
+int layout_window_gap(const desktop_t *d);
+
+// true when the active layout shows a single toplevel at once
+bool layout_single_visible(const desktop_t *d);
+
+// allowed pointer resize edges for `n` (true when the layout provided them)
+bool layout_resize_edges(const desktop_t *d, const node_t *n, uint32_t *edges);
+
+// pointer resize hooks
+bool layout_pointer_resize_begin(output_t *m, desktop_t *d, node_t *n, double *initial);
+bool layout_pointer_resize_update(output_t *m, desktop_t *d, node_t *n, double delta);
+
+// scroll distance to bring `n` into view, used by focus follows mouse
+double layout_focus_scroll_distance(const desktop_t *d, const node_t *n);
+
+// pan hooks
+uint32_t layout_pan_fingers(const desktop_t *d);
+bool layout_pan_update(output_t *m, desktop_t *d, double delta);
+bool layout_pan_end(output_t *m, desktop_t *d);

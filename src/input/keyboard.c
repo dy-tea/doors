@@ -6,8 +6,6 @@
 #include "ipc/ipc.h"
 #include "layout/floating.h"
 #include "layout/layout.h"
-#include "layout/master_stack.h"
-#include "layout/scroller.h"
 #include "macros.h"
 #include "output/output.h"
 #include "protocol/global_shortcuts.h"
@@ -896,7 +894,11 @@ void monocle_toggle(output_t *m, desktop_t *d) {
 	if (m == NULL || d == NULL)
 		return;
 
-	layout_toggle(d, LAYOUT_MONOCLE);
+	layout_t target;
+	if (!layout_find_by_name("monocle", &target))
+		return;
+
+	layout_toggle(d, target);
 
 	arrange(m, d, true);
 	ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name,
@@ -925,8 +927,12 @@ void set_tiled_layout(void) {
 		return;
 	desktop_t *d = output_focused()->desk;
 
-	layout_set(d, LAYOUT_TILED);
-	d->user_layout = LAYOUT_TILED;
+	layout_t target;
+	if (!layout_find_by_name("tiled", &target))
+		return;
+
+	layout_set(d, target);
+	d->user_layout = target;
 
 	arrange(output_focused(), d, true);
 	ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name,
@@ -942,7 +948,11 @@ void toggle_master_stack(void) {
 
 	desktop_t *d = output_focused()->desk;
 
-	layout_toggle(d, LAYOUT_MASTER_STACK);
+	layout_t target;
+	if (!layout_find_by_name("master_stack", &target))
+		return;
+
+	layout_toggle(d, target);
 
 	arrange(output_focused(), d, true);
 	ipc_put_status(SUB_MASK_DESKTOP_LAYOUT, "desktop_layout[%s,%c]\n", d->name,
@@ -957,20 +967,25 @@ void toggle_floating_layout(void) {
 		return;
 
 	desktop_t *d = output_focused()->desk;
+	const layout_impl_t *impl = layout_get_impl(d->layout);
 
-	// bring toplevels back into the tree
-	if (d->layout == LAYOUT_FLOATING) {
+	// the layout places floating toplevels itself, bring them back into the tree
+	if (impl != NULL && impl->places_floating != NULL) {
 		layout_set(d, d->user_layout);
 
 		node_t **toplevels = NULL;
 		const int count = desktop_toplevels(d, &toplevels);
 		for (int i = 0; i < count; i++) {
-			if (toplevels[i]->client != NULL && IS_FLOATING(toplevels[i]->client))
+			if (toplevels[i]->client != NULL && impl->places_floating(d, toplevels[i]->client))
 				tile_node(output_focused(), d, toplevels[i]);
 		}
 		free(toplevels);
 	} else {
-		layout_toggle(d, LAYOUT_FLOATING);
+		layout_t target;
+		if (!layout_find_by_name("floating", &target))
+			return;
+
+		layout_toggle(d, target);
 	}
 
 	arrange(output_focused(), d, true);
@@ -1006,23 +1021,19 @@ void rotate_counterclockwise(void) {
 
 #define RESIZE_AMOUNT 0.05
 
-static bool resize_master_stack_ratio(const bool horizontal, float delta) {
-	if (output_focused()->desk->layout != LAYOUT_MASTER_STACK)
-		return false;
+static direction_t wlr_to_direction(const enum wlr_direction dir) {
+	switch (dir) {
+	case WLR_DIRECTION_LEFT:
+		return DIR_WEST;
+	case WLR_DIRECTION_RIGHT:
+		return DIR_EAST;
+	case WLR_DIRECTION_UP:
+		return DIR_NORTH;
+	case WLR_DIRECTION_DOWN:
+		return DIR_SOUTH;
+	}
 
-	const master_area_orientation_t orientation = master_stack_orientation(output_focused()->desk);
-
-	const bool horizontal_split = orientation == MASTER_LEFT || orientation == MASTER_RIGHT ||
-		orientation == MASTER_CENTER;
-	if (horizontal != horizontal_split)
-		return true;
-
-	if (orientation == MASTER_RIGHT || orientation == MASTER_BOTTOM)
-		delta = -delta;
-
-	if (master_stack_adjust_ratio(output_focused()->desk, delta))
-		arrange(output_focused(), output_focused()->desk, true);
-	return true;
+	return DIR_EAST;
 }
 
 static const char *direction_name(const enum wlr_direction dir) {
@@ -1055,17 +1066,8 @@ static void resize_along_split(const enum wlr_direction dir) {
 			focused && focused->desk ? (void *)focused->desk->focus : NULL);
 		return;
 	}
-	if (resize_master_stack_ratio(horizontal, delta))
+	if (layout_resize(focused, focused->desk, wlr_to_direction(dir), delta))
 		return;
-	if (focused->desk->layout == LAYOUT_SCROLLER) {
-		const bool resized = horizontal ? scroller_resize_width(focused->desk,
-			delta) : scroller_resize_stack(focused->desk, delta);
-		if (resized) {
-			arrange(focused, focused->desk, true);
-			wlr_log(WLR_INFO, "Resized %s (scroller)", name);
-		}
-		return;
-	}
 
 	node_t *n = focused->desk->focus;
 	if (n->parent == NULL) {

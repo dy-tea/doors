@@ -1,3 +1,4 @@
+#include "layout/layout.h"
 #include "layout/tree.h"
 #include "settings.h"
 #include "tabs.h"
@@ -38,23 +39,11 @@ void render_leaf(const output_t *m, desktop_t *d, const node_t *n, const struct 
 		slot = root_rect;
 		use_centering = true;
 		r = apply_bleed(r, bw, omit_window_gap ? 0 : compute_window_gap(d));
-	} else if (d->layout == LAYOUT_MONOCLE && IS_TILED(n->client) && !omit_window_gap) {
-		r = root_rect;
-		slot = root_rect;
-		use_centering = true;
-		r = apply_bleed(r, bw, settings.gapless_monocle ? 0 : compute_window_gap(d));
 	} else {
 		r = rect;
 		slot = rect;
 		use_centering = true;
-
-		int wg;
-		if (omit_window_gap)
-			wg = 0;
-		else
-			wg = (settings.gapless_monocle && d->layout == LAYOUT_MONOCLE) ? 0 : compute_window_gap(d);
-
-		r = apply_bleed(r, bw, wg);
+		r = apply_bleed(r, bw, omit_window_gap ? 0 : layout_window_gap(d));
 	}
 
 	// pseudo tile
@@ -175,7 +164,7 @@ static child_slot_t child_slot(node_t *c) {
 
 static void compute_split_rects(node_t *n, desktop_t *d, struct wlr_box rect,
 		struct wlr_box *first_rect, struct wlr_box *second_rect) {
-	if (d->layout == LAYOUT_MONOCLE) {
+	if (layout_single_visible(d)) {
 		*first_rect = rect;
 		*second_rect = rect;
 		return;
@@ -249,7 +238,7 @@ void apply_layout(output_t *m, desktop_t *d, node_t *n, const struct wlr_box rec
 		}
 
 		render_leaf(m, d, n, rect, root_rect, false);
-	} else if (n->split_type == TYPE_TABBED && d->layout != LAYOUT_MONOCLE) {
+	} else if (n->split_type == TYPE_TABBED && !layout_single_visible(d)) {
 		tabs_arrange_group(m, d, n, rect, root_rect);
 	} else {
 		struct wlr_box first_rect;
@@ -283,7 +272,7 @@ int tiled_count(node_t *n, const bool include_receptacles) {
 		include_receptacles);
 }
 
-int visible_tiled_count(desktop_t *d) {
+int visible_tiled_count(const desktop_t *d) {
 	if (!d || !d->root)
 		return 0;
 	return tiled_count(d->root, false);

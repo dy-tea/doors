@@ -7,7 +7,6 @@
 #include "input/pointer.h"
 #include "input/tablet.h"
 #include "layout/layout.h"
-#include "layout/scroller.h"
 #include "macros.h"
 #include "output/output.h"
 #include "protocol/global_shortcuts.h"
@@ -245,8 +244,6 @@ static void set_resize_anchors(desktop_t *d, node_t *v_ancestor, node_t *h_ances
 	if (!d || !d->root)
 		return;
 
-	const bool scroller = d->layout == LAYOUT_SCROLLER;
-
 	FOR_EACH_LEAF(n, d->root) {
 		if (!n->client || !n->client->view || !IS_TILED(n->client))
 			continue;
@@ -259,14 +256,8 @@ static void set_resize_anchors(desktop_t *d, node_t *v_ancestor, node_t *h_ances
 		const bool fills_y = c->view->geometry.height <= 0 ||
 			c->view->geometry.height + 2 >= c->arranged_rectangle.height;
 
-		if (scroller) {
-			// column only grows or shrinks on its trailing edge
-			c->view->content_anchor_x = fills_x ? -1 : 0;
-			c->view->content_anchor_y = 0;
-		} else {
-			c->view->content_anchor_x = fills_x ? leaf_resize_anchor(n, v_ancestor) : 0;
-			c->view->content_anchor_y = fills_y ? leaf_resize_anchor(n, h_ancestor) : 0;
-		}
+		c->view->content_anchor_x = fills_x ? leaf_resize_anchor(n, v_ancestor) : 0;
+		c->view->content_anchor_y = fills_y ? leaf_resize_anchor(n, h_ancestor) : 0;
 	}
 }
 
@@ -280,13 +271,10 @@ static void process_cursor_tiled_resize(void) {
 	if (!d)
 		return;
 
-	// Handle scroller layout
-	if (scroller_is_active(d)) {
-		if (scroller_resize_column_drag(d, node->client, server.cursor->x - server.grab_x,
-				server.tiled_resize.initial_width)) {
-			arrange(node->output, d, false);
-			apply_leaf_positions(d);
-		}
+	// let the layout own the drag when it resizes something other than the split tree
+	if (layout_pointer_resize_update(node->output, d, node, server.cursor->x - server.grab_x)) {
+		arrange(node->output, d, false);
+		apply_leaf_positions(d);
 		return;
 	}
 
@@ -586,7 +574,7 @@ static void process_cursor_motion(const uint32_t time, double dx, double dy, dou
 
 			if (node && node->output && node->desktop && node->desktop == node->output->desk) {
 				const double max_scroll = (double)settings.focus_follows_mouse_max_scroll / 100.0;
-				if (scroller_scroll_amount_to_activate(node->desktop, node->client) <= max_scroll)
+				if (layout_focus_scroll_distance(node->desktop, node) <= max_scroll)
 					focus_node(node->output, node->desktop, node);
 			}
 		} else if (settings.focus_follows_mouse == FOLLOWS_ALWAYS) {
@@ -642,9 +630,10 @@ void view_begin_interactive(view_t *view, enum cursor_mode mode, uint32_t edges)
 			set_resize_anchors(view->node->desktop, server.tiled_resize.parent_vertical,
 				server.tiled_resize.parent_horizontal);
 
-			const desktop_t *d = view->node->desktop;
-			if (d && scroller_is_active(d))
-				server.tiled_resize.initial_width = scroller_column_width(d, view->node->client);
+			desktop_t *d = view->node->desktop;
+			if (d != NULL)
+				layout_pointer_resize_begin(view->node->output, d, view->node,
+					&server.tiled_resize.initial_width);
 
 			// store grab position
 			server.grab_x = server.cursor->x;
@@ -785,12 +774,12 @@ bool cursor_interactive_resize(void) {
 		const struct wlr_box rect = c->floating_rectangle;
 		edges = edges_from_cursor(&rect, WLR_EDGE_LEFT | WLR_EDGE_RIGHT | WLR_EDGE_TOP | WLR_EDGE_BOTTOM);
 	} else if (IS_TILED(c)) {
-		// for scroller layouts, only allow horizontal edges (column width resize)
 		const struct wlr_box rect = c->tiled_rectangle;
-		if (d && d->layout == LAYOUT_SCROLLER)
-			edges = edges_from_cursor(&rect, WLR_EDGE_LEFT | WLR_EDGE_RIGHT);
-		else
-			edges = edges_from_cursor(&rect, get_tiled_resizable_edges(view->node));
+		uint32_t allowed = 0;
+		if (!layout_resize_edges(d, view->node, &allowed))
+			allowed = get_tiled_resizable_edges(view->node);
+
+		edges = edges_from_cursor(&rect, allowed);
 	}
 
 	if (edges == 0)
@@ -981,21 +970,21 @@ void cursor_axis(struct wl_listener *listener, void *data) {
 	m = server.focused_output;
 	desktop_t *d = m ? m->desk : NULL;
 	const bool is_touchpad = (event->source == WL_POINTER_AXIS_SOURCE_FINGER);
+	const uint32_t pan_fingers = layout_pan_fingers(d);
 
-	// cancel any ongoing touchpad scroll gesture if the layout is not scroller
-	if (server.touchpad_scroll.ongoing && (!d || d->layout != LAYOUT_SCROLLER))
+	// cancel any ongoing touchpad scroll gesture if the layout no longer pans
+	if (server.touchpad_scroll.ongoing && pan_fingers == 0)
 		server.touchpad_scroll.ongoing = false;
 
-	// handle touchpad horizontal scrolling in the scroller layout
-	if (d && d->layout == LAYOUT_SCROLLER && is_touchpad && settings.scroller_pan_fingers == 2 &&
+	// a two finger touchpad pan arrives as horizontal axis events
+	if (d != NULL && pan_fingers == 2 && is_touchpad &&
 			event->orientation == WL_POINTER_AXIS_HORIZONTAL_SCROLL) {
 		if (!server.touchpad_scroll.ongoing) {
 			server.touchpad_scroll.ongoing = true;
 			server.touchpad_scroll.is_touchpad = is_touchpad;
-			scroller_view_offset_gesture_begin(d, is_touchpad);
 		}
-		scroller_view_offset_gesture_update(d, event->delta);
-		arrange(m, d, true);
+		if (layout_pan_update(m, d, event->delta))
+			arrange(m, d, true);
 		return;
 	}
 
@@ -1003,10 +992,8 @@ void cursor_axis(struct wl_listener *listener, void *data) {
 	// horizontal touchpad scroll
 	if (server.touchpad_scroll.ongoing) {
 		server.touchpad_scroll.ongoing = false;
-		if (d && d->layout == LAYOUT_SCROLLER) {
-			scroller_view_offset_gesture_end(d);
+		if (layout_pan_end(m, d))
 			arrange(m, d, true);
-		}
 	}
 
 	const pointer_t *pointer = event->pointer ? event->pointer->base.data : NULL;
@@ -1172,8 +1159,11 @@ void handle_pointer_swipe_begin(struct wl_listener *listener, void *data) {
 	(void)listener;
 	struct wlr_pointer_swipe_begin_event *event = data;
 
+	const output_t *m = server.focused_output;
+	const desktop_t *d = m ? m->desk : NULL;
+
 	if (gesture_binding_check(GESTURE_TYPE_SWIPE,
-			event->fingers) || event->fingers == settings.scroller_pan_fingers) {
+			event->fingers) || event->fingers == layout_pan_fingers(d)) {
 		gesture_tracker_begin(&server.gesture_tracker, GESTURE_TYPE_SWIPE, event->fingers);
 	} else {
 		wlr_pointer_gestures_v1_send_swipe_begin(server.pointer_gestures, server.seat, event->time_msec,
@@ -1187,16 +1177,14 @@ void handle_pointer_swipe_update(struct wl_listener *listener, void *data) {
 
 	if (gesture_tracker_check(&server.gesture_tracker, GESTURE_TYPE_SWIPE)) {
 		gesture_tracker_update(&server.gesture_tracker, event->dx, event->dy, NAN, NAN);
-		if (server.gesture_tracker.fingers == settings.scroller_pan_fingers) {
-			output_t *m = server.focused_output;
-			desktop_t *d = m ? m->desk : NULL;
-			if (d && d->layout == LAYOUT_SCROLLER) {
-				double pan = event->dx * 5.0;
-				if (cursor_touchpad_natural_scroll_enabled())
-					pan = -pan;
-				scroller_view_offset_gesture_update(d, pan);
+		output_t *m = server.focused_output;
+		desktop_t *d = m ? m->desk : NULL;
+		if (d != NULL && server.gesture_tracker.fingers == layout_pan_fingers(d)) {
+			double pan = event->dx * 5.0;
+			if (cursor_touchpad_natural_scroll_enabled())
+				pan = -pan;
+			if (layout_pan_update(m, d, pan))
 				arrange(m, d, true);
-			}
 		}
 	} else {
 		wlr_pointer_gestures_v1_send_swipe_update(server.pointer_gestures, server.seat, event->time_msec,
@@ -1221,13 +1209,10 @@ void handle_pointer_swipe_end(struct wl_listener *listener, void *data) {
 
 	output_t *m = server.focused_output;
 	desktop_t *d = m ? m->desk : NULL;
-	const bool panned = server.gesture_tracker.fingers == settings.scroller_pan_fingers && d &&
-		d->layout == LAYOUT_SCROLLER;
+	const bool panned = d != NULL && server.gesture_tracker.fingers == layout_pan_fingers(d);
 
-	if (panned) {
-		scroller_view_offset_gesture_end(d);
+	if (panned && layout_pan_end(m, d))
 		arrange(m, d, true);
-	}
 
 	uint32_t directions = GESTURE_DIRECTION_NONE;
 	const double threshold = 30.0;

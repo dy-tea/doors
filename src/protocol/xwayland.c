@@ -611,6 +611,9 @@ static void handle_map(struct wl_listener *listener, void *data) {
 		insert_node(target_desktop, node, target_desktop->focus);
 	}
 
+	// let the layout adopt the new toplevel
+	layout_client_mapped(target_monitor, target_desktop, client, should_focus);
+
 	if (target_desktop != d && !target_desktop_is_focused) {
 		client->flags.shown = false;
 		wlr_scene_node_set_enabled(&xwayland_toplevel->view.scene_tree->node, false);
@@ -707,12 +710,17 @@ static void handle_unmap(struct wl_listener *listener, void *data) {
 				xwayland_toplevel->view.client &&
 				xwayland_toplevel->view.client->title[0] ? xwayland_toplevel->view.client->title : "?",
 				xwayland_toplevel->view.node->id);
+			// let the layout drop the toplevel before the tree changes
+			layout_client_unmapped(mon, desk, xwayland_toplevel->view.client);
+
 			remove_node(desk, xwayland_toplevel->view.node);
 			if (mon && desk) {
 				arrange(mon, desk, true);
 
-				// the closed toplevel was the last one standing
-				if (desk->focus == xwayland_toplevel->view.node || !node_focusable(desk->focus))
+				// the closed toplevel was the last one standing, unless the layout chose the focus
+				if (!layout_focus_after_unmap(mon, desk,
+					xwayland_toplevel->view.node) && (desk->focus == xwayland_toplevel->view.node ||
+					!node_focusable(desk->focus)))
 					desk->focus = desktop_fallback_focus(desk, xwayland_toplevel->view.node);
 
 				if (desk->focus != NULL)

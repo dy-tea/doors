@@ -187,13 +187,16 @@ void desktop_init(desktop_t *d, output_t *output, const char *name) {
 	d->id = next_desktop_id++;
 	strncpy(d->name, name, SMALEN - 1);
 	d->name[SMALEN - 1] = '\0';
-	layout_set(d, LAYOUT_TILED);
-	d->user_layout = LAYOUT_TILED;
 	d->window_gap = settings.window_gap;
 	d->output = output;
 	wl_list_init(&d->link);
 	wl_list_init(&d->minimized);
 	wl_list_init(&d->layout_states);
+
+	// the desktop has to be complete before a layout sees it
+	layout_set(d, LAYOUT_TILED);
+	d->user_layout = LAYOUT_TILED;
+
 	if (wl_list_empty(&output->desk_list))
 		output->desk = d;
 	wl_list_insert(output->desk_list.prev, &d->link);
@@ -277,9 +280,9 @@ static void update_window_visibility(node_t *node, output_t *m, desktop_t *curre
 	}
 
 found_desktop:
-	// in monocle layout, only the focused node should be visible
-	if (should_show && current_desktop->layout == LAYOUT_MONOCLE)
-		should_show = (node == current_desktop->focus);
+	// a layout can choose to reveal only part of the toplevels on its desktops
+	if (should_show && !layout_wants_visible(current_desktop, node))
+		should_show = false;
 
 	if (should_show && node_is_minimized(node))
 		should_show = false;

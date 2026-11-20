@@ -1,5 +1,6 @@
 #include "borders.h"
 #include "client.h"
+#include "layout/layout.h"
 #include "macros.h"
 #include "output/output.h"
 #include "protocol/xwayland.h"
@@ -30,9 +31,9 @@ static void get_border_color(client_t *client, float *color) {
 
 	const bool the_only_window = (wl_list_length(&mon_list) == 1) && bs.desk && bs.desk->root &&
 		bs.desk->root->client;
-	const bool no_border = (settings.borderless_monocle && bs.desk &&
-		bs.desk->layout == LAYOUT_MONOCLE && IS_TILED(client)) || (settings.borderless_singleton &&
-		the_only_window) || client->state == STATE_FULLSCREEN;
+	const bool no_border = layout_borderless(bs.desk,
+		client) || (settings.borderless_singleton && the_only_window) ||
+		client->state == STATE_FULLSCREEN;
 
 	if (no_border) {
 		color[0] = color[1] = color[2] = 0.0f;

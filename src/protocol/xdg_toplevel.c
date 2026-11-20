@@ -5,7 +5,6 @@
 #include "input/input_method.h"
 #include "ipc/ipc.h"
 #include "layout/layout.h"
-#include "layout/scroller.h"
 #include "output/output.h"
 #include "protocol/popup.h"
 #include "protocol/session_mgmt.h"
@@ -357,8 +356,8 @@ void xdg_toplevel_adopt(xdg_toplevel_t *toplevel) {
 		insert_node(target_desktop, n, focus);
 	}
 
-	// in scroller layout, also track the toplevel in the scroller state.
-	scroller_add_tile(target_desktop, n->client, should_focus);
+	// let the layout adopt the new toplevel
+	layout_client_mapped(target_output, target_desktop, n->client, should_focus);
 
 	// notify client of scale
 	if (target_output && target_output->wlr_output) {
@@ -471,10 +470,8 @@ void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 				n->client && n->client->app_id[0] ? n->client->app_id : "?",
 				n->client && n->client->title[0] ? n->client->title : "?", n->id);
 		}
-		// in scroller layout, remove from scroller state first
-		scroller_remove_tile(d, n->client, m);
-		if (d->layout == LAYOUT_SCROLLER)
-			scroller_apply_active_focus(d, m);
+		// let the layout drop the toplevel before the tree changes
+		layout_client_unmapped(m, d, n->client);
 
 		remove_node(d, n);
 
@@ -495,15 +492,8 @@ void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 		toplevel->view.node = NULL;
 		toplevel->view.client = NULL;
 
-		// focus handling after removing node
-		if (d->layout == LAYOUT_SCROLLER) {
-			// fall back to tree focus only if croller is empty
-			if (d->focus == NULL && d->root != NULL) {
-				d->focus = first_extrema(d->root);
-				if (d->focus != NULL)
-					focus_node(d->output ? d->output : m, d, d->focus);
-			}
-		} else {
+		// focus handling after removing node, unless the layout picked the focus itself
+		if (!layout_focus_after_unmap(m, d, n)) {
 			// the closed toplevel was the last one standing (floating layouts never put
 			// anything in the tree), hand the focus to the topmost toplevel left
 			if (d->focus == n || !node_focusable(d->focus)) {

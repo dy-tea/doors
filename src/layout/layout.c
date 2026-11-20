@@ -168,3 +168,131 @@ void layout_toggle(desktop_t *d, const layout_t target) {
 
 	layout_set(d, d->layout == target ? d->user_layout : target);
 }
+
+static const layout_impl_t *active_impl(const desktop_t *d) {
+	if (d == NULL)
+		return NULL;
+
+	return layout_get_impl(d->layout);
+}
+
+void layout_client_mapped(output_t *m, desktop_t *d, client_t *c, const bool focused) {
+	const layout_impl_t *impl = active_impl(d);
+	if (impl != NULL && impl->client_mapped != NULL)
+		impl->client_mapped(m, d, c, focused);
+}
+
+void layout_client_unmapped(output_t *m, desktop_t *d, client_t *c) {
+	const layout_impl_t *impl = active_impl(d);
+	if (impl != NULL && impl->client_unmapped != NULL)
+		impl->client_unmapped(m, d, c);
+}
+
+bool layout_focus_after_unmap(output_t *m, desktop_t *d, node_t *removed) {
+	const layout_impl_t *impl = active_impl(d);
+	if (impl == NULL || impl->focus_after_unmap == NULL)
+		return false;
+
+	return impl->focus_after_unmap(m, d, removed);
+}
+
+bool layout_resize(output_t *m, desktop_t *d, const direction_t dir, const double delta) {
+	const layout_impl_t *impl = active_impl(d);
+	if (impl == NULL || impl->resize == NULL)
+		return false;
+
+	return impl->resize(m, d, dir, delta);
+}
+
+bool layout_wants_visible(const desktop_t *d, const node_t *n) {
+	const layout_impl_t *impl = active_impl(d);
+	if (impl == NULL || impl->wants_visible == NULL)
+		return true;
+
+	return impl->wants_visible(d, n);
+}
+
+bool layout_borderless(const desktop_t *d, const client_t *c) {
+	const layout_impl_t *impl = active_impl(d);
+	if (impl == NULL || impl->borderless == NULL)
+		return false;
+
+	return impl->borderless(d, c);
+}
+
+bool layout_reports_maximized(const desktop_t *d, const client_t *c) {
+	const layout_impl_t *impl = active_impl(d);
+	if (impl == NULL || impl->reports_maximized == NULL)
+		return false;
+
+	return impl->reports_maximized(d, c);
+}
+
+int layout_window_gap(const desktop_t *d) {
+	const layout_impl_t *impl = active_impl(d);
+	if (impl != NULL && impl->window_gap != NULL)
+		return impl->window_gap(d);
+
+	return d != NULL ? compute_window_gap(d) : 0;
+}
+
+bool layout_single_visible(const desktop_t *d) {
+	const layout_impl_t *impl = active_impl(d);
+	return impl != NULL && impl->single_visible;
+}
+
+bool layout_resize_edges(const desktop_t *d, const node_t *n, uint32_t *edges) {
+	const layout_impl_t *impl = active_impl(d);
+	if (impl == NULL || impl->resize_edges == NULL || edges == NULL)
+		return false;
+
+	return impl->resize_edges(d, n, edges);
+}
+
+bool layout_pointer_resize_begin(output_t *m, desktop_t *d, node_t *n, double *initial) {
+	const layout_impl_t *impl = active_impl(d);
+	if (impl == NULL || impl->pointer_resize_begin == NULL)
+		return false;
+
+	return impl->pointer_resize_begin(m, d, n, initial);
+}
+
+bool layout_pointer_resize_update(output_t *m, desktop_t *d, node_t *n, const double delta) {
+	const layout_impl_t *impl = active_impl(d);
+	if (impl == NULL || impl->pointer_resize_update == NULL)
+		return false;
+
+	return impl->pointer_resize_update(m, d, n, delta);
+}
+
+double layout_focus_scroll_distance(const desktop_t *d, const node_t *n) {
+	const layout_impl_t *impl = active_impl(d);
+	if (impl == NULL || impl->focus_scroll_distance == NULL)
+		return 0.0;
+
+	return impl->focus_scroll_distance(d, n);
+}
+
+uint32_t layout_pan_fingers(const desktop_t *d) {
+	const layout_impl_t *impl = active_impl(d);
+	if (impl == NULL || impl->pan_fingers == NULL)
+		return 0;
+
+	return impl->pan_fingers(d);
+}
+
+bool layout_pan_update(output_t *m, desktop_t *d, const double delta) {
+	const layout_impl_t *impl = active_impl(d);
+	if (impl == NULL || impl->pan_update == NULL)
+		return false;
+
+	return impl->pan_update(m, d, delta);
+}
+
+bool layout_pan_end(output_t *m, desktop_t *d) {
+	const layout_impl_t *impl = active_impl(d);
+	if (impl == NULL || impl->pan_end == NULL)
+		return false;
+
+	return impl->pan_end(m, d);
+}

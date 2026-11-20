@@ -26,15 +26,15 @@ unsigned int node_area(const node_t *n);
 int tiled_count(node_t *n, bool include_receptacles);
 
 // number of tiled leaves currently on the desktop
-int visible_tiled_count(desktop_t *d);
+int visible_tiled_count(const desktop_t *d);
 
-static inline int effective_border_width(desktop_t *d) {
+static inline int effective_border_width(const desktop_t *d) {
 	if (settings.smart_borders && d && visible_tiled_count(d) <= 1)
 		return 0;
 	return settings.border_width;
 }
 
-static inline int compute_window_gap(desktop_t *d) {
+static inline int compute_window_gap(const desktop_t *d) {
 	if (settings.smart_gaps && visible_tiled_count(d) <= 1)
 		return 0;
 	return d->window_gap;

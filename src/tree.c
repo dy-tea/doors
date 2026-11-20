@@ -157,9 +157,8 @@ bool client_reports_maximized(const client_t *c, desktop_t *d) {
 		return false;
 	if (c->flags.maximized)
 		return true;
-	if (d == NULL || d->layout != LAYOUT_MONOCLE)
-		return false;
-	return d->focus != NULL && d->focus->client == c;
+
+	return layout_reports_maximized(d, c);
 }
 
 bool node_is_minimized(const node_t *n) {
@@ -794,7 +793,7 @@ bool client_set_maximized(output_t *m, desktop_t *d, node_t *n, const bool value
 	if (value && c->state == STATE_FULLSCREEN)
 		return false;
 
-	const layout_impl_t *impl = layout_get_impl(d != NULL ? d->layout : LAYOUT_TILED);
+	const layout_impl_t *impl = d != NULL ? layout_get_impl(d->layout) : NULL;
 	bool layout_places_floating = impl != NULL && impl->places_floating != NULL &&
 		impl->places_floating(d, c);
 

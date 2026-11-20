@@ -6,6 +6,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wlr/util/edges.h>
 #include <wlr/util/log.h>
 
 typedef struct scroller_tile_t {
@@ -30,6 +31,7 @@ typedef struct scroller_state_t {
 	double gap;
 	bool activate_prev_column_on_removal;
 	scroller_size_t default_column_width;
+	double drag_initial_width;
 } scroller_state_t;
 
 // the desktop's scroller state
@@ -1701,6 +1703,122 @@ static bool scroller_focus(desktop_t *d, direction_t dir) {
 	return false;
 }
 
+static void scroller_client_mapped(output_t *m, desktop_t *d, client_t *c, const bool focused) {
+	(void)m;
+	scroller_add_tile(d, c, focused);
+}
+
+static void scroller_client_unmapped(output_t *m, desktop_t *d, client_t *c) {
+	scroller_remove_tile(d, c, m);
+	scroller_apply_active_focus(d, m);
+}
+
+static bool scroller_focus_after_unmap(output_t *m, desktop_t *d, node_t *removed) {
+	(void)removed;
+
+	// the camera already moved to the active column, only fall back to the tree when it is empty
+	if (d->focus == NULL && d->root != NULL) {
+		d->focus = first_extrema(d->root);
+		if (d->focus != NULL)
+			focus_node(m, d, d->focus);
+	}
+
+	return true;
+}
+
+// a column only grows or shrinks on its trailing edge
+static void scroller_pointer_anchors(const desktop_t *d) {
+	if (d == NULL || d->root == NULL)
+		return;
+
+	FOR_EACH_LEAF(n, d->root) {
+		if (n->client == NULL || n->client->view == NULL || !IS_TILED(n->client))
+			continue;
+
+		client_t *c = n->client;
+		const bool fills_x = c->view->geometry.width <= 0 ||
+			c->view->geometry.width + 2 >= c->arranged_rectangle.width;
+
+		c->view->content_anchor_x = fills_x ? -1 : 0;
+		c->view->content_anchor_y = 0;
+	}
+}
+
+static bool scroller_resize(output_t *m, desktop_t *d, const direction_t dir, const double delta) {
+	const bool horizontal = dir == DIR_WEST || dir == DIR_EAST;
+	const bool resized = horizontal ? scroller_resize_width(d, delta) : scroller_resize_stack(d,
+		(float)delta);
+
+	if (resized)
+		arrange(m, d, true);
+
+	return true;
+}
+
+static bool scroller_resize_edges(const desktop_t *d, const node_t *n, uint32_t *edges) {
+	(void)d;
+	(void)n;
+
+	// a column only resizes horizontally
+	*edges = WLR_EDGE_LEFT | WLR_EDGE_RIGHT;
+	return true;
+}
+
+static bool scroller_pointer_resize_begin(output_t *m, desktop_t *d, node_t *n, double *initial) {
+	(void)m;
+	if (d == NULL || n == NULL || n->client == NULL)
+		return false;
+
+	scroller_pointer_anchors(d);
+
+	scroller_state_t *s = scroller_state(d);
+	if (s == NULL)
+		return false;
+
+	s->drag_initial_width = scroller_column_width(d, n->client);
+	*initial = s->drag_initial_width;
+	return true;
+}
+
+static bool scroller_pointer_resize_update(output_t *m, desktop_t *d, node_t *n,
+		const double delta) {
+	(void)m;
+	if (d == NULL || n == NULL || n->client == NULL)
+		return false;
+
+	scroller_state_t *s = scroller_state(d);
+	if (s == NULL)
+		return false;
+
+	scroller_resize_column_drag(d, n->client, delta, s->drag_initial_width);
+	return true;
+}
+
+static double scroller_focus_scroll_distance(const desktop_t *d, const node_t *n) {
+	if (n == NULL || n->client == NULL)
+		return 0.0;
+
+	return scroller_scroll_amount_to_activate(d, n->client);
+}
+
+static uint32_t scroller_pan_fingers(const desktop_t *d) {
+	(void)d;
+	return settings.scroller_pan_fingers;
+}
+
+static bool scroller_pan_update(output_t *m, desktop_t *d, const double delta) {
+	(void)m;
+	scroller_view_offset_gesture_update(d, delta);
+	return true;
+}
+
+static bool scroller_pan_end(output_t *m, desktop_t *d) {
+	(void)m;
+
+	scroller_view_offset_gesture_end(d);
+	return true;
+}
+
 const layout_impl_t scroller_impl = {
 	.name = "scroller",
 	.arrange = scroller_arrange,
@@ -1710,8 +1828,23 @@ const layout_impl_t scroller_impl = {
 	.enter = NULL,
 	.leave = scroller_leave,
 	.init_client = NULL,
+	.client_mapped = scroller_client_mapped,
+	.client_unmapped = scroller_client_unmapped,
+	.focus_after_unmap = scroller_focus_after_unmap,
 	.on_client_state = scroller_on_client_state,
+	.resize = scroller_resize,
 	.places_floating = NULL,
+	.wants_visible = NULL,
+	.borderless = NULL,
+	.reports_maximized = NULL,
+	.window_gap = NULL,
+	.resize_edges = scroller_resize_edges,
+	.pointer_resize_begin = scroller_pointer_resize_begin,
+	.pointer_resize_update = scroller_pointer_resize_update,
+	.focus_scroll_distance = scroller_focus_scroll_distance,
+	.pan_fingers = scroller_pan_fingers,
+	.pan_update = scroller_pan_update,
+	.pan_end = scroller_pan_end,
 	.collect = scroller_collect,
 	.single_visible = false,
 	.has_directional_nav = true,
