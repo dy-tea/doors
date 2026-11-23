@@ -116,7 +116,7 @@ static void hotkey_add(ipc_args_t *a) {
 	ipc_ok(a, "Hotkey added\n");
 }
 
-static const ipc_sub_t hotkey_subs[] = {
+const ipc_sub_t hotkey_subs[] = {
 	IPC_SUB("list", NULL, "hotkey list", hotkey_list),
 	IPC_SUB("add", NULL, "hotkey add <modifiers+key>[flags] <command>", hotkey_add),
 	IPC_SUB_END,

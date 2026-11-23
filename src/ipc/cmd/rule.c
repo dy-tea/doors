@@ -5,7 +5,6 @@
 #include <float.h>
 #include <limits.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 static const str_pair_t rule_flag_names[] = {
@@ -244,10 +243,9 @@ static void rule_show_list(ipc_args_t *a) {
 }
 
 const ipc_sub_t rule_subs[] = {
-	IPC_SUB("-a", "--add", "rule -a | --add <app_id> [one_shot] [key=value ...], "
-		"match fields take [exact:|glob:|regex:][i:]<pattern>", rule_add),
-	IPC_SUB("-r", "--remove", "rule -r | --remove <index>", rule_remove),
-	IPC_SUB("-l", "--list", "rule -l | --list", rule_show_list),
+	IPC_SUB("-a", "--add", "rule -a|--add <app_id> [one_shot] [<key>=<value>...]", rule_add),
+	IPC_SUB("-r", "--remove", "rule -r|--remove <index>", rule_remove),
+	IPC_SUB("-l", "--list", "rule -l|--list", rule_show_list),
 	IPC_SUB_END,
 };
 

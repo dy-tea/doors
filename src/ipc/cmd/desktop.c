@@ -310,12 +310,12 @@ static void desk_focus_sub(ipc_args_t *a) {
 }
 
 const ipc_sub_t desktop_subs[] = {
-	IPC_SUB("-f", "--focus", "desktop [-f|--focus] [next|last|prev]", desk_focus_sub),
+	IPC_SUB("-f", "--focus", "desktop -f|--focus [next|last|prev]", desk_focus_sub),
 	IPC_SUB("-l", "--layout", "desktop -l|--layout <layout> [--all]", desk_layout),
 	IPC_SUB("-n", "--rename", "desktop -n|--rename <name>", desk_rename),
 	IPC_SUB("-s", "--swap", "desktop -s|--swap <desktop>", desk_swap),
 	IPC_SUB("-r", "--remove", "desktop -r|--remove", desk_remove),
-	IPC_SUB("-b", "--bubble", "desktop -b|--bubble <up|down>", desk_bubble),
+	IPC_SUB("-b", "--bubble", "desktop -b|--bubble up|down", desk_bubble),
 	IPC_SUB("-m", "--to-monitor", "desktop -m|--to-monitor <monitor>", desk_to_monitor),
 	IPC_SUB_END,
 };

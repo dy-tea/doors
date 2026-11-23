@@ -459,14 +459,14 @@ static void wm_restart(ipc_args_t *a) {
 }
 
 const ipc_sub_t wm_subs[] = {
-	IPC_SUB("-d", "--dump-state", "wm -d | --dump-state", wm_dump_state),
-	IPC_SUB("-l", "--load-state", "wm -l | --load-state <file>", wm_load_state),
-	IPC_SUB("-a", "--add-monitor", "wm -a | --add-monitor <name>", wm_add_monitor),
-	IPC_SUB("-O", "--reorder-monitors", "wm -O | --reorder-monitors <names...>", wm_reorder_monitors),
-	IPC_SUB("-o", "--adopt-orphans", "wm -o | --adopt-orphans", wm_adopt_orphans),
-	IPC_SUB("-g", "--get-status", "wm -g | --get-status [--json]", wm_get_status),
-	IPC_SUB("-h", "--record-history", "wm -h | --record-history [true|false]", wm_record_history),
-	IPC_SUB("-r", "--restart", "wm -r | --restart", wm_restart),
+	IPC_SUB("-d", "--dump-state", "wm -d|--dump-state", wm_dump_state),
+	IPC_SUB("-l", "--load-state", "wm -l|--load-state <file>", wm_load_state),
+	IPC_SUB("-a", "--add-monitor", "wm -a|--add-monitor <name>", wm_add_monitor),
+	IPC_SUB("-O", "--reorder-monitors", "wm -O|--reorder-monitors <name>...", wm_reorder_monitors),
+	IPC_SUB("-o", "--adopt-orphans", "wm -o|--adopt-orphans", wm_adopt_orphans),
+	IPC_SUB("-g", "--get-status", "wm -g|--get-status [--json]", wm_get_status),
+	IPC_SUB("-h", "--record-history", "wm -h|--record-history [true|false]", wm_record_history),
+	IPC_SUB("-r", "--restart", "wm -r|--restart", wm_restart),
 	IPC_SUB_END,
 };
 

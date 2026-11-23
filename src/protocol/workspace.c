@@ -2,7 +2,6 @@
 #include "ipc/ipc.h"
 #include "layout/floating.h"
 #include "layout/layout.h"
-#include "layout/master_stack.h"
 #include "macros.h"
 #include "output/output.h"
 #include "protocol/workspace.h"

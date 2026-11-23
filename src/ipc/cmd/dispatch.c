@@ -9,7 +9,10 @@
 #include <stdlib.h>
 #include <wlr/util/log.h>
 
-#define CMD(name, summary, run) {name, summary, run, NULL}
+#define CMD(name, summary, usage, run) {name, summary, usage, run, NULL, NULL}
+#define CMD_SUB(name, summary, usage, run, subs) {name, summary, usage, run, subs, NULL}
+#define CMD_SUB_EXTRA(name, summary, usage, run, subs, extra) \
+	{name, summary, usage, run, subs, extra}
 
 static void ipc_cmd_commands(ipc_args_t *a);
 
@@ -36,36 +39,51 @@ static bool dry_run_supported(const char *name) {
 }
 
 static const ipc_cmd_t commands[] = {
-	CMD("bezier", "register a bezier easing curve", ipc_cmd_actions),
-	CMD("commands", "list every command and its subcommands", ipc_cmd_commands),
-	{"config", "get, set or reset a setting", ipc_cmd_config, config_subs},
-	{"desktop", "focus, create, rename or reorder desktops", ipc_cmd_desktop, desktop_subs},
-	{"env", "set or unset environment variables for launched clients", ipc_cmd_env, env_subs},
-	CMD("focus", "move focus in a direction", ipc_cmd_actions),
-	CMD("globalshortcuts", "list bound global shortcuts", ipc_cmd_globalshortcuts),
-	CMD("hotkey", "list or add keybinds", ipc_cmd_hotkey),
-	CMD("input", "set an input device property", ipc_cmd_input),
-	{"layer_rule", "manage layer-shell surface rules", ipc_cmd_layer_rule, layer_rule_subs},
-	{"layout", "list layouts, or get, set and run a layout's own options and commands", ipc_cmd_layout,
-		NULL},
-	{"node", "act on the focused window", ipc_cmd_node, node_subs},
-	{"output", "configure outputs and desktops", ipc_cmd_output, output_subs},
-	{"permission", "manage capture, output and input permissions", ipc_cmd_permission,
-		permission_subs},
-	{"plugin", "load or list plugins", ipc_cmd_plugin, plugin_subs},
-	{"query", "query monitors, desktops, layers and nodes", ipc_cmd_query, query_subs},
-	CMD("quit", "shut the compositor down", ipc_cmd_quit),
-	CMD("resize", "resize in a direction", ipc_cmd_actions),
-	{"rule", "manage window rules", ipc_cmd_rule, rule_subs},
-	CMD("scratchpad", "show, hide and list scratchpad entries", ipc_cmd_scratchpad),
-	{"seat", "list seats", ipc_cmd_seat, seat_subs},
-	CMD("send", "send the focused window to another desktop", ipc_cmd_actions),
-	CMD("sessions", "list application sessions", ipc_cmd_sessions),
-	CMD("spring", "register a spring animation curve", ipc_cmd_actions),
-	CMD("swap", "swap with the neighbour in a direction", ipc_cmd_actions),
-	CMD("toggle", "toggle a window state", ipc_cmd_actions),
-	{"tree", "drive the tiled (BSP) tree layout", ipc_cmd_tree, tree_subs},
-	{"wm", "compositor level commands", ipc_cmd_wm, wm_subs},
+	CMD("bezier", "register a bezier easing curve", "bezier <name> <p1x> <p1y> <p2x> <p2y>",
+		ipc_cmd_actions),
+	CMD("commands", "list every command and its subcommands", "commands", ipc_cmd_commands),
+	CMD_SUB("config", "get, set or reset a setting", NULL, ipc_cmd_config, config_subs),
+	CMD_SUB("desktop", "focus, create, rename or reorder desktops", NULL, ipc_cmd_desktop,
+		desktop_subs),
+	CMD_SUB("env", "set or unset environment variables for launched clients", NULL, ipc_cmd_env,
+		env_subs),
+	CMD("focus", "move focus in a direction", "focus west|east|north|south", ipc_cmd_actions),
+	CMD("globalshortcuts", "list bound global shortcuts", "globalshortcuts", ipc_cmd_globalshortcuts),
+	CMD_SUB("hotkey", "list or add keybinds", NULL, ipc_cmd_hotkey, hotkey_subs),
+	CMD("input", "set an input device property", "input [<device>] [type:<type>] <property> [<value>]",
+		ipc_cmd_input),
+	CMD_SUB("layer_rule", "manage layer-shell surface rules", NULL, ipc_cmd_layer_rule,
+		layer_rule_subs),
+	CMD_SUB("layout", "list layouts, or get, set and run a layout's own options and commands", NULL,
+		ipc_cmd_layout, NULL),
+	CMD_SUB("node", "act on the focused window", NULL, ipc_cmd_node, node_subs),
+	CMD_SUB_EXTRA("output", "configure outputs and desktops", NULL, ipc_cmd_output, output_subs,
+		output_global_subs),
+	CMD_SUB("permission", "manage capture, output and input permissions",
+		"permission <subject> <capability>=<mode>...", ipc_cmd_permission, permission_subs),
+	CMD_SUB("plugin", "load or list plugins", NULL, ipc_cmd_plugin, plugin_subs),
+	CMD_SUB("query", "query monitors, desktops, layers and nodes", NULL, ipc_cmd_query, query_subs),
+	CMD("quit", "shut the compositor down", "quit", ipc_cmd_quit),
+	CMD("resize", "resize in a direction", "resize left|right|up|down", ipc_cmd_actions),
+	CMD_SUB("rule", "manage window rules", NULL, ipc_cmd_rule, rule_subs),
+	CMD_SUB("scratchpad", "show, hide and list scratchpad entries", NULL, ipc_cmd_scratchpad,
+		scratchpad_subs),
+	CMD_SUB("seat", "list seats", NULL, ipc_cmd_seat, seat_subs),
+	CMD("send", "send the focused window to another desktop", "send next|prev|previous",
+		ipc_cmd_actions),
+	CMD("sessions", "list application sessions", "sessions", ipc_cmd_sessions),
+	CMD("spring", "register a spring animation curve",
+		"spring <name> <stiffness> <damping> [<mass>] [<value_eps>] [<velocity_eps>]", ipc_cmd_actions),
+	CMD("subscribe", "subscribe to events",
+		"subscribe [report|monitor|desktop|node|config|permission|all] [-c|--count <n>] "
+		"[-f|--fifo]", NULL),
+	CMD("swap", "swap with the neighbour in a direction", "swap west|east|north|south",
+		ipc_cmd_actions),
+	CMD("toggle", "toggle a window state",
+		"toggle floating|fullscreen|maximize|minimize|restore_minimized|pseudo_tiled|monocle|"
+		"floating_layout|block_out_from_screenshare", ipc_cmd_actions),
+	CMD_SUB("tree", "drive the tiled (BSP) tree layout", NULL, ipc_cmd_tree, tree_subs),
+	CMD_SUB("wm", "compositor level commands", NULL, ipc_cmd_wm, wm_subs),
 };
 
 static void ipc_cmd_commands(ipc_args_t *a) {
@@ -80,11 +98,15 @@ static void ipc_cmd_commands(ipc_args_t *a) {
 	for (size_t i = 0; i < IPC_ARRAY_LEN(commands); i++) {
 		const ipc_cmd_t *c = &commands[i];
 		fprintf(f, "%-18s %s", c->name, c->summary);
-		if (c->subs) {
-			for (const ipc_sub_t *s = c->subs; s->flag; s++) {
-				if (s->usage)
-					fprintf(f, "\n  %s", s->usage);
-			}
+		if (c->usage)
+			fprintf(f, "\n  doorsctl %s", c->usage);
+		for (const ipc_sub_t *s = c->subs; s && s->flag; s++) {
+			if (s->usage)
+				fprintf(f, "\n  doorsctl %s", s->usage);
+		}
+		for (const ipc_sub_t *s = c->extra_subs; s && s->flag; s++) {
+			if (s->usage)
+				fprintf(f, "\n  doorsctl %s", s->usage);
 		}
 		fputc('\n', f);
 	}

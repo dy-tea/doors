@@ -180,12 +180,12 @@ static void layer_rule_show_list(ipc_args_t *a) {
 }
 
 const ipc_sub_t layer_rule_subs[] = {
-	IPC_SUB("-a", "--add", "layer_rule -a | --add <namespace> [output=<pattern>] "
+	IPC_SUB("-a", "--add", "layer_rule -a|--add <namespace> [output=<pattern>] "
 		"[blur=on|off] [opacity=0-1] [animations_disable=on|off] "
 		"[keyboard_interactivity=none|exclusive|on_demand] "
 		"[layer=background|bottom|top|overlay] [block_out_from_screenshare=on|off]", layer_rule_add),
-	IPC_SUB("-r", "--remove", "layer_rule -r | --remove <index>", layer_rule_remove),
-	IPC_SUB("-l", "--list", "layer_rule -l | --list", layer_rule_show_list),
+	IPC_SUB("-r", "--remove", "layer_rule -r|--remove <index>", layer_rule_remove),
+	IPC_SUB("-l", "--list", "layer_rule -l|--list", layer_rule_show_list),
 	IPC_SUB_END,
 };
 

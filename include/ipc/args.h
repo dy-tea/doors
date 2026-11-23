@@ -1,6 +1,5 @@
 #pragma once
 
-#include "ipc/ipc.h"
 #include "str.h"
 #include <stdarg.h>
 #include <stdbool.h>
@@ -65,24 +64,15 @@ typedef struct {
 	bool owned;
 } ipc_buf_t;
 
-// writes into the caller's buffer, setting `truncated` when something did not fit
 void ipc_buf_init(ipc_buf_t *b, char *buf, size_t cap);
-
-// starts a heap backed buffer that grows to fit whatever is written
 void ipc_buf_growable(ipc_buf_t *b);
 void ipc_buf_free(ipc_buf_t *b);
-
 void ipc_buff(ipc_buf_t * b, const char *fmt, ...);
-// appends the separator first when the buffer is not empty, then formats in
 void ipc_buff_sep(ipc_buf_t * b, const char *sep, const char *fmt, ...);
-// sends the reply and releases it; a reply that could not be built in full is
-// reported as an error instead of being sent cut short
 void ipc_buf_send(ipc_args_t *a, ipc_buf_t *b);
 
-// writes a whole listing into `buf`, returning false when it did not fit
 typedef bool (*ipc_list_fn)(char *buf, size_t size);
 
-// sends a listing that may outgrow one reply buffer, growing until it fits
 void ipc_list_send(ipc_args_t *a, ipc_list_fn write);
 
 // declares a reply buffer that grows to fit whatever is written to it
@@ -90,7 +80,6 @@ void ipc_list_send(ipc_args_t *a, ipc_list_fn write);
 	ipc_buf_t name; \
 	ipc_buf_growable(&name)
 
-// appends `"a", "b", "c"` for a fixed-length array whose first member is `name`
 #define IPC_FORMAT_NAMES(b, arr, n) \
 	for (size_t _i = 0; _i < (size_t)(n); _i++) \
 		ipc_buff_sep((b), ", ", "\"%s\"", (arr)[_i].name)

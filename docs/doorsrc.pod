@@ -52,15 +52,13 @@ directory can be passed to doors with the B<-c> option.
 
 =head1 WHEN IT RUNS
 
-I<doorsrc> runs exactly once, at startup. It is not re-run on demand:
+I<doorsrc> runs exactly once, at startup. It is not re-run on demand, as
 re-running it would launch the applications it starts a second time. For
 changes made while doors is running, use I<doorsctl> directly (C<config>,
 C<rule>, C<hotkey>, ...).
 
-Editing I<doorsrc> after startup is noticed: doors announces it through
-C<doorsctl subscribe config> as a C<config_changed> event. Nothing in the
-file is applied automatically in response; the announcement is only a
-notification so that external tooling can react.
+Editing I<doorsrc> after startup is announced through
+C<doorsctl subscribe config> as a C<config_changed> event.
 
 Defaults for settings are captured at startup, before I<doorsrc> runs, so
 C<doorsctl config --list --changed> reports exactly what the config altered.

@@ -119,11 +119,11 @@ static void tree_presel(ipc_args_t *a) {
 const ipc_sub_t tree_subs[] = {
 	IPC_SUB("balance", NULL, "tree balance", tree_balance),
 	IPC_SUB("equalize", NULL, "tree equalize", tree_equalize),
-	IPC_SUB("rotate", NULL, "tree rotate <clockwise|counterclockwise>", tree_rotate),
-	IPC_SUB("flip", NULL, "tree flip <horizontal|vertical>", tree_flip),
-	IPC_SUB("presel", NULL, "tree presel <west|east|north|south|cancel>", tree_presel),
+	IPC_SUB("rotate", NULL, "tree rotate clockwise|counterclockwise", tree_rotate),
+	IPC_SUB("flip", NULL, "tree flip horizontal|vertical", tree_flip),
+	IPC_SUB("presel", NULL, "tree presel west|east|north|south|cancel", tree_presel),
 	IPC_SUB("presel_ratio", "presel-ratio", "tree presel_ratio <ratio>", ipc_presel_ratio),
-	IPC_SUB("circulate", NULL, "tree circulate <forward|backward>", ipc_circulate),
+	IPC_SUB("circulate", NULL, "tree circulate forward|backward", ipc_circulate),
 	IPC_SUB_END,
 };
 

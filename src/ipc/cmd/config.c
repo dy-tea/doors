@@ -502,8 +502,8 @@ static void cfg_reset(ipc_args_t *a) {
 }
 
 const ipc_sub_t config_subs[] = {
-	IPC_SUB("-l", "--list", "config --list [--json] [--changed] [--no-header]", cfg_list),
-	IPC_SUBA("-r", "--reset", "reset\0", "config reset [<name>...]", cfg_reset),
+	IPC_SUB("-l", "--list", "config -l|--list [--json] [--changed] [--no-header]", cfg_list),
+	IPC_SUBA("-r", "--reset", "reset\0", "config reset|-r|--reset [<name>...]", cfg_reset),
 	IPC_SUB_END,
 };
 

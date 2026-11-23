@@ -24,6 +24,7 @@ static size_t exchange(const char *msg, size_t len, char *reply, size_t replysz)
 	return (size_t)n;
 }
 
+
 #define SEND(msg, reply) exchange(msg, sizeof(msg) - 1, reply, sizeof(reply))
 
 static void test_resize_directions(void) {

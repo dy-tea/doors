@@ -2,7 +2,6 @@
 #include "layout/tree.h"
 #include "settings.h"
 #include "tabs.h"
-#include "transaction.h"
 #include "tree.h"
 #include "types.h"
 #include <wlr/util/log.h>

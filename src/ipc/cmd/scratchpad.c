@@ -83,9 +83,9 @@ static void sp_list(ipc_args_t *a) {
 	ipc_buf_send(a, &b);
 }
 
-static const ipc_sub_t scratchpad_subs[] = {
+const ipc_sub_t scratchpad_subs[] = {
 	IPC_SUB("show", NULL, "scratchpad show [app_id:<id>|title:<title>]", sp_show),
-	IPC_SUB("hide", NULL, "scratchpad hide <app_id:<id>|title:<title>>", sp_hide),
+	IPC_SUB("hide", NULL, "scratchpad hide app_id:<id>|title:<title>", sp_hide),
 	IPC_SUB("list", NULL, "scratchpad list", sp_list),
 	IPC_SUB_END,
 };

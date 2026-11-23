@@ -303,19 +303,19 @@ static void permission_answer_prompt(ipc_args_t *a) {
 }
 
 const ipc_sub_t permission_subs[] = {
-	IPC_SUB("default", NULL, "permission default <capability>=<mode> ...", permission_set_defaults),
-	IPC_SUB("answer", NULL, "permission answer <token> <allow|deny> [--remember=session|always]",
+	IPC_SUB("default", NULL, "permission default <capability>=<mode>...", permission_set_defaults),
+	IPC_SUB("answer", NULL, "permission answer <token> allow|deny [--remember=session|always]",
 		permission_answer_prompt),
-	IPC_SUB("-l", "--list", "permission -l | --list", permission_list),
-	IPC_SUB("-r", "--remove", "permission -r | --remove <index>", permission_remove),
+	IPC_SUB("-l", "--list", "permission -l|--list", permission_list),
+	IPC_SUB("-r", "--remove", "permission -r|--remove <index>", permission_remove),
 	IPC_SUB("--forget", NULL, "permission --forget [<subject>]", permission_forget),
 	IPC_SUB_END,
 };
 
 static void permission_usage(ipc_args_t *a) {
 	IPC_REPLY_GROWING(b);
-	ipc_buff(&b, "Usage:\n  permission <subject> <capability>=<mode> ...\n");
-	ipc_buff(&b, "  permission answer <token> <allow|deny> [--remember=session|always]\n");
+	ipc_buff(&b, "Usage:\n  permission <subject> <capability>=<mode>...\n");
+	ipc_buff(&b, "  permission answer <token> allow|deny [--remember=session|always]\n");
 	ipc_sub_usage(&b, permission_subs);
 	ipc_buff(&b, "\n");
 	send_failure(a->fd, b.buf != NULL ? b.buf : "");

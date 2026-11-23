@@ -30,6 +30,16 @@ test_programs = {
 	'diagnostics': 'test_diagnostics.c',
 }
 
+docs_usage_test = executable(
+	'test-docs-usage',
+	'test_docs_usage.c',
+	include_directories: test_includes,
+	link_with: doors_core,
+	dependencies: libs + [wl_protos_dep],
+	c_args: ['-DDOORS_DOCS_PATH="' + meson.project_source_root() / 'docs' + '"'],
+)
+test('docs-usage', docs_usage_test)
+
 foreach name, source : test_programs
 	prog = executable(
 		'test-' + name,

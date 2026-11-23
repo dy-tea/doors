@@ -4,9 +4,13 @@ on:
   push:
     paths:
       - "docs/*"
+      - "src/ipc/cmd/*"
+      - "tests/test_docs_usage.c"
   pull_request:
     paths:
       - "docs/*"
+      - "src/ipc/cmd/*"
+      - "tests/test_docs_usage.c"
 
 jobs:
   linux:
