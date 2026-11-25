@@ -86,7 +86,7 @@ bool parse_float_range(const char *s, float min, float max, float *out) {
 	return true;
 }
 
-static const str_pair_t bool_texts[] = {
+const str_pair_t parse_bool_values[] = {
 	{"true", 1},
 	{"on", 1},
 	{"yes", 1},
@@ -103,7 +103,7 @@ static const str_pair_t bool_texts[] = {
 };
 
 bool parse_bool(const char *s, bool *out) {
-	const str_pair_t *e = str_table_find(bool_texts, s);
+	const str_pair_t *e = str_table_find(parse_bool_values, s);
 	if (!e)
 		return false;
 

@@ -10,9 +10,9 @@
 #include "protocol/xdg_toplevel.h"
 #include "server.h"
 #include "settings.h"
+#include "settings_enum.h"
 #include "str.h"
 #include "transaction.h"
-#include "tree.h"
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,28 +21,6 @@
 #include <wlr/types/wlr_output_layout.h>
 
 static void wm_dump_state(ipc_args_t *a) {
-	static const str_pair_t focus_on_activate_values[] = {
-		{"focus", FOCUS_ON_ACTIVATE_FOCUS},
-		{"none", FOCUS_ON_ACTIVATE_NONE},
-		{"smart", FOCUS_ON_ACTIVATE_SMART},
-		{"urgent", FOCUS_ON_ACTIVATE_URGENT},
-		IPC_ENUM_END,
-	};
-
-	static const str_pair_t follows_values[] = {
-		{"no", FOLLOWS_NO},
-		{"yes", FOLLOWS_YES},
-		{"always", FOLLOWS_ALWAYS},
-		IPC_ENUM_END,
-	};
-
-	static const str_pair_t automatic_scheme_values[] = {
-		{"longest_side", SCHEME_LONGEST_SIDE},
-		{"alternate", SCHEME_ALTERNATE},
-		{"spiral", SCHEME_SPIRAL},
-		IPC_ENUM_END,
-	};
-
 	IPC_REPLY_GROWING(b);
 
 	ipc_buff(&b, "{\n  \"monitors\": [\n");
@@ -72,7 +50,7 @@ static void wm_dump_state(ipc_args_t *a) {
 	ipc_buff(&b, "    \"focus_wrapping\": %s,\n", str_bool_text(settings.focus_wrapping));
 	const char *focus_on_activate = ipc_enum_name(focus_on_activate_values,
 		settings.focus_on_activate);
-	const char *follows = ipc_enum_name(follows_values, settings.focus_follows_mouse);
+	const char *follows = ipc_enum_name(focus_follows_pointer_values, settings.focus_follows_mouse);
 
 	ipc_buff(&b, "    \"focus_on_activate\": \"%s\",\n", focus_on_activate ? focus_on_activate : "?");
 	ipc_buff(&b, "    \"focus_follows_mouse\": \"%s\",\n", follows ? follows : "?");

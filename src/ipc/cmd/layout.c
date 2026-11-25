@@ -41,12 +41,17 @@ static void layout_reset(ipc_args_t *a, const layout_t id, const layout_impl_t *
 	const bool named = ipc_left(a) > 0;
 	const setting_t **targets = NULL;
 	size_t total = 0;
+	char *dflt = NULL, *before = NULL;
+	ipc_buf_t detail;
+	ipc_buf_growable(&detail);
+	size_t changed = 0;
+	bool layout_state = false;
 
 	if (named) {
 		targets = calloc((size_t)ipc_left(a), sizeof(*targets));
 		if (targets == NULL) {
 			ipc_fail(a, "Out of memory\n");
-			return;
+			goto out;
 		}
 
 		ipc_foreach(a, arg) {
@@ -57,8 +62,7 @@ static void layout_reset(ipc_args_t *a, const layout_t id, const layout_impl_t *
 						"restores its default\n", arg, impl->name);
 				else
 					ipc_fail(a, "Unknown setting \"%s\" for layout \"%s\"\n", arg, impl->name);
-				free(targets);
-				return;
+				goto out;
 			}
 
 			targets[total++] = s;
@@ -66,7 +70,7 @@ static void layout_reset(ipc_args_t *a, const layout_t id, const layout_impl_t *
 	} else {
 		if (impl->settings_count == 0 && impl->reset == NULL) {
 			ipc_okf(a, "%s has no settings to reset\n", impl->name);
-			return;
+			goto out;
 		}
 
 		total = impl->settings_count;
@@ -79,28 +83,19 @@ static void layout_reset(ipc_args_t *a, const layout_t id, const layout_impl_t *
 			cap = setting_capacity(s);
 	}
 
-	char *dflt = calloc(1, cap), *before = calloc(1, cap);
+	dflt = calloc(1, cap);
+	before = calloc(1, cap);
 	if (dflt == NULL || before == NULL) {
-		free(dflt);
-		free(before);
-		free(targets);
 		ipc_fail(a, "Out of memory\n");
-		return;
+		goto out;
 	}
-
-	IPC_REPLY_GROWING(detail);
-	size_t changed = 0;
 
 	for (size_t i = 0; i < total; i++) {
 		const setting_t *s = named ? targets[i] : &impl->settings[i];
 
 		if (!layout_setting_default(id, s->name, dflt, cap)) {
-			ipc_buf_free(&detail);
-			free(dflt);
-			free(before);
-			free(targets);
 			ipc_fail(a, "%s: no recorded default\n", s->name);
-			return;
+			goto out;
 		}
 		str_rtrim(dflt);
 
@@ -111,12 +106,8 @@ static void layout_reset(ipc_args_t *a, const layout_t id, const layout_impl_t *
 		if (!same) {
 			char err[256];
 			if (!layout_setting_reset(id, s->name, err, sizeof(err), a->dry_run)) {
-				ipc_buf_free(&detail);
-				free(dflt);
-				free(before);
-				free(targets);
 				ipc_fail(a, "%s", err);
-				return;
+				goto out;
 			}
 			changed++;
 		}
@@ -130,11 +121,7 @@ static void layout_reset(ipc_args_t *a, const layout_t id, const layout_impl_t *
 			ipc_buff(&detail, "  %s %s -> %s\n", s->name, before, dflt);
 	}
 
-	free(dflt);
-	free(before);
-	free(targets);
-
-	const bool layout_state = !named && !a->dry_run && impl->reset != NULL;
+	layout_state = !named && !a->dry_run && impl->reset != NULL;
 	if (layout_state)
 		impl->reset();
 
@@ -152,21 +139,25 @@ static void layout_reset(ipc_args_t *a, const layout_t id, const layout_impl_t *
 	if (layout_state)
 		ipc_buff(&b, "  layout state reset\n");
 
-	const bool failed = detail.truncated;
-	ipc_buf_free(&detail);
-
-	if (failed) {
+	if (detail.truncated) {
 		ipc_buf_free(&b);
 		ipc_fail(a, "Out of memory\n");
-		return;
+		goto out;
 	}
 
 	ipc_buf_send(a, &b);
+
+out:
+	ipc_buf_free(&detail);
+	free(dflt);
+	free(before);
+	free(targets);
 }
 
 // layout <name> -l
 static void layout_list_one(ipc_args_t *a, const layout_impl_t *impl) {
 	IPC_REPLY_GROWING(b);
+	bool ok = true;
 
 	ipc_buff(&b, "%s settings:\n", impl->name);
 	for (size_t i = 0; i < impl->settings_count; i++) {
@@ -175,20 +166,26 @@ static void layout_list_one(ipc_args_t *a, const layout_impl_t *impl) {
 
 		char *value = calloc(1, cap), *range = calloc(1, cap);
 		if (value == NULL || range == NULL) {
-			free(value);
-			free(range);
-			ipc_buf_free(&b);
-			ipc_fail(a, "Out of memory\n");
-			return;
+			ok = false;
+		} else {
+			setting_format(s, value, cap);
+			str_rtrim(value);
+			setting_range(s, range, cap);
+
+			ipc_buff(&b, "  %-28s %-7s %-22s %s\n", s->name, setting_type_name(s->type), value, range);
 		}
 
-		setting_format(s, value, cap);
-		str_rtrim(value);
-		setting_range(s, range, cap);
-
-		ipc_buff(&b, "  %-28s %-7s %-22s %s\n", s->name, setting_type_name(s->type), value, range);
 		free(value);
 		free(range);
+
+		if (!ok)
+			break;
+	}
+
+	if (!ok) {
+		ipc_buf_free(&b);
+		ipc_fail(a, "Out of memory\n");
+		return;
 	}
 
 	ipc_buff(&b, "%s commands:\n", impl->name);

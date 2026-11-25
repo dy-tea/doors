@@ -53,16 +53,6 @@ static void apply_ok(ipc_args_t *a, const char *what) {
 	ipc_okf(a, "%s set\n", what);
 }
 
-static const str_pair_t onoff_values[] = {
-	{"on", 1},
-	{"enable", 1},
-	{"true", 1},
-	{"off", 0},
-	{"disable", 0},
-	{"false", 0},
-	IPC_ENUM_END,
-};
-
 static const str_pair_t transform_values[] = {
 	{"normal", WL_OUTPUT_TRANSFORM_NORMAL},
 	{"0", WL_OUTPUT_TRANSFORM_NORMAL},
@@ -235,7 +225,7 @@ static void out_transform(ipc_args_t *a) {
 
 static void out_dpms(ipc_args_t *a) {
 	long value;
-	if (!ipc_enum(a, "state", onoff_values, &value))
+	if (!ipc_enum(a, "state", parse_bool_values, &value))
 		return;
 
 	ctx_of(a)->oc->dpms_state = value ? OUTPUT_CONFIG_DPMS_ON : OUTPUT_CONFIG_DPMS_OFF;
@@ -244,7 +234,7 @@ static void out_dpms(ipc_args_t *a) {
 
 static void out_adaptive_sync(ipc_args_t *a) {
 	long value;
-	if (!ipc_enum(a, "state", onoff_values, &value))
+	if (!ipc_enum(a, "state", parse_bool_values, &value))
 		return;
 
 	ctx_of(a)->oc->adaptive_sync = value ? OUTPUT_CONFIG_ADAPTIVE_SYNC_ENABLED :
@@ -263,7 +253,7 @@ static void out_render_bit_depth(ipc_args_t *a) {
 
 static void out_hdr(ipc_args_t *a) {
 	long value;
-	if (!ipc_enum(a, "state", onoff_values, &value))
+	if (!ipc_enum(a, "state", parse_bool_values, &value))
 		return;
 
 	out_ctx_t *c = ctx_of(a);
@@ -274,7 +264,7 @@ static void out_hdr(ipc_args_t *a) {
 
 static void out_tearing(ipc_args_t *a) {
 	long value;
-	if (!ipc_enum(a, "state", onoff_values, &value))
+	if (!ipc_enum(a, "state", parse_bool_values, &value))
 		return;
 
 	ctx_of(a)->oc->allow_tearing = value ? 1 : 0;

@@ -102,7 +102,7 @@ wl_protos_dep = declare_dependency(sources: wl_protos_h)
 shader_headers = []
 subdir('src' / 'shaders')
 
-inc = include_directories(['include', '.'])
+inc = include_directories(['include', '.', 'src'])
 
 version_h = vcs_tag(
 	input: 'include' / 'version.h.in',
@@ -135,6 +135,8 @@ doors_sources = [
 		'src' / 'effects' / 'gles2.c',
 		'src' / 'effects' / 'vk.c',
 		'src' / 'fs.c',
+		'src' / 'hotkey' / 'parse.c',
+		'src' / 'hotkey' / 'watch.c',
 		'src' / 'input' / 'cursor.c',
 		'src' / 'input' / 'gesture.c',
 		'src' / 'input' / 'input.c',
@@ -182,6 +184,7 @@ doors_sources = [
 		'src' / 'layout' / 'monocle.c',
 		'src' / 'layout' / 'registry.c',
 		'src' / 'layout' / 'scroller.c',
+		'src' / 'layout' / 'scroller_settings.c',
 		'src' / 'layout' / 'scroller_view.c',
 		'src' / 'layout' / 'tiled.c',
 		'src' / 'layout' / 'tree.c',
@@ -226,6 +229,7 @@ doors_sources = [
 		'src' / 'scratchpad.c',
 		'src' / 'server.c',
 		'src' / 'settings.c',
+		'src' / 'settings_enum.c',
 		'src' / 'spring.c',
 		'src' / 'str.c',
 		'src' / 'surface.c',

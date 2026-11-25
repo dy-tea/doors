@@ -2,6 +2,7 @@
 
 #include "borders.h"
 #include "layout/scroller.h"
+#include "str.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -19,6 +20,7 @@ bool parse_double_range(const char *s, double min, double max, double *out);
 bool parse_float_range(const char *s, float min, float max, float *out);
 
 // true/false, on/off, yes/no, 1/0, enable(d)/disable(d), case insensitive
+extern const str_pair_t parse_bool_values[];
 bool parse_bool(const char *s, bool *out);
 
 // RRGGBB or RRGGBBAA with an optional leading '#', alpha defaults to 1

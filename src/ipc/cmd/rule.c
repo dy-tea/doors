@@ -36,12 +36,6 @@ static const str_pair_t rule_state_names[] = {
 	IPC_ENUM_END,
 };
 
-static const str_pair_t rule_onoff_names[] = {
-	{"on", 1},
-	{"off", 0},
-	IPC_ENUM_END,
-};
-
 static bool rule_apply_flag(ipc_args_t *a, rule_t *r, const char *arg, bool *ok) {
 	*ok = true;
 
@@ -51,7 +45,7 @@ static bool rule_apply_flag(ipc_args_t *a, rule_t *r, const char *arg, bool *ok)
 			continue;
 
 		long on;
-		if (!ipc_enum_names(a, e->name, value, rule_onoff_names, &on)) {
+		if (!ipc_enum_names(a, e->name, value, parse_bool_values, &on)) {
 			*ok = false;
 			return true;
 		}

@@ -20,12 +20,6 @@ static const str_pair_t keyboard_names[] = {
 	IPC_ENUM_END,
 };
 
-static const str_pair_t onoff_names[] = {
-	{"on", 1},
-	{"off", 0},
-	IPC_ENUM_END,
-};
-
 static const str_pair_t layer_rule_flag_names[] = {
 	{"blur", LAYER_RULE_BLUR},
 	{"animations_disable", LAYER_RULE_ANIMATIONS_DISABLE},
@@ -42,7 +36,7 @@ static bool layer_rule_apply_flag(ipc_args_t *a, layer_rule_t *r, const char *ar
 			continue;
 
 		long on;
-		if (!ipc_enum_names(a, e->name, value, onoff_names, &on)) {
+		if (!ipc_enum_names(a, e->name, value, parse_bool_values, &on)) {
 			*ok = false;
 			return true;
 		}

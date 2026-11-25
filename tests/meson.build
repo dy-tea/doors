@@ -15,6 +15,7 @@ strip_plugin = shared_module(
 
 test_programs = {
 	'actions': 'test_actions.c',
+	'hotkey-grammar': 'test_hotkey_grammar.c',
 	'str': 'test_str.c',
 	'bezier': 'test_bezier.c',
 	'spring': 'test_spring.c',
