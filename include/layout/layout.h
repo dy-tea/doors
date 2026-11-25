@@ -3,7 +3,7 @@
 #include "settings.h"
 #include "str.h"
 #include "types.h"
-
+#include "rule.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -30,6 +30,9 @@ typedef struct layout_impl_t {
 	// called when the layout stops being active, so it can drop its per-desktop state
 	void (*leave)(output_t *m, desktop_t *d);
 
+	// called when a client object is created, so the layout can attach per-client state
+	void (*client_created)(client_t *c);
+
 	// called when a new client is mapped on a desktop using this layout (returns true if layout took
 	// over client)
 	bool (*init_client)(output_t *m, desktop_t *d, client_t *c);
@@ -47,6 +50,10 @@ typedef struct layout_impl_t {
 	// called after a client changes state (fullscreen, maximized, minimized, tiled/floating)
 	// and before the desktop is rearranged
 	void (*on_client_state)(output_t *m, desktop_t *d, node_t *n, client_state_t old_state);
+
+	// called after the core applied a rule's consequences to a new client, so the layout can read
+	// the rule fields
+	void (*apply_rules)(client_t *c, const rule_consequence_t *rule);
 
 	// called when the resize bind is executed; return true if the layout resized the focused
 	// toplevel itself, false to resize the split tree
@@ -162,10 +169,34 @@ void layout_state_drop_impl(desktop_t *d, const layout_impl_t *impl);
 // drops every layout state of the desktop
 void layout_states_clear(desktop_t *d);
 
+// per-client layout state, dropped when the client is freed
+void *client_layout_state_get(client_t *c, layout_t layout, size_t size,
+	void (*destroy)(void *state));
+
+// state stored on the client or NULL
+void *client_layout_state_peek(const client_t *c, layout_t layout);
+
+// drops state stored on the client if any
+void client_layout_state_drop(client_t *c, layout_t layout);
+
+void *client_layout_state_get_impl(client_t *c, const layout_impl_t *impl, size_t size,
+	void (*destroy)(void *state));
+void *client_layout_state_peek_impl(const client_t *c, const layout_impl_t *impl);
+void client_layout_state_drop_impl(client_t *c, const layout_impl_t *impl);
+
+// drops every layout state of the client
+void client_layout_states_clear(client_t *c);
+
 void arrange(output_t *m, desktop_t *d, bool use_transaction);
 void layout_set(desktop_t *d, layout_t new_layout);
 void layout_toggle(desktop_t *d, layout_t target);
 bool layout_init_client(output_t *m, desktop_t *d, client_t *c);
+
+// tells every layout that a client object was created, so it can attach per-client state
+void layout_client_created(client_t *c);
+
+// tells every layout the consequences of the rule that matched a new client
+void layout_apply_client_rules(client_t *c, const rule_consequence_t *rule);
 
 // tells the active layout that one of its clients changed state
 void layout_client_state_changed(output_t *m, desktop_t *d, node_t *n, client_state_t old_state);

@@ -37,25 +37,26 @@ typedef struct layout_state_t {
 	struct wl_list link;
 } layout_state_t;
 
-void *layout_state_peek(const desktop_t *d, const layout_t layout) {
-	if (d == NULL)
+// per-layout state slots, shared by desktops and clients
+static void *layout_state_list_peek(const struct wl_list *states, const layout_t layout) {
+	if (states == NULL)
 		return NULL;
 
 	const layout_state_t *s;
-	wl_list_for_each(s, &d->layout_states, link) {
+	wl_list_for_each(s, states, link) {
 		if (s->layout == layout)
 			return s->data;
 	}
 	return NULL;
 }
 
-void *layout_state_get(desktop_t *d, const layout_t layout, const size_t size,
+static void *layout_state_list_get(struct wl_list *states, const layout_t layout, const size_t size,
 		void (*destroy)(void *state)) {
-	if (d == NULL || size == 0)
+	if (states == NULL || size == 0)
 		return NULL;
 
 	layout_state_t *s;
-	wl_list_for_each(s, &d->layout_states, link) {
+	wl_list_for_each(s, states, link) {
 		if (s->layout == layout)
 			return s->data;
 	}
@@ -72,16 +73,16 @@ void *layout_state_get(desktop_t *d, const layout_t layout, const size_t size,
 
 	s->layout = layout;
 	s->destroy = destroy;
-	wl_list_insert(d->layout_states.prev, &s->link);
+	wl_list_insert(states->prev, &s->link);
 	return s->data;
 }
 
-void layout_state_drop(desktop_t *d, const layout_t layout) {
-	if (d == NULL)
+static void layout_state_list_drop(struct wl_list *states, const layout_t layout) {
+	if (states == NULL)
 		return;
 
 	layout_state_t *s, *tmp;
-	wl_list_for_each_safe(s, tmp, &d->layout_states, link) {
+	wl_list_for_each_safe(s, tmp, states, link) {
 		if (s->layout != layout)
 			continue;
 
@@ -93,6 +94,35 @@ void layout_state_drop(desktop_t *d, const layout_t layout) {
 		free(s);
 		return;
 	}
+}
+
+static void layout_state_list_clear(struct wl_list *states) {
+	if (states == NULL)
+		return;
+
+	layout_state_t *s, *tmp;
+	wl_list_for_each_safe(s, tmp, states, link) {
+		wl_list_remove(&s->link);
+		if (s->destroy != NULL)
+			s->destroy(s->data);
+		else
+			free(s->data);
+		free(s);
+	}
+}
+
+void *layout_state_peek(const desktop_t *d, const layout_t layout) {
+	return d != NULL ? layout_state_list_peek(&d->layout_states, layout) : NULL;
+}
+
+void *layout_state_get(desktop_t *d, const layout_t layout, const size_t size,
+		void (*destroy)(void *state)) {
+	return d != NULL ? layout_state_list_get(&d->layout_states, layout, size, destroy) : NULL;
+}
+
+void layout_state_drop(desktop_t *d, const layout_t layout) {
+	if (d != NULL)
+		layout_state_list_drop(&d->layout_states, layout);
 }
 
 void *layout_state_get_impl(desktop_t *d, const layout_impl_t *impl, const size_t size,
@@ -121,18 +151,52 @@ void layout_state_drop_impl(desktop_t *d, const layout_impl_t *impl) {
 }
 
 void layout_states_clear(desktop_t *d) {
-	if (d == NULL)
+	if (d != NULL)
+		layout_state_list_clear(&d->layout_states);
+}
+
+void *client_layout_state_peek(const client_t *c, const layout_t layout) {
+	return c != NULL ? layout_state_list_peek(&c->layout_states, layout) : NULL;
+}
+
+void *client_layout_state_get(client_t *c, const layout_t layout, const size_t size,
+		void (*destroy)(void *state)) {
+	return c != NULL ? layout_state_list_get(&c->layout_states, layout, size, destroy) : NULL;
+}
+
+void client_layout_state_drop(client_t *c, const layout_t layout) {
+	if (c != NULL)
+		layout_state_list_drop(&c->layout_states, layout);
+}
+
+void *client_layout_state_get_impl(client_t *c, const layout_impl_t *impl, const size_t size,
+		void (*destroy)(void *state)) {
+	const layout_t layout = layout_id_for(impl);
+	if (layout == (layout_t)-1)
+		return NULL;
+
+	return client_layout_state_get(c, layout, size, destroy);
+}
+
+void *client_layout_state_peek_impl(const client_t *c, const layout_impl_t *impl) {
+	const layout_t layout = layout_id_for(impl);
+	if (layout == (layout_t)-1)
+		return NULL;
+
+	return client_layout_state_peek(c, layout);
+}
+
+void client_layout_state_drop_impl(client_t *c, const layout_impl_t *impl) {
+	const layout_t layout = layout_id_for(impl);
+	if (layout == (layout_t)-1)
 		return;
 
-	layout_state_t *s, *tmp;
-	wl_list_for_each_safe(s, tmp, &d->layout_states, link) {
-		wl_list_remove(&s->link);
-		if (s->destroy != NULL)
-			s->destroy(s->data);
-		else
-			free(s->data);
-		free(s);
-	}
+	client_layout_state_drop(c, layout);
+}
+
+void client_layout_states_clear(client_t *c) {
+	if (c != NULL)
+		layout_state_list_clear(&c->layout_states);
 }
 
 void arrange(output_t *m, desktop_t *d, const bool use_transaction) {
@@ -162,6 +226,30 @@ bool layout_init_client(output_t *m, desktop_t *d, client_t *c) {
 		return impl->init_client(m, d, c);
 
 	return false;
+}
+
+void layout_client_created(client_t *c) {
+	if (c == NULL)
+		return;
+
+	const size_t count = layout_count();
+	for (size_t i = 0; i < count; i++) {
+		const layout_impl_t *impl = layout_get_impl((layout_t)i);
+		if (impl != NULL && impl->client_created != NULL)
+			impl->client_created(c);
+	}
+}
+
+void layout_apply_client_rules(client_t *c, const rule_consequence_t *rule) {
+	if (c == NULL || rule == NULL)
+		return;
+
+	const size_t count = layout_count();
+	for (size_t i = 0; i < count; i++) {
+		const layout_impl_t *impl = layout_get_impl((layout_t)i);
+		if (impl != NULL && impl->apply_rules != NULL)
+			impl->apply_rules(c, rule);
+	}
 }
 
 void layout_client_state_changed(output_t *m, desktop_t *d, node_t *n, client_state_t old_state) {

@@ -1,5 +1,5 @@
 #include "ipc/args.h"
-#include "layout/scroller.h"
+#include "layout/layout.h"
 #include "macros.h"
 #include "rule.h"
 #include "str.h"
@@ -473,11 +473,6 @@ void rule_apply_consequence(node_t *node, client_t *client, const rule_consequen
 	if (rule->has & RULE_TYPE_LOCKED)
 		node->locked = rule_flag(rule, RULE_TYPE_LOCKED);
 
-	if (rule->has & RULE_TYPE_SCROLLER_PROPORTION || rule->has & RULE_TYPE_SCROLLER_PROPORTION_SINGLE)
-		scroller_apply_client_rules(client,
-			rule->has & RULE_TYPE_SCROLLER_PROPORTION ? rule->scroller_proportion : 0.0f,
-			rule->has & RULE_TYPE_SCROLLER_PROPORTION_SINGLE ? rule->scroller_proportion_single : 0.0f);
-
 	if (rule->has & RULE_TYPE_BLOCK_OUT_FROM_SCREENSHARE)
 		client->flags.block_out_from_screenshare = rule_flag(rule, RULE_TYPE_BLOCK_OUT_FROM_SCREENSHARE);
 
@@ -519,6 +514,9 @@ void rule_apply_consequence(node_t *node, client_t *client, const rule_consequen
 		client->shadow_offset_y = settings.shadow_offset_y;
 		memcpy(client->shadow_color, settings.shadow_color, sizeof(settings.shadow_color));
 	}
+
+	// the layouts consume the rule fields the core does not know about
+	layout_apply_client_rules(client, rule);
 }
 
 // build the shader/region nodes a rule asks for, on top of the flags

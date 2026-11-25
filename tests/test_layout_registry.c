@@ -1,4 +1,5 @@
 #include "layout/layout.h"
+#include "rule.h"
 #include "settings.h"
 #include "str.h"
 #include "test.h"
@@ -20,6 +21,27 @@ static const layout_impl_t test_layout_a = {
 static const layout_impl_t test_layout_b = {
 	.name = "registry_test_b",
 	.arrange = NULL,
+	.single_visible = false,
+};
+
+static int test_hooks_created;
+static int test_hooks_rules;
+
+static void test_client_created(client_t *c) {
+	(void)c;
+	test_hooks_created++;
+}
+
+static void test_apply_rules(client_t *c, const rule_consequence_t *rule) {
+	(void)c;
+	if (rule->has & RULE_TYPE_STATE)
+		test_hooks_rules++;
+}
+
+static const layout_impl_t test_layout_hooks = {
+	.name = "registry_test_hooks",
+	.client_created = test_client_created,
+	.apply_rules = test_apply_rules,
 	.single_visible = false,
 };
 
@@ -190,6 +212,7 @@ static void test_layout_identity_and_state(void) {
 	CHECK(!layout_has_floating_placement(LAYOUT_TILED));
 
 	client_t c = {0};
+	wl_list_init(&c.layout_states);
 	c.state = STATE_FLOATING;
 	CHECK(layout_places_floating(LAYOUT_FLOATING, &d, &c));
 	CHECK(!layout_places_floating(LAYOUT_TILED, &d, &c));
@@ -197,6 +220,33 @@ static void test_layout_identity_and_state(void) {
 	c.state = STATE_TILED;
 	CHECK(!layout_places_floating(LAYOUT_FLOATING, &d, &c));
 	CHECK(!layout_places_floating((layout_t)9999, &d, &c));
+
+	// per-client state works like the per-desktop one
+	int *client_state = client_layout_state_get_impl(&c, &test_layout_a, sizeof(*client_state), NULL);
+	CHECK(client_state != NULL);
+	if (client_state != NULL)
+		*client_state = 7;
+
+	CHECK(client_layout_state_peek_impl(&c, &test_layout_a) == client_state);
+	CHECK(client_layout_state_peek_impl(&c, &unregistered) == NULL);
+	client_layout_state_drop_impl(&c, &test_layout_a);
+	CHECK(client_layout_state_peek_impl(&c, &test_layout_a) == NULL);
+
+	// layouts hear about new clients and about the rule fields they own
+	CHECK(layout_register(&test_layout_hooks) != (layout_t)-1);
+
+	test_hooks_created = 0;
+	layout_client_created(&c);
+	CHECK(test_hooks_created == 1);
+
+	rule_consequence_t rule = {0};
+	rule.has = RULE_TYPE_STATE;
+	test_hooks_rules = 0;
+	layout_apply_client_rules(&c, &rule);
+	CHECK(test_hooks_rules == 1);
+
+	client_layout_states_clear(&c);
+	CHECK(client_layout_state_peek(&c, LAYOUT_MASTER_STACK) == NULL);
 }
 
 static void test_duplicate_and_invalid(void) {

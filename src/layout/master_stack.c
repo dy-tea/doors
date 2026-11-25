@@ -55,11 +55,55 @@ static int ms_count(desktop_t *d) {
 	return s != NULL ? s->count : 0;
 }
 
+// per-client master-stack membership and stack order
+typedef struct {
+	uint64_t order;
+	bool master;
+} master_stack_client_t;
+
+static uint64_t next_client_order = 1;
+
+// the client's master-stack state, attached when the client is created
+static master_stack_client_t *ms_client(client_t *c) {
+	if (c == NULL)
+		return NULL;
+
+	master_stack_client_t *s = client_layout_state_peek(c, LAYOUT_MASTER_STACK);
+	if (s != NULL)
+		return s;
+
+	s = client_layout_state_get(c, LAYOUT_MASTER_STACK, sizeof(*s), NULL);
+	if (s != NULL)
+		s->order = next_client_order++;
+
+	return s;
+}
+
+static uint64_t ms_client_order(const client_t *c) {
+	const master_stack_client_t *s = client_layout_state_peek(c, LAYOUT_MASTER_STACK);
+	return s != NULL ? s->order : 0;
+}
+
+static bool ms_client_is_master(const client_t *c) {
+	const master_stack_client_t *s = client_layout_state_peek(c, LAYOUT_MASTER_STACK);
+	return s != NULL && s->master;
+}
+
+static void ms_client_set_master(client_t *c, const bool master) {
+	master_stack_client_t *s = ms_client(c);
+	if (s != NULL)
+		s->master = master;
+}
+
+static void master_stack_client_created(client_t *c) {
+	(void)ms_client(c);
+}
+
 static int compare_node_order(const void *lhs, const void *rhs) {
 	const node_t *a = *(node_t *const *)lhs;
 	const node_t *b = *(node_t *const *)rhs;
-	const uint64_t a_order = a->client->master_stack_order;
-	const uint64_t b_order = b->client->master_stack_order;
+	const uint64_t a_order = ms_client_order(a->client);
+	const uint64_t b_order = ms_client_order(b->client);
 
 	if (a_order < b_order)
 		return -1;
@@ -71,8 +115,8 @@ static int compare_node_order(const void *lhs, const void *rhs) {
 static int compare_master_then_order(const void *lhs, const void *rhs) {
 	const node_t *a = *(node_t *const *)lhs;
 	const node_t *b = *(node_t *const *)rhs;
-	const bool a_master = a->client->flags.master_stack_master;
-	const bool b_master = b->client->flags.master_stack_master;
+	const bool a_master = ms_client_is_master(a->client);
+	const bool b_master = ms_client_is_master(b->client);
 
 	if (a_master != b_master)
 		return a_master ? -1 : 1;
@@ -95,14 +139,14 @@ static void reconcile_master_membership(desktop_t *d, node_t **nodes, int count)
 
 	// count number of actual masters
 	for (int i = 0; i < count; ++i)
-		actual += nodes[i]->client->flags.master_stack_master;
+		actual += ms_client_is_master(nodes[i]->client);
 
 	if (actual > target) {
 		for (int i = count - 1; i >= 0 && actual > target; --i) {
 			client_t *client = nodes[i]->client;
 
-			if (client->flags.master_stack_master) {
-				client->flags.master_stack_master = false;
+			if (ms_client_is_master(client)) {
+				ms_client_set_master(client, false);
 				--actual;
 			}
 		}
@@ -110,8 +154,8 @@ static void reconcile_master_membership(desktop_t *d, node_t **nodes, int count)
 		for (int i = 0; i < count && actual < target; ++i) {
 			client_t *client = nodes[i]->client;
 
-			if (!client->flags.master_stack_master) {
-				client->flags.master_stack_master = true;
+			if (!ms_client_is_master(client)) {
+				ms_client_set_master(client, true);
 				++actual;
 			}
 		}
@@ -124,6 +168,10 @@ static int collect_tiled_nodes(desktop_t *d, node_t ***out_nodes) {
 		return 0;
 
 	node_t **nodes = *out_nodes;
+	// every tiled client needs its stack order before the sort
+	for (int i = 0; i < count; i++)
+		ms_client(nodes[i]->client);
+
 	qsort(nodes, (size_t)count, sizeof(*nodes), compare_node_order);
 	reconcile_master_membership(d, nodes, count);
 	qsort(nodes, (size_t)count, sizeof(*nodes), compare_master_then_order);
@@ -425,9 +473,9 @@ bool master_stack_increment(desktop_t *d) {
 		return false;
 	}
 
-	const node_t *target = d->focus && d->focus->client &&
-		!d->focus->client->flags.master_stack_master && IS_TILED(d->focus->client) ? d->focus : nodes[mc];
-	target->client->flags.master_stack_master = true;
+	const node_t *target = d->focus && d->focus->client && !ms_client_is_master(d->focus->client) &&
+		IS_TILED(d->focus->client) ? d->focus : nodes[mc];
+	ms_client_set_master(target->client, true);
 
 	master_stack_state_t *s = ms_state(d);
 	if (s != NULL)
@@ -446,9 +494,9 @@ bool master_stack_decrement(desktop_t *d) {
 		return false;
 	}
 
-	const node_t *target = d->focus && d->focus->client && d->focus->client->flags.master_stack_master &&
+	const node_t *target = d->focus && d->focus->client && ms_client_is_master(d->focus->client) &&
 		IS_TILED(d->focus->client) ? d->focus : nodes[mc - 1];
-	target->client->flags.master_stack_master = false;
+	ms_client_set_master(target->client, false);
 
 	master_stack_state_t *s = ms_state(d);
 	if (s != NULL)
@@ -463,12 +511,12 @@ bool master_stack_promote(desktop_t *d) {
 	const int count = collect_tiled_nodes(d, &nodes);
 	const int mc = master_count_clamped(d, count);
 	const int focus_index = find_node_index(nodes, count, d ? d->focus : NULL);
-	if (focus_index < 0 || nodes[focus_index]->client->flags.master_stack_master) {
+	if (focus_index < 0 || ms_client_is_master(nodes[focus_index]->client)) {
 		free(nodes);
 		return false;
 	}
 
-	nodes[focus_index]->client->flags.master_stack_master = true;
+	ms_client_set_master(nodes[focus_index]->client, true);
 
 	master_stack_state_t *s = ms_state(d);
 	if (s != NULL)
@@ -480,7 +528,7 @@ bool master_stack_promote(desktop_t *d) {
 
 bool master_stack_demote(desktop_t *d) {
 	if (!d || !d->focus || !d->focus->client || !IS_TILED(d->focus->client) ||
-		!d->focus->client->flags.master_stack_master)
+		!ms_client_is_master(d->focus->client))
 		return false;
 
 	node_t **nodes = NULL;
@@ -491,7 +539,7 @@ bool master_stack_demote(desktop_t *d) {
 		return false;
 	}
 
-	d->focus->client->flags.master_stack_master = false;
+	ms_client_set_master(d->focus->client, false);
 
 	master_stack_state_t *s = ms_state(d);
 	if (s != NULL)
@@ -739,12 +787,19 @@ bool master_stack_swap(output_t *m, desktop_t *d, const direction_t direction) {
 
 	client_t *focused = nodes[index]->client;
 	client_t *other = nodes[target]->client;
-	const uint64_t order = focused->master_stack_order;
-	const bool is_master = focused->flags.master_stack_master;
-	focused->master_stack_order = other->master_stack_order;
-	focused->flags.master_stack_master = other->flags.master_stack_master;
-	other->master_stack_order = order;
-	other->flags.master_stack_master = is_master;
+	master_stack_client_t *focused_state = ms_client(focused);
+	master_stack_client_t *other_state = ms_client(other);
+	if (focused_state == NULL || other_state == NULL) {
+		free(nodes);
+		return false;
+	}
+
+	const uint64_t order = focused_state->order;
+	const bool is_master = focused_state->master;
+	focused_state->order = other_state->order;
+	focused_state->master = other_state->master;
+	other_state->order = order;
+	other_state->master = is_master;
 
 	free(nodes);
 	arrange(m, d, true);
@@ -930,11 +985,13 @@ const layout_impl_t master_stack_impl = {
 	.swap = master_stack_swap,
 	.enter = NULL,
 	.leave = NULL,
+	.client_created = master_stack_client_created,
 	.init_client = NULL,
 	.client_mapped = NULL,
 	.client_unmapped = NULL,
 	.focus_after_unmap = NULL,
 	.on_client_state = NULL,
+	.apply_rules = NULL,
 	.resize = master_stack_resize,
 	.places_floating = NULL,
 	.wants_visible = NULL,

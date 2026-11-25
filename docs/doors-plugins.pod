@@ -44,116 +44,7 @@ named C<doors_plugin>:
 		const layout_impl_t *const *layouts; // NULL-terminated list of layouts
 	};
 
-Every element of I<layouts> is a C<layout_impl_t>, the same abstraction
-the built-in layouts use:
-
-	typedef struct layout_impl_t {
-		const char *name; // unique layout name, e.g. "strip"
-
-		// called when an automatic arrange occurs (e.g. output size changes)
-		void (*arrange)(output_t *m, desktop_t *d, struct wlr_box available);
-
-		// called when focus_node is called
-		void (*on_focus)(output_t *m, desktop_t *d, node_t *n);
-
-		// called when the focus bind is executed (returns true if focus succeeded)
-		bool (*focus)(desktop_t *d, direction_t dir);
-
-		// called when the swap bind is executed (returns true if swap succeeded)
-		bool (*swap)(output_t *m, desktop_t *d, direction_t dir);
-
-		// called when the layout becomes active on a desktop, to adopt the toplevels
-		void (*enter)(output_t *m, desktop_t *d);
-
-		// called when the layout stops being active, so it can drop its per-desktop state
-		void (*leave)(output_t *m, desktop_t *d);
-
-		// called when a new client is mapped on a desktop using this layout
-		// (returns true if the layout took over the client)
-		bool (*init_client)(output_t *m, desktop_t *d, client_t *c);
-
-		// called after a new client has been placed on the desktop and
-		// before it is focused
-		void (*client_mapped)(output_t *m, desktop_t *d, client_t *c,
-			bool focused);
-
-		// called before a client is removed from the desktop
-		void (*client_unmapped)(output_t *m, desktop_t *d, client_t *c);
-
-		// called after a client was removed and the desktop rearranged;
-		// return true when the layout picked the next focus itself
-		bool (*focus_after_unmap)(output_t *m, desktop_t *d, node_t *removed);
-
-		// called after a client changes state (fullscreen, maximized, minimized,
-		// tiled/floating) and before the desktop is rearranged
-		void (*on_client_state)(output_t *m, desktop_t *d, node_t *n,
-			client_state_t old_state);
-
-		// called when the resize bind runs; return true if the layout resized
-		// the focused toplevel itself, false to resize the split tree
-		bool (*resize)(output_t *m, desktop_t *d, direction_t dir, double delta);
-
-		// true when this layout places floating clients itself
-		bool (*places_floating)(desktop_t *d, client_t *c);
-
-		// true when the layout wants node `n` shown while its desktop is
-		// visible (NULL shows every node)
-		bool (*wants_visible)(const desktop_t *d, const node_t *n);
-
-		// true when `c` should be drawn without a border
-		bool (*borderless)(const desktop_t *d, const client_t *c);
-
-		// true when `c` counts as maximized even though the client does not
-		// report it
-		bool (*reports_maximized)(const desktop_t *d, const client_t *c);
-
-		// window gap around the layout's tiled leaves; NULL uses the global one
-		int (*window_gap)(const desktop_t *d);
-
-		// allowed edges for a pointer resize of `n`; return false to use the
-		// split tree's edges
-		bool (*resize_edges)(const desktop_t *d, const node_t *n,
-			uint32_t *edges);
-
-		// called when a pointer resize starts; return true when the layout owns
-		// the drag and write the size the drag starts from to `initial`
-		bool (*pointer_resize_begin)(output_t *m, desktop_t *d, node_t *n,
-			double *initial);
-
-		// called with the pointer delta since the grab started; return true
-		// when the layout handled it
-		bool (*pointer_resize_update)(output_t *m, desktop_t *d, node_t *n,
-			double delta);
-
-		// fraction of the viewport that has to be scrolled to bring `n` into
-		// view, used by focus follows mouse
-		double (*focus_scroll_distance)(const desktop_t *d, const node_t *n);
-
-		// number of fingers the layout consumes for panning, 0 for none
-		uint32_t (*pan_fingers)(const desktop_t *d);
-
-		// pan the layout's view; return true when the layout handled it
-		bool (*pan_update)(output_t *m, desktop_t *d, double delta);
-
-		// finish a pan, snapping the layout's view
-		bool (*pan_end)(output_t *m, desktop_t *d);
-
-		// settings exposed through `doorsctl layout <name> <setting>`
-		const setting_t *settings;
-		size_t settings_count;
-
-		// commands exposed through `doorsctl layout <name> <command>`,
-		// terminated by a NULL name
-		const command_t *commands;
-
-		// restores values the settings do not describe, on
-		// `doorsctl layout <name> reset`
-		void (*reset)(void);
-
-		// true if the layout only shows a single toplevel at once
-		bool single_visible;
-	} layout_impl_t;
-
+Every element of I<layouts> is a C<layout_impl_t>. See C<include/layout/layout.h>
 All callbacks are optional (set them to C<NULL> when not needed), except
 that a layout without I<arrange> will never move windows.
 
@@ -239,6 +130,11 @@ know the numeric id its layout was registered under, so it can pass its
 C<layout_impl_t> to C<layout_state_get_impl()> instead; C<layout_id_for()>
 returns the id itself. Every layout owns one state per desktop. The slot is
 not destroyed by I<leave> unless the layout drops it.
+
+Per-client state is stored the same way with C<client_layout_state_get()> and
+C<client_layout_state_get_impl()>. Clients start without state, so
+I<client_created> is the place to attach it; it is dropped when the client is
+freed.
 
 =head2 Building a plugin
 

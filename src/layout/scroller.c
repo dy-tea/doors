@@ -1414,15 +1414,6 @@ bool scroller_is_tiled(const client_t *c) {
 	return c->state == STATE_TILED || c->state == STATE_PSEUDO_TILED;
 }
 
-void scroller_apply_client_rules(client_t *c, float rule_proportion, float rule_proportion_single) {
-	if (!c)
-		return;
-	(void)c;
-	(void)rule_proportion;
-	(void)rule_proportion_single;
-	// TODO: store per-client proportion overrides if needed later.
-}
-
 bool scroller_set_column_width(const desktop_t *d, const scroller_size_t size) {
 	scroller_state_t *s = scroller_state(d);
 	if (!s || s->column_count == 0)
@@ -2426,11 +2417,13 @@ const layout_impl_t scroller_impl = {
 	.swap = scroller_swap,
 	.enter = NULL,
 	.leave = scroller_leave,
+	.client_created = NULL,
 	.init_client = NULL,
 	.client_mapped = scroller_client_mapped,
 	.client_unmapped = scroller_client_unmapped,
 	.focus_after_unmap = scroller_focus_after_unmap,
 	.on_client_state = scroller_on_client_state,
+	.apply_rules = NULL,
 	.resize = scroller_resize,
 	.places_floating = NULL,
 	.wants_visible = NULL,

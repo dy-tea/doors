@@ -78,7 +78,6 @@ typedef struct {
 	uint32_t freed : 1;
 	uint32_t maximized : 1;
 	uint32_t minimized : 1;
-	uint32_t master_stack_master : 1;
 	uint32_t blur : 1;
 	uint32_t blur_from_rule : 1;
 	uint32_t mica : 1;
@@ -99,15 +98,15 @@ struct client_t {
 	struct wlr_box pre_maximize_rectangle;
 	struct view_t *view;
 
+	// per-layout client state
+	struct wl_list layout_states;
+
 	struct {
 		struct wl_listener activate;
 		struct wl_listener fullscreen;
 		struct wl_listener close;
 		struct wl_listener destroy;
 	} foreign;
-
-	// Master-stack layout properties
-	uint64_t master_stack_order;
 
 	// Visual effects
 	float border_radius;

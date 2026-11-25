@@ -23,8 +23,6 @@
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
 
-static uint64_t next_master_stack_order = 1;
-
 node_t *make_node(uint32_t id) {
 	node_t *n = (node_t *)calloc(1, sizeof(node_t));
 	if (n == NULL)
@@ -78,9 +76,8 @@ client_t *make_client(void) {
 	c->last_state = STATE_TILED;
 	c->flags.urgent = false;
 	c->flags.shown = false;
-	c->master_stack_order = next_master_stack_order++;
-	c->flags.master_stack_master = false;
 	c->opacity = 1.0f;
+	wl_list_init(&c->layout_states);
 
 	// initialize shadow defaults
 	c->flags.shadow = false;
@@ -89,6 +86,7 @@ client_t *make_client(void) {
 	c->shadow_offset_y = settings.shadow_offset_y;
 	memcpy(c->shadow_color, settings.shadow_color, sizeof(settings.shadow_color));
 
+	layout_client_created(c);
 	return c;
 }
 
@@ -124,6 +122,7 @@ void free_node(node_t *n) {
 	if (n->client != NULL) {
 		render_unfocused_client_remove(n->client);
 		n->client->flags.freed = true;
+		client_layout_states_clear(n->client);
 		free(n->client);
 	}
 
