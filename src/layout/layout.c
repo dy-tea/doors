@@ -4,6 +4,7 @@
 #include "layout/tree.h"
 #include "output/output.h"
 #include "transaction.h"
+#include "tree.h"
 #include "types.h"
 #include <stdlib.h>
 #include <wayland-server-core.h>
@@ -92,6 +93,31 @@ void layout_state_drop(desktop_t *d, const layout_t layout) {
 		free(s);
 		return;
 	}
+}
+
+void *layout_state_get_impl(desktop_t *d, const layout_impl_t *impl, const size_t size,
+		void (*destroy)(void *state)) {
+	const layout_t layout = layout_id_for(impl);
+	if (layout == (layout_t)-1)
+		return NULL;
+
+	return layout_state_get(d, layout, size, destroy);
+}
+
+void *layout_state_peek_impl(const desktop_t *d, const layout_impl_t *impl) {
+	const layout_t layout = layout_id_for(impl);
+	if (layout == (layout_t)-1)
+		return NULL;
+
+	return layout_state_peek(d, layout);
+}
+
+void layout_state_drop_impl(desktop_t *d, const layout_impl_t *impl) {
+	const layout_t layout = layout_id_for(impl);
+	if (layout == (layout_t)-1)
+		return;
+
+	layout_state_drop(d, layout);
 }
 
 void layout_states_clear(desktop_t *d) {
@@ -195,6 +221,36 @@ static const layout_impl_t *active_impl(const desktop_t *d) {
 		return NULL;
 
 	return layout_get_impl(d->layout);
+}
+
+void layout_on_focus(output_t *m, desktop_t *d, node_t *n) {
+	const layout_impl_t *impl = active_impl(d);
+	if (impl != NULL && impl->on_focus != NULL) {
+		impl->on_focus(m, d, n);
+		return;
+	}
+
+	// layouts without an on_focus hook show every leaf of the desktop
+	if (d == NULL || d->root == NULL)
+		return;
+
+	FOR_EACH_LEAF(node, d->root) {
+		if (node->client != NULL && !node_is_minimized(node))
+			node->client->flags.shown = true;
+	}
+}
+
+bool layout_has_floating_placement(const layout_t layout) {
+	const layout_impl_t *impl = layout_get_impl(layout);
+	return impl != NULL && impl->places_floating != NULL;
+}
+
+bool layout_places_floating(const layout_t layout, desktop_t *d, client_t *c) {
+	const layout_impl_t *impl = layout_get_impl(layout);
+	if (impl == NULL || impl->places_floating == NULL || d == NULL || c == NULL)
+		return false;
+
+	return impl->places_floating(d, c);
 }
 
 void layout_client_mapped(output_t *m, desktop_t *d, client_t *c, const bool focused) {

@@ -1648,45 +1648,6 @@ bool scroller_cycle_height_preset(const desktop_t *d, int step) {
 	return scroller_set_window_height(d, presets[next]);
 }
 
-int scroller_collect(desktop_t *d, node_t ***out_nodes) {
-	scroller_state_t *s = scroller_state(d);
-	if (!s || s->column_count == 0) {
-		if (out_nodes)
-			*out_nodes = NULL;
-		return 0;
-	}
-
-	// count total tiles
-	int total = 0;
-	for (int i = 0; i < s->column_count; i++)
-		total += s->columns[i].tile_count;
-
-	if (total == 0) {
-		if (out_nodes)
-			*out_nodes = NULL;
-		return 0;
-	}
-
-	node_t **nodes = calloc((size_t)total, sizeof(*nodes));
-	if (!nodes) {
-		if (out_nodes)
-			*out_nodes = NULL;
-		return 0;
-	}
-
-	int idx = 0;
-	for (int i = 0; i < s->column_count; i++) {
-		for (int j = 0; j < s->columns[i].tile_count; j++) {
-			client_t *c = s->columns[i].tiles[j].client;
-			if (c && c->view)
-				nodes[idx++] = c->view->node;
-		}
-	}
-
-	*out_nodes = nodes;
-	return idx;
-}
-
 static void scroller_on_focus(output_t *m, desktop_t *d, node_t *n) {
 	if (!d)
 		return;
@@ -2483,11 +2444,9 @@ const layout_impl_t scroller_impl = {
 	.pan_fingers = scroller_pan_fingers,
 	.pan_update = scroller_pan_update,
 	.pan_end = scroller_pan_end,
-	.collect = scroller_collect,
 	.settings = scroller_settings,
 	.settings_count = IPC_ARRAY_LEN(scroller_settings),
 	.commands = scroller_commands,
 	.reset = scroller_reset,
 	.single_visible = false,
-	.has_directional_nav = true,
 };

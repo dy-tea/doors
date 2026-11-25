@@ -14,17 +14,13 @@ static void test_arrange(output_t *m, desktop_t *d, struct wlr_box available) {
 static const layout_impl_t test_layout_a = {
 	.name = "registry_test_a",
 	.arrange = test_arrange,
-	.collect = NULL,
 	.single_visible = false,
-	.has_directional_nav = false,
 };
 
 static const layout_impl_t test_layout_b = {
 	.name = "registry_test_b",
 	.arrange = NULL,
-	.collect = NULL,
 	.single_visible = false,
-	.has_directional_nav = false,
 };
 
 static void test_builtin_registry(void) {
@@ -162,6 +158,47 @@ static void test_plugin_registration(void) {
 	CHECK(layout_name((layout_t)9999) == NULL);
 }
 
+static void test_layout_identity_and_state(void) {
+	layout_t a;
+	CHECK(layout_find_by_name("registry_test_a", &a));
+	CHECK(layout_id_for(&test_layout_a) == a);
+	CHECK(layout_id_for(layout_get_impl(LAYOUT_TILED)) == LAYOUT_TILED);
+	CHECK(layout_id_for(layout_get_impl(LAYOUT_MONOCLE)) == LAYOUT_MONOCLE);
+	CHECK(layout_id_for(NULL) == (layout_t)-1);
+
+	const layout_impl_t unregistered = {
+		.name = "registry_test_unregistered"
+	};
+	CHECK(layout_id_for(&unregistered) == (layout_t)-1);
+
+	desktop_t d = {0};
+	wl_list_init(&d.layout_states);
+
+	int *state = layout_state_get_impl(&d, &test_layout_a, sizeof(*state), NULL);
+	CHECK(state != NULL);
+	if (state != NULL)
+		*state = 42;
+
+	CHECK(layout_state_peek_impl(&d, &test_layout_a) == state);
+	layout_state_drop_impl(&d, &test_layout_a);
+	CHECK(layout_state_peek_impl(&d, &test_layout_a) == NULL);
+	CHECK(layout_state_get_impl(&d, &unregistered, sizeof(int), NULL) == NULL);
+	layout_states_clear(&d);
+
+	// floating placement is a layout policy core asks for by layout id
+	CHECK(layout_has_floating_placement(LAYOUT_FLOATING));
+	CHECK(!layout_has_floating_placement(LAYOUT_TILED));
+
+	client_t c = {0};
+	c.state = STATE_FLOATING;
+	CHECK(layout_places_floating(LAYOUT_FLOATING, &d, &c));
+	CHECK(!layout_places_floating(LAYOUT_TILED, &d, &c));
+
+	c.state = STATE_TILED;
+	CHECK(!layout_places_floating(LAYOUT_FLOATING, &d, &c));
+	CHECK(!layout_places_floating((layout_t)9999, &d, &c));
+}
+
 static void test_duplicate_and_invalid(void) {
 	// duplicate name must be rejected
 	CHECK(layout_register(&test_layout_a) == (layout_t)-1);
@@ -200,6 +237,7 @@ int main(void) {
 	test_layout_queries();
 	test_layout_settings();
 	test_plugin_registration();
+	test_layout_identity_and_state();
 	test_duplicate_and_invalid();
 	test_ipc_values();
 	printf("%d checks passed\n", test_checks);

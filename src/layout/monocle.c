@@ -194,10 +194,8 @@ const layout_impl_t monocle_impl = {
 	.pan_fingers = NULL,
 	.pan_update = NULL,
 	.pan_end = NULL,
-	.collect = tiled_collect,
 	.settings = monocle_settings,
 	.settings_count = IPC_ARRAY_LEN(monocle_settings),
 	.commands = monocle_commands,
 	.single_visible = true,
-	.has_directional_nav = false,
 };

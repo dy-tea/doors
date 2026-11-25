@@ -56,6 +56,13 @@ node_t *prev_leaf(node_t *n, node_t *r);
 void swap_nodes(struct output_t *m1, desktop_t *d1, node_t *n1, struct output_t *m2, desktop_t *d2,
 	node_t *n2);
 int collect_tiled_leaves(desktop_t *d, node_t ***out_nodes);
+
+// every toplevel of the desktop, in tree order followed by detached clients
+int desktop_toplevels(const desktop_t *d, node_t ***out_nodes);
+
+// true when the desktop holds any toplevel
+bool desktop_has_toplevels(const desktop_t *d);
+
 bool set_state(struct output_t *m, desktop_t *d, node_t *n, client_state_t s);
 void client_set_fullscreen(struct output_t *m, desktop_t *d, node_t *n, bool value);
 bool client_set_maximized(struct output_t *m, desktop_t *d, node_t *n, bool value);

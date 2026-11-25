@@ -1,10 +1,10 @@
 #include "client.h"
 #include "ipc/ipc.h"
-#include "layout/floating.h"
 #include "macros.h"
 #include "output/output.h"
 #include "server.h"
 #include "settings.h"
+#include "tree.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>

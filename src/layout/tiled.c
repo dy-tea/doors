@@ -111,10 +111,6 @@ static bool tiled_swap(output_t *m, desktop_t *d, direction_t dir) {
 	return false;
 }
 
-int tiled_collect(desktop_t *d, node_t ***out_nodes) {
-	return collect_tiled_leaves(d, out_nodes);
-}
-
 const layout_impl_t tiled_impl = {
 	.name = "tiled",
 	.arrange = tiled_arrange,
@@ -141,7 +137,5 @@ const layout_impl_t tiled_impl = {
 	.pan_fingers = NULL,
 	.pan_update = NULL,
 	.pan_end = NULL,
-	.collect = tiled_collect,
 	.single_visible = false,
-	.has_directional_nav = false,
 };

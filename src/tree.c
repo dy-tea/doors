@@ -9,6 +9,7 @@
 #include "protocol/xwayland.h"
 #include "render_unfocused.h"
 #include "scratchpad.h"
+#include "server.h"
 #include "tabs.h"
 #include "transaction.h"
 #include "tree.h"
@@ -289,6 +290,75 @@ node_t *find_public(desktop_t *d) {
 	}
 
 	return b;
+}
+
+static bool node_outside_tree(const node_t *n, const desktop_t *d) {
+	for (const node_t *p = n; p != NULL; p = p->parent)
+		if (p == d->root)
+			return false;
+	return true;
+}
+
+int desktop_toplevels(const desktop_t *d, node_t ***out_nodes) {
+	if (out_nodes != NULL)
+		*out_nodes = NULL;
+	if (d == NULL || out_nodes == NULL)
+		return 0;
+
+	int count = 0;
+	if (d->root != NULL)
+		FOR_EACH_LEAF(n, d->root)
+			if (n->client != NULL)
+				count++;
+
+	view_t *view;
+	wl_list_for_each(view, &server.views, link) {
+		if (view->mapped && view->node != NULL && view->node->client != NULL && view->node->desktop == d &&
+			node_outside_tree(view->node, d))
+			count++;
+	}
+
+	if (count == 0)
+		return 0;
+
+	node_t **nodes = calloc(count, sizeof(*nodes));
+	if (nodes == NULL)
+		return 0;
+
+	int index = 0;
+	if (d->root != NULL) {
+		FOR_EACH_LEAF(n, d->root)
+			if (n->client != NULL)
+				nodes[index++] = n;
+	}
+
+	wl_list_for_each(view, &server.views, link) {
+		if (view->mapped && view->node != NULL && view->node->client != NULL && view->node->desktop == d &&
+			node_outside_tree(view->node, d))
+			nodes[index++] = view->node;
+	}
+
+	*out_nodes = nodes;
+	return count;
+}
+
+bool desktop_has_toplevels(const desktop_t *d) {
+	if (d == NULL)
+		return false;
+
+	if (d->root != NULL) {
+		FOR_EACH_LEAF(n, d->root)
+			if (n->client != NULL)
+				return true;
+	}
+
+	view_t *view;
+	wl_list_for_each(view, &server.views, link) {
+		if (view->mapped && view->node != NULL && view->node->client != NULL && view->node->desktop == d)
+			return true;
+	}
+
+	return false;
 }
 
 int collect_tiled_leaves(desktop_t *d, node_t ***out_nodes) {
@@ -793,11 +863,9 @@ bool client_set_maximized(output_t *m, desktop_t *d, node_t *n, const bool value
 	if (value && c->state == STATE_FULLSCREEN)
 		return false;
 
-	const layout_impl_t *impl = d != NULL ? layout_get_impl(d->layout) : NULL;
-	bool layout_places_floating = impl != NULL && impl->places_floating != NULL &&
-		impl->places_floating(d, c);
+	const bool layout_owns_floating = d != NULL && layout_places_floating(d->layout, d, c);
 
-	if (value && IS_FLOATING(c) && !layout_places_floating) {
+	if (value && IS_FLOATING(c) && !layout_owns_floating) {
 		if (d == NULL)
 			return false;
 		focus_node(m, d, n);

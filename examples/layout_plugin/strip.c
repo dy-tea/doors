@@ -255,12 +255,10 @@ static const layout_impl_t strip_impl = {
 	.pan_fingers = NULL,
 	.pan_update = NULL,
 	.pan_end = NULL,
-	.collect = NULL,
 	.settings = strip_settings,
 	.settings_count = IPC_ARRAY_LEN(strip_settings),
 	.commands = strip_commands,
 	.single_visible = false,
-	.has_directional_nav = true,
 };
 
 const doors_plugin_t doors_plugin = {

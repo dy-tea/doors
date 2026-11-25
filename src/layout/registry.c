@@ -140,6 +140,24 @@ bool layout_find_by_name(const char *name, layout_t *out) {
 	return false;
 }
 
+layout_t layout_id_for(const layout_impl_t *impl) {
+	if (impl == NULL)
+		return (layout_t)-1;
+
+	for (size_t i = 0; i < REGISTRY_LEN(registry); i++) {
+		if (registry[i] == impl)
+			return (layout_t)i;
+	}
+
+	const dynamic_layout_t *entry;
+	wl_list_for_each(entry, &dynamic_layouts, link) {
+		if (entry->impl == impl)
+			return entry->id;
+	}
+
+	return (layout_t)-1;
+}
+
 const str_pair_t *layout_ipc_values(void) {
 	if (dynamic_ipc_values == NULL)
 		build_ipc_values();

@@ -1,6 +1,5 @@
 #include "animation.h"
 #include "ipc/ipc.h"
-#include "layout/floating.h"
 #include "layout/layout.h"
 #include "macros.h"
 #include "output/output.h"

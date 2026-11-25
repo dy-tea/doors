@@ -13,7 +13,6 @@ bool floating_init_client(output_t *m, desktop_t *d, client_t *c);
 void floating_arrange(output_t *m, desktop_t *d, struct wlr_box available);
 void floating_on_focus(output_t *m, desktop_t *d, node_t *n);
 bool floating_focus(desktop_t *d, direction_t dir);
-int floating_collect(desktop_t *d, node_t ***out_nodes);
 bool floating_places_floating(desktop_t *d, client_t *c);
 
 // toplevel state transitions
@@ -25,12 +24,6 @@ void float_node_set_rect(node_t *n, struct wlr_box r);
 
 // pulls a floating toplevel back into view when it is left outside of its output
 void float_node_clamp(output_t *m, desktop_t *d, node_t *n);
-
-// toplevels of a desktop
-int desktop_toplevels(const desktop_t *d, node_t ***out_nodes);
-
-// true when the desktop holds any toplevel
-bool desktop_has_toplevels(const desktop_t *d);
 
 // clears the output of every toplevel of a desktop
 void desktop_clear_output(const desktop_t *d, output_t *m);

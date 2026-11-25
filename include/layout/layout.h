@@ -92,9 +92,6 @@ typedef struct layout_impl_t {
 	// finish a pan, snapping the layout's view; return true when the layout handled it
 	bool (*pan_end)(output_t *m, desktop_t *d);
 
-	// get a list of nodes (returns count of nodes)
-	int (*collect)(desktop_t *d, node_t ***out_nodes);
-
 	// settings this layout exposes through `doorsctl layout <name> <setting>`
 	const setting_t *settings;
 	size_t settings_count;
@@ -108,9 +105,6 @@ typedef struct layout_impl_t {
 
 	// true if layout only shows a single toplevel at once
 	bool single_visible;
-
-	// true if layout supports directional navigation (nsew)
-	bool has_directional_nav;
 } layout_impl_t;
 
 void layout_init(void);
@@ -118,6 +112,10 @@ layout_t layout_register(const layout_impl_t *impl);
 size_t layout_count(void);
 const char *layout_name(layout_t layout);
 bool layout_find_by_name(const char *name, layout_t *out);
+
+// layout id of `impl`, (layout_t)-1 when it is not registered
+layout_t layout_id_for(const layout_impl_t *impl);
+
 const str_pair_t *layout_ipc_values(void);
 
 const layout_impl_t *layout_get_impl(layout_t layout);
@@ -155,6 +153,12 @@ void *layout_state_peek(const desktop_t *d, layout_t layout);
 // drops state stored on the desktop if any
 void layout_state_drop(desktop_t *d, layout_t layout);
 
+// same, resolving the layout id from its implementation
+void *layout_state_get_impl(desktop_t *d, const layout_impl_t *impl, size_t size,
+	void (*destroy)(void *state));
+void *layout_state_peek_impl(const desktop_t *d, const layout_impl_t *impl);
+void layout_state_drop_impl(desktop_t *d, const layout_impl_t *impl);
+
 // drops every layout state of the desktop
 void layout_states_clear(desktop_t *d);
 
@@ -168,6 +172,9 @@ void layout_client_state_changed(output_t *m, desktop_t *d, node_t *n, client_st
 
 // reconciles every client on the desktop with the layout that is now active
 void layout_desktop_changed(output_t *m, desktop_t *d);
+
+// tells the active layout that `n` was focused
+void layout_on_focus(output_t *m, desktop_t *d, node_t *n);
 
 // tells the active layout that a client was placed on the desktop
 void layout_client_mapped(output_t *m, desktop_t *d, client_t *c, bool focused);
@@ -186,6 +193,12 @@ bool layout_wants_visible(const desktop_t *d, const node_t *n);
 
 // true when the active layout draws `c` without a border
 bool layout_borderless(const desktop_t *d, const client_t *c);
+
+// true when `layout` places floating clients itself
+bool layout_has_floating_placement(layout_t layout);
+
+// true when `layout` places `c` as a floating client
+bool layout_places_floating(layout_t layout, desktop_t *d, client_t *c);
 
 // true when the active layout reports `c` as maximized
 bool layout_reports_maximized(const desktop_t *d, const client_t *c);

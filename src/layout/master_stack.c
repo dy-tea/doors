@@ -571,10 +571,6 @@ void master_stack_cycle_stack_layout(desktop_t *d) {
 		s->stack_layout = (ms_stack_layout(d) + 1) % 2;
 }
 
-int master_stack_collect(desktop_t *d, node_t ***out_nodes) {
-	return collect_tiled_nodes(d, out_nodes);
-}
-
 static node_t **gather_focused(desktop_t *d, int *out_total, int *out_index) {
 	node_t **nodes = NULL;
 	const int count = collect_tiled_nodes(d, &nodes);
@@ -952,8 +948,6 @@ const layout_impl_t master_stack_impl = {
 	.pan_fingers = NULL,
 	.pan_update = NULL,
 	.pan_end = NULL,
-	.collect = master_stack_collect,
 	.commands = master_stack_commands,
 	.single_visible = false,
-	.has_directional_nav = true,
 };

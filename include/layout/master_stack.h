@@ -19,7 +19,6 @@ typedef enum {
 } stack_layout_t;
 
 void master_stack_arrange(output_t *m, desktop_t *d, struct wlr_box available);
-int master_stack_collect(desktop_t *d, node_t ***out_nodes);
 bool master_stack_focus(desktop_t *d, direction_t direction);
 bool master_stack_swap(output_t *m, desktop_t *d, direction_t direction);
 

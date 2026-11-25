@@ -138,9 +138,6 @@ the built-in layouts use:
 		// finish a pan, snapping the layout's view
 		bool (*pan_end)(output_t *m, desktop_t *d);
 
-		// get a list of nodes (returns count of nodes)
-		int (*collect)(desktop_t *d, node_t ***out_nodes);
-
 		// settings exposed through `doorsctl layout <name> <setting>`
 		const setting_t *settings;
 		size_t settings_count;
@@ -155,9 +152,6 @@ the built-in layouts use:
 
 		// true if the layout only shows a single toplevel at once
 		bool single_visible;
-
-		// true if the layout supports directional navigation (nsew)
-		bool has_directional_nav;
 	} layout_impl_t;
 
 All callbacks are optional (set them to C<NULL> when not needed), except
@@ -240,9 +234,11 @@ the geometry:
 		free(nodes);
 	}
 
-Per-desktop state can be stored with C<layout_state_get()>. Every layout
-owns one state per desktop. The slot is not destroyed by I<leave> unless the
-layout drops it.
+Per-desktop state can be stored with C<layout_state_get()>. A plugin does not
+know the numeric id its layout was registered under, so it can pass its
+C<layout_impl_t> to C<layout_state_get_impl()> instead; C<layout_id_for()>
+returns the id itself. Every layout owns one state per desktop. The slot is
+not destroyed by I<leave> unless the layout drops it.
 
 =head2 Building a plugin
 

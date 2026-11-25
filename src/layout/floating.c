@@ -17,75 +17,6 @@
 #define FLOATING_DEFAULT_WIDTH 60
 #define FLOATING_DEFAULT_HEIGHT 60
 
-static bool node_outside_tree(node_t *n, const desktop_t *d) {
-	for (node_t *p = n; p != NULL; p = p->parent)
-		if (p == d->root)
-			return false;
-	return true;
-}
-
-int desktop_toplevels(const desktop_t *d, node_t ***out_nodes) {
-	if (out_nodes != NULL)
-		*out_nodes = NULL;
-	if (d == NULL || out_nodes == NULL)
-		return 0;
-
-	int count = 0;
-	if (d->root != NULL)
-		FOR_EACH_LEAF(n, d->root)
-			if (n->client != NULL)
-				count++;
-
-	view_t *view;
-	wl_list_for_each(view, &server.views, link) {
-		if (view->mapped && view->node != NULL && view->node->client != NULL && view->node->desktop == d &&
-			node_outside_tree(view->node, d))
-			count++;
-	}
-
-	if (count == 0)
-		return 0;
-
-	node_t **nodes = calloc(count, sizeof(*nodes));
-	if (nodes == NULL)
-		return 0;
-
-	int index = 0;
-	if (d->root != NULL) {
-		FOR_EACH_LEAF(n, d->root)
-			if (n->client != NULL)
-				nodes[index++] = n;
-	}
-
-	wl_list_for_each(view, &server.views, link) {
-		if (view->mapped && view->node != NULL && view->node->client != NULL && view->node->desktop == d &&
-			node_outside_tree(view->node, d))
-			nodes[index++] = view->node;
-	}
-
-	*out_nodes = nodes;
-	return count;
-}
-
-bool desktop_has_toplevels(const desktop_t *d) {
-	if (d == NULL)
-		return false;
-
-	if (d->root != NULL) {
-		FOR_EACH_LEAF(n, d->root)
-			if (n->client != NULL)
-				return true;
-	}
-
-	view_t *view;
-	wl_list_for_each(view, &server.views, link) {
-		if (view->mapped && view->node != NULL && view->node->client != NULL && view->node->desktop == d)
-			return true;
-	}
-
-	return false;
-}
-
 void desktop_clear_output(const desktop_t *d, output_t *m) {
 	if (d == NULL)
 		return;
@@ -626,44 +557,6 @@ bool floating_places_floating(desktop_t *d, client_t *c) {
 	return IS_FLOATING(c);
 }
 
-int floating_collect(desktop_t *d, node_t ***out_nodes) {
-	if (out_nodes != NULL)
-		*out_nodes = NULL;
-	if (d == NULL || out_nodes == NULL)
-		return 0;
-
-	node_t **toplevels = NULL;
-	const int count = desktop_toplevels(d, &toplevels);
-	if (toplevels == NULL)
-		return 0;
-
-	int floating = 0;
-	for (int i = 0; i < count; i++)
-		if (IS_FLOATING(toplevels[i]->client))
-			floating++;
-
-	if (floating == 0) {
-		free(toplevels);
-		return 0;
-	}
-
-	node_t **nodes = calloc(floating, sizeof(*nodes));
-	if (nodes == NULL) {
-		free(toplevels);
-		return 0;
-	}
-
-	int index = 0;
-	for (int i = 0; i < count; i++)
-		if (IS_FLOATING(toplevels[i]->client))
-			nodes[index++] = toplevels[i];
-
-	free(toplevels);
-
-	*out_nodes = nodes;
-	return floating;
-}
-
 const layout_impl_t floating_impl = {
 	.name = "floating",
 	.arrange = floating_arrange,
@@ -690,7 +583,5 @@ const layout_impl_t floating_impl = {
 	.pan_fingers = NULL,
 	.pan_update = NULL,
 	.pan_end = NULL,
-	.collect = floating_collect,
 	.single_visible = false,
-	.has_directional_nav = true,
 };

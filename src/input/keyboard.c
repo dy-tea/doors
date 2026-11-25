@@ -967,16 +967,16 @@ void toggle_floating_layout(void) {
 		return;
 
 	desktop_t *d = output_focused()->desk;
-	const layout_impl_t *impl = layout_get_impl(d->layout);
+	const layout_t current = d->layout;
 
 	// the layout places floating toplevels itself, bring them back into the tree
-	if (impl != NULL && impl->places_floating != NULL) {
+	if (layout_has_floating_placement(current)) {
 		layout_set(d, d->user_layout);
 
 		node_t **toplevels = NULL;
 		const int count = desktop_toplevels(d, &toplevels);
 		for (int i = 0; i < count; i++) {
-			if (toplevels[i]->client != NULL && impl->places_floating(d, toplevels[i]->client))
+			if (toplevels[i]->client != NULL && layout_places_floating(current, d, toplevels[i]->client))
 				tile_node(output_focused(), d, toplevels[i]);
 		}
 		free(toplevels);

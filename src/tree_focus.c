@@ -2,7 +2,6 @@
 #include "client.h"
 #include "dim.h"
 #include "ipc/ipc.h"
-#include "layout/floating.h"
 #include "layout/layout.h"
 #include "output/output.h"
 #include "protocol/xwayland.h"
@@ -91,14 +90,7 @@ static bool focus_node_impl(output_t *m, desktop_t *d, node_t *n, const bool giv
 		return true;
 	}
 
-	const layout_impl_t *impl = layout_get_impl(d->layout);
-	if (impl && impl->on_focus) {
-		impl->on_focus(m, d, n);
-	} else if (d->root != NULL) {
-		FOR_EACH_LEAF(node, d->root)
-			if (node->client != NULL && !node_is_minimized(node))
-				node->client->flags.shown = true;
-	}
+	layout_on_focus(m, d, n);
 
 	node_t *t = tabbed_ancestor(n);
 	if (t != NULL) {
