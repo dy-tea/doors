@@ -3,6 +3,7 @@
 #include "layout/scroller.h"
 #include "layout/scroller_view.h"
 #include "parse.h"
+#include "rule.h"
 #include "settings.h"
 #include "transaction.h"
 #include "tree.h"
@@ -104,6 +105,40 @@ static scroller_state_t *scroller_state_create(desktop_t *d) {
 static scroller_state_t *scroller_state_ensure(desktop_t *d) {
 	scroller_state_t *s = scroller_state(d);
 	return s != NULL ? s : scroller_state_create(d);
+}
+
+// per-client column width requested by a rule
+typedef struct {
+	float proportion;
+	float proportion_single;
+} scroller_client_rules_t;
+
+// the width a rule asks this client's column to start at, 0 when it sets none
+static double scroller_client_rule_width(const client_t *c) {
+	const scroller_client_rules_t *rules = client_layout_state_peek(c, LAYOUT_SCROLLER);
+	if (rules == NULL)
+		return 0.0;
+
+	// a client that gets a column to itself is alone in it
+	const float proportion = rules->proportion_single > 0.0f ? rules->proportion_single :
+		rules->proportion;
+	return proportion > 0.0f ? CLAMP((double)proportion, 0.1, 1.0) : 0.0;
+}
+
+static void scroller_apply_rules(client_t *c, const rule_consequence_t *rule) {
+	if (c == NULL || rule == NULL)
+		return;
+	if (!(rule->has & (RULE_TYPE_SCROLLER_PROPORTION | RULE_TYPE_SCROLLER_PROPORTION_SINGLE)))
+		return;
+
+	scroller_client_rules_t *rules = client_layout_state_get(c, LAYOUT_SCROLLER, sizeof(*rules), NULL);
+	if (rules == NULL)
+		return;
+
+	if (rule->has & RULE_TYPE_SCROLLER_PROPORTION)
+		rules->proportion = rule->scroller_proportion;
+	if (rule->has & RULE_TYPE_SCROLLER_PROPORTION_SINGLE)
+		rules->proportion_single = rule->scroller_proportion_single;
 }
 
 static scroller_tile_t *tile_grow(scroller_column_t *col) {
@@ -395,6 +430,13 @@ static int create_column(scroller_state_t *s, client_t *client, bool activate) {
 	memset(col, 0, sizeof(*col));
 	col->width = s->default_column_width;
 	col->active_tile_idx = 0;
+
+	const double rule_width = scroller_client_rule_width(client);
+	if (rule_width > 0.0)
+		col->width = (scroller_size_t){
+			SCROLLER_SIZE_PROPORTION,
+			rule_width
+		};
 
 	scroller_tile_t *t = tile_grow(col);
 	if (!t)
@@ -2423,7 +2465,7 @@ const layout_impl_t scroller_impl = {
 	.client_unmapped = scroller_client_unmapped,
 	.focus_after_unmap = scroller_focus_after_unmap,
 	.on_client_state = scroller_on_client_state,
-	.apply_rules = NULL,
+	.apply_rules = scroller_apply_rules,
 	.resize = scroller_resize,
 	.places_floating = NULL,
 	.wants_visible = NULL,

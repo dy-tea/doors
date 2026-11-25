@@ -33,20 +33,8 @@ typedef enum {
 	LAYOUT_BUILTIN_COUNT
 } layout_t;
 
-char layout_plugin_char(layout_t l);
-
-static inline char layout_to_char(layout_t l) {
-	const char layout_chars[] = {
-		[LAYOUT_TILED] = 'T',
-		[LAYOUT_MONOCLE] = 'M',
-		[LAYOUT_SCROLLER] = 'S',
-		[LAYOUT_MASTER_STACK] = 'K',
-		[LAYOUT_FLOATING] = 'F'
-	};
-	if (l < LAYOUT_BUILTIN_COUNT)
-		return layout_chars[l];
-	return layout_plugin_char(l);
-}
+// status char of `l`, '?' when it is not registered
+char layout_to_char(layout_t l);
 
 typedef enum {
 	DIR_NORTH,

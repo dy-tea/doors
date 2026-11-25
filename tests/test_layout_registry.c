@@ -54,6 +54,13 @@ static void test_builtin_registry(void) {
 	CHECK(layout_to_char(LAYOUT_TILED) == 'T');
 	CHECK(layout_to_char(LAYOUT_FLOATING) == 'F');
 
+	for (size_t i = 0; i < layout_count(); i++) {
+		CHECK(layout_name((layout_t)i) != NULL);
+		CHECK(layout_to_char((layout_t)i) != '?');
+		for (size_t j = i + 1; j < layout_count(); j++)
+			CHECK(layout_to_char((layout_t)i) != layout_to_char((layout_t)j));
+	}
+
 	// lookup by name covers the built-in layouts
 	layout_t id;
 	CHECK(layout_find_by_name("scroller", &id) && id == LAYOUT_SCROLLER);
@@ -167,9 +174,7 @@ static void test_plugin_registration(void) {
 	// status chars must not collide with the built-in ones
 	const char a_char = layout_to_char(a);
 	CHECK(a_char != 'T' && a_char != 'M' && a_char != 'S' && a_char != 'K' && a_char != 'F');
-	CHECK(layout_plugin_char(a) == a_char);
-	CHECK(layout_plugin_char((layout_t)9999) == '?');
-	CHECK(layout_plugin_char(LAYOUT_TILED) == '?');
+	CHECK(layout_to_char((layout_t)9999) == '?');
 
 	layout_t b = layout_register(&test_layout_b);
 	CHECK(b == (layout_t)(a + 1));
@@ -244,6 +249,13 @@ static void test_layout_identity_and_state(void) {
 	test_hooks_rules = 0;
 	layout_apply_client_rules(&c, &rule);
 	CHECK(test_hooks_rules == 1);
+
+	// the scroller layout keeps its own rule fields in per-client state
+	rule_consequence_t scroller_rule = {0};
+	scroller_rule.has = RULE_TYPE_SCROLLER_PROPORTION;
+	scroller_rule.scroller_proportion = 0.4f;
+	layout_apply_client_rules(&c, &scroller_rule);
+	CHECK(client_layout_state_peek(&c, LAYOUT_SCROLLER) != NULL);
 
 	client_layout_states_clear(&c);
 	CHECK(client_layout_state_peek(&c, LAYOUT_MASTER_STACK) == NULL);
